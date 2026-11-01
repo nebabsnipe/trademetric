@@ -1,0 +1,196 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>TradeMetric</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@700;800;900&family=Archivo:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<meta name="description" content="Fantasy football trades, rankings and lineup advice built on your league's exact settings.">
+<link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+<div class="topbar">
+  <div class="wrap topbar-in">
+    <a class="logo" href="#team" aria-label="TradeMetric home"><span class="logo-mark"><i></i><i></i><i></i></span><b>Trade<span>Metric</span></b></a>
+    <nav class="nav" aria-label="Sections">
+      <button data-tab="team">My Team</button>
+      <button data-tab="trade">Trades</button>
+      <button data-tab="rankings">Rankings</button>
+      <button data-tab="hub">League Hub</button>
+      <button data-tab="season">Season Sim</button>
+      <button data-tab="helper">AI Helper</button>
+      <button data-tab="league">League Setup</button>
+    </nav>
+    <div class="topbar-right">
+      <span class="demo-pill" title="Real 2026 stats through Week 8, from a snapshot taken Oct 31. The live site updates daily."><b>Week 9</b> · stats thru Wk 8</span>
+      <button class="theme-btn" id="theme-btn" aria-label="Switch light or dark mode"></button>
+    </div>
+  </div>
+</div>
+
+<main class="wrap">
+  <!-- MY TEAM -->
+  <section class="view" id="v-team" hidden>
+    <div class="hero">
+      <div><div class="kicker" id="team-kicker"></div><h1 id="team-title">Your Team</h1><p>Your optimal Week 9 lineup, scored to your league's exact settings. Select any player for his full profile.</p></div>
+      <span class="example" id="team-example">Sample league. Import yours in League Hub.</span>
+    </div>
+    <div class="tiles" id="team-tiles"></div>
+    <div class="card" id="matchup"></div>
+    <div class="grid2 even">
+      <div class="stack">
+        <div class="card"><div class="card-h"><h2>Starting lineup</h2><span class="note">Week 9 projection</span></div>
+          <div id="lineup"></div>
+          <div class="total"><span>Projected total</span><b id="lineup-total">0.0</b></div></div>
+        <div class="card"><div class="card-h"><h2>Bench</h2></div><div id="bench"></div></div>
+        <div class="card"><div class="card-h"><h2>Roster strength</h2><span class="note">Pts/week vs league average</span></div><div class="strength" id="strength"></div></div>
+        <div class="card"><div class="card-h"><h3>Add a player</h3></div>
+          <div class="addrow"><input type="text" id="add-player" list="dl-players" placeholder="Type a name, like Puka Nacua" autocomplete="off"><button class="btn primary" id="add-btn">Add</button></div>
+          <p class="note" id="roster-count" style="margin:8px 0 0"></p></div>
+        <div class="card" id="opp-card"></div>
+      </div>
+      <div class="stack">
+        <div class="card" id="fix-card"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- RANKINGS -->
+  <section class="view" id="v-rankings" hidden>
+    <div class="hero"><div><div class="kicker" id="rank-kicker"></div><h1>Rankings</h1><p>Every player valued for your league's scoring. <span class="badge buy">BL</span> buy-low candidate, <span class="badge sell">SH</span> sell-high candidate, <span class="badge risk">RISK</span> due for regression. Snap % and Opp/G (carries plus targets per game) show how secure a role is. Select any column to sort.</p></div></div>
+    <div class="toolbar">
+      <div class="seg" id="pos-filter"><button data-pos="ALL" aria-pressed="true">All</button><button data-pos="QB">QB</button><button data-pos="RB">RB</button><button data-pos="WR">WR</button><button data-pos="TE">TE</button><button data-pos="DST">D/ST</button></div>
+      <div class="seg" id="own-filter"><button data-own="all" aria-pressed="true">Everyone</button><button data-own="free">Available</button><button data-own="buy">Buy low</button><button data-own="risk">Risks</button><button data-own="opp">Opportunities</button></div>
+      <input type="search" id="rank-search" placeholder="Search players or NFL teams">
+      
+    </div>
+    <p class="note" id="rank-note" hidden style="margin:0;max-width:85ch"></p>
+    <div class="tablebox"><table id="rank-table" style="min-width:1040px">
+      <thead><tr><th class="r" data-sort data-first="asc">#</th><th data-sort data-first="asc">Player</th><th data-sort data-first="asc">Pos</th><th class="r" data-sort>Wk 9</th><th class="r" data-sort title="Projected points per game for the rest of the season">Pts/G</th><th class="r" data-sort title="Last 3 games compared with his season average">Trend</th><th class="r" data-sort title="Share of his team's targets">Tgt share</th><th class="r" data-sort title="Share of his team's offensive snaps">Snap %</th><th class="r" data-sort title="Carries plus targets per game">Opp/G</th><th data-sort data-first="asc">League team</th></tr></thead>
+      <tbody id="rank-body"></tbody></table></div>
+  </section>
+
+  <!-- TRADES -->
+  <section class="view" id="v-trade" hidden>
+    <div class="hero"><div><div class="kicker">Trade center</div><h1>Trades</h1><p>Three deals tailored to your roster. Each one fills a need for the other manager and gives you a modest rest-of-season edge.</p></div>
+      <button class="btn" id="refresh-trades">New ideas</button></div>
+    <div class="grid3" id="suggestions"></div>
+    <div class="grid2 grid-trade">
+      <div class="stack">
+        <div class="card"><div class="card-h"><h2>Build a trade</h2><button class="btn small ghost" id="trade-reset">Clear</button></div>
+          <h4 style="margin-top:0">You give</h4><div class="chips" id="give-chips"></div>
+          <h4>You get</h4><div class="chips" id="get-chips"></div>
+          <p class="note" id="get-hint" style="margin:6px 0 0"></p></div>
+        <div class="card" id="rating"></div>
+      </div>
+      <div class="card"><div class="card-h"><h2>Players to trade for</h2><span class="note" id="tgt-count"></span></div>
+        <input type="search" id="tgt-search" placeholder="Search players, NFL teams or league teams" style="width:100%;margin-bottom:10px">
+        <div class="toolbar" style="margin-bottom:10px;justify-content:space-between"><div class="seg" id="tgt-pos"><button data-tpos="ALL" aria-pressed="true">All</button><button data-tpos="QB">QB</button><button data-tpos="RB">RB</button><button data-tpos="WR">WR</button><button data-tpos="TE">TE</button></div>
+          <div class="seg" id="tgt-sort" aria-label="Sort by"><button data-tsort="2" aria-pressed="true">Pts/G</button><button data-tsort="1">Wk 9 proj</button><button data-tsort="3">Snap %</button></div></div>
+        <div class="scrollbox"><table class="tgt-table" id="tgt-table"><thead><tr><th data-sort data-first="asc">Player</th><th class="r" data-sort>Wk 9</th><th class="r" data-sort>Pts/G</th><th class="r" data-sort>Snap %</th><th data-sort data-first="asc">Team</th><th></th></tr></thead><tbody id="targets"></tbody></table></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- HUB -->
+  <section class="view" id="v-hub" hidden>
+    <div class="hero"><div><div class="kicker" id="hub-kicker"></div><h1>League Hub</h1><p>Every roster in your league. Import your league or add rosters manually; TradeMetric uses them for power rankings, trade analysis and the Season Sim.</p></div>
+      <div class="toolbar"><button class="btn" id="load-sample">Load sample league</button><button class="btn ghost" id="clear-league">Clear other rosters</button></div></div>
+    <div class="card" id="import-card"></div>
+    <div class="grid2 even">
+      <div class="stack">
+        <div class="card" id="team-manager"></div>
+        <div class="card"><div class="card-h"><h2>Trade log</h2></div><div id="trade-log"></div></div>
+      </div>
+      <div class="stack">
+        <div class="card"><div class="card-h"><h2>Power rankings</h2><span class="note">Roster strength and points scored</span></div><div id="power"></div></div>
+        <div class="card"><div class="card-h"><h2>What your scoring rewards</h2></div><ul class="dna" id="dna-list"></ul></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- SEASON -->
+  <section class="view" id="v-season" hidden>
+    <div class="hero"><div><div class="kicker" id="season-kicker">Season simulator</div><h1>Season Sim</h1><p>TradeMetric simulates the rest of the season 2,000 times from every team's projected lineup to estimate playoff and championship odds.</p></div></div>
+    <div class="tiles" id="season-tiles"></div>
+    <div class="grid2 grid-season">
+      <div class="card"><div class="card-h"><h2>League odds</h2><span class="note">Tap a column to sort</span></div>
+        <div style="overflow-x:auto"><table class="sortable" id="sim-table" style="min-width:600px"><thead><tr><th data-sort data-first="asc">Team</th><th class="r" data-sort>Record</th><th class="r" data-sort>Points for</th><th class="r" data-sort>Proj. wins</th><th data-sort>Playoffs</th><th data-sort>Bye</th><th data-sort>Title</th></tr></thead><tbody id="sim-body"></tbody></table></div>
+        <p class="note" id="sim-note" style="margin:10px 0 0"></p></div>
+      <div class="card"><div class="card-h"><h2>Your road</h2><span class="note">Win odds each week</span></div><div id="road"></div></div>
+    </div>
+  </section>
+
+  <!-- HELPER -->
+  <section class="view" id="v-helper" hidden>
+    <div class="hero"><div><div class="kicker">AI Helper</div><h1>Week 9 game plan</h1><p>A weekly briefing built from your roster and matchup. Ask follow-up questions below; answers include one-click actions.</p></div></div>
+    <div class="card" id="briefing"></div>
+    <div class="helper-grid">
+      <aside class="card hist"><div class="card-h"><h3>Past questions</h3><button class="btn small ghost" id="hist-clear">Clear</button></div><div id="hist"></div></aside>
+      <div class="card chat">
+        <div class="quick" id="quick">
+          <button class="btn small" data-q="Who should I start this week? Point out any close calls.">Who should I start?</button>
+          <button class="btn small" data-q="Who is the best pickup for my team this week, and who should I drop?">Best pickup this week?</button>
+          <button class="btn small" data-q="Find me a fair trade with one team that makes my team better.">Find me a trade</button>
+          <button class="btn small" data-q="Which of my players should I sell high, and who should I target instead?">Who to sell?</button>
+          <button class="btn small" data-q="What is my biggest weakness and how do I fix it before the playoffs?">Fix my weakness</button>
+        </div>
+        <div class="answers" id="answers"></div>
+        <div class="ask-box"><textarea id="helper-q" rows="2" placeholder="Ask about your team, a player or a trade"></textarea><button class="btn accent" id="helper-ask">Ask</button></div>
+        <p class="note" id="helper-status" style="margin:0"></p>
+      </div>
+    </div>
+  </section>
+
+  <!-- WELCOME -->
+  <section class="view" id="v-welcome" hidden>
+    <div class="wl">
+      <div class="wl-hero"><div class="kicker">Welcome to TradeMetric</div><h1>Bring in your league</h1><p>TradeMetric scores every player, lineup and trade with your league's exact rules. Connect your league to start; it takes about a minute.</p></div>
+      <div class="card" id="wl-import"></div>
+      <div class="wl-alt">
+        <div class="card wl-opt"><h3>Upload a screenshot</h3><p class="note">Works with any app. The AI reads your roster and you check every player before saving.</p><label class="btn primary" for="wl-shot">Choose a screenshot</label><input type="file" id="wl-shot" accept="image/*" hidden></div>
+        <div class="card wl-opt"><h3>Build it by hand</h3><p class="note">Start with empty teams and add players by name.</p><div class="addrow"><select id="wl-teams" aria-label="Number of teams"><option value="8">8 teams</option><option value="10">10 teams</option><option value="12" selected>12 teams</option><option value="14">14 teams</option></select><button class="btn" id="wl-hand">Start</button></div></div>
+      </div>
+      <button class="btn ghost wl-skip" id="wl-skip">Skip for now and explore a sample league</button>
+    </div>
+  </section>
+
+  <!-- LEAGUE SETUP -->
+  <section class="view" id="v-league" hidden>
+    <div class="hero"><div><div class="kicker">Settings</div><h1>League setup</h1><p>Your league's scoring and roster rules. Every ranking, lineup and trade updates instantly as you edit.</p></div></div>
+    <div class="card"><div class="card-h"><h3>Start from a preset</h3></div>
+      <div class="presets" id="presets">
+        <button class="btn" data-preset="std">Standard</button><button class="btn" data-preset="half">Half PPR</button><button class="btn" data-preset="ppr">Full PPR</button><button class="btn" data-preset="sf">Superflex + TE premium</button><button class="btn" data-preset="2qb">2QB, 6-pt pass TD</button>
+      </div></div>
+    <div class="grid2">
+      <div class="card"><div class="card-h"><h2>Scoring</h2></div><div id="scoring-form"></div></div>
+      <div class="stack">
+        <div class="card"><div class="card-h"><h2>Roster</h2></div>
+          <div class="field" style="margin-bottom:12px"><label for="lg-name">League name</label><input type="text" id="lg-name"></div>
+          <div class="slots" id="slots-form"></div>
+          <p class="note" style="margin:10px 0 0">Flex takes RB, WR or TE. Superflex also takes a QB.</p></div>
+        <div class="card"><div class="card-h"><h2>Projections</h2></div>
+          <p class="note" style="margin:0 0 10px" id="proj-source"></p>
+          <details><summary style="cursor:pointer;font-weight:600">Import your own projections (CSV)</summary>
+            <p class="note">One row per player, per-game numbers. Columns: <span class="num">name,pos,team,pass_cmp,pass_yd,pass_td,pass_int,rush_att,rush_yd,rush_td,targets,rec,rec_yd,rec_td,fum_lost,status,injury</span>. Missing columns count as 0. Status is Q, D, O or IR; TradeMetric then adjusts lineups and finds the teammates who gain.</p>
+            <textarea id="csv-text" rows="5" placeholder="name,pos,team,pass_yd,pass_td,..."></textarea>
+            <div class="toolbar" style="margin-top:8px"><input type="file" id="csv-file" accept=".csv,text/csv"><button class="btn primary" id="csv-apply">Use these projections</button><button class="btn" id="csv-template">Copy template</button><button class="btn ghost" id="csv-reset">Back to built-in</button></div>
+          </details></div>
+      </div>
+    </div>
+  </section>
+</main>
+<footer><div class="wrap">TradeMetric preview. Stats, schedules, betting lines and injury reports are real 2026 data through Week 8 from nflverse, captured Oct 31, 2026. Projections blend preseason expectations with 2026 production. The live site will refresh all of this daily.</div></footer>
+<datalist id="dl-players"></datalist>
+<div class="scrim" id="scrim" hidden><div class="modal" id="modal" role="dialog" aria-modal="true" aria-label="Player card"></div></div>
+<div class="toast" id="toast" hidden></div>
+
+<script>
+/* Load the stats snapshot, then start the app */
+fetch('data/nfl.json',{cache:'no-cache'}).then(r=>r.json()).then(d=>{
+  window.NFL_DATA=d;const s=document.createElement('script');s.src='js/app.js';document.body.appendChild(s);
+}).catch(()=>{document.body.insertAdjacentHTML('afterbegin','<p style="padding:20px;font-family:sans-serif">Could not load player data. Refresh to try again.</p>')});
+</script>
+</body>
+</html>
