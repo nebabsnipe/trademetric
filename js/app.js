@@ -580,26 +580,31 @@ Reply with JSON only: {"team_name":"the fantasy team's name if shown, otherwise 
 
 /* ===== Schedule, records, Season Sim, matchup ===== */
 const CV={QB:.32,RB:.48,WR:.55,TE:.6,DST:.6};
-const REG_WEEKS=14,N_SIM=2000;let SCHED=null,REC_CACHE={v:-1},SIM_CACHE={v:-1};
+const N_SIM=2000;let REG_WEEKS=14;
+/* S.real holds the league's actual results when imported: rec {tid:{w,l,t,pf}}, sched {week:[[a,b]]}, scores {week:{tid:pts}}, played, regWeeks, playoffTeams */
+const realPlayed=()=>S.real&&S.real.played!=null?S.real.played:PLAYED;let SCHED=null,REC_CACHE={v:-1},SIM_CACHE={v:-1};
 const Phi=z=>.5*(1+erf(z/Math.SQRT2));
 const pct=x=>Math.round(x*100)+'%';
-function schedule(){const ids=S.teams.map(T=>T.id),key=ids.join();if(SCHED&&SCHED.key===key)return SCHED.weeks;
+function schedule(){REG_WEEKS=(S.real&&S.real.regWeeks)||14;const ids=S.teams.map(T=>T.id),key=ids.join()+(S.real?'|R'+S.real.at:'');if(SCHED&&SCHED.key===key)return SCHED.weeks;
   const a=[...ids];if(a.length%2)a.push(null);const n=a.length,rest=a.slice(1),L=rest.length,weeks={};
   for(let w=1;w<=REG_WEEKS;w++){const k=(w-1)%(n-1),rot=[a[0],...rest.slice(L-k),...rest.slice(0,L-k)],pairs=[];for(let i=0;i<n/2;i++)pairs.push([rot[i],rot[n-1-i]]);weeks[w]=pairs}
+  if(S.real&&S.real.sched)for(const w in S.real.sched){const pr=S.real.sched[w].filter(x=>ids.includes(x[0])&&(!x[1]||ids.includes(x[1])));if(pr.length)weeks[w]=pr}
   SCHED={key,weeks};return weeks}
 function oppOf(tid,w){const pr=(schedule()[w]||[]).find(p=>p.includes(tid));return pr?(pr[0]===tid?pr[1]:pr[0]):null}
 function pickVal(w){return id=>{const p=byId[id];if(BYE[p.t]===w||LONG_OUT.includes(stOf(id)))return 0;const o=OPP[p.t]&&OPP[p.t][w];return V.pts[id]*(o?matchF(o.opp,p.pos):1)*(w===WEEK?weekMult(id)*(p.pos==='DST'?1:vegasF(p.t)):1)}}
 function weekLine(players,w){const f=pickVal(w),lu=lineup(players,f);let m=0,v=0;lu.slots.forEach(s=>{if(!s.p)return;const x=f(s.p.id);m+=x;v+=(CV[s.p.pos]*x)**2});return {m,sd:Math.sqrt(v)||1,lu}}
 function recordsThru(n){const d={};S.teams.forEach(T=>d[T.id]={w:0,l:0,t:0,pf:0});const sched=schedule();
+  if(S.real&&S.real.scores){for(let w=1;w<=n;w++){const sc=S.real.scores[w]||{};(sched[w]||[]).forEach(([a,b])=>{if(!a||!b||sc[a]==null||sc[b]==null)return;d[a].pf+=sc[a];d[b].pf+=sc[b];if(sc[a]>sc[b]){d[a].w++;d[b].l++}else if(sc[b]>sc[a]){d[b].w++;d[a].l++}else{d[a].t++;d[b].t++}})}return d}
   for(let w=1;w<=n;w++){const sc={};S.teams.forEach(T=>{const lu=lineup(T.players,id=>BYE[byId[id].t]===w?0:V.pts[id]);sc[T.id]=lu.slots.reduce((a,x)=>a+(x.p?(G[x.p.id].pts[w-1]||0):0),0)});
     sched[w].forEach(([a,b])=>{if(!a||!b)return;d[a].pf+=sc[a];d[b].pf+=sc[b];if(sc[a]>sc[b]){d[a].w++;d[b].l++}else if(sc[b]>sc[a]){d[b].w++;d[a].l++}else{d[a].t++;d[b].t++}})}
   return d}
-function powerRanks(){const st=teamStats(),now=records(),prev=recordsThru(Math.max(0,PLAYED-1)),z=a=>{const m=avg(a),sd=Math.sqrt(avg(a.map(x=>(x-m)**2)))||1;return a.map(x=>(x-m)/sd)};
+function powerRanks(){const st=teamStats(),now=records(),prev=recordsThru(Math.max(0,realPlayed()-1)),z=a=>{const m=avg(a),sd=Math.sqrt(avg(a.map(x=>(x-m)**2)))||1;return a.map(x=>(x-m)/sd)};
   const ids=S.teams.map(T=>T.id),tot=ids.map(t=>(st.rows.find(r=>r.T.id===t)||{total:0}).total),zt=z(tot);
   const score=rec=>{const zp=z(ids.map(t=>rec[t].pf)),zw=z(ids.map(t=>rec[t].w+rec[t].t/2));return ids.map((t,i)=>.55*zt[i]+.25*zp[i]+.2*zw[i])};
   const sn=score(now),sp=score(prev),rk=a=>{const o=ids.map((t,i)=>[t,a[i]]).sort((x,y)=>y[1]-x[1]),m={};o.forEach(([t],i)=>m[t]=i+1);return m},rn=rk(sn),rp=rk(sp);
   return ids.map((t,i)=>({T:teamById(t),score:sn[i],rank:rn[t],move:rp[t]-rn[t]})).sort((a,b)=>a.rank-b.rank)}
 function records(){if(REC_CACHE.v===VER)return REC_CACHE.d;const d={};S.teams.forEach(T=>d[T.id]={w:0,l:0,t:0,pf:0});const sched=schedule();
+  if(S.real&&S.real.rec){S.teams.forEach(T=>{const r=S.real.rec[T.id];if(r)d[T.id]={w:r.w||0,l:r.l||0,t:r.t||0,pf:r.pf||0}});REC_CACHE={v:VER,d};return d}
   for(let w=1;w<=PLAYED;w++){const sc={};S.teams.forEach(T=>{const lu=lineup(T.players,id=>BYE[byId[id].t]===w?0:V.pts[id]);sc[T.id]=lu.slots.reduce((a,x)=>a+(x.p?(G[x.p.id].pts[w-1]||0):0),0)});
     sched[w].forEach(([a,b])=>{if(!a||!b)return;d[a].pf+=sc[a];d[b].pf+=sc[b];if(sc[a]>sc[b]){d[a].w++;d[b].l++}else if(sc[b]>sc[a]){d[b].w++;d[a].l++}else{d[a].t++;d[b].t++}})}
   REC_CACHE={v:VER,d};return d}
@@ -608,17 +613,17 @@ function simulate(over){
   if(S.teams.length<2)return null;if(SIM_CACHE.v!==VER)SIM_CACHE={v:VER};
   const key=over?Object.keys(over).sort().map(k=>k+':'+over[k].join(',')).join(';'):'base';if(SIM_CACHE[key])return SIM_CACHE[key];
   const ids=S.teams.map(T=>T.id),pl=t=>(over&&over[t])||teamById(t).players,rec=records(),sched=schedule(),M={};
-  ids.forEach(t=>{M[t]={};for(let w=PLAYED+1;w<=17;w++)M[t][w]=weekLine(pl(t),w)});
+  const P0=realPlayed();ids.forEach(t=>{M[t]={};for(let w=Math.min(P0,PLAYED)+1;w<=17;w++)M[t][w]=weekLine(pl(t),w)});
   const r=mulberry32(90210);let spare=null;
   const z=()=>{if(spare!==null){const x=spare;spare=null;return x}let u=0;while(u===0)u=r();const v=r(),m=Math.sqrt(-2*Math.log(u));spare=m*Math.sin(2*Math.PI*v);return m*Math.cos(2*Math.PI*v)};
-  const P=ids.length>=10?6:ids.length>=6?4:2,out={P};ids.forEach(t=>out[t]={wins:0,playoff:0,bye:0,title:0});
+  const PT=(S.real&&S.real.playoffTeams)||(ids.length>=10?6:ids.length>=6?4:2),P=Math.min(PT,ids.length),BP=P>=6?6:P>=4?4:2,out={P};ids.forEach(t=>out[t]={wins:0,playoff:0,bye:0,title:0});
   const play=(a,b,w)=>M[a][w].m+M[a][w].sd*z()>=M[b][w].m+M[b][w].sd*z()?a:b;
   for(let s=0;s<N_SIM;s++){const W={},PF={};ids.forEach(t=>{W[t]=rec[t].w+rec[t].t/2;PF[t]=rec[t].pf});
-    for(let w=PLAYED+1;w<=REG_WEEKS;w++)sched[w].forEach(([a,b])=>{if(!a||!b)return;const x=M[a][w].m+M[a][w].sd*z(),y=M[b][w].m+M[b][w].sd*z();PF[a]+=x;PF[b]+=y;if(x>=y)W[a]++;else W[b]++});
-    const seeds=[...ids].sort((a,b)=>W[b]-W[a]||PF[b]-PF[a]),po=seeds.slice(0,P);ids.forEach(t=>out[t].wins+=W[t]);po.forEach(t=>out[t].playoff++);
+    for(let w=P0+1;w<=REG_WEEKS;w++)(sched[w]||[]).forEach(([a,b])=>{if(!a||!b)return;const x=M[a][w].m+M[a][w].sd*z(),y=M[b][w].m+M[b][w].sd*z();PF[a]+=x;PF[b]+=y;if(x>=y)W[a]++;else W[b]++});
+    const seeds=[...ids].sort((a,b)=>W[b]-W[a]||PF[b]-PF[a]),po=seeds.slice(0,BP);ids.forEach(t=>out[t].wins+=W[t]);seeds.slice(0,P).forEach(t=>out[t].playoff++);
     let champ;
-    if(P===6){out[po[0]].bye++;out[po[1]].bye++;const a=play(po[2],po[5],15),b=play(po[3],po[4],15),low=seeds.indexOf(a)>seeds.indexOf(b)?a:b,high=low===a?b:a;champ=play(play(po[0],low,16),play(po[1],high,16),17)}
-    else if(P===4)champ=play(play(po[0],po[3],16),play(po[1],po[2],16),17);
+    if(BP===6){out[po[0]].bye++;out[po[1]].bye++;const a=play(po[2],po[5],15),b=play(po[3],po[4],15),low=seeds.indexOf(a)>seeds.indexOf(b)?a:b,high=low===a?b:a;champ=play(play(po[0],low,16),play(po[1],high,16),17)}
+    else if(BP===4)champ=play(play(po[0],po[3],16),play(po[1],po[2],16),17);
     else champ=play(po[0],po[1],17);
     out[champ].title++}
   ids.forEach(t=>{const o=out[t];o.wins/=N_SIM;o.playoff/=N_SIM;o.bye/=N_SIM;o.title/=N_SIM});
@@ -697,25 +702,41 @@ async function sleeperImport(i){
     Object.assign(sc,{dsk:ss.sack??1,dint:ss.int??2,dfr:ss.fum_rec??2,dtd:ss.def_td??6,dsf:ss.safe??2,pa0:ss.pts_allow_0??10,pa6:ss.pts_allow_1_6??7,pa13:ss.pts_allow_7_13??4,pa20:ss.pts_allow_14_20??1,pa27:ss.pts_allow_21_27??0,pa34:ss.pts_allow_28_34??-1,pa35:ss.pts_allow_35p??-4});
     const teams=rosters.map(r=>{const us=users.find(x=>x.user_id===r.owner_id);return {name:(us&&us.metadata&&us.metadata.team_name)||(us&&us.display_name)||'Team '+r.roster_id,mine:r.owner_id===u.user_id,
       names:(r.players||[]).map(pid=>SLEEPER_PLAYERS[pid]||(NICK[pid==='LA'?'LAR':pid]?{position:'DEF',team:pid}:null)).filter(x=>x&&(OFF.includes(x.position)||x.position==='DEF')).map(x=>x.position==='DEF'?(NICK[x.team==='LA'?'LAR':x.team]||x.team)+' D/ST':x.full_name)}});
-    applyImport(lg.name,teams,sc,slots,'Sleeper')}
+    const rw=Math.max(1,((lg.settings&&lg.settings.playoff_week_start)||15)-1),ix={};rosters.forEach((r,i)=>ix[r.roster_id]=i);
+    const weeks=await Promise.all(Array.from({length:rw},(_,i)=>getJSON(`https://api.sleeper.app/v1/league/${lg.league_id}/matchups/${i+1}`).catch(()=>[])));
+    const real={regWeeks:rw,playoffTeams:(lg.settings&&lg.settings.playoff_teams)||null,sched:{},scores:{},rec:{},played:0};
+    weeks.forEach((ms,i)=>{const w=i+1,g={};(ms||[]).forEach(m=>{if(ix[m.roster_id]==null)return;if(m.matchup_id!=null)(g[m.matchup_id]=g[m.matchup_id]||[]).push(ix[m.roster_id]);(real.scores[w]=real.scores[w]||{})[ix[m.roster_id]]=+m.points||0});
+      const pr=Object.values(g).filter(x=>x.length===2);if(pr.length)real.sched[w]=pr;
+      if(w<WEEK&&Object.values(real.scores[w]||{}).some(x=>x>0))real.played=w});
+    rosters.forEach((r,i)=>{const s=r.settings||{};real.rec[i]={w:s.wins||0,l:s.losses||0,t:s.ties||0,pf:(s.fpts||0)+(s.fpts_decimal||0)/100}});
+    applyImport(lg.name,teams,sc,slots,'Sleeper',real)}
   catch(e){impMsg(e.blocked?BLOCKED_MSG:`<p class="note" style="color:var(--bad)">Import failed (${esc(e.message)}). Try again.</p>`)}
 }
 async function espnImport(id){
   if(!/^\d+$/.test(id)){impMsg('<p class="note" style="color:var(--bad)">An ESPN league ID is a number, like 12345678. You can find it in your league page address after "leagueId=".</p>');return}
   impMsg('<p class="note">Looking up ESPN league '+esc(id)+'...</p>');
-  try{const d=await getJSON(`https://lm-api-reads.fantasy.espn.com/apis/v3/games/ffl/seasons/${SEASON}/segments/0/leagues/${id}?view=mTeam&view=mRoster&view=mSettings`);
+  try{const d=await getJSON(`https://lm-api-reads.fantasy.espn.com/apis/v3/games/ffl/seasons/${SEASON}/segments/0/leagues/${id}?view=mTeam&view=mRoster&view=mSettings&view=mMatchupScore`);
     const st=d.settings||{},items=(st.scoringSettings&&st.scoringSettings.scoringItems)||[],pt=sid=>{const x=items.find(i=>i.statId===sid);return x?x.points:0};
     const sc={...BASE_SC,pyd:pt(3)?Math.round(1/pt(3)):25,ptd:pt(4)||4,int:pt(20)||-2,ryd:pt(24)?Math.round(1/pt(24)):10,rtd:pt(25)||6,recyd:pt(42)?Math.round(1/pt(42)):10,rectd:pt(43)||6,recRB:pt(53),recWR:pt(53),recTE:pt(53),fl:pt(72)||-2};
     const ls=(st.rosterSettings&&st.rosterSettings.lineupSlotCounts)||{},slots={QB:ls[0]||1,RB:ls[2]||2,WR:ls[4]||2,TE:ls[6]||1,FLEX:ls[23]||0,SFLEX:ls[7]||0,BN:ls[20]||6};
     const POSID={1:'QB',2:'RB',3:'WR',4:'TE',16:'DST'};
     const teams=(d.teams||[]).map(t=>({name:t.name||[t.location,t.nickname].filter(Boolean).join(' ')||'Team '+t.id,mine:false,
       names:((t.roster&&t.roster.entries)||[]).map(e=>e.playerPoolEntry&&e.playerPoolEntry.player).filter(x=>x&&POSID[x.defaultPositionId]).map(x=>x.fullName)}));
-    applyImport((st.name)||'ESPN League',teams,sc,slots,'ESPN')}
+    const ix={},ss=st.scheduleSettings||{},rw=ss.matchupPeriodCount||14;(d.teams||[]).forEach((t,i)=>ix[t.id]=i);
+    const real={regWeeks:rw,playoffTeams:ss.playoffTeamCount||null,sched:{},scores:{},rec:{},played:0};
+    (d.schedule||[]).forEach(m=>{const w=m.matchupPeriodId;if(!w||w>rw||!m.home||ix[m.home.teamId]==null)return;const a=ix[m.home.teamId],b=m.away&&ix[m.away.teamId]!=null?ix[m.away.teamId]:null;
+      if(b!=null)(real.sched[w]=real.sched[w]||[]).push([a,b]);
+      if(m.winner&&m.winner!=='UNDECIDED'){const sc=(real.scores[w]=real.scores[w]||{});sc[a]=m.home.totalPoints||0;if(b!=null)sc[b]=m.away.totalPoints||0;real.played=Math.max(real.played,w)}});
+    (d.teams||[]).forEach((t,i)=>{const o=(t.record&&t.record.overall)||{};real.rec[i]={w:o.wins||0,l:o.losses||0,t:o.ties||0,pf:o.pointsFor||0}});
+    applyImport((st.name)||'ESPN League',teams,sc,slots,'ESPN',real)}
   catch(e){impMsg(e.blocked?BLOCKED_MSG:`<p class="note" style="color:var(--bad)">ESPN didn't return that league (${esc(e.message)}). It may be private, which needs the sign-in step at launch.</p>`)}
 }
-function applyImport(name,teams,sc,slots,src){
+function applyImport(name,teams,sc,slots,src,real){
   let miss=0;S.league.name=name;S.league.sc={...S.league.sc,...sc};S.league.slots={...S.league.slots,...slots};S.league.teams=teams.length;
   S.teams=teams.map((t,i)=>({id:'t'+(i+1),name:t.name,players:[...new Set(t.names.map(n=>{const p=findByName(n);if(!p)miss++;return p&&p.id}).filter(Boolean))]}));
+  if(real){const tid=i=>S.teams[i]&&S.teams[i].id,mapW=o=>{const r={};for(const w in o)r[w]=o[w].map(([a,b])=>[tid(a),b==null?null:tid(b)]);return r},mapT=o=>{const r={};for(const k in o)r[tid(+k)]=o[k];return r};
+    const scores={};for(const w in real.scores)scores[w]=mapT(real.scores[w]);
+    S.real={at:Date.now(),regWeeks:real.regWeeks,playoffTeams:real.playoffTeams,played:real.played,rec:mapT(real.rec),sched:mapW(real.sched),scores}}else S.real=null;SCHED=null;
   const mi=teams.findIndex(t=>t.mine);S.me=S.teams[mi>=0?mi:0].id;S.log=[];S.example=false;S.imported={name,src};S.onboarded=true;IMP.open=undefined;hubSel=S.me;bump();buildLeagueForm();toast('Imported '+name);if(tab==='welcome')location.hash='team';
   impMsg(`<div class="callout buy"><b>Imported ${esc(name)}.</b> ${teams.length} teams and your scoring are loaded.${miss?` ${miss} players aren't in TradeMetric's player list yet and were skipped.`:''}${mi<0?' Pick your team in Team rosters and press "This is my team".':''}</div>`)}
 
@@ -881,12 +902,12 @@ $('refresh-trades').addEventListener('click',()=>{sugSkip+=3;if(sugSkip>=Math.ma
 $('rank-search').addEventListener('input',renderRankings);$('tgt-search').addEventListener('input',renderTargets);
 $('helper-ask').addEventListener('click',()=>askHelper($('helper-q').value));
 $('helper-q').addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();askHelper($('helper-q').value)}});
-function freshLeague(n){S.league.teams=n;S.teams=makeTeams(n);S.me='t1';S.example=false;S.imported=null;S.log=[];S.onboarded=true;hubSel='t1';shotState=null;save();recompute()}
+function freshLeague(n){S.real=null;SCHED=null;S.league.teams=n;S.teams=makeTeams(n);S.me='t1';S.example=false;S.imported=null;S.log=[];S.onboarded=true;hubSel='t1';shotState=null;save();recompute()}
 $('wl-skip').addEventListener('click',()=>{S.onboarded=true;save();location.hash='team'});
 $('wl-hand').addEventListener('click',()=>{freshLeague(+$('wl-teams').value);location.hash='hub';toast('Empty league ready. Add players to each team.')});
 $('wl-shot').addEventListener('change',e=>{const f=e.target.files[0];if(!f)return;freshLeague(+$('wl-teams').value);location.hash='hub';go('hub');readScreenshot(f);e.target.value=''});
 $('hist-clear').addEventListener('click',()=>{S.chat=[];save();renderHelper()});
-$('load-sample').addEventListener('click',()=>{S.imported=null;S.league.teams=S.league.teams||12;exampleLeague();hubSel=S.me;shotState=null;render();toast('Sample league loaded')});
+$('load-sample').addEventListener('click',()=>{S.imported=null;S.real=null;SCHED=null;S.league.teams=S.league.teams||12;exampleLeague();hubSel=S.me;shotState=null;render();toast('Sample league loaded')});
 $('clear-league').addEventListener('click',()=>{S.teams.forEach(T=>{if(T.id!==S.me)T.players=[]});S.example=false;bump();toast('Other rosters cleared. Your team was kept.')});
 $('v-league').addEventListener('input',e=>{const i=e.target;
   if(i.dataset.sc!==undefined){const v=parseFloat(i.value);if(isNaN(v))return;S.league.sc[i.dataset.sc]=v}
