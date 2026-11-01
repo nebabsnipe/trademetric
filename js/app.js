@@ -671,7 +671,7 @@ function importGridHtml(){
   const tile=(bg,mark,sm,name,sub,desc,act)=>`<div class="imp"><div class="imp-h"><span class="imp-logo${sm?' sm':''}" style="background:${bg}" aria-hidden="true">${mark}</span><div><b>${name}</b><span class="imp-sub">${sub}</span></div></div><p class="imp-desc">${desc}</p><div class="imp-act">${act}</div></div>`;
   return `<div class="imp-grid">
     ${tile('#18213A','S',0,'Sleeper','Username, no password','Pulls every roster, team name and your scoring settings.',`<input type="text" class="imp-in" placeholder="Sleeper username" autocomplete="off" value="${esc(IMP.user||'')}"><button class="btn primary" data-imp="sleeper">Connect</button>`)}
-    ${tile('#C8102E','ESPN',1,'ESPN','League ID','Public leagues work now. Private leagues get a sign-in step at launch.',`<input type="text" class="imp-in" placeholder="League ID" inputmode="numeric" autocomplete="off"><button class="btn primary" data-imp="espn">Connect</button>`)}
+    ${tile('#C8102E','ESPN',1,'ESPN','League ID','Works for public and private leagues. Private leagues take one extra sign-in step.',`<input type="text" class="imp-in" placeholder="League ID" inputmode="numeric" autocomplete="off"><button class="btn primary" data-imp="espn">Connect</button>`)}
     ${tile('#5B12C7','Y',0,'Yahoo','Sign in with Yahoo','Pick your league after signing in. Turns on when TradeMetric launches.',`<button class="btn" disabled>Available at launch</button>`)}
     ${tile('#0B2A5B','NFL',1,'NFL Fantasy','Screenshot','No public data access. Upload a screenshot of each roster.',`<button class="btn" data-imp="shot">Use a screenshot</button>`)}
     ${tile('#0A4AA6','CBS',1,'CBS','Screenshot','No public data access. Upload a screenshot of each roster.',`<button class="btn" data-imp="shot">Use a screenshot</button>`)}
@@ -712,15 +712,41 @@ async function sleeperImport(i){
     applyImport(lg.name,teams,sc,slots,'Sleeper',real)}
   catch(e){impMsg(e.blocked?BLOCKED_MSG:`<p class="note" style="color:var(--bad)">Import failed (${esc(e.message)}). Try again.</p>`)}
 }
-async function espnImport(id){
+const ESPN_KEY='tm-espn-login';
+function espnSaved(){try{return JSON.parse(localStorage.getItem(ESPN_KEY)||'null')}catch(e){return null}}
+async function espnFetch(id,creds){
+  if(creds){const r=await fetch('/api/espn',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({leagueId:id,season:SEASON,s2:creds.s2,swid:creds.swid})}).catch(()=>null);
+    if(!r){const e=new Error('blocked');e.blocked=true;throw e}
+    const j=await r.json().catch(()=>({}));if(!r.ok){const e=new Error(j.error||'HTTP '+r.status);e.code=j.code||'error';e.status=r.status;throw e}return j}
+  return getJSON(`https://lm-api-reads.fantasy.espn.com/apis/v3/games/ffl/seasons/${SEASON}/segments/0/leagues/${id}?view=mTeam&view=mRoster&view=mSettings&view=mMatchupScore`)}
+function espnPrivateForm(id,err){const sv=espnSaved()||{};
+  return `<div class="callout neutral espn-priv" style="color:var(--ink)"><b>This looks like a private league.</b> ESPN doesn't let other apps sign in for you, so we use two login codes ESPN saves in your browser.${err?`<p style="color:var(--bad);margin:8px 0 0">${esc(err)}</p>`:''}
+   <ol class="espn-steps"><li>On a computer, sign in at <b>espn.com/fantasy</b> in Chrome.</li><li>Right-click the page and pick <b>Inspect</b>, then open the <b>Application</b> tab.</li><li>Under <b>Cookies</b>, click <b>https://www.espn.com</b>.</li><li>Copy the values of <b>espn_s2</b> and <b>SWID</b> into the boxes below.</li></ol>
+   <div class="espn-fields"><label>espn_s2<input type="password" class="imp-in espn-s2" autocomplete="off" spellcheck="false" value="${esc(sv.s2||'')}" placeholder="Long code starting with AE..."></label>
+   <label>SWID<input type="text" class="imp-in espn-swid" autocomplete="off" spellcheck="false" value="${esc(sv.swid||'')}" placeholder="{XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX}"></label></div>
+   <label class="espn-rem"><input type="checkbox" class="espn-remember" ${sv.s2?'checked':''}> Remember on this device</label>
+   <div class="toolbar" style="margin-top:10px"><button class="btn primary" data-espn-private="${esc(id)}">Import private league</button>${sv.s2?'<button class="btn" data-espn-forget="1">Forget codes</button>':''}</div>
+   <p class="note" style="margin:8px 0 0">These codes act like your ESPN login. TradeMetric only uses them to read your league and never stores them on its servers. Signing out of ESPN makes them stop working.</p></div>`}
+async function espnImport(id,creds){
   if(!/^\d+$/.test(id)){impMsg('<p class="note" style="color:var(--bad)">An ESPN league ID is a number, like 12345678. You can find it in your league page address after "leagueId=".</p>');return}
+  IMP.espnId=id;if(!creds){const sv=espnSaved();if(sv&&sv.s2)creds=sv}
   impMsg('<p class="note">Looking up ESPN league '+esc(id)+'...</p>');
-  try{const d=await getJSON(`https://lm-api-reads.fantasy.espn.com/apis/v3/games/ffl/seasons/${SEASON}/segments/0/leagues/${id}?view=mTeam&view=mRoster&view=mSettings&view=mMatchupScore`);
+  let d;
+  try{d=await espnFetch(id,creds)}
+  catch(e){
+    if(!creds&&!e.blocked&&/HTTP (401|403|404)/.test(e.message)){impMsg(espnPrivateForm(id));return}
+    if(creds&&!e.blocked){impMsg(espnPrivateForm(id,e.message));return}
+    if(!creds&&e.blocked){impMsg(espnPrivateForm(id));return}
+    impMsg(e.blocked?BLOCKED_MSG:`<p class="note" style="color:var(--bad)">ESPN didn't return that league (${esc(e.message)}).</p>`);return}
+  if(!d||!d.teams||!d.teams.length||(d.teams[0]&&!d.teams[0].roster&&!creds)){impMsg(espnPrivateForm(id));return}
+  try{
+
     const st=d.settings||{},items=(st.scoringSettings&&st.scoringSettings.scoringItems)||[],pt=sid=>{const x=items.find(i=>i.statId===sid);return x?x.points:0};
     const sc={...BASE_SC,pyd:pt(3)?Math.round(1/pt(3)):25,ptd:pt(4)||4,int:pt(20)||-2,ryd:pt(24)?Math.round(1/pt(24)):10,rtd:pt(25)||6,recyd:pt(42)?Math.round(1/pt(42)):10,rectd:pt(43)||6,recRB:pt(53),recWR:pt(53),recTE:pt(53),fl:pt(72)||-2};
     const ls=(st.rosterSettings&&st.rosterSettings.lineupSlotCounts)||{},slots={QB:ls[0]||1,RB:ls[2]||2,WR:ls[4]||2,TE:ls[6]||1,FLEX:ls[23]||0,SFLEX:ls[7]||0,BN:ls[20]||6};
     const POSID={1:'QB',2:'RB',3:'WR',4:'TE',16:'DST'};
-    const teams=(d.teams||[]).map(t=>({name:t.name||[t.location,t.nickname].filter(Boolean).join(' ')||'Team '+t.id,mine:false,
+    const myId=creds&&creds.swid?('{'+creds.swid.replace(/[{}]/g,'')+'}').toUpperCase():null;
+    const teams=(d.teams||[]).map(t=>({name:t.name||[t.location,t.nickname].filter(Boolean).join(' ')||'Team '+t.id,mine:!!myId&&[t.primaryOwner,...(t.owners||[])].some(o=>String(o||'').toUpperCase()===myId),
       names:((t.roster&&t.roster.entries)||[]).map(e=>e.playerPoolEntry&&e.playerPoolEntry.player).filter(x=>x&&POSID[x.defaultPositionId]).map(x=>x.fullName)}));
     const ix={},ss=st.scheduleSettings||{},rw=ss.matchupPeriodCount||14;(d.teams||[]).forEach((t,i)=>ix[t.id]=i);
     const real={regWeeks:rw,playoffTeams:ss.playoffTeamCount||null,sched:{},scores:{},rec:{},played:0};
@@ -729,7 +755,7 @@ async function espnImport(id){
       if(m.winner&&m.winner!=='UNDECIDED'){const sc=(real.scores[w]=real.scores[w]||{});sc[a]=m.home.totalPoints||0;if(b!=null)sc[b]=m.away.totalPoints||0;real.played=Math.max(real.played,w)}});
     (d.teams||[]).forEach((t,i)=>{const o=(t.record&&t.record.overall)||{};real.rec[i]={w:o.wins||0,l:o.losses||0,t:o.ties||0,pf:o.pointsFor||0}});
     applyImport((st.name)||'ESPN League',teams,sc,slots,'ESPN',real)}
-  catch(e){impMsg(e.blocked?BLOCKED_MSG:`<p class="note" style="color:var(--bad)">ESPN didn't return that league (${esc(e.message)}). It may be private, which needs the sign-in step at launch.</p>`)}
+  catch(e){impMsg(`<p class="note" style="color:var(--bad)">Couldn't read that ESPN league (${esc(e.message)}).</p>`)}
 }
 function applyImport(name,teams,sc,slots,src,real){
   let miss=0;S.league.name=name;S.league.sc={...S.league.sc,...sc};S.league.slots={...S.league.slots,...slots};S.league.teams=teams.length;
@@ -860,6 +886,10 @@ document.addEventListener('click',e=>{
   else if(d.scout)scout(d.scout);
   else if(d.imp){const inp=t.parentNode.querySelector('input');if(d.imp==='sleeper'){const v=inp.value.trim();if(!v){toast('Type your Sleeper username');return}sleeperConnect(v)}else if(d.imp==='espn')espnImport(inp.value.trim());else if(tab==='welcome')$('wl-shot').click();else if($('shot-file'))$('shot-file').click()}
   else if(d.impLeague!==undefined)sleeperImport(+d.impLeague);
+  else if(d.espnPrivate){const box=t.closest('.espn-priv'),q=c=>box.querySelector(c),s2=q('.espn-s2').value||'',swid=q('.espn-swid').value||'',rem=q('.espn-remember').checked;
+    if(!s2.trim()||!swid.trim()){toast('Paste both codes first');return}const c={s2:s2.trim(),swid:swid.trim()};
+    try{if(rem)localStorage.setItem(ESPN_KEY,JSON.stringify(c));else localStorage.removeItem(ESPN_KEY)}catch(e){}espnImport(d.espnPrivate,c)}
+  else if(d.espnForget){try{localStorage.removeItem(ESPN_KEY)}catch(e){}impMsg(espnPrivateForm(IMP.espnId||''));toast('ESPN codes forgotten')}
   else if(t.id==='set-me'){S.me=hubSel;S.example=false;bump();toast(teamById(S.me).name+' is now your team')}
   else if(d.assignMe){assign(d.assignMe,S.me);toast('Added '+byId[d.assignMe].n);render()}
   else if(d.unassign){const n=byId[d.unassign].n;assign(d.unassign,null);toast('Removed '+n);render()}
