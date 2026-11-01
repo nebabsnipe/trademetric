@@ -144,7 +144,27 @@ function derive(){
     const trendPct=played.length>=4&&season>0?last3/season-1:null,cons=played.length?played.filter(x=>x>=rp).length/played.length:null,boom=played.length?played.filter(x=>x>=rp*1.75).length/played.length:null;
     G[p.id]={log,pts,last3,season,ur,tag,trend,ros,po,cv,buy,risk,role,tshare,snap,trendPct,cons,boom,oppg,gp:played.length,mates,opp:OPPS.filter(o=>o.id===p.id),next:nx?{...nx,rank:defRank(nx.opp,p.pos)}:null,projNext,mkt:.55*proj+.45*(played.length?last3:proj)}});
 }
-function recompute(){computeBoosts();V=valuate(S.league);B=valuate(BASELINE);derive();rebuildOwn();VER++}
+function recompute(){computeBoosts();V=valuate(S.league);B=valuate(BASELINE);derive();applyLive();rebuildOwn();VER++}
+/* ===== Live game-day data (/api/live) ===== */
+let LIVE=null,LIVEST={},LIVE_TIMER=null;
+function applyLive(){
+  if(!LIVE||LIVE.week!==WEEK)return;const sc=S.league.sc;
+  POOL.forEach(p=>{const gm=LIVE.games[p.t],g=G[p.id];if(!gm||!g||gm.state==='pre')return;const st=LIVEST[p.id];
+    if(p.pos==='DST'){const L=st||{dsk:0,dint:0,dfr:0,dtd:0,dsf:0,pa:gm.oppScore||0},stat=L.dsk*sc.dsk+L.dint*sc.dint+L.dfr*sc.dfr+L.dtd*sc.dtd+L.dsf*sc.dsf,pa=Math.max(L.pa||0,gm.oppScore||0);
+      const projStat=p.dsk*sc.dsk+p.dint*sc.dint+p.dfr*sc.dfr+p.dtd*sc.dtd+p.dsf*sc.dsf,estPA=gm.state==='post'?pa:pa+(VEGAS[gm.opp]??p.pa)*gm.rem;
+      g.live={pts:gm.state==='post'?stat+paTier(pa,sc):stat,state:gm.state,detail:gm.detail,rem:gm.rem};g.projNext=stat+projStat*gm.rem+paTier(Math.round(estPA),sc);return}
+    const pts=st?linePts(st,p.pos,sc):0;g.live={pts,state:gm.state,detail:gm.detail,rem:gm.rem};g.projNext=gm.state==='post'?pts:pts+g.projNext*gm.rem})}
+function liveStatus(){if(!LIVE||!LIVE.injuries)return;const keep=['IR','PUP','SUS'];
+  LIVE.injuries.forEach(([n,t,st])=>{const p=findByName(n);if(!p||p.pos==='DST'||(p.t!==t&&norm(p.n)!==norm(n)))return;
+    if(st)p.status=st;else if(!keep.includes(String(p.status||'').toUpperCase()))p.status=''})}
+async function loadLive(){
+  clearTimeout(LIVE_TIMER);let next=10*60e3;
+  try{const r=await fetch('/api/live?week='+WEEK,{cache:'no-cache'});if(r.ok){const j=await r.json();
+    if(j&&j.games){LIVE=j;LIVEST={};(j.players||[]).forEach(x=>{const p=x.pos==='DST'?byId['dst-'+String(x.t).toLowerCase()]:findByName(x.n);if(p&&p.pos===x.pos)LIVEST[p.id]=x.s});
+      liveStatus();recompute();const a=document.activeElement;if(!(a&&/INPUT|TEXTAREA|SELECT/.test(a.tagName)))render();if(j.live)next=2*60e3}}}catch(e){}
+  LIVE_TIMER=setTimeout(()=>{if(document.hidden)document.addEventListener('visibilitychange',loadLive,{once:true});else loadLive()},next)}
+const liveOf=id=>G[id]&&G[id].live;
+function liveTxt(id){const l=liveOf(id);if(!l)return '';return `<span class="live-tag ${l.state}">${l.state==='post'?'Final':esc(l.detail||'Live')}</span>`}
 function rebuildOwn(){OWN={};S.teams.forEach(T=>T.players.forEach(id=>OWN[id]=T.id))}
 const teamById=id=>S.teams.find(T=>T.id===id);
 const myTeam=()=>teamById(S.me);
@@ -592,8 +612,8 @@ function schedule(){REG_WEEKS=(S.real&&S.real.regWeeks)||14;const ids=S.teams.ma
   if(S.real&&S.real.sched)for(const w in S.real.sched){const pr=S.real.sched[w].filter(x=>ids.includes(x[0])&&(!x[1]||ids.includes(x[1])));if(pr.length)weeks[w]=pr}
   SCHED={key,weeks};return weeks}
 function oppOf(tid,w){const pr=(schedule()[w]||[]).find(p=>p.includes(tid));return pr?(pr[0]===tid?pr[1]:pr[0]):null}
-function pickVal(w){return id=>{const p=byId[id];if(BYE[p.t]===w||LONG_OUT.includes(stOf(id)))return 0;const o=OPP[p.t]&&OPP[p.t][w];return V.pts[id]*(o?matchF(o.opp,p.pos):1)*(w===WEEK?weekMult(id)*(p.pos==='DST'?1:vegasF(p.t)):1)}}
-function weekLine(players,w){const f=pickVal(w),lu=lineup(players,f);let m=0,v=0;lu.slots.forEach(s=>{if(!s.p)return;const x=f(s.p.id);m+=x;v+=(CV[s.p.pos]*x)**2});return {m,sd:Math.sqrt(v)||1,lu}}
+function pickVal(w){return id=>{const p=byId[id];if(BYE[p.t]===w||LONG_OUT.includes(stOf(id)))return 0;if(w===WEEK&&G[id]&&G[id].live)return G[id].projNext;const o=OPP[p.t]&&OPP[p.t][w];return V.pts[id]*(o?matchF(o.opp,p.pos):1)*(w===WEEK?weekMult(id)*(p.pos==='DST'?1:vegasF(p.t)):1)}}
+function weekLine(players,w){const f=pickVal(w),lu=lineup(players,f);let m=0,v=0;lu.slots.forEach(s=>{if(!s.p)return;const x=f(s.p.id),l=w===WEEK&&liveOf(s.p.id),rf=l?(l.state==='post'?0:l.rem):1;m+=x;v+=(CV[s.p.pos]*x*rf)**2});return {m,sd:Math.sqrt(v)||1,lu}}
 function recordsThru(n){const d={};S.teams.forEach(T=>d[T.id]={w:0,l:0,t:0,pf:0});const sched=schedule();
   if(S.real&&S.real.scores){for(let w=1;w<=n;w++){const sc=S.real.scores[w]||{};(sched[w]||[]).forEach(([a,b])=>{if(!a||!b||sc[a]==null||sc[b]==null)return;d[a].pf+=sc[a];d[b].pf+=sc[b];if(sc[a]>sc[b]){d[a].w++;d[b].l++}else if(sc[b]>sc[a]){d[b].w++;d[a].l++}else{d[a].t++;d[b].t++}})}return d}
   for(let w=1;w<=n;w++){const sc={};S.teams.forEach(T=>{const lu=lineup(T.players,id=>BYE[byId[id].t]===w?0:V.pts[id]);sc[T.id]=lu.slots.reduce((a,x)=>a+(x.p?(G[x.p.id].pts[w-1]||0):0),0)});
@@ -640,10 +660,11 @@ function renderMatchup(){const el=$('matchup');const oid=oppOf(S.me,WEEK);
   if(!oid){el.innerHTML=`<div class="card-h"><h2>Week ${WEEK} matchup</h2></div><p class="empty">No opponent this week.</p>`;return}
   const me=myTeam(),O=teamById(oid),A=weekLine(me.players,WEEK),Bm=weekLine(O.players,WEEK),pw=Phi((A.m-Bm.m)/Math.sqrt(A.sd**2+Bm.sd**2)),f=pickVal(WEEK);
   const keyP=(lu,ot)=>{let best=null;lu.slots.forEach((x,i)=>{if(!x.p)return;const mu=f(x.p.id);if(mu<=0)return;const o=ot.slots[i],edge=mu-(o&&o.p?f(o.p.id):0);if(!best||edge>best.edge)best={p:x.p,mu,edge,slot:x.label}});return best};
-  const kp=(x,lab)=>{if(!x)return '';const n=G[x.p.id].next;return `<div><span class="lab2">${lab}</span>${plCell(x.p,`${f1(x.mu)} projected${x.edge>0?`, ${f1(x.edge)} more than the other ${x.slot}`:''}${n?`. Faces ${n.opp}, ${ord(n.rank)} against ${x.p.pos}s`:''}.`)}</div>`};
+  const kp=(x,lab)=>{if(!x)return '';const n=G[x.p.id].next,lv=liveOf(x.p.id);if(lv)return `<div><span class="lab2">${lab}</span>${plCell(x.p,lv.state==='post'?`Scored ${f1(lv.pts)}. Game is final.`:`${f1(lv.pts)} so far, on pace for ${f1(x.mu)}.`)}</div>`;return `<div><span class="lab2">${lab}</span>${plCell(x.p,`${f1(x.mu)} projected${x.edge>0?`, ${f1(x.edge)} more than the other ${x.slot}`:''}${n?`. Faces ${n.opp}, ${ord(n.rank)} against ${x.p.pos}s`:''}.`)}</div>`};
   const rows=A.lu.slots.map((x,i)=>{const o=Bm.lu.slots[i],a=x.p?f(x.p.id):0,b=o&&o.p?f(o.p.id):0;
-    return `<tr><td>${x.p?plCell(x.p,`${x.p.pos} · ${oppHtml(x.p.id)}`):'<span class="empty">Empty</span>'}</td><td class="r num ${a>=b?'win':''}">${f1(a)}</td><td class="mu-slot">${x.label}</td><td class="num ${b>a?'win':''}">${f1(b)}</td><td>${o&&o.p?plCell(o.p,`${o.p.pos} · ${oppHtml(o.p.id)}`):'<span class="empty">Empty</span>'}</td></tr>`}).join('');
-  el.innerHTML=`<div class="card-h"><h2>Week ${WEEK} matchup</h2><span class="note">Win probability from projected lineups</span></div>
+    const sub=id=>liveOf(id)?`${byId[id].pos} · ${liveTxt(id)} ${f1(liveOf(id).pts)} pts`:`${byId[id].pos} · ${oppHtml(id)}`;
+    return `<tr><td>${x.p?plCell(x.p,sub(x.p.id)):'<span class="empty">Empty</span>'}</td><td class="r num ${a>=b?'win':''}">${f1(a)}</td><td class="mu-slot">${x.label}</td><td class="num ${b>a?'win':''}">${f1(b)}</td><td>${o&&o.p?plCell(o.p,sub(o.p.id)):'<span class="empty">Empty</span>'}</td></tr>`}).join('');
+  el.innerHTML=`<div class="card-h"><h2>Week ${WEEK} matchup</h2><span class="note">${LIVE&&LIVE.week===WEEK&&Object.values(LIVE.games).some(g=>g.state!=='pre')?`<span class="live-dot${LIVE.live?' on':''}"></span>${LIVE.live?'Live':'Updated'} · ${new Date(LIVE.updated).toLocaleTimeString([], {hour:'numeric',minute:'2-digit'})} · points so far plus the rest of each game projected`:'Win probability from projected lineups'}</span></div>
    <div class="mu-head"><div class="mu-team"><span class="mu-name"><i class="tsq" style="background:${teamColor(S.me)}"></i>${esc(me.name)}</span><span class="note">${recTxt(S.me)}</span><b class="num">${f1(A.m)}</b></div>
     <div class="mu-mid"><div class="mu-pct">${pct(pw)}</div><div class="note">chance you win</div></div>
     <div class="mu-team r"><span class="mu-name"><i class="tsq" style="background:${teamColor(oid)}"></i>${esc(O.name)}</span><span class="note">${recTxt(oid)}</span><b class="num">${f1(Bm.m)}</b></div></div>
@@ -957,3 +978,4 @@ else{S.league.sc={...BASE_SC,...S.league.sc};if(S.league.slots.DST===undefined)S
 buildLeagueForm();
 S.chat=(S.chat||[]).filter(x=>x.status==='done'||x.status==='error');
 let start=location.hash.slice(1);if(!S.onboarded)start='welcome';go(TABS.includes(start)?start:'team');
+loadLive();

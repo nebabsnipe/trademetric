@@ -12,6 +12,8 @@ Fantasy football trades, rankings and lineup advice built on your league's exact
 | `data/nfl.json` | The stats snapshot the site reads. Rebuilt every morning by GitHub |
 | `data/preseason.json` | Preseason expectations blended into projections. Replace each summer |
 | `api/ai.js` | Server function for the AI Helper, scouting reports and screenshot reading |
+| `api/live.js` | Live game-day data: scores, game clocks, player stats so far, injury news (cached 2 min during games, 10 min otherwise) |
+| `api/espn.js` | Reads private ESPN leagues with the user's espn_s2 and SWID codes (never stored) |
 | `scripts/update_data.py` | Downloads fresh stats, injuries, schedules, betting lines and expert rankings |
 
 Handy places in `js/app.js`:

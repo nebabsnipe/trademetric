@@ -474,3 +474,9 @@ label.btn.shot-btn{display:inline-flex;align-items:center;gap:8px;white-space:no
 .espn-fields .imp-in{width:100%;padding:10px 12px;font-family:var(--f-mono,monospace);font-size:12px}
 .espn-rem{display:flex;align-items:center;gap:6px;margin-top:8px;font-size:13px}
 @media (max-width:640px){.espn-fields{grid-template-columns:minmax(0,1fr)}}
+.live-tag{display:inline-block;font-family:var(--f-mono,monospace);font-size:10.5px;font-weight:600;padding:1px 5px;border-radius:4px;background:var(--surface-2);color:var(--muted)}
+.live-tag.in{background:var(--accent);color:#fff}
+.live-tag.post{background:var(--ink);color:var(--surface)}
+.live-dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--muted);margin-right:6px;vertical-align:1px}
+.live-dot.on{background:var(--accent);animation:livepulse 1.4s ease-in-out infinite}
+@keyframes livepulse{50%{opacity:.35}}
