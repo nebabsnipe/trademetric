@@ -5,6 +5,7 @@ const tcVars=t=>{const c=TC[t]||['#333','#666','#fff'];return `--c1:${c[0]};--c2
 
 /* ===== Real 2026 data: nflverse snapshot ===== */
 const DATA=window.NFL_DATA;
+{const el=document.getElementById('week-pill');if(el){el.innerHTML=`<b>Week ${DATA.week}</b> · stats thru Wk ${DATA.played}`;el.title=`Real ${DATA.asOf.slice(0,4)} stats through Week ${DATA.played}, updated ${DATA.asOf}. Refreshed every morning.`}}
 const FUM={QB:.2,RB:.09,WR:.04,TE:.04};
 const slug=n=>n.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');
 const Z={cmp:0,pyd:0,ptd:0,int:0,ratt:0,ryd:0,rtd:0,tgt:0,rec:0,recyd:0,rectd:0};
@@ -763,7 +764,7 @@ function applyImport(name,teams,sc,slots,src,real){
   if(real){const tid=i=>S.teams[i]&&S.teams[i].id,mapW=o=>{const r={};for(const w in o)r[w]=o[w].map(([a,b])=>[tid(a),b==null?null:tid(b)]);return r},mapT=o=>{const r={};for(const k in o)r[tid(+k)]=o[k];return r};
     const scores={};for(const w in real.scores)scores[w]=mapT(real.scores[w]);
     S.real={at:Date.now(),regWeeks:real.regWeeks,playoffTeams:real.playoffTeams,played:real.played,rec:mapT(real.rec),sched:mapW(real.sched),scores}}else S.real=null;SCHED=null;
-  const mi=teams.findIndex(t=>t.mine);S.me=S.teams[mi>=0?mi:0].id;S.log=[];S.example=false;S.imported={name,src};S.onboarded=true;IMP.open=undefined;hubSel=S.me;bump();buildLeagueForm();toast('Imported '+name);if(tab==='welcome')location.hash='team';
+  const mi=teams.findIndex(t=>t.mine);S.me=S.teams[mi>=0?mi:0].id;S.log=[];S.example=false;S.imported={name,src};S.onboarded=true;IMP.open=undefined;hubSel=S.me;bump();buildLeagueForm();toast('Imported '+name);if(location.hash!=='#team')location.hash='team';else render();window.scrollTo({top:0,behavior:'smooth'});
   impMsg(`<div class="callout buy"><b>Imported ${esc(name)}.</b> ${teams.length} teams and your scoring are loaded.${miss?` ${miss} players aren't in TradeMetric's player list yet and were skipped.`:''}${mi<0?' Pick your team in Team rosters and press "This is my team".':''}</div>`)}
 
 /* ===== AI scouting report ===== */

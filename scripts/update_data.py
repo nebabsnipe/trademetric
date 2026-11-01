@@ -53,7 +53,13 @@ print('preseason',len(pre),file=sys.stderr)
 
 w=pd.read_csv(D+'stats_player_week_'+str(SEASON)+'.csv',low_memory=False)
 w=w[(w.season_type=='REG')&w.position.isin(['QB','RB','WR','TE'])].copy()
-PLAYED=int(w.week.max());WEEK=PLAYED+1
+# A week counts as played only when every game in it is final (Thursday games alone don't count)
+_g=pd.read_csv(D+'games.csv',low_memory=False);_g=_g[(_g.season==SEASON)&(_g.game_type=='REG')]
+_done={int(k):bool(v) for k,v in _g.groupby('week').home_score.apply(lambda x:x.notna().all()).items()}
+PLAYED=0
+while _done.get(PLAYED+1):PLAYED+=1
+WEEK=PLAYED+1
+w=w[w.week<=PLAYED].copy()
 w['fl']=w[['sack_fumbles_lost','rushing_fumbles_lost','receiving_fumbles_lost']].fillna(0).sum(axis=1)
 w['team']=w.team.map(fix);w['opponent_team']=w.opponent_team.map(fix)
 ros=pd.read_csv(D+'roster_'+str(SEASON)+'.csv',low_memory=False);ros=ros[ros.week==ros.week.max()]
