@@ -1,7 +1,8 @@
 // Server function for the AI Helper, scouting reports and screenshot reading.
 // Runs on Vercel. Your Anthropic API key lives in the ANTHROPIC_API_KEY
-// environment variable, never in the browser.
+// (or APIKEY1) environment variable, never in the browser.
 
+const API_KEY = process.env.ANTHROPIC_API_KEY || process.env.APIKEY1;
 const MODEL = process.env.ANTHROPIC_MODEL || 'claude-sonnet-5-5';
 const MAX_PROMPT = 60000;          // characters
 const MAX_IMAGES = 2;
@@ -26,10 +27,10 @@ function parseJSON(text) {
 
 export default async function handler(req, res) {
   if (req.method === 'GET') {
-    return res.status(200).json({ ok: !!process.env.ANTHROPIC_API_KEY });
+    return res.status(200).json({ ok: !!API_KEY });
   }
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
-  if (!process.env.ANTHROPIC_API_KEY) return res.status(503).json({ code: 'not_configured', error: 'AI is not set up yet.' });
+  if (!API_KEY) return res.status(503).json({ code: 'not_configured', error: 'AI is not set up yet.' });
 
   const ip = (req.headers['x-forwarded-for'] || '').split(',')[0] || 'unknown';
   if (limited(ip)) return res.status(429).json({ code: 'rate_limited', error: 'Too many AI requests. Try again later.' });
@@ -51,7 +52,7 @@ export default async function handler(req, res) {
       method: 'POST',
       headers: {
         'content-type': 'application/json',
-        'x-api-key': process.env.ANTHROPIC_API_KEY,
+        'x-api-key': API_KEY,
         'anthropic-version': '2023-06-01',
       },
       body: JSON.stringify({
