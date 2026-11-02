@@ -9,7 +9,8 @@ export default async function handler(req, res) {
   res.setHeader('Cache-Control', 'no-store');
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-  const { leagueId, season, s2, swid } = req.body || {};
+  const { leagueId, season, s2, swid, scoringPeriodId } = req.body || {};
+  const sp = parseInt(scoringPeriodId, 10);
   const id = String(leagueId || '').trim();
   const yr = String(season || '').trim();
   let sw = String(swid || '').trim();
@@ -22,7 +23,7 @@ export default async function handler(req, res) {
   if (!/^\{[0-9A-Fa-f-]{36}\}$/.test(sw)) return res.status(400).json({ code: 'bad_swid', error: 'SWID should look like {XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX}.' });
   if (cookie.length < 40 || cookie.length > 2000 || !/^[A-Za-z0-9%+/=_.-]+$/.test(cookie)) return res.status(400).json({ code: 'bad_s2', error: 'espn_s2 looks incomplete. Copy the whole value.' });
 
-  const url = `https://lm-api-reads.fantasy.espn.com/apis/v3/games/ffl/seasons/${yr}/segments/0/leagues/${id}?` + VIEWS.map(v => 'view=' + v).join('&');
+  const url = `https://lm-api-reads.fantasy.espn.com/apis/v3/games/ffl/seasons/${yr}/segments/0/leagues/${id}?` + VIEWS.map(v => 'view=' + v).join('&') + (sp >= 1 && sp <= 18 ? '&scoringPeriodId=' + sp : '');
   try {
     const r = await fetch(url, {
       headers: {

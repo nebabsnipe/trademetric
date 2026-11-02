@@ -153,29 +153,48 @@ function applyLive(){
   POOL.forEach(p=>{const gm=LIVE.games[p.t],g=G[p.id];if(!gm||!g||gm.state==='pre')return;const st=LIVEST[p.id];
     if(p.pos==='DST'){const L=st||{dsk:0,dint:0,dfr:0,dtd:0,dsf:0,pa:gm.oppScore||0},stat=L.dsk*sc.dsk+L.dint*sc.dint+L.dfr*sc.dfr+L.dtd*sc.dtd+L.dsf*sc.dsf,pa=Math.max(L.pa||0,gm.oppScore||0);
       const projStat=p.dsk*sc.dsk+p.dint*sc.dint+p.dfr*sc.dfr+p.dtd*sc.dtd+p.dsf*sc.dsf,estPA=gm.state==='post'?pa:pa+(VEGAS[gm.opp]??p.pa)*gm.rem;
-      g.live={pts:gm.state==='post'?stat+paTier(pa,sc):stat,state:gm.state,detail:gm.detail,rem:gm.rem};g.projNext=stat+projStat*gm.rem+paTier(Math.round(estPA),sc);return}
-    const pts=st?linePts(st,p.pos,sc):0;g.live={pts,state:gm.state,detail:gm.detail,rem:gm.rem};g.projNext=gm.state==='post'?pts:pts+g.projNext*gm.rem})}
+      const pp=PLAT&&PLAT.pts[p.id];g.live={pts:pp!=null?pp:gm.state==='post'?stat+paTier(pa,sc):stat,state:gm.state,detail:gm.detail,rem:gm.rem,src:pp!=null?PLAT.src:null};g.projNext=pp!=null&&gm.state==='post'?pp:stat+projStat*gm.rem+paTier(Math.round(estPA),sc);return}
+    const pp=PLAT&&PLAT.pts[p.id],pts=pp!=null?pp:st?linePts(st,p.pos,sc):0;g.live={pts,state:gm.state,detail:gm.detail,rem:gm.rem,src:pp!=null?PLAT.src:null};g.projNext=gm.state==='post'?pts:pts+g.projNext*gm.rem})}
 function liveStatus(){if(!LIVE||!LIVE.injuries)return;const keep=['IR','PUP','SUS'];
   LIVE.injuries.forEach(([n,t,st])=>{const p=findByName(n);if(!p||p.pos==='DST'||(p.t!==t&&norm(p.n)!==norm(n)))return;
     if(st)p.status=st;else if(!keep.includes(String(p.status||'').toUpperCase()))p.status=''})}
 async function loadLive(){
   clearTimeout(LIVE_TIMER);let next=10*60e3;
   try{const r=await fetch('/api/live?week='+WEEK+'&b='+Math.floor(Date.now()/120000));if(r.ok){const j=await r.json();
-    if(j&&j.games){await loadSleeperLineups();LIVE=j;LIVEST={};(j.players||[]).forEach(x=>{const p=x.pos==='DST'?byId['dst-'+String(x.t).toLowerCase()]:findByName(x.n);if(p&&p.pos===x.pos)LIVEST[p.id]=x.s});
+    if(j&&j.games){await loadPlatform();LIVE=j;LIVEST={};(j.players||[]).forEach(x=>{const p=x.pos==='DST'?byId['dst-'+String(x.t).toLowerCase()]:findByName(x.n);if(p&&p.pos===x.pos)LIVEST[p.id]=x.s});
       liveStatus();recompute();const a=document.activeElement;if(!(a&&/INPUT|TEXTAREA|SELECT/.test(a.tagName)))render();if(j.live||Object.values(j.games).some(g=>g.state==='pre'&&Date.parse(g.start)-Date.now()<30*60e3))next=2*60e3}}}catch(e){}
   LIVE_TIMER=setTimeout(()=>{if(document.hidden)document.addEventListener('visibilitychange',loadLive,{once:true});else loadLive()},next)}
 const liveOf=id=>G[id]&&G[id].live;
 /* Real starting lineups from the league's platform. Sleeper refreshes with live data; ESPN is captured at import. */
 const SLOT_ORDER=['QB','RB','WR','TE','FLEX','SF','DST'];
-let LIVE_LU=null;
+let LIVE_LU=null,PLAT=null;
 const SLEEPER_SLOT={QB:'QB',RB:'RB',WR:'WR',TE:'TE',FLEX:'FLEX',REC_FLEX:'FLEX',WRRB_FLEX:'FLEX',SUPER_FLEX:'SF',DEF:'DST'};
 function realLineup(tid){let r=LIVE_LU&&LIVE_LU[tid];if(!r&&S.real&&S.real.lineups&&S.real.lineupWeek===WEEK)r=S.real.lineups[tid];if(!r||!r.length)return null;
   return {slots:r.map(x=>({label:x.label,p:x.id&&byId[x.id]||null})),bench:[],total:0,real:true}}
+const sleeperDst=pid=>/^[A-Z]{2,3}$/.test(pid)?'dst-'+(pid==='LA'?'lar':pid.toLowerCase()):null;
+/* Real lineups and the platform's own fantasy points for this week, so numbers match Sleeper or ESPN exactly */
 async function loadSleeperLineups(){const src=S.real&&S.real.src;if(!src||src.type!=='sleeper')return;
-  try{const ms=await getJSON(`https://api.sleeper.app/v1/league/${src.league}/matchups/${WEEK}`),out={};
-    (ms||[]).forEach(m=>{const tid=src.rid[m.roster_id];if(!tid||!Array.isArray(m.starters))return;
-      out[tid]=m.starters.map((pid,i)=>({label:SLEEPER_SLOT[src.labels[i]]||null,id:src.pmap[pid]||(/^[A-Z]{2,3}$/.test(pid)?'dst-'+(pid==='LA'?'lar':pid.toLowerCase()):null)})).filter(x=>x.label)});
-    LIVE_LU=out}catch(e){}}
+  try{const ms=await getJSON(`https://api.sleeper.app/v1/league/${src.league}/matchups/${WEEK}`),out={},pts={},team={};
+    (ms||[]).forEach(m=>{const tid=src.rid[m.roster_id];if(!tid)return;team[tid]=+m.points||0;
+      Object.entries(m.players_points||{}).forEach(([pid,v])=>{const id=src.pmap[pid]||sleeperDst(pid);if(id)pts[id]=+v||0});
+      if(Array.isArray(m.starters))out[tid]=m.starters.map((pid,i)=>({label:SLEEPER_SLOT[src.labels[i]]||null,id:src.pmap[pid]||sleeperDst(pid)})).filter(x=>x.label)});
+    LIVE_LU=out;PLAT={src:'Sleeper',pts,team,at:Date.now()}}catch(e){}}
+const ESPN_SLOT_MAP={0:'QB',2:'RB',4:'WR',6:'TE',16:'DST',23:'FLEX',3:'FLEX',5:'FLEX',7:'SF'};
+function readEspnWeek(d){const src=S.real&&S.real.src;if(!d||!src||src.type!=='espn')return;const out={},pts={},team={};
+  (d.teams||[]).forEach(t=>{const tid=src.rid[t.id];if(!tid)return;const L=[];
+    ((t.roster&&t.roster.entries)||[]).forEach(e=>{const pl=e.playerPoolEntry&&e.playerPoolEntry.player;if(!pl)return;const q=findByName(pl.fullName)||(pl.defaultPositionId===16?byId['dst-'+String(pl.proTeamAbbreviation||'').toLowerCase()]:null);
+      const st=(pl.stats||[]).find(x=>x.scoringPeriodId===WEEK&&x.statSourceId===0&&(x.statSplitTypeId===1||x.statSplitTypeId==null));if(q&&st)pts[q.id]=+st.appliedTotal||0;
+      if(ESPN_SLOT_MAP[e.lineupSlotId])L.push({label:ESPN_SLOT_MAP[e.lineupSlotId],id:q?q.id:null})});
+    L.sort((a,b)=>SLOT_ORDER.indexOf(a.label)-SLOT_ORDER.indexOf(b.label));if(L.length)out[tid]=L});
+  (d.schedule||[]).filter(m=>m.matchupPeriodId===WEEK).forEach(m=>[m.home,m.away].forEach(x=>{if(x&&src.rid[x.teamId])team[src.rid[x.teamId]]=+(x.totalPointsLive??x.totalPoints)||0}));
+  LIVE_LU=out;PLAT={src:'ESPN',pts,team,at:Date.now()}}
+async function loadEspnWeek(){const src=S.real&&S.real.src;if(!src||src.type!=='espn')return;
+  const creds=src.priv?(IMP.espnCreds||espnSaved()):null;if(src.priv&&!(creds&&creds.s2))return;
+  try{readEspnWeek(await espnFetch(src.league,creds,WEEK))}catch(e){}}
+async function loadPlatform(){await loadSleeperLineups();await loadEspnWeek()}
+function lprojHtml(id){const g=G[id],l=liveOf(id);
+  if(l)return `<div class="lproj live ${l.state}"><b>${f1(l.pts)}</b><span>${l.state==='post'?'final':'proj '+f1(g.projNext)}</span></div>`;
+  return `<div class="lproj">${g.next?`<b>${f1(g.projNext)}</b><span>${f1(g.season)} avg</span>`:'<b class="muted">—</b><span>Bye</span>'}</div>`}
 function liveTxt(id){const l=liveOf(id);if(!l)return '';return `<span class="live-tag ${l.state}">${l.state==='post'?'Final':esc(l.detail||'Live')}</span>`}
 function rebuildOwn(){OWN={};S.teams.forEach(T=>T.players.forEach(id=>OWN[id]=T.id))}
 const teamById=id=>S.teams.find(T=>T.id===id);
@@ -319,18 +338,21 @@ function syncTeamCount(){const n=S.league.teams;while(S.teams.length<n)S.teams.p
 
 /* ===== MY TEAM ===== */
 function renderTeam(){
-  const me=myTeam(),st=teamStats(),mine=st.rows.find(r=>r.T.id===S.me),LU=lineup(me.players,nextV);
+  const me=myTeam(),st=teamStats(),mine=st.rows.find(r=>r.T.id===S.me),RL=realLineup(S.me);
+  const LU=RL?{slots:RL.slots,bench:me.players.filter(id=>!RL.slots.some(x=>x.p&&x.p.id===id)).sort((a,b)=>nextV(b)-nextV(a)),total:sum(RL.slots.filter(x=>x.p),x=>G[x.p.id].projNext),real:true}:lineup(me.players,nextV);
+  const started=LU.slots.filter(x=>x.p&&liveOf(x.p.id)),actual=sum(started,x=>liveOf(x.p.id).pts);
   $('team-example').hidden=!S.example;$('team-title').textContent=me.name;$('team-kicker').textContent=`${S.league.name||'My League'} · Week ${WEEK}`;
   const sim=simulate();const byes=me.players.filter(id=>!G[id].next).length,tags=me.players.filter(id=>G[id].tag).length;
   const weak=weakList(mine)[0];
-  $('team-tiles').innerHTML=`<div class="tile hot"><div class="lab">Week ${WEEK} projection</div><div class="val num">${f1(LU.total)}</div><div class="sub">Optimal lineup</div></div>
+  $('team-tiles').innerHTML=(started.length?`<div class="tile hot"><div class="lab">Week ${WEEK} score <span class="live-dot${LIVE&&LIVE.live?' on':''}"></span></div><div class="val num">${f1(actual)}</div><div class="sub">Projected ${f1(LU.total)} · ${started.length} of ${LU.slots.filter(x=>x.p).length} playing or done</div></div>`
+     :`<div class="tile hot"><div class="lab">Week ${WEEK} projection</div><div class="val num">${f1(LU.total)}</div><div class="sub">${LU.real?'Your lineup':'Optimal lineup'}</div></div>`)+`
    <div class="tile"><div class="lab">Playoff odds</div><div class="val">${sim?pct(sim[S.me].playoff):'-'}</div><div class="sub">Record ${recTxt(S.me)} · power rank #${mine.rank}</div></div>
    <div class="tile"><div class="lab">Weakest spot</div><div class="val">${weak}</div><div class="sub">${sgn(mine.rel[weak])} pts/wk vs. league average</div></div>
    <div class="tile"><div class="lab">Byes and alerts</div><div class="val">${byes}<span class="muted" style="font-size:20px"> / ${tags}</span></div><div class="sub">Players on bye · buy/sell alerts</div></div>`;
-  const row=(label,p)=>p?`<div class="lrow" data-open="${p.id}"><span class="slot">${label}</span><div class="pl">${av(p)}<div class="meta"><span style="display:flex;gap:6px;align-items:center;min-width:0"><button class="pname" data-open="${p.id}">${esc(p.n)}</button>${tagHtml(p.id)}</span><span class="psub">${p.pos}${V.posRank[p.id]} · ${oppHtml(p.id)}</span></div></div><div class="lproj">${G[p.id].next?`<b>${f1(G[p.id].projNext)}</b><span>${f1(G[p.id].season)} avg</span>`:'<b class="muted">—</b><span>Bye</span>'}</div></div>`
+  const row=(label,p)=>p?`<div class="lrow" data-open="${p.id}"><span class="slot">${label}</span><div class="pl">${av(p)}<div class="meta"><span style="display:flex;gap:6px;align-items:center;min-width:0"><button class="pname" data-open="${p.id}">${esc(p.n)}</button>${tagHtml(p.id)}</span><span class="psub">${p.pos}${V.posRank[p.id]} · ${liveOf(p.id)?liveTxt(p.id)+(liveOf(p.id).state==='post'?'':' live'):oppHtml(p.id)}</span></div></div>${lprojHtml(p.id)}</div>`
     :`<div class="lrow" style="cursor:default"><span class="slot">${label}</span><span class="empty">Empty. Add a player who fits this slot.</span><span></span></div>`;
   $('lineup').innerHTML=LU.slots.map(s=>row(s.label,s.p)).join('');
-  $('lineup-total').textContent=f1(LU.total);
+  $('lineup-total').textContent=f1(started.length?actual:LU.total);$('lineup-total-lab').textContent=started.length?'Score so far':LU.real?'Projected total · your lineup':'Projected total';$('lineup-total-sub').textContent=started.length?'proj '+f1(LU.total):'';
   $('bench').innerHTML=LU.bench.length?LU.bench.map(id=>row('BN',byId[id])).join(''):'<p class="empty">No bench players yet.</p>';
   $('roster-count').textContent=`${me.players.length} of ${rosterSize()} roster spots filled.`;
   const mx=Math.max(4,...POS.map(x=>Math.abs(mine.rel[x])));
@@ -671,18 +693,20 @@ function renderOppCard(){const el=$('opp-card');if(!el)return;
 function renderMatchup(){const el=$('matchup');const oid=oppOf(S.me,WEEK);
   if(!oid){el.innerHTML=`<div class="card-h"><h2>Week ${WEEK} matchup</h2></div><p class="empty">No opponent this week.</p>`;return}
   const me=myTeam(),O=teamById(oid),A=weekLine(me.players,WEEK,S.me),Bm=weekLine(O.players,WEEK,oid),pw=Phi((A.m-Bm.m)/Math.sqrt(A.sd**2+Bm.sd**2)),f=pickVal(WEEK);
+  const act=lu=>sum(lu.slots.filter(x=>x.p&&liveOf(x.p.id)),x=>liveOf(x.p.id).pts),anyLive=[...A.lu.slots,...Bm.lu.slots].some(x=>x.p&&liveOf(x.p.id)),aA=act(A.lu),aB=act(Bm.lu);
   const keyP=(lu,ot)=>{let best=null;lu.slots.forEach((x,i)=>{if(!x.p)return;const mu=f(x.p.id);if(mu<=0)return;const o=ot.slots[i],edge=mu-(o&&o.p?f(o.p.id):0);if(!best||edge>best.edge)best={p:x.p,mu,edge,slot:x.label}});return best};
   const kp=(x,lab)=>{if(!x)return '';const n=G[x.p.id].next,lv=liveOf(x.p.id);if(lv)return `<div><span class="lab2">${lab}</span>${plCell(x.p,lv.state==='post'?`Scored ${f1(lv.pts)}. Game is final.`:`${f1(lv.pts)} so far, on pace for ${f1(x.mu)}.`)}</div>`;return `<div><span class="lab2">${lab}</span>${plCell(x.p,`${f1(x.mu)} projected${x.edge>0?`, ${f1(x.edge)} more than the other ${x.slot}`:''}${n?`. Faces ${n.opp}, ${ord(n.rank)} against ${x.p.pos}s`:''}.`)}</div>`};
+  const cell=(id,v,win,al)=>{const l=id&&liveOf(id);return `<td class="${al} num ${win?'win':''}">${l?`<b>${f1(l.pts)}</b><small>${l.state==='post'?'final':'proj '+f1(v)}</small>`:f1(v)}</td>`};
   const rows=A.lu.slots.map((x,i)=>{const o=Bm.lu.slots[i],a=x.p?f(x.p.id):0,b=o&&o.p?f(o.p.id):0;
     const sub=id=>liveOf(id)?`${byId[id].pos} · ${liveTxt(id)} ${f1(liveOf(id).pts)} pts`:`${byId[id].pos} · ${oppHtml(id)}`;
-    return `<tr><td>${x.p?plCell(x.p,sub(x.p.id)):'<span class="empty">Empty</span>'}</td><td class="r num ${a>=b?'win':''}">${f1(a)}</td><td class="mu-slot">${x.label}</td><td class="num ${b>a?'win':''}">${f1(b)}</td><td>${o&&o.p?plCell(o.p,sub(o.p.id)):'<span class="empty">Empty</span>'}</td></tr>`}).join('');
+    return `<tr><td>${x.p?plCell(x.p,sub(x.p.id)):'<span class="empty">Empty</span>'}</td>${cell(x.p&&x.p.id,a,a>=b,'r')}<td class="mu-slot">${x.label}</td>${cell(o&&o.p&&o.p.id,b,b>a,'')}<td>${o&&o.p?plCell(o.p,sub(o.p.id)):'<span class="empty">Empty</span>'}</td></tr>`}).join('');
   el.innerHTML=`<div class="card-h"><h2>Week ${WEEK} matchup</h2><span class="note">${A.lu.real?'Your real lineups · ':''}${LIVE&&LIVE.week===WEEK&&Object.values(LIVE.games).some(g=>g.state!=='pre')?`<span class="live-dot${LIVE.live?' on':''}"></span>${LIVE.live?'Live':'Updated'} · ${new Date(LIVE.updated).toLocaleTimeString([], {hour:'numeric',minute:'2-digit'})} · points so far plus the rest of each game projected`:'Win probability from projected lineups'}</span></div>
-   <div class="mu-head"><div class="mu-team"><span class="mu-name"><i class="tsq" style="background:${teamColor(S.me)}"></i>${esc(me.name)}</span><span class="note">${recTxt(S.me)}</span><b class="num">${f1(A.m)}</b></div>
+   <div class="mu-head"><div class="mu-team"><span class="mu-name"><i class="tsq" style="background:${teamColor(S.me)}"></i>${esc(me.name)}</span><span class="note">${recTxt(S.me)}</span><b class="num">${f1(anyLive?aA:A.m)}</b>${anyLive?`<span class="mu-proj">proj ${f1(A.m)}</span>`:''}</div>
     <div class="mu-mid"><div class="mu-pct">${pct(pw)}</div><div class="note">chance you win</div></div>
-    <div class="mu-team r"><span class="mu-name"><i class="tsq" style="background:${teamColor(oid)}"></i>${esc(O.name)}</span><span class="note">${recTxt(oid)}</span><b class="num">${f1(Bm.m)}</b></div></div>
+    <div class="mu-team r"><span class="mu-name"><i class="tsq" style="background:${teamColor(oid)}"></i>${esc(O.name)}</span><span class="note">${recTxt(oid)}</span><b class="num">${f1(anyLive?aB:Bm.m)}</b>${anyLive?`<span class="mu-proj">proj ${f1(Bm.m)}</span>`:''}</div></div>
    <div class="mu-bar"><i style="width:${pw*100}%;background:${teamColor(S.me)}"></i><i style="width:${(1-pw)*100}%;background:${versusColor(teamColor(S.me),teamColor(oid))}"></i></div>
    <div class="mu-swing">${kp(keyP(A.lu,Bm.lu),'Your key player')}${kp(keyP(Bm.lu,A.lu),'Their key player')}</div>
-   <details class="mu-details"><summary>Position-by-position comparison</summary><div class="mu-table"><table><thead><tr><th>You</th><th class="r">Proj</th><th style="text-align:center">Slot</th><th>Proj</th><th>${esc(O.name)}</th></tr></thead><tbody>${rows}</tbody></table></div></details>`}
+   <details class="mu-details"><summary>Position-by-position comparison</summary><div class="mu-table"><table><thead><tr><th>You</th><th class="r">${anyLive?'Pts':'Proj'}</th><th style="text-align:center">Slot</th><th>${anyLive?'Pts':'Proj'}</th><th>${esc(O.name)}</th></tr></thead><tbody>${rows}</tbody></table></div></details>`}
 function renderSeason(){
   const sim=simulate(),me=S.me;$('season-kicker').textContent=`${S.league.name||'My League'} · ${N_SIM.toLocaleString()} simulated seasons`;
   if(!sim){$('season-tiles').innerHTML='';$('sim-body').innerHTML='<tr><td colspan="7" class="empty">Add at least two teams in League Hub.</td></tr>';$('road').innerHTML='';return}
@@ -743,18 +767,20 @@ async function sleeperImport(i){
       const pr=Object.values(g).filter(x=>x.length===2);if(pr.length)real.sched[w]=pr;
       if(w<WEEK&&Object.values(real.scores[w]||{}).some(x=>x>0))real.played=w});
     rosters.forEach((r,i)=>{const s=r.settings||{};real.rec[i]={w:s.wins||0,l:s.losses||0,t:s.ties||0,pf:(s.fpts||0)+(s.fpts_decimal||0)/100}});
-    const pmap={};rosters.forEach(r=>(r.players||[]).forEach(pid=>{const sp=SLEEPER_PLAYERS[pid];if(sp&&OFF.includes(sp.position)){const q=findByName(sp.full_name);if(q)pmap[pid]=q.id}}));
+    const pmap={},want=new Map(POOL.filter(q=>q.pos!=='DST').map(q=>[norm(q.n),q])),cands=Object.entries(SLEEPER_PLAYERS).filter(([,sp])=>sp&&OFF.includes(sp.position)&&sp.full_name&&want.has(norm(sp.full_name)));
+    /* same name: prefer the one on the same NFL team */
+    const took=new Set();[true,false].forEach(sameTeam=>cands.forEach(([pid,sp])=>{const q=want.get(norm(sp.full_name));if(took.has(q.id)||(sameTeam&&sp.team!==q.t))return;pmap[pid]=q.id;took.add(q.id)}));rosters.forEach(r=>(r.players||[]).forEach(pid=>{const sp=SLEEPER_PLAYERS[pid];if(sp&&!pmap[pid]&&OFF.includes(sp.position)){const q=findByName(sp.full_name);if(q)pmap[pid]=q.id}}));
     real.src={type:'sleeper',league:lg.league_id,labels:rp.filter(x=>!['BN','IR','TAXI'].includes(x)),rid:Object.fromEntries(rosters.map((r,i)=>[r.roster_id,i])),pmap};
     applyImport(lg.name,teams,sc,slots,'Sleeper',real)}
   catch(e){impMsg(e.blocked?BLOCKED_MSG:`<p class="note" style="color:var(--bad)">Import failed (${esc(e.message)}). Try again.</p>`)}
 }
 const ESPN_KEY='tm-espn-login';
 function espnSaved(){try{return JSON.parse(localStorage.getItem(ESPN_KEY)||'null')}catch(e){return null}}
-async function espnFetch(id,creds){
-  if(creds){const r=await fetch('/api/espn',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({leagueId:id,season:SEASON,s2:creds.s2,swid:creds.swid})}).catch(()=>null);
+async function espnFetch(id,creds,sp){
+  if(creds){const r=await fetch('/api/espn',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({leagueId:id,season:SEASON,s2:creds.s2,swid:creds.swid,scoringPeriodId:sp||null})}).catch(()=>null);
     if(!r){const e=new Error('blocked');e.blocked=true;throw e}
     const j=await r.json().catch(()=>({}));if(!r.ok){const e=new Error(j.error||'HTTP '+r.status);e.code=j.code||'error';e.status=r.status;throw e}return j}
-  return getJSON(`https://lm-api-reads.fantasy.espn.com/apis/v3/games/ffl/seasons/${SEASON}/segments/0/leagues/${id}?view=mTeam&view=mRoster&view=mSettings&view=mMatchupScore`)}
+  return getJSON(`https://lm-api-reads.fantasy.espn.com/apis/v3/games/ffl/seasons/${SEASON}/segments/0/leagues/${id}?view=mTeam&view=mRoster&view=mSettings&view=mMatchupScore${sp?'&scoringPeriodId='+sp:''}`)}
 function espnPrivateForm(id,err){const sv=espnSaved()||{};
   return `<div class="callout neutral espn-priv" style="color:var(--ink)"><b>This looks like a private league.</b> ESPN doesn't let other apps sign in for you, so we use two login codes ESPN saves in your browser.${err?`<p style="color:var(--bad);margin:8px 0 0">${esc(err)}</p>`:''}
    <ol class="espn-steps"><li>On a computer, sign in at <b>espn.com/fantasy</b> in Chrome.</li><li>Right-click the page and pick <b>Inspect</b>, then open the <b>Application</b> tab.</li><li>Under <b>Cookies</b>, click <b>https://www.espn.com</b>.</li><li>Copy the values of <b>espn_s2</b> and <b>SWID</b> into the boxes below.</li></ol>
@@ -794,7 +820,8 @@ async function espnImport(id,creds){
     real.lineupWeek=d.scoringPeriodId||null;real.lineups={};
     (d.teams||[]).forEach((t,i)=>{const L=((t.roster&&t.roster.entries)||[]).filter(e=>ESPN_SLOT[e.lineupSlotId]).map(e=>{const pl=e.playerPoolEntry&&e.playerPoolEntry.player,q=pl&&findByName(pl.fullName);return {label:ESPN_SLOT[e.lineupSlotId],id:q?q.id:null}});
       L.sort((a,b)=>SLOT_ORDER.indexOf(a.label)-SLOT_ORDER.indexOf(b.label));if(L.length)real.lineups[i]=L});
-    applyImport((st.name)||'ESPN League',teams,sc,slots,'ESPN',real)}
+    real.src={type:'espn',league:String(id),priv:!!creds,rid:Object.fromEntries((d.teams||[]).map((t,i)=>[t.id,i]))};if(creds)IMP.espnCreds=creds;
+    applyImport((st.name)||'ESPN League',teams,sc,slots,'ESPN',real);readEspnWeek(d)}
   catch(e){impMsg(`<p class="note" style="color:var(--bad)">Couldn't read that ESPN league (${esc(e.message)}).</p>`)}
 }
 function applyImport(name,teams,sc,slots,src,real){
@@ -803,8 +830,8 @@ function applyImport(name,teams,sc,slots,src,real){
   if(real){const tid=i=>S.teams[i]&&S.teams[i].id,mapW=o=>{const r={};for(const w in o)r[w]=o[w].map(([a,b])=>[tid(a),b==null?null:tid(b)]);return r},mapT=o=>{const r={};for(const k in o)r[tid(+k)]=o[k];return r};
     const scores={};for(const w in real.scores)scores[w]=mapT(real.scores[w]);
     const src=real.src?{...real.src,rid:Object.fromEntries(Object.entries(real.src.rid).map(([rid,i])=>[rid,tid(i)]))}:null;
-    S.real={at:Date.now(),regWeeks:real.regWeeks,playoffTeams:real.playoffTeams,played:real.played,rec:mapT(real.rec),sched:mapW(real.sched),scores,src,lineupWeek:real.lineupWeek||null,lineups:real.lineups?mapT(real.lineups):null}}else S.real=null;SCHED=null;LIVE_LU=null;
-  if(S.real&&S.real.src)setTimeout(()=>loadSleeperLineups().then(()=>{recompute();render()}),0);
+    PLAT=null;S.real={at:Date.now(),regWeeks:real.regWeeks,playoffTeams:real.playoffTeams,played:real.played,rec:mapT(real.rec),sched:mapW(real.sched),scores,src,lineupWeek:real.lineupWeek||null,lineups:real.lineups?mapT(real.lineups):null}}else S.real=null;SCHED=null;LIVE_LU=null;
+  if(S.real&&S.real.src&&S.real.src.type==='sleeper')setTimeout(()=>loadSleeperLineups().then(()=>{recompute();render()}),0);
   const mi=teams.findIndex(t=>t.mine);S.me=S.teams[mi>=0?mi:0].id;S.log=[];S.example=false;S.imported={name,src};S.onboarded=true;IMP.open=undefined;hubSel=S.me;bump();buildLeagueForm();toast('Imported '+name);if(location.hash!=='#team')location.hash='team';else render();window.scrollTo({top:0,behavior:'smooth'});
   impMsg(`<div class="callout buy"><b>Imported ${esc(name)}.</b> ${teams.length} teams and your scoring are loaded.${miss?` ${miss} players aren't in TradeMetric's player list yet and were skipped.`:''}${mi<0?' Pick your team in Team rosters and press "This is my team".':''}</div>`)}
 
@@ -856,6 +883,7 @@ function openCard(id){if(openId!==id)delete SORTS['log-table'];openId=id;const p
     ${g.tag==='sell'?`<div class="callout sell"><b>Sell high.</b> He's scoring ${f1(g.last3)} a game lately, well above his ${f1(V.pts[id])} projection, without getting more work. Good time to trade him.</div>`:''}
     ${g.risk?`<div class="callout risk"><b>Why he is a risk</b><ul class="reasons">${g.risk.map(x=>`<li>${esc(x)}</li>`).join('')}</ul></div>`:''}
     ${g.role?`<div class="callout buy"><b>Hot streak with a reason.</b> ${esc(g.role)}</div>`:''}
+    <div class="msec" id="card-hl">${cardHighlights(id)}</div>
     <div class="msec"><h4>Scouting report</h4><div class="scout-grid">
       <div><span class="lab2">Status</span>${stOf(id)?`<b>${ST_LABEL[stOf(id)]}</b>${p.inj?`<span class="note">${esc(p.inj)}</span>`:''}`:'<b>No injury designation</b>'}<span class="note">${S.custom?'From your imported data':`From the Week ${DATA.injWeek} injury report`}</span></div>
       <div><span class="lab2">Injury history</span><b>Played ${games.length} of ${teamGames} team games</b><span class="note">${games.length<teamGames?`Missed ${teamGames-games.length} this season`:'Has not missed a game this season'}</span></div>
@@ -1007,7 +1035,7 @@ var EXP_KEY='tm-auth-exp',KEEP_KEY='tm-keep',TWO_WEEKS=14*864e5;
 function lsGet(k){try{return localStorage.getItem(k)}catch(e){return null}}
 function lsSet(k,v){try{localStorage.setItem(k,v)}catch(e){}}
 function lsDel(k){try{localStorage.removeItem(k)}catch(e){}}
-function adoptState(st){S=st;setPool();SCHED=null;LIVE_LU=null;recompute();buildLeagueForm();hubSel=S.me;if(tab==='welcome')location.hash='team';render();if(S.real&&S.real.src)loadSleeperLineups().then(()=>{recompute();render()})}
+function adoptState(st){S=st;setPool();SCHED=null;LIVE_LU=null;recompute();buildLeagueForm();hubSel=S.me;if(tab==='welcome')location.hash='team';render();if(S.real&&S.real.src)loadPlatform().then(()=>{recompute();render()})}
 async function cloudPull(){
   const {data,error}=await SB.from('user_state').select('state,updated_at').eq('user_id',USER.id).maybeSingle();
   if(error){CLOUD.err=error.message;acctUI();return}
@@ -1110,7 +1138,7 @@ initAccounts();
 
 /* ===== Highlights tab: results, clips (ESPN + NFL on YouTube) and news for your team and everyone you follow ===== */
 var FEED=null,FEED_AT=0,FEED_F='all',FEED_LOADING=false,REC_CACHE2={at:-1,list:[]},PV={key:'',map:{}},CLIPS=[],CV_OBS=null,CV_CUR=-1;
-const FEED_LS='tm-feed-cache';
+const FEED_LS='tm-feed-cache2';
 const isFollowing=id=>(S.following||[]).includes(id);
 function followBtn(id,mini){const on=isFollowing(id);return mini?`<button class="star${on?' on':''}" data-follow="${id}" title="${on?'Following. Click to unfollow':'Follow this player in Highlights'}" aria-label="${on?'Unfollow':'Follow'}">${on?'★':'☆'}</button>`
   :`<button class="follow-btn${on?' on':''}" data-follow="${id}">${on?'★ Following':'☆ Follow'}</button>`}
@@ -1144,14 +1172,14 @@ function feedPlayers(){const me=myTeam();if(!me)return [];const out=[],seen=new 
 
 async function loadFeed(force){if(FEED_LOADING||(!force&&FEED&&Date.now()-FEED_AT<4*60e3))return;FEED_LOADING=true;
   try{const r=await fetch('/api/feed?week='+WEEK+'&b='+Math.floor(Date.now()/300000));if(r.ok){const d=await r.json();if(d&&d.videos){FEED=d;FEED_AT=Date.now();try{localStorage.setItem(FEED_LS,JSON.stringify({at:FEED_AT,d}))}catch(e){}}}}catch(e){}
-  FEED_LOADING=false;if(tab==='feed')renderFeed()}
+  FEED_LOADING=false;if(tab==='feed')renderFeed();const ch=$('card-hl');if(ch&&openId)ch.innerHTML=cardHighlights(openId)}
 /* show the last copy instantly, then refresh in the background */
 try{const c=JSON.parse(localStorage.getItem(FEED_LS)||'null');if(c&&c.d&&c.d.week===WEEK&&Date.now()-c.at<6*3600e3){FEED=c.d;FEED_AT=c.at-4*60e3}}catch(e){}
 setTimeout(()=>loadFeed(),1500);
 setInterval(()=>{if(tab==='feed'&&!document.hidden)loadFeed()},5*60e3);
 function playerVideos(p){if(!FEED)return [];const key=FEED_AT+'|'+VER;if(PV.key!==key)PV={key,map:{}};if(PV.map[p.id])return PV.map[p.id];
   const full=norm(p.n),last=full.split(' ').pop();
-  const vids=FEED.videos.filter(v=>v.teams.includes(p.t)||(v.src==='youtube'&&!v.teams.length&&p.pos!=='DST'&&wordIn(norm(v.title),full)));
+  const vids=FEED.videos.filter(v=>v.src==='youtube'&&(v.teams.includes(p.t)||(!v.teams.length&&p.pos!=='DST'&&wordIn(norm(v.title),full))));
   let out;
   if(p.pos==='DST')out=vids.filter(v=>/highlight/i.test(v.title)).sort((a,b)=>b.week-a.week).slice(0,2).map(v=>({...v,game:true}));
   else{const lastUnique=POOL.filter(q=>q.id!==p.id&&q.pos!=='DST'&&norm(q.n).split(' ').pop()===last&&vids.some(v=>v.teams.includes(q.t))).length===0;
@@ -1164,7 +1192,9 @@ function playerVideos(p){if(!FEED)return [];const key=FEED_AT+'|'+VER;if(PV.key!
   return PV.map[p.id]=out}
 function playerNews(p){if(!FEED||p.pos==='DST')return [];const full=norm(p.n);
   return FEED.news.filter(a=>a.athletes.some(x=>norm(x)===full)||wordIn(norm(a.title+' '+a.desc),full)).slice(0,3)}
-const srcBadge=v=>`<span class="srcb ${v.src||'espn'}">${v.src==='youtube'?'YouTube':'ESPN'}</span>`;
+const chName=v=>v.ch&&v.ch!=='NFL'?(NICK[v.ch]||v.ch):'NFL';
+const srcBadge=v=>`<span class="srcb youtube">${esc(chName(v))}</span>`;
+const nflUrl=p=>p.pos==='DST'?`https://www.nfl.com/teams/`:`https://www.nfl.com/players/${p.id}/`;
 function thumbHtml(v,size){const i=CLIPS.findIndex(c=>c.id===v.id);const p=v.player?byId[v.player]:null;
   return `<button class="hthumb ${size||''}" data-clip="${i}" title="${esc(v.title)}"><span class="vimg${v.thumb?'':' noimg'}" style="${tcVars(p?p.t:(v.teams[0]||''))}">${v.thumb?`<img src="${esc(v.thumb)}" alt="" loading="lazy" decoding="async" onerror="this.remove()">`:''}<span class="vplay" aria-hidden="true"></span>${srcBadge(v)}${v.dur?`<span class="vdur">${Math.floor(v.dur/60)}:${String(v.dur%60).padStart(2,'0')}</span>`:''}</span>
     ${size==='xs'?'':`<span class="vtitle">${v.game?'<span class="vtag">Game</span>':''}${esc(v.title)}</span><span class="note">${p&&size!=='lg'?esc(p.n)+' · ':''}Week ${v.week}${v.at?' · '+ago(v.at):''}</span>`}</button>`}
@@ -1186,7 +1216,7 @@ function renderFeed(){
     top.innerHTML=`<div class="card hl-feature"><div class="hl-feat-main">${thumbHtml(f,'lg')}</div>
       <div class="hl-feat-side"><div class="kicker">${CLIPS.length} clip${CLIPS.length>1?'s':''} · ${FEED_F==='mine'?'your team':FEED_F==='follow'?'players and teams you follow':'your team and follows'}</div>
         <h2>${fp?esc(fp.n):'Latest highlights'}</h2>
-        <div class="hl-upnext">${up.map(v=>`<button class="hl-up" data-clip="${CLIPS.indexOf(v)}"><span class="vimg${v.thumb?'':' noimg'}" style="${tcVars(v.player?byId[v.player].t:(v.teams[0]||''))}">${v.thumb?`<img src="${esc(v.thumb)}" alt="" loading="lazy" decoding="async" onerror="this.remove()">`:''}</span><span><b>${esc(v.title)}</b><span class="note">${v.player?esc(byId[v.player].n)+' · ':''}${v.src==='youtube'?'YouTube':'ESPN'}</span></span></button>`).join('')}</div>
+        <div class="hl-upnext">${up.map(v=>`<button class="hl-up" data-clip="${CLIPS.indexOf(v)}"><span class="vimg${v.thumb?'':' noimg'}" style="${tcVars(v.player?byId[v.player].t:(v.teams[0]||''))}">${v.thumb?`<img src="${esc(v.thumb)}" alt="" loading="lazy" decoding="async" onerror="this.remove()">`:''}</span><span><b>${esc(v.title)}</b><span class="note">${v.player?esc(byId[v.player].n)+' · ':''}${esc(chName(v))} on YouTube</span></span></button>`).join('')}</div>
         <button class="btn primary hl-watch" data-clip="0"><span class="play" aria-hidden="true"></span>Watch all clips</button></div></div>`}
   /* player rows */
   if(!list.length){$('feed-list').innerHTML=`<div class="card empty-card">${FEED_F==='follow'?`<h2>Follow players and teams</h2><p class="note">Follow an NFL team or a recommended player on the right, tap the ☆ next to anyone in Rankings, or use <b>☆ Follow</b> on a player's card.</p><button class="btn" data-goto="rankings">Find players in Rankings</button>`:'<p class="empty">No players here yet.</p>'}</div>`}
@@ -1200,6 +1230,7 @@ function renderFeed(){
     return `<article class="hl-row"><div class="hl-head"><span class="fd-slot">${slot}</span>${av(p)}<div class="fd-who"><div class="fd-name"><button class="pname" data-open="${id}">${esc(p.n)}</button>${stHtml(id)}${OWN[id]!==S.me?followBtn(id,true):''}</div><div class="fd-meta"><span class="psub">${p.pos} · ${p.t}</span>${chip}</div></div><div class="fd-pts">${pts==null?'<b class="num">—</b>':`<b class="num">${f1(pts)}</b>`}<span class="note">${sub}</span></div></div>
       ${line?`<p class="hl-line">${esc(line)}</p>`:''}
       ${vids.length?`<div class="hl-clips">${vids.map(v=>thumbHtml(v,'sm')).join('')}</div>`:''}
+      <div class="hl-links"><a href="${nflUrl(p)}" target="_blank" rel="noopener">${p.pos==='DST'?'NFL.com':'NFL.com profile'} ↗</a>${vids.length?`<button class="linkish" data-pclips="${id}">Watch ${vids.length} clip${vids.length>1?'s':''}</button>`:''}</div>
       ${news?`<a class="hl-news1" href="${esc(news.url||'#')}" target="_blank" rel="noopener"><b>${esc(news.title)}</b>${news.at?`<span class="note"> · ${ago(news.at)}</span>`:''}</a>`:''}</article>`}).join('');
   /* side: follow tools on Following, news for everyone in view */
   const seenN=new Set(),allNews=[];list.forEach(({id})=>playerNews(byId[id]).forEach(a=>{if(!seenN.has(a.title)){seenN.add(a.title);allNews.push({...a,pid:id})}}));
@@ -1214,13 +1245,13 @@ function followPanelHtml(){const ft=S.followTeams||[],teams=Object.keys(NICK).so
     ${!FEED?'<p class="note">Loading...</p>':rec.length?`<div class="rec-list">${rec.map(r=>{const p=byId[r.id];return `<div class="rec">${av(p,'sm')}<div class="rec-who"><button class="pname" data-open="${p.id}">${esc(p.n)}</button><span class="psub">${p.pos} · ${p.t} · ${r.n} clip${r.n>1?'s':''}</span></div>${followBtn(p.id,false).replace('follow-btn','follow-btn light')}</div>`}).join('')}</div>`:'<p class="note">No clips yet. Check back after the games.</p>'}</div>`}
 /* ===== Clip viewer: scroll through clips one at a time; only the clip on screen loads a player ===== */
 function posterHtml(v){return `<span class="vimg${v.thumb?'':' noimg'}" style="${tcVars(v.player?byId[v.player].t:(v.teams[0]||''))}">${v.thumb?`<img src="${esc(v.thumb)}" alt="" loading="lazy" decoding="async" onerror="this.remove()">`:''}<span class="vplay" aria-hidden="true"></span></span>`}
-function embedHtml(v){const src=v.src==='youtube'?`https://www.youtube-nocookie.com/embed/${encodeURIComponent(v.yt)}?autoplay=1&playsinline=1&rel=0&modestbranding=1`:`https://www.espn.com/core/video/iframe/_/id/${encodeURIComponent(v.id)}/endcard/false`;
+function embedHtml(v){const src=`https://www.youtube-nocookie.com/embed/${encodeURIComponent(v.yt)}?autoplay=1&playsinline=1&rel=0&modestbranding=1`;
   return `<iframe src="${src}" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen title="${esc(v.title)}"></iframe>`}
 function openViewer(start){if(!CLIPS.length)return;const el=$('clipview');el.hidden=false;document.body.style.overflow='hidden';CV_CUR=-1;
   el.innerHTML=`<div class="cv-bar"><span class="cv-brand"><span class="play" aria-hidden="true"></span>Highlights</span><span class="cv-count" id="cv-count"></span><button class="cv-x" data-cvclose="1" aria-label="Close">×</button></div>
     <div class="cv-scroll" id="cv-scroll">${CLIPS.map((v,i)=>{const p=v.player?byId[v.player]:null;return `<section class="cv-slide" data-i="${i}"><div class="cv-media" data-cvplay="${i}">${posterHtml(v)}</div>
       <div class="cv-info">${srcBadge(v)}<h3>${esc(v.title)}</h3><p class="note">${p?`<b>${esc(p.n)}</b> · ${p.pos} · ${p.t} · `:v.teams.length?esc(v.teams.join(' vs '))+' · ':''}Week ${v.week}${v.at?' · '+ago(v.at):''}</p>
-      ${v.url?`<a href="${esc(v.url)}" target="_blank" rel="noopener">Open on ${v.src==='youtube'?'YouTube':'ESPN'} ↗</a>`:''}</div></section>`}).join('')}</div>
+      <span class="cv-links">${v.url?`<a href="${esc(v.url)}" target="_blank" rel="noopener">Open on YouTube ↗</a>`:''}${p?`<a href="${nflUrl(p)}" target="_blank" rel="noopener">${esc(p.n)} on NFL.com ↗</a>`:''}</span></div></section>`}).join('')}</div>
     <div class="cv-nav"><button data-cvstep="-1" aria-label="Previous clip">▲</button><button data-cvstep="1" aria-label="Next clip">▼</button></div>`;
   const sc=$('cv-scroll');CV_OBS=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting)activateClip(+e.target.dataset.i)}),{root:sc,threshold:.65});
   sc.querySelectorAll('.cv-slide').forEach(x=>CV_OBS.observe(x));
@@ -1242,3 +1273,12 @@ document.addEventListener('click',e=>{const t=e.target;if(!t.closest)return;
   const fte=t.closest('[data-fteam]');if(fte){toggleTeam(fte.dataset.fteam);return}},true);
 document.addEventListener('change',e=>{if(e.target.id==='team-add'&&e.target.value)toggleTeam(e.target.value)});
 document.addEventListener('keydown',e=>{if($('clipview').hidden)return;if(e.key==='Escape')closeViewer();else if(e.key==='ArrowDown'||e.key==='j'){e.preventDefault();stepClip(1)}else if(e.key==='ArrowUp'||e.key==='k'){e.preventDefault();stepClip(-1)}});
+/* highlights on the player card */
+function cardHighlights(id){const p=byId[id];if(!FEED){loadFeed();return `<h4>Highlights</h4><p class="note">Loading clips...</p>`}
+  const vids=playerVideos(p);
+  return `<h4>Highlights</h4>${vids.length?`<div class="hl-clips card-clips">${vids.map((v,i)=>`<button class="hthumb sm" data-pclip="${id}|${i}" title="${esc(v.title)}"><span class="vimg${v.thumb?'':' noimg'}" style="${tcVars(p.t)}">${v.thumb?`<img src="${esc(v.thumb)}" alt="" loading="lazy" decoding="async" onerror="this.remove()">`:''}<span class="vplay" aria-hidden="true"></span>${srcBadge(v)}</span><span class="vtitle">${v.game?'<span class="vtag">Game</span>':''}${esc(v.title)}</span><span class="note">Week ${v.week}${v.at?' · '+ago(v.at):''}</span></button>`).join('')}</div>`
+    :`<p class="note">No clips from this week or last week yet.</p>`}<p class="note" style="margin:8px 0 0"><a href="${nflUrl(p)}" target="_blank" rel="noopener">More on NFL.com ↗</a></p>`}
+function openPlayerClips(id,i){CLIPS=playerVideos(byId[id]).map(v=>({...v,player:v.game?null:id}));openViewer(Math.max(0,i||0))}
+document.addEventListener('click',e=>{const t=e.target;if(!t.closest)return;
+  const pc=t.closest('[data-pclip]');if(pc){const [id,i]=pc.dataset.pclip.split('|');openPlayerClips(id,+i);return}
+  const pcs=t.closest('[data-pclips]');if(pcs){openPlayerClips(pcs.dataset.pclips,0)}},true);

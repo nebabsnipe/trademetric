@@ -18,10 +18,10 @@
       <button data-tab="feed" class="nav-hot"><span class="play" aria-hidden="true"></span>Highlights</button>
       <button data-tab="trade">Trades</button>
       <button data-tab="rankings">Rankings</button>
-      <button data-tab="hub">League Hub</button>
-      <button data-tab="season">Season Sim</button>
-      <button data-tab="helper">AI Helper</button>
-      <button data-tab="league">League Setup</button>
+      <button data-tab="hub"><span class="lbl-l">League Hub</span><span class="lbl-s">Hub</span></button>
+      <button data-tab="season"><span class="lbl-l">Season Sim</span><span class="lbl-s">Sim</span></button>
+      <button data-tab="helper"><span class="lbl-l">AI Helper</span><span class="lbl-s">AI</span></button>
+      <button data-tab="league"><span class="lbl-l">League Setup</span><span class="lbl-s">Setup</span></button>
     </nav>
     <div class="topbar-right">
       <span class="demo-pill" id="week-pill"></span>
@@ -44,7 +44,7 @@
       <div class="stack">
         <div class="card"><div class="card-h"><h2>Starting lineup</h2><span class="note"><span class="wk-now">This week's</span> projection</span></div>
           <div id="lineup"></div>
-          <div class="total"><span>Projected total</span><b id="lineup-total">0.0</b></div></div>
+          <div class="total"><span id="lineup-total-lab">Projected total</span><span class="total-r"><b id="lineup-total">0.0</b><small id="lineup-total-sub"></small></span></div></div>
         <div class="card"><div class="card-h"><h2>Bench</h2></div><div id="bench"></div></div>
         <div class="card"><div class="card-h"><h2>Roster strength</h2><span class="note">Pts/week vs league average</span></div><div class="strength" id="strength"></div></div>
         <div class="card"><div class="card-h"><h3>Add a player</h3></div>

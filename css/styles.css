@@ -666,3 +666,37 @@ body.signed-out .nav,body.signed-out #week-pill,body.signed-out #acct-btn{displa
 @media (max-width:600px){.hl-head{grid-template-columns:auto minmax(0,1fr) auto}.hl-head .fd-slot{display:none}.hl-clips{grid-auto-columns:70%}
   .cv-nav{display:none}.cv-slide{justify-content:center;padding:58px 0 20px}.cv-media{border-radius:0;width:100%}.cv-info{padding:0 16px}.cv-info h3{font-size:17px}}
 .btn.primary.hl-watch{background:var(--accent);border-color:var(--accent);color:#fff}.btn.primary.hl-watch:hover{filter:brightness(1.08)}
+/* live scoring display */
+.lproj.live b{color:var(--ink);font-size:20px}
+.lproj.live.in b{color:var(--accent)}
+.lproj.live span{font-family:var(--f-mono);font-size:11px}
+.total-r{display:flex;flex-direction:column;align-items:flex-end}
+.total-r small{font:500 12px var(--f-mono);color:var(--muted)}
+.mu-proj{display:block;font:500 12.5px var(--f-mono);color:var(--muted);margin-top:2px}
+.mu-table td.num b{display:block;font-size:14px}.mu-table td.num small{display:block;font-size:10.5px;color:var(--muted);font-weight:500}
+.hl-links{display:flex;gap:16px;align-items:center;font-size:12.5px}
+.hl-links a{color:var(--muted);text-decoration:none;font-weight:600}.hl-links a:hover{color:var(--accent)}
+.hl-links .linkish{color:var(--accent);text-decoration:none;font-weight:700;font-size:12.5px}
+.card-clips{grid-auto-columns:190px}
+.cv-links{display:flex;gap:18px;flex-wrap:wrap}
+/* top menu: everything fits */
+.topbar-in{gap:12px}.nav button{padding:8px 9px;font-size:13px}.logo b{font-size:23px}
+.lbl-s{display:none}
+@media (max-width:1240px) and (min-width:821px){.demo-pill{display:none}}
+@media (max-width:1100px) and (min-width:821px){.lbl-l{display:none}.lbl-s{display:inline}}
+/* Season Sim league odds: bolder and clearer */
+#sim-table thead th{font-size:11.5px;font-weight:800;letter-spacing:.08em;color:var(--ink)}
+#sim-table td{padding-top:11px;padding-bottom:11px;font-size:14px}
+#sim-table td:first-child .owner{font-size:14.5px;font-weight:700;gap:9px}
+#sim-table td:first-child .owner i{width:12px;height:12px;border-radius:3px}
+#sim-table td.num{font-family:var(--f-mono);font-weight:700;font-size:14.5px;color:var(--ink)}
+#sim-table .pbar{height:28px;border-radius:6px;min-width:62px}
+#sim-table td,#sim-table th{padding-left:8px;padding-right:8px}
+#sim-table{min-width:0;width:100%}
+#sim-table .pbar i{border-radius:6px}
+#sim-table .pbar i.hi{background:var(--good);opacity:.55}#sim-table .pbar i.mid{background:var(--warn);opacity:.55}#sim-table .pbar i.lo{background:var(--bad);opacity:.42}
+#sim-table .pbar span{font-size:13.5px;font-weight:800;line-height:28px;padding-left:9px;color:var(--ink)}
+#sim-table tr.me-row td{background:color-mix(in srgb,var(--accent) 12%,var(--surface))}
+#sim-table tr.me-row td:first-child{box-shadow:inset 4px 0 0 var(--accent)}
+#sim-table tbody tr:hover td{background:var(--surface-2)}
+#card-hl a{color:var(--accent);font-weight:600;text-decoration:none}#card-hl a:hover{text-decoration:underline}

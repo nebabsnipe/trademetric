@@ -1,5 +1,6 @@
 // Player feed: game results, highlight videos and news for the current and previous week.
-// Everything comes from ESPN's public site API and is the same for every visitor,
+// Videos come only from the NFL's and the 32 teams' official YouTube channels (played with YouTube's own player).
+// Game results and news headlines come from ESPN's public site API. Everything is the same for every visitor,
 // so it is cached at Vercel's edge (the page adds a 5-minute time bucket to the URL).
 
 const SITE = 'https://site.api.espn.com/apis/site/v2/sports/football/nfl';
@@ -31,15 +32,6 @@ const names = cats => (cats || []).filter(c => c && (c.type === 'athlete' || c.a
   .map(c => pick(c.athlete && c.athlete.description, c.description, c.athlete && c.athlete.displayName)).filter(Boolean);
 const img = o => pick(o && o.thumbnail, o && o.images && o.images[0] && o.images[0].url, o && o.posterImages && o.posterImages.default && o.posterImages.default.href);
 
-function videoOf(v, ev) {
-  const links = v.links || {};
-  return {
-    id: v.id, ev: ev.id, week: ev.week, teams: ev.teams.map(x => x.t),
-    title: v.headline || v.title || '', desc: v.description || '', dur: v.duration || 0,
-    thumb: img(v) || null, url: pick(links.web && links.web.href, links.web && links.web.self && links.web.self.href) || null,
-    athletes: names(v.categories), at: pick(v.originalPublishDate, v.lastModified, v.published) || null,
-  };
-}
 function articleOf(a) {
   const links = a.links || {};
   return {
@@ -49,42 +41,49 @@ function articleOf(a) {
   };
 }
 
-/* ---- YouTube: the NFL's official channel ----
-   Without a key we read the channel's public RSS feed (latest 15 uploads).
-   With YOUTUBE_API_KEY set in Vercel we read the latest 200 uploads (4 quota units per refresh). */
+/* ---- YouTube: the NFL's and each team's official channel ----
+   Channel IDs live in data/yt_channels.json (found by scripts/yt_channels.py in the daily job).
+   Without a key each channel's public RSS feed gives its latest 15 uploads.
+   With YOUTUBE_API_KEY set in Vercel each channel gives its latest 50 (1 quota unit per channel per refresh). */
 const NFL_CHANNEL = 'UCDVYQ4Zhbm3S2dlz7P1GBDg';
 const NICKS = { ARI:'Cardinals',ATL:'Falcons',BAL:'Ravens',BUF:'Bills',CAR:'Panthers',CHI:'Bears',CIN:'Bengals',CLE:'Browns',DAL:'Cowboys',DEN:'Broncos',DET:'Lions',GB:'Packers',HOU:'Texans',IND:'Colts',JAX:'Jaguars',KC:'Chiefs',LV:'Raiders',LAC:'Chargers',LAR:'Rams',MIA:'Dolphins',MIN:'Vikings',NE:'Patriots',NO:'Saints',NYG:'Giants',NYJ:'Jets',PHI:'Eagles',PIT:'Steelers',SF:'49ers',SEA:'Seahawks',TB:'Buccaneers',TEN:'Titans',WAS:'Commanders' };
 const teamsIn = t => Object.entries(NICKS).filter(([, n]) => new RegExp('\\b' + n + '\\b', 'i').test(t)).map(([k]) => k);
 const unxml = s => String(s || '').replace(/<!\[CDATA\[|\]\]>/g, '').replace(/&amp;/g, '&').replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&lt;/g, '<').replace(/&gt;/g, '>');
-async function ytUploads() {
-  const key = process.env.YOUTUBE_API_KEY, out = [];
+async function channelList(host) {
+  try { const j = await cj(`https://${host}/data/yt_channels.json`, 6 * 3600e3); if (j && j.NFL) return j; } catch {}
+  return { NFL: NFL_CHANNEL };
+}
+async function channelUploads(cid) {
+  const key = process.env.YOUTUBE_API_KEY;
   if (key) {
-    let page = '';
-    for (let i = 0; i < 4; i++) {
-      const j = await cj(`https://www.googleapis.com/youtube/v3/playlistItems?part=snippet&maxResults=50&playlistId=UU${NFL_CHANNEL.slice(2)}&key=${key}${page ? '&pageToken=' + page : ''}`, 30 * 60e3);
-      (j.items || []).forEach(it => { const s = it.snippet || {}; const id = s.resourceId && s.resourceId.videoId; if (id) out.push({ id, title: s.title, desc: s.description || '', at: s.publishedAt }); });
-      if (!j.nextPageToken) break; page = j.nextPageToken;
-    }
-    return out;
+    const j = await cj(`https://www.googleapis.com/youtube/v3/playlistItems?part=snippet&maxResults=50&playlistId=UU${cid.slice(2)}&key=${key}`, 30 * 60e3);
+    return (j.items || []).map(it => { const s = it.snippet || {}; return { id: s.resourceId && s.resourceId.videoId, title: s.title, desc: s.description || '', at: s.publishedAt }; }).filter(v => v.id);
   }
-  const hit = mem.get('yt-rss');
+  const k = 'rss:' + cid, hit = mem.get(k);
   if (hit && Date.now() - hit.at < 15 * 60e3) return hit.data;
-  const r = await fetch(`https://www.youtube.com/feeds/videos.xml?channel_id=${NFL_CHANNEL}`, { headers: { 'User-Agent': 'TradeMetric/1.0' } });
+  const r = await fetch(`https://www.youtube.com/feeds/videos.xml?channel_id=${cid}`, { headers: { 'User-Agent': 'TradeMetric/1.0' } });
   if (!r.ok) throw new Error('yt rss ' + r.status);
-  const xml = await r.text();
+  const xml = await r.text(), out = [];
   for (const m of xml.matchAll(/<entry>([\s\S]*?)<\/entry>/g)) {
     const e = m[1], g = re => (e.match(re) || [])[1];
     const id = g(/<yt:videoId>([^<]+)</);
     if (id) out.push({ id, title: unxml(g(/<title>([^<]*)</)), desc: unxml(g(/<media:description>([\s\S]*?)<\/media:description>/)), at: g(/<published>([^<]+)</) });
   }
-  mem.set('yt-rss', { at: Date.now(), data: out });
+  mem.set(k, { at: Date.now(), data: out });
   return out;
+}
+async function ytUploads(host) {
+  const chans = await channelList(host);
+  const lists = await Promise.all(Object.entries(chans).filter(([, c]) => c).map(([team, c]) =>
+    channelUploads(c).then(vs => vs.map(v => ({ ...v, chTeam: team === 'NFL' ? null : team, ch: team }))).catch(() => [])));
+  return lists.flat();
 }
 function ytVideo(v, week, games) {
   const wk = +((v.title.match(/week\s*(\d{1,2})/i) || [])[1]) || null;
   const curStart = Math.min(...games.filter(g => g.week === week).map(g => Date.parse(g.start)).filter(Boolean));
   const w = wk || (Date.parse(v.at) >= curStart - 864e5 ? week : week - 1);
-  return { id: 'yt:' + v.id, src: 'youtube', yt: v.id, ev: null, week: w, teams: teamsIn(v.title), title: v.title, desc: (v.desc || '').slice(0, 300), dur: 0,
+  const teams = [...new Set([...(v.chTeam ? [v.chTeam] : []), ...teamsIn(v.title)])];
+  return { id: 'yt:' + v.id, src: 'youtube', yt: v.id, ch: v.ch || 'NFL', ev: null, week: w, teams, title: v.title, desc: (v.desc || '').slice(0, 300), dur: 0,
     thumb: `https://i.ytimg.com/vi/${v.id}/mqdefault.jpg`, url: `https://www.youtube.com/watch?v=${v.id}`, athletes: [], at: v.at };
 }
 
@@ -98,12 +97,8 @@ export default async function handler(req, res) {
     const boards = await Promise.all(weeks.map(w =>
       cj(`${SITE}/scoreboard?seasontype=2&week=${w}&dates=${season}`, w === week ? 2 * 60e3 : 60 * 60e3).catch(() => null)));
     const games = boards.flatMap((b, i) => eventsOf(b, weeks[i]));
-    const played = games.filter(g => g.state !== 'pre');
-    const sums = await Promise.all(played.map(g =>
-      cj(`${SITE}/summary?event=${g.id}`, g.state === 'post' ? 6 * 3600e3 : 2 * 60e3).catch(() => null)));
     const videos = [];
-    sums.forEach((s, i) => (s && s.videos || []).forEach(v => videos.push({ ...videoOf(v, played[i]), src: 'espn' })));
-    const yt = await ytUploads().catch(() => []);
+    const yt = await ytUploads(req.headers && req.headers.host || 'trademetric-rho.vercel.app').catch(() => []);
     yt.forEach(v => { const x = ytVideo(v, week, games); if (x.week >= week - 1 && x.week <= week) videos.push(x); });
 
     const [fan, gen] = await Promise.all([
@@ -119,7 +114,6 @@ export default async function handler(req, res) {
     const out = { season, week, updated: new Date().toISOString(), games, videos: uniq, news: news.slice(0, 250) };
     if (req.query && req.query.debug) out.debug = {
       fanKeys: fan && Object.keys(fan), genKeys: gen && Object.keys(gen),
-      video0: sums.find(s => s && s.videos && s.videos.length)?.videos[0] || null,
       fan0: fan && (fan.feed || fan.articles || [])[0] || null, yt: yt.length, ytKey: !!process.env.YOUTUBE_API_KEY,
     };
     res.setHeader('Cache-Control', 'public, max-age=0, s-maxage=300');
