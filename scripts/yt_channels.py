@@ -15,18 +15,20 @@ TEAMS = {
  'CAR':('Carolina Panthers',['Panthers','CarolinaPanthers']),'CHI':('Chicago Bears',['ChicagoBears']),
  'CIN':('Cincinnati Bengals',['Bengals','CincinnatiBengals']),'CLE':('Cleveland Browns',['Browns','ClevelandBrowns']),
  'DAL':('Dallas Cowboys',['DallasCowboys']),'DEN':('Denver Broncos',['DenverBroncos','Broncos']),
- 'DET':('Detroit Lions',['DetroitLions','Lions']),'GB':('Green Bay Packers',['packers','GreenBayPackers']),
+ 'DET':('Detroit Lions',['DetroitLionsNFL','detroitlions','DetroitLionsOfficial','DetroitLions']),'GB':('Green Bay Packers',['packers','GreenBayPackers']),
  'HOU':('Houston Texans',['HoustonTexans','Texans']),'IND':('Indianapolis Colts',['Colts','IndianapolisColts']),
  'JAX':('Jacksonville Jaguars',['Jaguars','JacksonvilleJaguars']),'KC':('Kansas City Chiefs',['Chiefs','KansasCityChiefs']),
- 'LV':('Las Vegas Raiders',['Raiders','LasVegasRaiders']),'LAC':('Los Angeles Chargers',['Chargers','LAChargers']),
+ 'LV':('Las Vegas Raiders',['Raiders','RaidersNFL','LasVegasRaiders']),'LAC':('Los Angeles Chargers',['Chargers','LAChargers']),
  'LAR':('Los Angeles Rams',['Rams','LARams']),'MIA':('Miami Dolphins',['MiamiDolphins','Dolphins']),
  'MIN':('Minnesota Vikings',['Vikings','MinnesotaVikings']),'NE':('New England Patriots',['Patriots','NewEnglandPatriots']),
- 'NO':('New Orleans Saints',['Saints','NewOrleansSaints']),'NYG':('New York Giants',['Giants','NewYorkGiants']),
+ 'NO':('New Orleans Saints',['Saints','NewOrleansSaints']),'NYG':('New York Giants',['nygiants','Giants','NewYorkGiants','GiantsNFL']),
  'NYJ':('New York Jets',['nyjets','NewYorkJets']),'PHI':('Philadelphia Eagles',['Eagles','PhiladelphiaEagles']),
  'PIT':('Pittsburgh Steelers',['Steelers','PittsburghSteelers']),'SF':('San Francisco 49ers',['49ers','SanFrancisco49ers']),
  'SEA':('Seattle Seahawks',['Seahawks','SeattleSeahawks']),'TB':('Tampa Bay Buccaneers',['Buccaneers','TampaBayBuccaneers']),
  'TEN':('Tennessee Titans',['Titans','TennesseeTitans']),'WAS':('Washington Commanders',['Commanders','WashingtonCommanders']),
 }
+# a few official channels use a shorter display name
+ALIASES = {'LV': ['raiders'], 'NYG': ['new york giants', 'giants'], 'DET': ['detroit lions']}
 UA = {'User-Agent': 'Mozilla/5.0 (TradeMetric channel lookup)', 'Accept-Language': 'en-US,en;q=0.9'}
 
 def lookup(handle):
@@ -45,7 +47,7 @@ for abbr, (full, handles) in TEAMS.items():
             cid, name = lookup(h)
         except Exception as e:
             print(abbr, h, 'error', e, file=sys.stderr); continue
-        if cid and name.strip().lower() == full.lower():
+        if cid and (name.strip().lower() == full.lower() or name.strip().lower() in ALIASES.get(abbr, [])):
             found = cid; break
         print(abbr, h, 'rejected', repr(name), file=sys.stderr)
     out[abbr] = found or prev.get(abbr)
