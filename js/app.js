@@ -1109,7 +1109,7 @@ document.addEventListener('submit',e=>{if(e.target.id!=='auth-form')return;e.pre
 initAccounts();
 
 /* ===== Highlights tab: results, video and news for your players and players you follow ===== */
-var FEED=null,FEED_AT=0,FEED_F='start',FEED_LOADING=false,VIDS={};
+var FEED=null,FEED_AT=0,FEED_F='all',REC_CACHE2={at:-1,list:[]},FEED_LOADING=false,VIDS={};
 const isFollowing=id=>(S.following||[]).includes(id);
 function followBtn(id,mini){const on=isFollowing(id);return mini?`<button class="star${on?' on':''}" data-follow="${id}" title="${on?'Following. Click to unfollow':'Follow this player in Highlights'}" aria-label="${on?'Unfollow':'Follow'}">${on?'★':'☆'}</button>`
   :`<button class="follow-btn${on?' on':''}" data-follow="${id}">${on?'★ Following':'☆ Follow'}</button>`}
@@ -1124,7 +1124,9 @@ const wordIn=(hay,w)=>new RegExp('(^|[^a-z])'+w.replace(/[.*+?^${}()|[\]\\]/g,'\
 function playerVideos(p){if(!FEED)return [];const full=norm(p.n),last=full.split(' ').pop();
   const vids=FEED.videos.filter(v=>v.teams.includes(p.t));if(p.pos==='DST')return vids.filter(v=>/highlight/i.test(v.title)).slice(0,2).map(v=>({...v,game:true}));
   const lastUnique=POOL.filter(q=>q.id!==p.id&&q.pos!=='DST'&&norm(q.n).split(' ').pop()===last&&vids.some(v=>v.teams.includes(q.t))).length===0;
-  const hit=vids.filter(v=>{const h=norm(v.title+' '+v.desc);return v.athletes.some(a=>norm(a)===full)||wordIn(h,full)||(lastUnique&&last.length>3&&wordIn(norm(v.title),last))});
+  const others=POOL.filter(q=>q.id!==p.id&&q.pos!=='DST'&&vids.some(v=>v.teams.includes(q.t))).map(q=>norm(q.n));
+  const hit=vids.filter(v=>{const h=norm(v.title+' '+v.desc),t=norm(v.title);if(v.athletes.some(a=>norm(a)===full)||wordIn(h,full))return true;
+    return lastUnique&&last.length>3&&wordIn(t,last)&&!others.some(o=>wordIn(t,o))});
   const out=hit.sort((a,b)=>b.week-a.week||Date.parse(b.at||0)-Date.parse(a.at||0)).slice(0,4);
   if(!out.length){const gh=vids.filter(v=>/highlight/i.test(v.title)).sort((a,b)=>b.week-a.week)[0];if(gh)out.push({...gh,game:true})}
   return out}
@@ -1139,10 +1141,27 @@ function statLineTxt(pos,s){if(!s)return '';const parts=[],n=x=>Math.round(x||0)
 function feedGame(p){const lg=LIVE&&LIVE.week===WEEK&&LIVE.games[p.t];if(lg)return lg;
   const g=FEED&&FEED.games.find(x=>x.week===WEEK&&x.teams.some(t=>t.t===p.t));if(!g)return null;const me=g.teams.find(t=>t.t===p.t),o=g.teams.find(t=>t.t!==p.t)||{};
   return {state:g.state,detail:g.detail,start:g.start,score:me.score,opp:o.t,oppScore:o.score,home:me.home}}
-function feedPlayers(){const me=myTeam();if(!me)return [];
-  if(FEED_F==='follow')return (S.following||[]).filter(id=>byId[id]).map(id=>({id,slot:OWN[id]===S.me?'Yours':OWN[id]?esc(teamById(OWN[id]).name):'Free agent'}));
-  const lu=realLineup(S.me)||lineup(me.players,nextV),st=lu.slots.filter(x=>x.p).map(x=>({id:x.p.id,slot:x.label}));
-  if(FEED_F==='start')return st;const used=new Set(st.map(x=>x.id));return me.players.filter(id=>!used.has(id)&&byId[id]).map(id=>({id,slot:'BN'}))}
+const teamName=t=>(NICK[t]||t);
+function teamStars(t){return POOL.filter(p=>p.t===t&&p.pos!=='DST'&&V.rank[p.id]<=220).sort((a,b)=>V.pts[b.id]-V.pts[a.id]).slice(0,6).map(p=>p.id)}
+function toggleTeam(t){S.followTeams=S.followTeams||[];const i=S.followTeams.indexOf(t);if(i>=0)S.followTeams.splice(i,1);else S.followTeams.push(t);save();
+  toast(i>=0?`Unfollowed the ${teamName(t)}`:`Following the ${teamName(t)}`);render()}
+/* players with the most highlight clips this week and last, not already yours or followed */
+function recommendedFollows(){if(!FEED)return [];if(REC_CACHE2.at===FEED_AT+VER)return REC_CACHE2.list;
+  const skip=new Set([...(S.following||[]),...(myTeam()?myTeam().players:[])]);
+  const list=POOL.filter(p=>p.pos!=='DST'&&V.rank[p.id]<=200&&!skip.has(p.id)).map(p=>{const v=playerVideos(p).filter(x=>!x.game);return {id:p.id,n:v.length,cur:v.filter(x=>x.week===WEEK).length}})
+    .filter(x=>x.n>0).sort((a,b)=>b.n-a.n||b.cur-a.cur||V.rank[a.id]-V.rank[b.id]).slice(0,8);
+  REC_CACHE2={at:FEED_AT+VER,list};return list}
+function feedPlayers(){const me=myTeam();if(!me)return [];const out=[],seen=new Set(),add=(id,slot)=>{if(byId[id]&&!seen.has(id)){seen.add(id);out.push({id,slot})}};
+  if(FEED_F!=='follow'){const lu=realLineup(S.me)||lineup(me.players,nextV);lu.slots.forEach(x=>{if(x.p)add(x.p.id,x.label)});me.players.forEach(id=>add(id,'BN'))}
+  if(FEED_F!=='mine'){(S.following||[]).forEach(id=>add(id,'<span class="slot-star">★</span>'));(S.followTeams||[]).forEach(t=>teamStars(t).forEach(id=>add(id,t)))}
+  return out}
+function renderFollowPanel(){const el=$('feed-follow');el.hidden=FEED_F!=='follow';if(el.hidden)return;
+  const ft=S.followTeams||[],teams=Object.keys(NICK).sort((a,b)=>teamName(a).localeCompare(teamName(b))),rec=recommendedFollows();
+  el.innerHTML=`<div class="fol-grid"><div><div class="card-h"><h2>Teams you follow</h2><span class="note">Their top fantasy players join your feed</span></div>
+      <div class="team-chips">${ft.map(t=>`<span class="tchip" style="${tcVars(t)}"><i></i>${esc(teamName(t))}<button data-fteam="${t}" aria-label="Unfollow ${esc(teamName(t))}">×</button></span>`).join('')}
+      <select id="team-add" aria-label="Follow a team"><option value="">+ Follow a team</option>${teams.filter(t=>!ft.includes(t)).map(t=>`<option value="${t}">${esc(teamName(t))} (${t})</option>`).join('')}</select></div></div>
+    <div><div class="card-h"><h2>Recommended</h2><span class="note">Most highlight clips the last two weeks</span></div>
+      ${!FEED?'<p class="note">Loading...</p>':rec.length?`<div class="rec-list">${rec.map(r=>{const p=byId[r.id];return `<div class="rec">${av(p,'sm')}<div class="rec-who"><button class="pname" data-open="${p.id}">${esc(p.n)}</button><span class="psub">${p.pos} · ${p.t} · ${r.n} clip${r.n>1?'s':''}</span></div>${followBtn(p.id,false).replace('follow-btn','follow-btn light')}</div>`}).join('')}</div>`:'<p class="note">No clips yet this week. Check back after the games.</p>'}</div></div>`}
 function vidThumb(v,big){VIDS[v.id]=v;const p=v.player?byId[v.player]:null;
   return `<button class="vthumb${big?' big':''}" data-vid="${esc(v.id)}" title="${esc(v.title)}"><span class="vimg${v.thumb?'':' noimg'}" style="${v.thumb?`background-image:url('${esc(v.thumb)}')`:tcVars(p?p.t:v.teams[0])}"><span class="vplay" aria-hidden="true"></span>${v.dur?`<span class="vdur">${Math.floor(v.dur/60)}:${String(v.dur%60).padStart(2,'0')}</span>`:''}</span>
     <span class="vtitle">${v.game?'<span class="vtag">Game</span>':''}${p&&big&&!norm(v.title).includes(norm(p.n))?`<b>${esc(p.n)}</b> · `:''}${esc(v.title)}</span><span class="note">Week ${v.week}${v.at?' · '+ago(v.at):''}</span></button>`}
@@ -1150,15 +1169,15 @@ function renderFeed(){
   if(!FEED)loadFeed();else if(Date.now()-FEED_AT>4*60e3)loadFeed();
   $('feed-kicker').textContent=`Week ${WEEK} · ${FEED?'updated '+new Date(FEED.updated).toLocaleTimeString([], {hour:'numeric',minute:'2-digit'}):'loading'}`;
   document.querySelectorAll('#feed-filter button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.ff===FEED_F));
-  const fl=$('feed-filter').querySelector('[data-ff=follow]');fl.textContent=`Following${(S.following||[]).length?' ('+S.following.length+')':''}`;
+  const fc=(S.following||[]).length+(S.followTeams||[]).length,fl=$('feed-filter').querySelector('[data-ff=follow]');fl.textContent=`Following${fc?' ('+fc+')':''}`;renderFollowPanel();
   const list=feedPlayers();
   /* highlight reel: newest player clips across the list */
   const reel=[];list.forEach(({id})=>playerVideos(byId[id]).filter(v=>!v.game).forEach(v=>{if(!reel.some(x=>x.id===v.id))reel.push({...v,player:id})}));
   reel.sort((a,b)=>b.week-a.week||Date.parse(b.at||0)-Date.parse(a.at||0));
   $('feed-reel').innerHTML=!FEED?`<div class="reel-empty"><span class="spin"></span> Loading highlights...</div>`
-    :reel.length?`<div class="card-h"><h2>Latest highlights</h2><span class="note">${FEED_F==='follow'?'Players you follow':FEED_F==='bench'?'Your bench':'Your starters'} · tap to play</span></div><div class="reel">${reel.slice(0,10).map(v=>vidThumb(v,true)).join('')}</div>`
+    :reel.length?`<div class="card-h"><h2>Latest highlights</h2><span class="note">${FEED_F==='follow'?'Players and teams you follow':FEED_F==='mine'?'Your team':'Your team and everyone you follow'} · tap to play</span></div><div class="reel">${reel.slice(0,10).map(v=>vidThumb(v,true)).join('')}</div>`
     :`<div class="reel-empty">No player clips yet for this group. Game highlights show on each player below.</div>`;
-  if(!list.length){$('feed-list').innerHTML=`<div class="card empty-card">${FEED_F==='follow'?`<h2>Follow players you're watching</h2><p class="note">Tap the ☆ next to any player in Rankings, or <b>☆ Follow</b> on their player card. They'll show up here with their results, highlights and news.</p><button class="btn" data-goto="rankings">Find players in Rankings</button>`:'<p class="empty">No players here yet.</p>'}</div>`;return}
+  if(!list.length){$('feed-list').innerHTML=`<div class="card empty-card">${FEED_F==='follow'?`<h2>Follow players and teams</h2><p class="note">Follow an NFL team above, pick from the recommended players, tap the ☆ next to anyone in Rankings, or use <b>☆ Follow</b> on a player's card.</p><button class="btn" data-goto="rankings">Find players in Rankings</button>`:'<p class="empty">No players here yet.</p>'}</div>`;return}
   $('feed-list').innerHTML=list.map(({id,slot})=>{const p=byId[id],g=G[id],gm=feedGame(p),lv=liveOf(id),st=LIVEST[id];
     let chip,pts,sub,line;
     if(!gm){const nx=OPP[p.t]&&OPP[p.t][WEEK];chip=`<span class="fchip">${nx?(nx.home?'vs ':'at ')+nx.opp:'Bye'}</span>`;pts=nx?g.projNext:null;sub=nx?'projected':'bye week'}
@@ -1182,5 +1201,7 @@ document.addEventListener('click',e=>{const t=e.target;if(!t.closest)return;
   const ff=t.closest('[data-ff]');if(ff){FEED_F=ff.dataset.ff;renderFeed();return}
   const vb=t.closest('[data-vid]');if(vb){openVideo(vb.dataset.vid);return}
   if(t.closest('[data-vclose]')||t.id==='vid-modal'){closeVideo();return}
-  const gt=t.closest('[data-goto]');if(gt){location.hash=gt.dataset.goto;return}},true);
+  const gt=t.closest('[data-goto]');if(gt){location.hash=gt.dataset.goto;return}
+  const fte=t.closest('[data-fteam]');if(fte){toggleTeam(fte.dataset.fteam);return}},true);
+document.addEventListener('change',e=>{if(e.target.id==='team-add'&&e.target.value)toggleTeam(e.target.value)});
 document.addEventListener('keydown',e=>{if(e.key==='Escape')closeVideo()});

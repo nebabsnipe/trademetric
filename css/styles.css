@@ -590,3 +590,18 @@ body.signed-out .nav,body.signed-out #week-pill,body.signed-out #acct-btn{displa
 
 .vimg.noimg{background:linear-gradient(135deg,var(--c1,#333) 0%,var(--c2,#111) 120%)}
 .vm-meta .btn{color:var(--ink);text-decoration:none;white-space:nowrap}
+.follow-card{padding-bottom:16px}
+.fol-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.4fr);gap:28px}
+.team-chips{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.tchip{display:inline-flex;align-items:center;gap:7px;padding:5px 6px 5px 10px;border-radius:99px;background:var(--surface-2);font-weight:600;font-size:13px}
+.tchip i{width:10px;height:10px;border-radius:50%;background:var(--c1)}
+.tchip button{appearance:none;border:0;background:none;cursor:pointer;color:var(--muted);font-size:15px;line-height:1;padding:0 4px}
+.tchip button:hover{color:var(--bad)}
+#team-add{border-radius:99px;padding:6px 12px;font-weight:600;font-size:13px;cursor:pointer}
+.rec-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px 18px}
+.rec{display:flex;align-items:center;gap:9px;min-width:0}
+.rec-who{display:flex;flex-direction:column;min-width:0;flex:1}.rec-who .pname{font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:left}
+.follow-btn.light{border-color:var(--line);background:var(--surface);color:var(--ink)}
+.follow-btn.light.on{background:var(--accent);border-color:var(--accent);color:#fff}
+.slot-star{color:var(--accent)}
+@media (max-width:800px){.fol-grid{grid-template-columns:minmax(0,1fr)}.rec-list{grid-template-columns:minmax(0,1fr)}}
