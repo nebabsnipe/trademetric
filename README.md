@@ -14,6 +14,7 @@ Fantasy football trades, rankings and lineup advice built on your league's exact
 | `api/ai.js` | Server function for the AI Helper, scouting reports and screenshot reading |
 | `api/live.js` | Live game-day data: scores, game clocks, player stats so far, injury news (cached 2 min during games, 10 min otherwise) |
 | `api/espn.js` | Reads private ESPN leagues with the user's espn_s2 and SWID codes (never stored) |
+| `supabase/schema.sql` | Database table for saved accounts. Run once in Supabase's SQL Editor |
 | `scripts/update_data.py` | Downloads fresh stats, injuries, schedules, betting lines and expert rankings |
 
 Handy places in `js/app.js`:
@@ -43,7 +44,11 @@ Every change pushed to the `main` branch goes live automatically in about a minu
 
 Data: [nflverse](https://github.com/nflverse/nflverse-data) (stats, schedules, betting lines, injuries, rosters, snap counts) and FantasyPros expert consensus via [DynastyProcess](https://github.com/dynastyprocess/data).
 
+## Accounts (Supabase)
+
+Sign-in is by emailed link. Each user's league is saved to the `user_state` table, and row-level security means people can only read their own row. The project URL and publishable key are at the bottom of `js/app.js` (search for `SUPA_URL`); both are safe to be public.
+
 ## Coming next
 
-- User accounts and saved leagues (Supabase)
+- Sign in with Google
 - Mobile layout pass

@@ -57,7 +57,8 @@ const MY_EXAMPLE=['jalen-hurts','dak-prescott','bryce-young','zach-charbonnet','
 /* ===== State ===== */
 const KEY='trademetric-v1';
 let S;try{S=JSON.parse(localStorage.getItem(KEY))}catch(e){S=null}
-function save(){try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
+const AUTH_HASH=/access_token=|error_description=/.test(location.hash)?location.hash.slice(1):null;
+function save(){S.savedAt=Date.now();try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}if(typeof cloudSave==='function')cloudSave()}
 let POOL=BUILTIN,byId={};
 function setPool(){POOL=(S.custom&&S.custom.length)?S.custom:BUILTIN;byId={};POOL.forEach(p=>byId[p.id]=p);
   document.getElementById('dl-players').innerHTML=POOL.map(p=>`<option value="${esc(p.n)}">${p.pos} · ${p.t}</option>`).join('');
@@ -998,3 +999,41 @@ buildLeagueForm();
 S.chat=(S.chat||[]).filter(x=>x.status==='done'||x.status==='error');
 let start=location.hash.slice(1);if(!S.onboarded)start='welcome';go(TABS.includes(start)?start:'team');
 loadLive();
+
+/* ===== Accounts (Supabase): sign in by emailed link, state saved to the cloud ===== */
+const SUPA_URL='https://rltmfnmgbfgecbaevfvc.supabase.co',SUPA_KEY='sb_publishable_AFX79aKgqorAx3zgOyKatw_o_3_ERWG';
+var SB=null,USER=null,CLOUD={timer:null,last:null,busy:false,err:null};
+function adoptState(st){S=st;setPool();SCHED=null;LIVE_LU=null;recompute();buildLeagueForm();hubSel=S.me;if(tab==='welcome')location.hash='team';render();if(S.real&&S.real.src)loadSleeperLineups().then(()=>{recompute();render()})}
+async function cloudPull(){
+  const {data,error}=await SB.from('user_state').select('state,updated_at').eq('user_id',USER.id).maybeSingle();
+  if(error){CLOUD.err=error.message;acctUI();return}
+  const cs=data&&data.state;
+  if(cs&&cs.league&&cs.teams&&(S.example||!S.savedAt||(cs.savedAt||0)>S.savedAt)){adoptState(cs);try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}toast('Loaded your saved league')}
+  else await cloudPush();
+  CLOUD.last=Date.now();acctUI()}
+async function cloudPush(){if(!SB||!USER)return;CLOUD.busy=true;
+  const {error}=await SB.from('user_state').upsert({user_id:USER.id,state:S,updated_at:new Date().toISOString()});
+  CLOUD.busy=false;CLOUD.err=error?error.message:null;if(!error)CLOUD.last=Date.now();acctUI()}
+function cloudSave(){if(!SB||!USER)return;clearTimeout(CLOUD.timer);CLOUD.timer=setTimeout(cloudPush,1500)}
+function acctUI(){const b=$('acct-btn'),pop=$('acct-pop');if(!b)return;
+  if(!USER){b.textContent='Sign in';b.classList.remove('in');pop.innerHTML=`<b>Save your league</b><p class="note">Sign in to keep your league, trades and settings on every device. We'll email you a sign-in link, no password needed.</p>
+    <form id="acct-form"><input type="email" id="acct-email" placeholder="you@example.com" autocomplete="email" required><button class="btn primary" type="submit">Email me a link</button></form><div id="acct-msg" class="note"></div>`;return}
+  const em=USER.email||'Account';b.textContent=em[0].toUpperCase();b.classList.add('in');b.title=em;
+  pop.innerHTML=`<b>${esc(em)}</b><p class="note">${CLOUD.err?`<span style="color:var(--bad)">Couldn't save: ${esc(CLOUD.err)}</span>`:CLOUD.busy?'Saving...':CLOUD.last?'Saved to your account '+new Date(CLOUD.last).toLocaleTimeString([], {hour:'numeric',minute:'2-digit'}):'Signed in'}</p><button class="btn" id="acct-out" type="button">Sign out</button>`}
+async function initAccounts(){
+  acctUI();
+  try{const {createClient}=await import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/+esm');
+    SB=createClient(SUPA_URL,SUPA_KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:false,flowType:'implicit'}})}catch(e){return}
+  if(AUTH_HASH){const q=new URLSearchParams(AUTH_HASH);history.replaceState(null,'',location.pathname+location.search+'#'+(tab||'team'));
+    if(q.get('access_token')){const {error}=await SB.auth.setSession({access_token:q.get('access_token'),refresh_token:q.get('refresh_token')});if(error)toast('That sign-in link expired. Request a new one.');else toast('Signed in')}
+    else if(q.get('error_description'))toast(q.get('error_description').replace(/\+/g,' '))}
+  const {data}=await SB.auth.getSession();USER=data&&data.session?data.session.user:null;acctUI();if(USER)cloudPull();
+  SB.auth.onAuthStateChange((ev,session)=>{const was=USER&&USER.id;USER=session?session.user:null;acctUI();if(USER&&USER.id!==was)cloudPull()})}
+document.addEventListener('click',e=>{const t=e.target,pop=$('acct-pop');if(!pop)return;
+  if(t.closest&&t.closest('#acct-btn')){pop.hidden=!pop.hidden;if(!pop.hidden){const i=$('acct-email');if(i)i.focus()}return}
+  if(t.id==='acct-out'){SB.auth.signOut().then(()=>{USER=null;acctUI();pop.hidden=true;toast('Signed out. Your league stays on this device.')});return}
+  if(!pop.hidden&&!(t.closest&&t.closest('#acct-pop')))pop.hidden=true});
+document.addEventListener('submit',async e=>{if(e.target.id!=='acct-form')return;e.preventDefault();const em=$('acct-email').value.trim(),msg=$('acct-msg');if(!SB){msg.textContent='Sign-in is unavailable right now.';return}
+  msg.textContent='Sending...';const {error}=await SB.auth.signInWithOtp({email:em,options:{emailRedirectTo:location.origin+location.pathname}});
+  msg.innerHTML=error?`<span style="color:var(--bad)">${esc(error.message)}</span>`:`Check <b>${esc(em)}</b> for a sign-in link. You can open it on any device.`});
+initAccounts();

@@ -511,3 +511,12 @@ label.btn.shot-btn{display:inline-flex;align-items:center;gap:8px;white-space:no
   .tgt-table .av{display:none}
   .tgt-table .btn.small{padding:5px 8px}
 }
+.acct{position:relative}
+.acct-btn{appearance:none;border:1px solid rgba(255,255,255,.22);background:none;color:inherit;height:34px;padding:0 14px;border-radius:99px;font:600 13px var(--f-body,inherit);cursor:pointer;white-space:nowrap}
+.acct-btn.in{width:34px;padding:0;background:var(--accent);border-color:var(--accent);color:#fff;font-weight:800}
+.acct-pop{position:absolute;right:0;top:calc(100% + 8px);width:300px;max-width:calc(100vw - 32px);background:var(--surface);color:var(--ink);border:1px solid var(--line);border-radius:var(--r-sm,10px);box-shadow:0 12px 32px rgba(0,0,0,.18);padding:14px;z-index:50}
+.acct-pop b{display:block;font-size:14px;overflow:hidden;text-overflow:ellipsis}
+.acct-pop .note{margin:6px 0 10px;line-height:1.45}
+.acct-pop form{display:flex;flex-direction:column;gap:8px}
+.acct-pop input[type=email]{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-sm);padding:9px 10px;color:var(--ink)}
+@media (max-width:600px){.acct-btn{padding:0 10px;font-size:12px}}
