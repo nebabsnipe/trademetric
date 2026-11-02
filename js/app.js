@@ -907,7 +907,7 @@ $('theme-btn').addEventListener('click',()=>{themePref=isDark()?'light':'dark';t
 
 /* ===== Routing & events ===== */
 const TABS=['team','trade','rankings','hub','season','helper','league','welcome','signin'];let tab='team';
-function go(t){tab=TABS.includes(t)?t:'team';if(tab!=='welcome'&&S&&!S.onboarded){S.onboarded=true;save()}document.querySelectorAll('.nav button').forEach(b=>{if(b.dataset.tab===tab)b.setAttribute('aria-current','page');else b.removeAttribute('aria-current')});
+function go(t){if(!USER&&t!=='signin')t='signin';tab=TABS.includes(t)?t:'team';if(tab!=='welcome'&&S&&!S.onboarded){S.onboarded=true;save()}document.querySelectorAll('.nav button').forEach(b=>{if(b.dataset.tab===tab)b.setAttribute('aria-current','page');else b.removeAttribute('aria-current')});
   TABS.forEach(x=>$('v-'+x).hidden=x!==tab);render();window.scrollTo(0,0)}
 function render(){({team:renderTeam,rankings:renderRankings,trade:renderTrade,hub:renderHub,season:renderSeason,helper:renderHelper,welcome:renderWelcome,league:fillLeagueForm,signin:renderSignin})[tab]();if(openId&&!$('scrim').hidden)openCard(openId)}
 document.querySelectorAll('.nav button').forEach(b=>b.addEventListener('click',()=>{location.hash=b.dataset.tab}));
@@ -997,12 +997,12 @@ if(!S||!S.league||!S.teams){S={league:{name:'Sample League',teams:12,sc:{...PRES
 else{S.league.sc={...BASE_SC,...S.league.sc};if(S.league.slots.DST===undefined)S.league.slots.DST=1;setPool();recompute()}
 buildLeagueForm();
 S.chat=(S.chat||[]).filter(x=>x.status==='done'||x.status==='error');
-let start=location.hash.slice(1);if(!S.onboarded&&start!=='signin')start='welcome';go(TABS.includes(start)?start:'team');
+var INTENDED=location.hash.slice(1);go('signin');
 loadLive();
 
 /* ===== Accounts (Supabase): username or email + password, own sign-in page, league saved to the cloud ===== */
 var SUPA_URL='https://rltmfnmgbfgecbaevfvc.supabase.co',SUPA_KEY='sb_publishable_AFX79aKgqorAx3zgOyKatw_o_3_ERWG';
-var AUTH_VALS={},SB=null,USER=null,PROFILE=null,CLOUD={timer:null,last:null,busy:false,err:null},AUTH_MODE='in',AUTH_MSG=null,AUTH_BUSY=false;
+var SB_FAILED=false,AUTH_VALS={},SB=null,USER=null,PROFILE=null,CLOUD={timer:null,last:null,busy:false,err:null},AUTH_MODE='in',AUTH_MSG=null,AUTH_BUSY=false;
 var EXP_KEY='tm-auth-exp',KEEP_KEY='tm-keep',TWO_WEEKS=14*864e5;
 function lsGet(k){try{return localStorage.getItem(k)}catch(e){return null}}
 function lsSet(k,v){try{localStorage.setItem(k,v)}catch(e){}}
@@ -1011,11 +1011,12 @@ function adoptState(st){S=st;setPool();SCHED=null;LIVE_LU=null;recompute();build
 async function cloudPull(){
   const {data,error}=await SB.from('user_state').select('state,updated_at').eq('user_id',USER.id).maybeSingle();
   if(error){CLOUD.err=error.message;acctUI();return}
-  const cs=data&&data.state;
-  if(cs&&cs.league&&cs.teams&&(S.example||!S.savedAt||(cs.savedAt||0)>S.savedAt)){adoptState(cs);try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}toast('Loaded your saved league')}
+  const cs=data&&data.state,other=S.owner&&S.owner!==USER.id;
+  if(other&&!(cs&&cs.league&&cs.teams)){S={league:{name:'Sample League',teams:12,sc:{...PRESETS.sf.sc},slots:{...PRESETS.sf.slots}},teams:[],me:'t1',log:[],example:true,custom:null,onboarded:false,chat:[]};setPool();exampleLeague();S.real=null;SCHED=null;LIVE_LU=null;buildLeagueForm();hubSel=S.me;render()}
+  if(cs&&cs.league&&cs.teams&&(other||S.example||!S.savedAt||(cs.savedAt||0)>S.savedAt)){adoptState(cs);try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}toast('Loaded your saved league')}
   else await cloudPush();
   CLOUD.last=Date.now();acctUI()}
-async function cloudPush(){if(!SB||!USER)return;CLOUD.busy=true;
+async function cloudPush(){if(!SB||!USER)return;S.owner=USER.id;CLOUD.busy=true;
   const {error}=await SB.from('user_state').upsert({user_id:USER.id,state:S,updated_at:new Date().toISOString()});
   CLOUD.busy=false;CLOUD.err=error?error.message:null;if(!error)CLOUD.last=Date.now();acctUI()}
 function cloudSave(){if(!SB||!USER)return;clearTimeout(CLOUD.timer);CLOUD.timer=setTimeout(cloudPush,1500)}
@@ -1023,7 +1024,7 @@ async function loadProfile(){if(!USER)return;const {data}=await SB.from('profile
 /* "Keep me signed in": unchecked means the session ends 2 weeks after signing in. Saved data is never touched. */
 function startSessionClock(){if(lsGet(EXP_KEY)!==null)return;lsSet(EXP_KEY,lsGet(KEEP_KEY)==='1'?'0':String(Date.now()+TWO_WEEKS))}
 async function checkExpiry(){const v=lsGet(EXP_KEY);if(!USER||!v||v==='0'||Date.now()<+v)return false;
-  await SB.auth.signOut({scope:'local'});lsDel(EXP_KEY);USER=null;PROFILE=null;acctUI();toast('Signed out after 2 weeks. Sign in again; your league is still here.');return true}
+  await SB.auth.signOut({scope:'local'});lsDel(EXP_KEY);leaveApp();toast('Signed out after 2 weeks. Sign in again; your league is still here.');return true}
 function acctName(){return PROFILE&&PROFILE.username||(USER&&USER.email)||''}
 function acctUI(){const b=$('acct-btn');if(b){if(USER){b.textContent=(acctName()[0]||'?').toUpperCase();b.classList.add('in');b.title='Signed in as '+acctName()}else{b.textContent='Sign in';b.classList.remove('in');b.title=''}}
   if(tab==='signin')renderSignin()}
@@ -1031,7 +1032,7 @@ function renderSignin(){const el=$('signin-card');if(!el)return;
   const msg=AUTH_MSG?`<p class="auth-msg ${AUTH_MSG.bad?'bad':''}">${AUTH_MSG.html}</p>`:'';
   const keep=`<label class="auth-keep"><input type="checkbox" id="auth-keep" ${lsGet(KEEP_KEY)==='1'?'checked':''}> Keep me signed in<span class="note">Otherwise you're signed out after 2 weeks. Your league stays saved either way.</span></label>`;
   const btn=t=>`<button class="btn primary auth-go" type="submit" ${AUTH_BUSY?'disabled':''}>${AUTH_BUSY?'One moment...':t}</button>`;
-  if(!SB){el.innerHTML=`<h1>Sign in</h1><p class="note">Sign-in is loading. If this doesn't change, refresh the page.</p>`;return}
+  if(!SB){el.innerHTML=SB_FAILED?`<h1>Can't sign in</h1><p class="note">Sign-in didn't load. Check your connection and refresh the page.</p>`:`<h1>Loading</h1><p class="note">One moment...</p>`;return}
   if(USER&&AUTH_MODE!=='reset'){const v=lsGet(EXP_KEY);
     el.innerHTML=`<div class="kicker">Your account</div><h1>${esc(acctName())}</h1>${PROFILE&&USER.email?`<p class="note">${esc(USER.email)}</p>`:''}
      <div class="auth-rows"><div><span>League saved</span><b>${CLOUD.err?`<span style="color:var(--bad)">Couldn't save: ${esc(CLOUD.err)}</span>`:CLOUD.busy?'Saving...':CLOUD.last?'Saved '+new Date(CLOUD.last).toLocaleTimeString([], {hour:'numeric',minute:'2-digit'}):'Yes'}</b></div>
@@ -1044,8 +1045,8 @@ function renderSignin(){const el=$('signin-card');if(!el)return;
      <label>Password<input type="password" id="auth-pw" autocomplete="current-password" required></label>${keep}${msg}${btn('Sign in')}
      <button type="button" class="linkish" data-auth-mode="forgot">Forgot your password?</button></form>`;
   else if(AUTH_MODE==='up')body=`<h1>Create your account</h1><form id="auth-form" data-mode="up">
-     <label>Username<input type="text" id="auth-user" autocomplete="username" autocapitalize="none" spellcheck="false" maxlength="20" required placeholder="3 to 20 letters, numbers or _"></label>
-     <label>Email<input type="email" id="auth-email" autocomplete="email" required><span class="note">Only used to reset your password.</span></label>
+     <label>Username<input type="text" id="auth-user" autocomplete="username" autocapitalize="none" spellcheck="false" maxlength="20" required placeholder="Pick a username"></label>
+     <label>Email<input type="email" id="auth-email" autocomplete="email" required></label>
      <label>Password<input type="password" id="auth-pw" autocomplete="new-password" minlength="8" required placeholder="At least 8 characters"></label>${keep}${msg}${btn('Create account')}</form>`;
   else if(AUTH_MODE==='forgot')body=`<h1>Reset your password</h1><form id="auth-form" data-mode="forgot"><p class="note">Enter your account email and we'll send a link to set a new password.</p>
      <label>Email<input type="email" id="auth-email" autocomplete="email" required></label>${msg}${btn('Send reset link')}<button type="button" class="linkish" data-auth-mode="in">Back to sign in</button></form>`;
@@ -1053,6 +1054,10 @@ function renderSignin(){const el=$('signin-card');if(!el)return;
      <label>New password<input type="password" id="auth-pw" autocomplete="new-password" minlength="8" required placeholder="At least 8 characters"></label>${msg}${btn('Save password')}</form>`;
   el.innerHTML=tabs+body;['auth-id','auth-user','auth-email'].forEach(k=>{const i=$(k);if(i&&AUTH_VALS[k])i.value=AUTH_VALS[k]});
   const f=[...el.querySelectorAll('input[type=text],input[type=email],input[type=password]')].find(i=>!i.value);if(f)setTimeout(()=>f.focus(),0)}
+function enterApp(){document.body.classList.remove('signed-out');AUTH_MODE='in';AUTH_MSG=null;
+  let t=TABS.includes(INTENDED)&&INTENDED!=='signin'?INTENDED:'team';INTENDED=null;if(!S.onboarded)t='welcome';
+  if(location.hash.slice(1)===t)go(t);else location.hash=t}
+function leaveApp(){document.body.classList.add('signed-out');USER=null;PROFILE=null;AUTH_MODE='in';AUTH_MSG=null;if(location.hash!=='#signin')location.hash='signin';else go('signin');acctUI()}
 function authFail(t){AUTH_BUSY=false;AUTH_MSG={bad:true,html:esc(t)};renderSignin()}
 function authNote(h){AUTH_BUSY=false;AUTH_MSG={bad:false,html:h};renderSignin()}
 async function authSubmit(mode){
@@ -1062,9 +1067,9 @@ async function authSubmit(mode){
       if(!id.includes('@')){const {data,error}=await SB.rpc('login_email',{p_username:id.toLowerCase(),p_password:pw});
         if(error)return authFail(error.message);if(!data)return authFail('Wrong username or password.');email=data}
       lsSet(KEEP_KEY,keep?'1':'0');lsDel(EXP_KEY);
-      const {error}=await SB.auth.signInWithPassword({email,password:pw});
+      const {data:sd,error}=await SB.auth.signInWithPassword({email,password:pw});
       if(error)return authFail(/not confirmed/i.test(error.message)?'Confirm your email first. Check your inbox for the link.':/invalid login/i.test(error.message)?'Wrong username or password.':error.message);
-      AUTH_BUSY=false;AUTH_MSG=null;location.hash='team';return}
+      AUTH_BUSY=false;AUTH_MSG=null;if(sd&&sd.session&&!USER){USER=sd.session.user;startSessionClock();loadProfile();cloudPull()}enterApp();return}
     if(mode==='up'){const u=v('auth-user').toLowerCase(),em=v('auth-email'),pw=F['auth-pw'];
       if(!/^[a-z0-9_]{3,20}$/.test(u))return authFail('Usernames are 3 to 20 letters, numbers or underscores.');
       if(pw.length<8)return authFail('Use at least 8 characters for your password.');
@@ -1072,33 +1077,33 @@ async function authSubmit(mode){
       lsSet(KEEP_KEY,keep?'1':'0');lsDel(EXP_KEY);
       const {data,error}=await SB.auth.signUp({email:em,password:pw,options:{data:{username:u},emailRedirectTo:location.origin+location.pathname}});
       if(error)return authFail(/database error/i.test(error.message)?'That username is taken. Try another.':error.message);
-      if(data&&data.session){AUTH_BUSY=false;AUTH_MSG=null;location.hash='team';toast('Account created');return}
+      if(data&&data.session){AUTH_BUSY=false;AUTH_MSG=null;if(!USER){USER=data.session.user;startSessionClock();loadProfile();cloudPull()}enterApp();toast('Account created');return}
       AUTH_MODE='in';return authNote(`Almost done. We sent a confirmation link to <b>${esc(em)}</b>. Open it, then sign in with <b>${esc(u)}</b>.`)}
     if(mode==='forgot'){const em=v('auth-email');const {error}=await SB.auth.resetPasswordForEmail(em,{redirectTo:location.origin+location.pathname});
       if(error)return authFail(error.message);return authNote(`If <b>${esc(em)}</b> has an account, a reset link is on its way.`)}
     if(mode==='reset'){const pw=F['auth-pw'];if(pw.length<8)return authFail('Use at least 8 characters for your password.');
-      const {error}=await SB.auth.updateUser({password:pw});if(error)return authFail(error.message);AUTH_MODE='in';authNote('Password updated. You are signed in.');toast('Password updated')}
+      const {error}=await SB.auth.updateUser({password:pw});if(error)return authFail(error.message);AUTH_BUSY=false;toast('Password updated');enterApp()}
   }catch(e){authFail('Something went wrong. Try again.')}}
 async function initAccounts(){
   acctUI();
   try{const {createClient}=await import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/+esm');
-    SB=createClient(SUPA_URL,SUPA_KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:false,flowType:'implicit'}})}catch(e){if(tab==='signin')renderSignin();return}
-  if(AUTH_HASH){const q=new URLSearchParams(AUTH_HASH),rec=q.get('type')==='recovery';
-    history.replaceState(null,'',location.pathname+location.search+'#'+(rec?'signin':(tab&&tab!=='welcome'?tab:'team')));
+    SB=createClient(SUPA_URL,SUPA_KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:false,flowType:'implicit'}})}catch(e){SB_FAILED=true;renderSignin();return}
+  if(AUTH_HASH){const q=new URLSearchParams(AUTH_HASH),rec=q.get('type')==='recovery';INTENDED='team';
+    history.replaceState(null,'',location.pathname+location.search+'#signin');if(rec)AUTH_MODE='reset';
     if(q.get('access_token')){const {error}=await SB.auth.setSession({access_token:q.get('access_token'),refresh_token:q.get('refresh_token')});
-      if(error)toast('That link expired. Request a new one.');else if(rec){AUTH_MODE='reset';go('signin')}else toast('Email confirmed. You are signed in.')}
+      if(error){AUTH_MODE='in';toast('That link expired. Request a new one.')}else if(!rec)toast('Email confirmed. You are signed in.')}
     else if(q.get('error_description'))toast(q.get('error_description').replace(/\+/g,' '))}
   const {data}=await SB.auth.getSession();USER=data&&data.session?data.session.user:null;
-  if(USER){startSessionClock();if(!(await checkExpiry())){loadProfile();cloudPull()}}
+  if(USER){startSessionClock();if(!(await checkExpiry())){loadProfile();cloudPull();if(AUTH_MODE!=='reset')enterApp()}}
   acctUI();
   SB.auth.onAuthStateChange((ev,session)=>{const was=USER&&USER.id;USER=session?session.user:null;
-    if(ev==='SIGNED_OUT'){PROFILE=null;lsDel(EXP_KEY)}
-    if(USER&&USER.id!==was){startSessionClock();loadProfile();cloudPull()}acctUI()});
+    if(ev==='SIGNED_OUT'){lsDel(EXP_KEY);if(was)leaveApp();return}
+    if(USER&&USER.id!==was){startSessionClock();loadProfile();cloudPull();if(tab==='signin'&&AUTH_MODE!=='reset'&&!AUTH_BUSY)enterApp()}acctUI()});
   setInterval(checkExpiry,60*60e3)}
 document.addEventListener('click',e=>{const t=e.target;if(!t.closest)return;
   if(t.closest('#acct-btn')){location.hash='signin';return}
   const m=t.closest('[data-auth-mode]');if(m){AUTH_MODE=m.dataset.authMode;AUTH_MSG=null;renderSignin();return}
   if(t.closest('[data-auth-home]')){location.hash='team';return}
-  if(t.id==='auth-out'){SB.auth.signOut({scope:'local'}).then(()=>{USER=null;PROFILE=null;lsDel(EXP_KEY);AUTH_MODE='in';acctUI();toast('Signed out. Your league stays on this device.')})}});
+  if(t.id==='auth-out'){SB.auth.signOut({scope:'local'}).then(()=>{lsDel(EXP_KEY);leaveApp();toast('Signed out. Your league is saved.')})}});
 document.addEventListener('submit',e=>{if(e.target.id!=='auth-form')return;e.preventDefault();if(!AUTH_BUSY)authSubmit(e.target.dataset.mode)});
 initAccounts();

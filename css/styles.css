@@ -532,3 +532,4 @@ label.btn.shot-btn{display:inline-flex;align-items:center;gap:8px;white-space:no
 .auth-rows>div{display:flex;justify-content:space-between;gap:12px;padding:11px 12px;font-size:13.5px}
 .auth-rows>div+div{border-top:1px solid var(--line)}.auth-rows span{color:var(--muted)}
 @media (max-width:600px){.acct-btn{padding:0 10px;font-size:12px}.auth-card{padding:20px}.auth-card h1{font-size:32px}}
+body.signed-out .nav,body.signed-out #week-pill,body.signed-out #acct-btn{display:none}
