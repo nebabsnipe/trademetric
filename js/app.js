@@ -156,12 +156,12 @@ function applyLive(){
       const pp=PLAT&&PLAT.pts[p.id];g.live={pts:pp!=null?pp:gm.state==='post'?stat+paTier(pa,sc):stat,state:gm.state,detail:gm.detail,rem:gm.rem,src:pp!=null?PLAT.src:null};g.projNext=pp!=null&&gm.state==='post'?pp:stat+projStat*gm.rem+paTier(Math.round(estPA),sc);return}
     const pp=PLAT&&PLAT.pts[p.id],pts=pp!=null?pp:st?linePts(st,p.pos,sc):0;g.live={pts,state:gm.state,detail:gm.detail,rem:gm.rem,src:pp!=null?PLAT.src:null};g.projNext=gm.state==='post'?pts:pts+g.projNext*gm.rem})}
 function liveStatus(){if(!LIVE||!LIVE.injuries)return;const keep=['IR','PUP','SUS'];
-  LIVE.injuries.forEach(([n,t,st])=>{const p=findByName(n);if(!p||p.pos==='DST'||(p.t!==t&&norm(p.n)!==norm(n)))return;
+  LIVE.injuries.forEach(([n,t,st])=>{const p=findExact(n);if(!p||p.pos==='DST'||(p.t!==t&&norm(p.n)!==norm(n)))return;
     if(st)p.status=st;else if(!keep.includes(String(p.status||'').toUpperCase()))p.status=''})}
 async function loadLive(){
   clearTimeout(LIVE_TIMER);let next=10*60e3;
   try{const r=await fetch('/api/live?week='+WEEK+'&b='+Math.floor(Date.now()/120000));if(r.ok){const j=await r.json();
-    if(j&&j.games){await loadPlatform();LIVE=j;LIVEST={};(j.players||[]).forEach(x=>{const p=x.pos==='DST'?byId['dst-'+String(x.t).toLowerCase()]:findByName(x.n);if(p&&p.pos===x.pos)LIVEST[p.id]=x.s});
+    if(j&&j.games){await loadPlatform();LIVE=j;LIVEST={};(j.players||[]).forEach(x=>{const p=x.pos==='DST'?byId['dst-'+String(x.t).toLowerCase()]:findExact(x.n);if(p&&p.pos===x.pos)LIVEST[p.id]=x.s});
       liveStatus();recompute();const a=document.activeElement;if(!(a&&/INPUT|TEXTAREA|SELECT/.test(a.tagName)))render();if(j.live||Object.values(j.games).some(g=>g.state==='pre'&&Date.parse(g.start)-Date.now()<30*60e3))next=2*60e3}}}catch(e){}
   LIVE_TIMER=setTimeout(()=>{if(document.hidden)document.addEventListener('visibilitychange',loadLive,{once:true});else loadLive()},next)}
 const liveOf=id=>G[id]&&G[id].live;
@@ -182,7 +182,7 @@ async function loadSleeperLineups(){const src=S.real&&S.real.src;if(!src||src.ty
 const ESPN_SLOT_MAP={0:'QB',2:'RB',4:'WR',6:'TE',16:'DST',23:'FLEX',3:'FLEX',5:'FLEX',7:'SF'};
 function readEspnWeek(d){const src=S.real&&S.real.src;if(!d||!src||src.type!=='espn')return;const out={},pts={},team={};
   (d.teams||[]).forEach(t=>{const tid=src.rid[t.id];if(!tid)return;const L=[];
-    ((t.roster&&t.roster.entries)||[]).forEach(e=>{const pl=e.playerPoolEntry&&e.playerPoolEntry.player;if(!pl)return;const q=findByName(pl.fullName)||(pl.defaultPositionId===16?byId['dst-'+String(pl.proTeamAbbreviation||'').toLowerCase()]:null);
+    ((t.roster&&t.roster.entries)||[]).forEach(e=>{const pl=e.playerPoolEntry&&e.playerPoolEntry.player;if(!pl)return;const q=findExact(pl.fullName)||(pl.defaultPositionId===16?byId['dst-'+String(pl.proTeamAbbreviation||'').toLowerCase()]:null);
       const st=(pl.stats||[]).find(x=>x.scoringPeriodId===WEEK&&x.statSourceId===0&&(x.statSplitTypeId===1||x.statSplitTypeId==null));if(q&&st)pts[q.id]=+st.appliedTotal||0;
       if(ESPN_SLOT_MAP[e.lineupSlotId])L.push({label:ESPN_SLOT_MAP[e.lineupSlotId],id:q?q.id:null})});
     L.sort((a,b)=>SLOT_ORDER.indexOf(a.label)-SLOT_ORDER.indexOf(b.label));if(L.length)out[tid]=L});
@@ -198,10 +198,12 @@ async function sleeperIds(){if(SLP_IDS)return SLP_IDS;try{const r=await fetch('/
 function rosterChanged(T,ids){const a=[...T.players].sort().join(),b=[...ids].sort().join();if(a===b)return false;T.players=ids;return true}
 async function syncSleeper(){const src=S.real&&S.real.src;if(!src||src.type!=='sleeper')return false;
   const [rosters,users]=await Promise.all([getJSON(`https://api.sleeper.app/v1/league/${src.league}/rosters`),getJSON(`https://api.sleeper.app/v1/league/${src.league}/users`)]);
-  let changed=false,ids=null;
+  let changed=false,ids=await sleeperIds();
+  /* re-check saved Sleeper-to-player links against Sleeper's real names; drop any that were matched loosely */
+  if(ids&&Object.keys(ids).length)for(const [pid,id] of Object.entries(src.pmap)){const x=ids[pid],q=byId[id];if(x&&(!q||norm(q.n)!==norm(x[0])))delete src.pmap[pid]}
   for(const r of rosters){const tid=src.rid[r.roster_id],T=tid&&teamById(tid);if(!T)continue;
     const out=[];for(const pid of (r.players||[])){let id=src.pmap[pid]||sleeperDst(pid);
-      if(!id){ids=ids||await sleeperIds();const x=ids[pid];const q=x&&findByName(x[0]);if(q&&q.pos===x[1]){id=q.id;src.pmap[pid]=id}}
+      if(!id){const x=ids&&ids[pid];const q=x&&findExact(x[0],x[1],x[2]);if(q&&q.pos===x[1]){id=q.id;src.pmap[pid]=id}}
       if(id&&byId[id])out.push(id)}
     if(rosterChanged(T,[...new Set(out)]))changed=true;
     const us=users.find(x=>x.user_id===r.owner_id),nm=(us&&us.metadata&&us.metadata.team_name)||(us&&us.display_name);if(nm&&nm!==T.name){T.name=nm;changed=true}
@@ -209,7 +211,7 @@ async function syncSleeper(){const src=S.real&&S.real.src;if(!src||src.type!=='s
   return changed}
 function syncEspnRosters(d){const src=S.real&&S.real.src;if(!d||!src||src.type!=='espn')return false;let changed=false;
   (d.teams||[]).forEach(t=>{const tid=src.rid[t.id],T=tid&&teamById(tid);if(!T)return;
-    const out=((t.roster&&t.roster.entries)||[]).map(e=>e.playerPoolEntry&&e.playerPoolEntry.player).filter(Boolean).map(pl=>{const q=pl.defaultPositionId===16?(findByName(pl.fullName)||null):findByName(pl.fullName);return q&&q.id}).filter(Boolean);
+    const out=((t.roster&&t.roster.entries)||[]).map(e=>e.playerPoolEntry&&e.playerPoolEntry.player).filter(Boolean).map(pl=>{const q=pl.defaultPositionId===16?(byId['dst-'+String(pl.proTeamAbbreviation||'').toLowerCase()]||findExact(pl.fullName)):findExact(pl.fullName);return q&&q.id}).filter(Boolean);
     if(out.length&&rosterChanged(T,[...new Set(out)]))changed=true;
     const nm=t.name||[t.location,t.nickname].filter(Boolean).join(' ');if(nm&&nm!==T.name){T.name=nm;changed=true}
     const o=(t.record&&t.record.overall)||{};S.real.rec[tid]={w:o.wins||0,l:o.losses||0,t:o.ties||0,pf:o.pointsFor||0}});
@@ -341,11 +343,16 @@ function ownerHtml(id,withAssign=true){const o=OWN[id];if(o){const T=teamById(o)
 function plCell(p,sub){return `<div class="pl">${av(p,'sm')}<div class="meta"><button class="pname" data-open="${p.id}">${esc(p.n)}</button><span class="psub">${sub??`${p.t} · ${oppHtml(p.id)}`}</span></div></div>`}
 let toastT;function toast(m){const t=$('toast');t.textContent=m;t.hidden=false;clearTimeout(toastT);toastT=setTimeout(()=>t.hidden=true,2400)}
 const norm=s=>s.toLowerCase().replace(/[.'’]/g,'').replace(/\b(jr|sr|ii|iii|iv)\b/g,'').replace(/[^a-z ]/g,' ').replace(/\s+/g,' ').trim();
-function findByName(v){const q=norm(v||'');if(!q)return null;let p=POOL.find(x=>norm(x.n)===q);if(p)return p;
-  const parts=q.split(' '),last=parts[parts.length-1],fi=parts[0][0];
-  const lastM=POOL.filter(x=>{const n=norm(x.n).split(' ');return n[n.length-1]===last||n.includes(last)});
-  if(lastM.length===1)return lastM[0];p=lastM.find(x=>norm(x.n)[0]===fi);if(p)return p;
-  return POOL.find(x=>norm(x.n).includes(q))||null}
+/* Exact full-name match only. Used for anything automatic (league imports, syncing, live stats, injuries),
+   so a player TradeMetric doesn't track is skipped instead of being mistaken for someone else. */
+function findExact(v,pos,team){const q=norm(v||'');if(!q)return null;const m=POOL.filter(x=>norm(x.n)===q);if(m.length<2)return m[0]||null;
+  return m.find(x=>(!pos||x.pos===pos)&&(!team||x.t===team))||m.find(x=>!pos||x.pos===pos)||m[0]}
+/* Forgiving match for names people type in. Last name must match exactly; with a first name, its first letter must match too. */
+function findByName(v){const q=norm(v||'');if(!q)return null;const ex=findExact(v);if(ex)return ex;
+  const parts=q.split(' ');
+  if(parts.length===1){const m=POOL.filter(x=>norm(x.n).split(' ').includes(q));return m.length===1?m[0]:m.sort((a,b)=>V.rank[a.id]-V.rank[b.id])[0]||null}
+  const last=parts[parts.length-1],fi=parts[0][0];
+  return POOL.filter(x=>{const n=norm(x.n).split(' ');return n[n.length-1]===last&&n[0][0]===fi}).sort((a,b)=>V.rank[a.id]-V.rank[b.id])[0]||null}
 function assign(id,teamId){S.teams.forEach(T=>T.players=T.players.filter(x=>x!==id));if(teamId)teamById(teamId).players.push(id);S.example=false;save();recompute()}
 const bump=()=>{save();recompute();render()};
 
@@ -797,7 +804,7 @@ async function sleeperImport(i){
     rosters.forEach((r,i)=>{const s=r.settings||{};real.rec[i]={w:s.wins||0,l:s.losses||0,t:s.ties||0,pf:(s.fpts||0)+(s.fpts_decimal||0)/100}});
     const pmap={},want=new Map(POOL.filter(q=>q.pos!=='DST').map(q=>[norm(q.n),q])),cands=Object.entries(SLEEPER_PLAYERS).filter(([,sp])=>sp&&OFF.includes(sp.position)&&sp.full_name&&want.has(norm(sp.full_name)));
     /* same name: prefer the one on the same NFL team */
-    const took=new Set();[true,false].forEach(sameTeam=>cands.forEach(([pid,sp])=>{const q=want.get(norm(sp.full_name));if(took.has(q.id)||(sameTeam&&sp.team!==q.t))return;pmap[pid]=q.id;took.add(q.id)}));rosters.forEach(r=>(r.players||[]).forEach(pid=>{const sp=SLEEPER_PLAYERS[pid];if(sp&&!pmap[pid]&&OFF.includes(sp.position)){const q=findByName(sp.full_name);if(q)pmap[pid]=q.id}}));
+    const took=new Set();[true,false].forEach(sameTeam=>cands.forEach(([pid,sp])=>{const q=want.get(norm(sp.full_name));if(took.has(q.id)||(sameTeam&&sp.team!==q.t))return;pmap[pid]=q.id;took.add(q.id)}));rosters.forEach(r=>(r.players||[]).forEach(pid=>{const sp=SLEEPER_PLAYERS[pid];if(sp&&!pmap[pid]&&OFF.includes(sp.position)){const q=findExact(sp.full_name,sp.position);if(q)pmap[pid]=q.id}}));
     real.src={type:'sleeper',league:lg.league_id,labels:rp.filter(x=>!['BN','IR','TAXI'].includes(x)),rid:Object.fromEntries(rosters.map((r,i)=>[r.roster_id,i])),pmap};
     applyImport(lg.name,teams,sc,slots,'Sleeper',real)}
   catch(e){impMsg(e.blocked?BLOCKED_MSG:`<p class="note" style="color:var(--bad)">Import failed (${esc(e.message)}). Try again.</p>`)}
@@ -846,7 +853,7 @@ async function espnImport(id,creds){
     (d.teams||[]).forEach((t,i)=>{const o=(t.record&&t.record.overall)||{};real.rec[i]={w:o.wins||0,l:o.losses||0,t:o.ties||0,pf:o.pointsFor||0}});
     const ESPN_SLOT={0:'QB',2:'RB',4:'WR',6:'TE',16:'DST',23:'FLEX',3:'FLEX',5:'FLEX',7:'SF'};
     real.lineupWeek=d.scoringPeriodId||null;real.lineups={};
-    (d.teams||[]).forEach((t,i)=>{const L=((t.roster&&t.roster.entries)||[]).filter(e=>ESPN_SLOT[e.lineupSlotId]).map(e=>{const pl=e.playerPoolEntry&&e.playerPoolEntry.player,q=pl&&findByName(pl.fullName);return {label:ESPN_SLOT[e.lineupSlotId],id:q?q.id:null}});
+    (d.teams||[]).forEach((t,i)=>{const L=((t.roster&&t.roster.entries)||[]).filter(e=>ESPN_SLOT[e.lineupSlotId]).map(e=>{const pl=e.playerPoolEntry&&e.playerPoolEntry.player,q=pl&&findExact(pl.fullName);return {label:ESPN_SLOT[e.lineupSlotId],id:q?q.id:null}});
       L.sort((a,b)=>SLOT_ORDER.indexOf(a.label)-SLOT_ORDER.indexOf(b.label));if(L.length)real.lineups[i]=L});
     real.src={type:'espn',league:String(id),priv:!!creds,rid:Object.fromEntries((d.teams||[]).map((t,i)=>[t.id,i]))};if(creds)IMP.espnCreds=creds;
     applyImport((st.name)||'ESPN League',teams,sc,slots,'ESPN',real);readEspnWeek(d)}
@@ -854,7 +861,7 @@ async function espnImport(id,creds){
 }
 function applyImport(name,teams,sc,slots,src,real){
   let miss=0;S.league.name=name;S.league.sc={...S.league.sc,...sc};S.league.slots={...S.league.slots,...slots};S.league.teams=teams.length;
-  S.teams=teams.map((t,i)=>({id:'t'+(i+1),name:t.name,players:[...new Set(t.names.map(n=>{const p=findByName(n);if(!p)miss++;return p&&p.id}).filter(Boolean))]}));
+  S.teams=teams.map((t,i)=>({id:'t'+(i+1),name:t.name,players:[...new Set(t.names.map(n=>{const p=findExact(n);if(!p)miss++;return p&&p.id}).filter(Boolean))]}));
   if(real){const tid=i=>S.teams[i]&&S.teams[i].id,mapW=o=>{const r={};for(const w in o)r[w]=o[w].map(([a,b])=>[tid(a),b==null?null:tid(b)]);return r},mapT=o=>{const r={};for(const k in o)r[tid(+k)]=o[k];return r};
     const scores={};for(const w in real.scores)scores[w]=mapT(real.scores[w]);
     const src=real.src?{...real.src,rid:Object.fromEntries(Object.entries(real.src.rid).map(([rid,i])=>[rid,tid(i)]))}:null;
