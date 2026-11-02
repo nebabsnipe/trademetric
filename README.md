@@ -44,7 +44,7 @@ Every change pushed to the `main` branch goes live automatically in about a minu
 
 ## Scoring
 
-When a league is imported from Sleeper or ESPN, it re-syncs in the background (rosters, team names, records, starters and points) when the site opens and every few minutes. Live and final fantasy points for the week come from that platform, and lineups follow the starters set there. Projections are TradeMetric's own.
+When a league is imported from Sleeper or ESPN, it re-syncs in the background (rosters, team names, records, starters and points) when the site opens and every few minutes. Live and final fantasy points for the week come from that platform, and lineups follow the starters set there. Projections are TradeMetric's own. Kickers (K) are included, with kicking scoring under League Setup.
 
 ## Fresh data every day
 

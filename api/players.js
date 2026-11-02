@@ -6,7 +6,7 @@ export default async function handler(req, res) {
     if (!r.ok) throw new Error('sleeper ' + r.status);
     const all = await r.json(), out = {};
     for (const [id, p] of Object.entries(all)) {
-      if (!p || !['QB', 'RB', 'WR', 'TE'].includes(p.position) || !p.full_name) continue;
+      if (!p || !['QB', 'RB', 'WR', 'TE', 'K'].includes(p.position) || !p.full_name) continue;
       out[id] = [p.full_name, p.position, p.team || ''];
     }
     res.setHeader('Cache-Control', 'public, max-age=3600, s-maxage=43200');

@@ -18,7 +18,7 @@ async function injuries() {
   const all = await j('https://api.sleeper.app/v1/players/nfl');
   const out = [];
   for (const p of Object.values(all)) {
-    if (!['QB', 'RB', 'WR', 'TE'].includes(p.position) || !p.team) continue;
+    if (!['QB', 'RB', 'WR', 'TE', 'K'].includes(p.position) || !p.team) continue;
     if (!(p.search_rank > 0 && p.search_rank <= 600)) continue;
     let st = p.injury_status ? (INJ[p.injury_status] ?? '') : '';
     if (!st && p.status === 'Injured Reserve') st = 'IR';
@@ -52,6 +52,10 @@ function gameInfo(board) {
 
 function statLine(s, pos) {
   const n = k => +s[k] || 0;
+  if (pos === 'K') return {
+    k39: n('fgm_0_19') + n('fgm_20_29') + n('fgm_30_39'), k49: n('fgm_40_49'), k50: n('fgm_50p') || (n('fgm_50_59') + n('fgm_60p')),
+    kmiss: n('fgmiss'), xpm: n('xpm'), xpmiss: n('xpmiss'),
+  };
   if (pos === 'DEF') return {
     dsk: n('def_sack') || n('sack'), dint: n('def_int') || n('int'), dfr: n('def_fum_rec') || n('fum_rec'),
     dtd: n('def_td') + n('def_st_td') + n('st_td'), dsf: n('def_safe') || n('safe'), pa: n('pts_allow'),
@@ -69,7 +73,7 @@ export default async function handler(req, res) {
     const season = +state.season;
     let week = parseInt((req.query && req.query.week) || state.week, 10);
     if (!(week >= 1 && week <= 18)) week = state.week;
-    const pos = ['QB', 'RB', 'WR', 'TE', 'DEF'].map(p => 'position[]=' + p).join('&');
+    const pos = ['QB', 'RB', 'WR', 'TE', 'K', 'DEF'].map(p => 'position[]=' + p).join('&');
     const [stats, board, inj] = await Promise.all([
       j(`https://api.sleeper.com/stats/nfl/${season}/${week}?season_type=regular&${pos}`).catch(() => []),
       j(`https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?seasontype=2&week=${week}&dates=${season}`).catch(() => null),

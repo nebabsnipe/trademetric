@@ -200,7 +200,45 @@ for i,(t,_) in enumerate(sorted(avgp.items(),key=lambda x:x[1])):d['def'].setdef
 d['dst']=out
 print(len(out),'defenses; league avg',[round(x,2) for x in L]);print(out[0][:2],out[0][2][-2:])
 
-# ---------- expert consensus ----------
+# ---------- kickers ----------
+# per-game made FGs by distance, misses and extra points, regressed toward the league average
+kw=pd.read_csv(D+'stats_player_week_'+str(SEASON)+'.csv',low_memory=False)
+kw=kw[(kw.season_type=='REG')&(kw.position=='K')&(kw.week<=PLAYED)].copy()
+kw['team']=kw.team.map(fix);kw['opponent_team']=kw.opponent_team.map(fix)
+for c in ['fg_made_0_19','fg_made_20_29','fg_made_30_39','fg_made_40_49','fg_made_50_59','fg_made_60_','fg_missed','pat_made','pat_missed']:kw[c]=kw[c].fillna(0)
+kw['k39']=kw.fg_made_0_19+kw.fg_made_20_29+kw.fg_made_30_39;kw['k49']=kw.fg_made_40_49;kw['k50']=kw.fg_made_50_59+kw.fg_made_60_
+kw['kmiss']=kw.fg_missed;kw['xpm']=kw.pat_made;kw['xpmiss']=kw.pat_missed
+KF=['k39','k49','k50','kmiss','xpm','xpmiss']
+kagg=kw.groupby('player_id').agg(name=('player_display_name','last'),g=('week','nunique'),**{f:(f,'sum') for f in KF}).reset_index()
+LG=[kw[f].sum()/max(1,len(kw)) for f in KF]
+rosk=ros[ros.position=='K']
+kickers=[]
+for r in kagg.sort_values('g',ascending=False).itertuples():
+    rows=kw[kw.player_id==r.player_id].sort_values('week');rr=ros[ros.gsis_id==r.player_id]
+    team=rr.iloc[0].team if len(rr) else rows.iloc[-1].team
+    if len(rr) and rr.iloc[0].status not in ('ACT','RES','INA','DEV'):continue
+    gp=r.g;proj=[round((getattr(r,f)+LG[i]*3)/(gp+3),3) for i,f in enumerate(KF)]
+    byw={int(x.week):x for x in rows.itertuples()};log=[]
+    for wk in range(1,PLAYED+1):
+        sch=sched.get(team,[0]*18)[wk-1]
+        if wk in byw:x=byw[wk];log.append([x.opponent_team,1 if sch and sch[1]==1 else 0]+[int(getattr(x,f)) for f in KF])
+        elif sch==0:log.append(0)
+        else:log.append([sch[0],sch[1]])
+    st,note=status_for(norm(r.name),r.player_id)
+    kickers.append([slug(r.name),r.name,team,st,note,proj,log])
+# rostered kickers who haven't kicked yet
+have={k[1] for k in kickers}
+for rr in rosk[rosk.status.isin(['ACT','RES'])].itertuples():
+    if rr.full_name in have or rr.team not in sched:continue
+    log=[0 if sched[rr.team][wk-1]==0 else [sched[rr.team][wk-1][0],sched[rr.team][wk-1][1]] for wk in range(1,PLAYED+1)]
+    st,note=status_for(norm(rr.full_name),rr.gsis_id);kickers.append([slug(rr.full_name),rr.full_name,rr.team,st,note,[round(x,3) for x in LG],log])
+# kicker matchup: standard kicker points allowed per game (1 = allows the fewest)
+kw['kp']=3*kw.k39+4*kw.k49+5*kw.k50-kw.kmiss+kw.xpm-kw.xpmiss
+ka=kw.groupby(['opponent_team','week']).kp.sum().reset_index().groupby('opponent_team').kp.mean()
+for i,(t,_) in enumerate(ka.sort_values().items()):d['def'].setdefault(t,{})['K']=i+1
+d['k']=kickers;d['kfields']=KF
+print(len(kickers),'kickers',file=sys.stderr)
+
 d=data
 rows=list(csv.DictReader(open(ECR_FILE))) if ECR_FILE else []
 norm=lambda s:re.sub(r'[^a-z]','',re.sub(r'\b(jr|sr|ii|iii|iv|v)\b\.?','',s.lower()))
