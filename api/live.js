@@ -1,6 +1,6 @@
 // Live game-day data: scores and game clocks (ESPN), player stats so far (Sleeper)
 // and the latest injury designations (Sleeper). Cached at Vercel's edge so every
-// visitor shares one fetch: 2 minutes while games are on, 10 minutes otherwise.
+// visitor shares one fetch per 2-minute window.
 
 const TEAM = { WSH: 'WAS', LA: 'LAR', JAC: 'JAX' };
 const fix = t => TEAM[t] || t;
@@ -85,7 +85,8 @@ export default async function handler(req, res) {
       players.push({ n: ps === 'DEF' ? null : `${p.first_name || ''} ${p.last_name || ''}`.trim(), pos: ps === 'DEF' ? 'DST' : ps, t: team, s: statLine(s, ps), ppr: +s.pts_ppr || 0 });
     }
     const live = Object.values(games).some(g => g.state === 'in');
-    res.setHeader('Cache-Control', `public, s-maxage=${live ? 120 : 600}, stale-while-revalidate=300`);
+    // The page adds a 2-minute time bucket to the URL (&b=...), so a cached copy is never older than that.
+    res.setHeader('Cache-Control', `public, max-age=0, s-maxage=${live ? 120 : 300}`);
     return res.status(200).json({ season, week, nflWeek: state.week, updated: new Date().toISOString(), live, games, players, injuries: inj });
   } catch (e) {
     res.setHeader('Cache-Control', 'public, s-maxage=60');

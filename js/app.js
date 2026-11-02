@@ -159,11 +159,22 @@ function liveStatus(){if(!LIVE||!LIVE.injuries)return;const keep=['IR','PUP','SU
     if(st)p.status=st;else if(!keep.includes(String(p.status||'').toUpperCase()))p.status=''})}
 async function loadLive(){
   clearTimeout(LIVE_TIMER);let next=10*60e3;
-  try{const r=await fetch('/api/live?week='+WEEK,{cache:'no-cache'});if(r.ok){const j=await r.json();
-    if(j&&j.games){LIVE=j;LIVEST={};(j.players||[]).forEach(x=>{const p=x.pos==='DST'?byId['dst-'+String(x.t).toLowerCase()]:findByName(x.n);if(p&&p.pos===x.pos)LIVEST[p.id]=x.s});
-      liveStatus();recompute();const a=document.activeElement;if(!(a&&/INPUT|TEXTAREA|SELECT/.test(a.tagName)))render();if(j.live)next=2*60e3}}}catch(e){}
+  try{const r=await fetch('/api/live?week='+WEEK+'&b='+Math.floor(Date.now()/120000));if(r.ok){const j=await r.json();
+    if(j&&j.games){await loadSleeperLineups();LIVE=j;LIVEST={};(j.players||[]).forEach(x=>{const p=x.pos==='DST'?byId['dst-'+String(x.t).toLowerCase()]:findByName(x.n);if(p&&p.pos===x.pos)LIVEST[p.id]=x.s});
+      liveStatus();recompute();const a=document.activeElement;if(!(a&&/INPUT|TEXTAREA|SELECT/.test(a.tagName)))render();if(j.live||Object.values(j.games).some(g=>g.state==='pre'&&Date.parse(g.start)-Date.now()<30*60e3))next=2*60e3}}}catch(e){}
   LIVE_TIMER=setTimeout(()=>{if(document.hidden)document.addEventListener('visibilitychange',loadLive,{once:true});else loadLive()},next)}
 const liveOf=id=>G[id]&&G[id].live;
+/* Real starting lineups from the league's platform. Sleeper refreshes with live data; ESPN is captured at import. */
+const SLOT_ORDER=['QB','RB','WR','TE','FLEX','SF','DST'];
+let LIVE_LU=null;
+const SLEEPER_SLOT={QB:'QB',RB:'RB',WR:'WR',TE:'TE',FLEX:'FLEX',REC_FLEX:'FLEX',WRRB_FLEX:'FLEX',SUPER_FLEX:'SF',DEF:'DST'};
+function realLineup(tid){let r=LIVE_LU&&LIVE_LU[tid];if(!r&&S.real&&S.real.lineups&&S.real.lineupWeek===WEEK)r=S.real.lineups[tid];if(!r||!r.length)return null;
+  return {slots:r.map(x=>({label:x.label,p:x.id&&byId[x.id]||null})),bench:[],total:0,real:true}}
+async function loadSleeperLineups(){const src=S.real&&S.real.src;if(!src||src.type!=='sleeper')return;
+  try{const ms=await getJSON(`https://api.sleeper.app/v1/league/${src.league}/matchups/${WEEK}`),out={};
+    (ms||[]).forEach(m=>{const tid=src.rid[m.roster_id];if(!tid||!Array.isArray(m.starters))return;
+      out[tid]=m.starters.map((pid,i)=>({label:SLEEPER_SLOT[src.labels[i]]||null,id:src.pmap[pid]||(/^[A-Z]{2,3}$/.test(pid)?'dst-'+(pid==='LA'?'lar':pid.toLowerCase()):null)})).filter(x=>x.label)});
+    LIVE_LU=out}catch(e){}}
 function liveTxt(id){const l=liveOf(id);if(!l)return '';return `<span class="live-tag ${l.state}">${l.state==='post'?'Final':esc(l.detail||'Live')}</span>`}
 function rebuildOwn(){OWN={};S.teams.forEach(T=>T.players.forEach(id=>OWN[id]=T.id))}
 const teamById=id=>S.teams.find(T=>T.id===id);
@@ -512,7 +523,7 @@ function bestPickups(){if(BRIEF_CACHE.v===VER)return BRIEF_CACHE.d;const me=myTe
   const d=POOL.filter(p=>!OWN[p.id]&&!isOut(p.id)&&V.pts[p.id]>4).map(p=>{const drop=dropFor(p.id);return {p,drop,g:drop?lineup(me.players.filter(x=>x!==drop).concat(p.id),projV).total-before:0}}).sort((a,b)=>b.g-a.g).slice(0,3);
   BRIEF_CACHE={v:VER,d};return d}
 function renderBriefing(){const el=$('briefing');if(!el)return;const me=myTeam(),items=[];
-  const oid=oppOf(S.me,WEEK);if(oid){const A=weekLine(me.players,WEEK),Bm=weekLine(teamById(oid).players,WEEK),pw=Phi((A.m-Bm.m)/Math.sqrt(A.sd**2+Bm.sd**2));
+  const oid=oppOf(S.me,WEEK);if(oid){const A=weekLine(me.players,WEEK,S.me),Bm=weekLine(teamById(oid).players,WEEK,oid),pw=Phi((A.m-Bm.m)/Math.sqrt(A.sd**2+Bm.sd**2));
     items.push({k:'Matchup',h:`<p>You're <b>${pct(pw)}</b> to beat ${esc(teamById(oid).name)} this week, ${f1(A.m)} to ${f1(Bm.m)} projected.</p>`,acts:[['Open matchup','goto|team|matchup']]})}
   const starters=lineup(me.players,projV).slots.filter(x=>x.p).map(x=>x.p.id),worries=[];
   starters.forEach(id=>{const st=stOf(id),g=G[id],n=esc(byId[id].n);if(st&&st!=='Q')worries.push([id,`${n} is ${({O:'out',D:'doubtful',IR:'on injured reserve',PUP:'on the PUP list',SUS:'suspended'})[st]}.`]);else if(st==='Q')worries.push([id,`${n} is questionable${byId[id].inj?' ('+esc(byId[id].inj).toLowerCase()+')':''}.`]);else if(!g.next)worries.push([id,`${n} is on bye.`]);else if(g.next.rank<=4)worries.push([id,`${n} faces a tough ${g.next.opp} defense.`])});
@@ -613,7 +624,7 @@ function schedule(){REG_WEEKS=(S.real&&S.real.regWeeks)||14;const ids=S.teams.ma
   SCHED={key,weeks};return weeks}
 function oppOf(tid,w){const pr=(schedule()[w]||[]).find(p=>p.includes(tid));return pr?(pr[0]===tid?pr[1]:pr[0]):null}
 function pickVal(w){return id=>{const p=byId[id];if(BYE[p.t]===w||LONG_OUT.includes(stOf(id)))return 0;if(w===WEEK&&G[id]&&G[id].live)return G[id].projNext;const o=OPP[p.t]&&OPP[p.t][w];return V.pts[id]*(o?matchF(o.opp,p.pos):1)*(w===WEEK?weekMult(id)*(p.pos==='DST'?1:vegasF(p.t)):1)}}
-function weekLine(players,w){const f=pickVal(w),lu=lineup(players,f);let m=0,v=0;lu.slots.forEach(s=>{if(!s.p)return;const x=f(s.p.id),l=w===WEEK&&liveOf(s.p.id),rf=l?(l.state==='post'?0:l.rem):1;m+=x;v+=(CV[s.p.pos]*x*rf)**2});return {m,sd:Math.sqrt(v)||1,lu}}
+function weekLine(players,w,tid){const f=pickVal(w),lu=(w===WEEK&&tid&&realLineup(tid))||lineup(players,f);let m=0,v=0;lu.slots.forEach(s=>{if(!s.p)return;const x=f(s.p.id),l=w===WEEK&&liveOf(s.p.id),rf=l?(l.state==='post'?0:l.rem):1;m+=x;v+=(CV[s.p.pos]*x*rf)**2});return {m,sd:Math.sqrt(v)||1,lu}}
 function recordsThru(n){const d={};S.teams.forEach(T=>d[T.id]={w:0,l:0,t:0,pf:0});const sched=schedule();
   if(S.real&&S.real.scores){for(let w=1;w<=n;w++){const sc=S.real.scores[w]||{};(sched[w]||[]).forEach(([a,b])=>{if(!a||!b||sc[a]==null||sc[b]==null)return;d[a].pf+=sc[a];d[b].pf+=sc[b];if(sc[a]>sc[b]){d[a].w++;d[b].l++}else if(sc[b]>sc[a]){d[b].w++;d[a].l++}else{d[a].t++;d[b].t++}})}return d}
   for(let w=1;w<=n;w++){const sc={};S.teams.forEach(T=>{const lu=lineup(T.players,id=>BYE[byId[id].t]===w?0:V.pts[id]);sc[T.id]=lu.slots.reduce((a,x)=>a+(x.p?(G[x.p.id].pts[w-1]||0):0),0)});
@@ -634,7 +645,7 @@ function simulate(over){
   if(S.teams.length<2)return null;if(SIM_CACHE.v!==VER)SIM_CACHE={v:VER};
   const key=over?Object.keys(over).sort().map(k=>k+':'+over[k].join(',')).join(';'):'base';if(SIM_CACHE[key])return SIM_CACHE[key];
   const ids=S.teams.map(T=>T.id),pl=t=>(over&&over[t])||teamById(t).players,rec=records(),sched=schedule(),M={};
-  const P0=realPlayed();ids.forEach(t=>{M[t]={};for(let w=Math.min(P0,PLAYED)+1;w<=17;w++)M[t][w]=weekLine(pl(t),w)});
+  const P0=realPlayed();ids.forEach(t=>{M[t]={};for(let w=Math.min(P0,PLAYED)+1;w<=17;w++)M[t][w]=weekLine(pl(t),w,over&&over[t]?null:t)});
   const r=mulberry32(90210);let spare=null;
   const z=()=>{if(spare!==null){const x=spare;spare=null;return x}let u=0;while(u===0)u=r();const v=r(),m=Math.sqrt(-2*Math.log(u));spare=m*Math.sin(2*Math.PI*v);return m*Math.cos(2*Math.PI*v)};
   const PT=(S.real&&S.real.playoffTeams)||(ids.length>=10?6:ids.length>=6?4:2),P=Math.min(PT,ids.length),BP=P>=6?6:P>=4?4:2,out={P};ids.forEach(t=>out[t]={wins:0,playoff:0,bye:0,title:0});
@@ -658,13 +669,13 @@ function renderOppCard(){const el=$('opp-card');if(!el)return;
    :`<p class="empty" style="margin:0">When a starter is ruled out or lands on injured reserve, the teammates who inherit his work show up here as pickups. This turns on with the live injury feed, or now if you import projections with a status column.</p>`)}
 function renderMatchup(){const el=$('matchup');const oid=oppOf(S.me,WEEK);
   if(!oid){el.innerHTML=`<div class="card-h"><h2>Week ${WEEK} matchup</h2></div><p class="empty">No opponent this week.</p>`;return}
-  const me=myTeam(),O=teamById(oid),A=weekLine(me.players,WEEK),Bm=weekLine(O.players,WEEK),pw=Phi((A.m-Bm.m)/Math.sqrt(A.sd**2+Bm.sd**2)),f=pickVal(WEEK);
+  const me=myTeam(),O=teamById(oid),A=weekLine(me.players,WEEK,S.me),Bm=weekLine(O.players,WEEK,oid),pw=Phi((A.m-Bm.m)/Math.sqrt(A.sd**2+Bm.sd**2)),f=pickVal(WEEK);
   const keyP=(lu,ot)=>{let best=null;lu.slots.forEach((x,i)=>{if(!x.p)return;const mu=f(x.p.id);if(mu<=0)return;const o=ot.slots[i],edge=mu-(o&&o.p?f(o.p.id):0);if(!best||edge>best.edge)best={p:x.p,mu,edge,slot:x.label}});return best};
   const kp=(x,lab)=>{if(!x)return '';const n=G[x.p.id].next,lv=liveOf(x.p.id);if(lv)return `<div><span class="lab2">${lab}</span>${plCell(x.p,lv.state==='post'?`Scored ${f1(lv.pts)}. Game is final.`:`${f1(lv.pts)} so far, on pace for ${f1(x.mu)}.`)}</div>`;return `<div><span class="lab2">${lab}</span>${plCell(x.p,`${f1(x.mu)} projected${x.edge>0?`, ${f1(x.edge)} more than the other ${x.slot}`:''}${n?`. Faces ${n.opp}, ${ord(n.rank)} against ${x.p.pos}s`:''}.`)}</div>`};
   const rows=A.lu.slots.map((x,i)=>{const o=Bm.lu.slots[i],a=x.p?f(x.p.id):0,b=o&&o.p?f(o.p.id):0;
     const sub=id=>liveOf(id)?`${byId[id].pos} · ${liveTxt(id)} ${f1(liveOf(id).pts)} pts`:`${byId[id].pos} · ${oppHtml(id)}`;
     return `<tr><td>${x.p?plCell(x.p,sub(x.p.id)):'<span class="empty">Empty</span>'}</td><td class="r num ${a>=b?'win':''}">${f1(a)}</td><td class="mu-slot">${x.label}</td><td class="num ${b>a?'win':''}">${f1(b)}</td><td>${o&&o.p?plCell(o.p,sub(o.p.id)):'<span class="empty">Empty</span>'}</td></tr>`}).join('');
-  el.innerHTML=`<div class="card-h"><h2>Week ${WEEK} matchup</h2><span class="note">${LIVE&&LIVE.week===WEEK&&Object.values(LIVE.games).some(g=>g.state!=='pre')?`<span class="live-dot${LIVE.live?' on':''}"></span>${LIVE.live?'Live':'Updated'} · ${new Date(LIVE.updated).toLocaleTimeString([], {hour:'numeric',minute:'2-digit'})} · points so far plus the rest of each game projected`:'Win probability from projected lineups'}</span></div>
+  el.innerHTML=`<div class="card-h"><h2>Week ${WEEK} matchup</h2><span class="note">${A.lu.real?'Your real lineups · ':''}${LIVE&&LIVE.week===WEEK&&Object.values(LIVE.games).some(g=>g.state!=='pre')?`<span class="live-dot${LIVE.live?' on':''}"></span>${LIVE.live?'Live':'Updated'} · ${new Date(LIVE.updated).toLocaleTimeString([], {hour:'numeric',minute:'2-digit'})} · points so far plus the rest of each game projected`:'Win probability from projected lineups'}</span></div>
    <div class="mu-head"><div class="mu-team"><span class="mu-name"><i class="tsq" style="background:${teamColor(S.me)}"></i>${esc(me.name)}</span><span class="note">${recTxt(S.me)}</span><b class="num">${f1(A.m)}</b></div>
     <div class="mu-mid"><div class="mu-pct">${pct(pw)}</div><div class="note">chance you win</div></div>
     <div class="mu-team r"><span class="mu-name"><i class="tsq" style="background:${teamColor(oid)}"></i>${esc(O.name)}</span><span class="note">${recTxt(oid)}</span><b class="num">${f1(Bm.m)}</b></div></div>
@@ -682,7 +693,7 @@ function renderSeason(){
   $('sim-body').innerHTML=ids.map(t=>{const T=teamById(t),r=rec[t],x=sim[t];return `<tr class="${t===me?'me-row':''}"><td data-v="${esc(T.name.toLowerCase())}"><span class="owner${t===me?' me':''}"><i style="background:${teamColor(t)}"></i>${esc(T.name)}${t===me?' (you)':''}</span></td><td class="r num" data-v="${r.w+r.t/2+r.pf/1e5}">${recTxt(t)}</td><td class="r num">${f1(r.pf)}</td><td class="r num">${x.wins.toFixed(1)}</td><td data-v="${x.playoff}">${bar(x.playoff)}</td><td data-v="${x.bye}">${sim.P===6?bar(x.bye):'<span class="note">-</span>'}</td><td data-v="${x.title}">${bar(x.title)}</td></tr>`}).join('');
   sortTable('sim-table');
   $('sim-note').textContent=`Weeks 1 to ${PLAYED} use real 2026 scores; Weeks ${PLAYED+1} to ${REG_WEEKS} and the playoffs are simulated from projected lineups, byes and matchups. ${sim.P===6?'Seeds 1 and 2 get a first-round bye.':''}`;
-  let road='';for(let w=WEEK;w<=REG_WEEKS;w++){const oid=oppOf(me,w);if(!oid)continue;const A=weekLine(myTeam().players,w),Bm=weekLine(teamById(oid).players,w),p=Phi((A.m-Bm.m)/Math.sqrt(A.sd**2+Bm.sd**2));
+  let road='';for(let w=WEEK;w<=REG_WEEKS;w++){const oid=oppOf(me,w);if(!oid)continue;const A=weekLine(myTeam().players,w,me),Bm=weekLine(teamById(oid).players,w,oid),p=Phi((A.m-Bm.m)/Math.sqrt(A.sd**2+Bm.sd**2));
     road+=`<div class="road-row"><span class="slot">Wk ${w}</span><span class="owner"><i style="background:${teamColor(oid)}"></i>${esc(teamById(oid).name)}</span><span class="note">${recTxt(oid)}</span><span class="wp ${p>=.6?'good':p<.4?'bad':''}">${pct(p)}</span></div>`}
   $('road').innerHTML=road||'<p class="empty">Regular season is over.</p>';
 }
@@ -731,6 +742,8 @@ async function sleeperImport(i){
       const pr=Object.values(g).filter(x=>x.length===2);if(pr.length)real.sched[w]=pr;
       if(w<WEEK&&Object.values(real.scores[w]||{}).some(x=>x>0))real.played=w});
     rosters.forEach((r,i)=>{const s=r.settings||{};real.rec[i]={w:s.wins||0,l:s.losses||0,t:s.ties||0,pf:(s.fpts||0)+(s.fpts_decimal||0)/100}});
+    const pmap={};rosters.forEach(r=>(r.players||[]).forEach(pid=>{const sp=SLEEPER_PLAYERS[pid];if(sp&&OFF.includes(sp.position)){const q=findByName(sp.full_name);if(q)pmap[pid]=q.id}}));
+    real.src={type:'sleeper',league:lg.league_id,labels:rp.filter(x=>!['BN','IR','TAXI'].includes(x)),rid:Object.fromEntries(rosters.map((r,i)=>[r.roster_id,i])),pmap};
     applyImport(lg.name,teams,sc,slots,'Sleeper',real)}
   catch(e){impMsg(e.blocked?BLOCKED_MSG:`<p class="note" style="color:var(--bad)">Import failed (${esc(e.message)}). Try again.</p>`)}
 }
@@ -776,6 +789,10 @@ async function espnImport(id,creds){
       if(b!=null)(real.sched[w]=real.sched[w]||[]).push([a,b]);
       if(m.winner&&m.winner!=='UNDECIDED'){const sc=(real.scores[w]=real.scores[w]||{});sc[a]=m.home.totalPoints||0;if(b!=null)sc[b]=m.away.totalPoints||0;real.played=Math.max(real.played,w)}});
     (d.teams||[]).forEach((t,i)=>{const o=(t.record&&t.record.overall)||{};real.rec[i]={w:o.wins||0,l:o.losses||0,t:o.ties||0,pf:o.pointsFor||0}});
+    const ESPN_SLOT={0:'QB',2:'RB',4:'WR',6:'TE',16:'DST',23:'FLEX',3:'FLEX',5:'FLEX',7:'SF'};
+    real.lineupWeek=d.scoringPeriodId||null;real.lineups={};
+    (d.teams||[]).forEach((t,i)=>{const L=((t.roster&&t.roster.entries)||[]).filter(e=>ESPN_SLOT[e.lineupSlotId]).map(e=>{const pl=e.playerPoolEntry&&e.playerPoolEntry.player,q=pl&&findByName(pl.fullName);return {label:ESPN_SLOT[e.lineupSlotId],id:q?q.id:null}});
+      L.sort((a,b)=>SLOT_ORDER.indexOf(a.label)-SLOT_ORDER.indexOf(b.label));if(L.length)real.lineups[i]=L});
     applyImport((st.name)||'ESPN League',teams,sc,slots,'ESPN',real)}
   catch(e){impMsg(`<p class="note" style="color:var(--bad)">Couldn't read that ESPN league (${esc(e.message)}).</p>`)}
 }
@@ -784,7 +801,9 @@ function applyImport(name,teams,sc,slots,src,real){
   S.teams=teams.map((t,i)=>({id:'t'+(i+1),name:t.name,players:[...new Set(t.names.map(n=>{const p=findByName(n);if(!p)miss++;return p&&p.id}).filter(Boolean))]}));
   if(real){const tid=i=>S.teams[i]&&S.teams[i].id,mapW=o=>{const r={};for(const w in o)r[w]=o[w].map(([a,b])=>[tid(a),b==null?null:tid(b)]);return r},mapT=o=>{const r={};for(const k in o)r[tid(+k)]=o[k];return r};
     const scores={};for(const w in real.scores)scores[w]=mapT(real.scores[w]);
-    S.real={at:Date.now(),regWeeks:real.regWeeks,playoffTeams:real.playoffTeams,played:real.played,rec:mapT(real.rec),sched:mapW(real.sched),scores}}else S.real=null;SCHED=null;
+    const src=real.src?{...real.src,rid:Object.fromEntries(Object.entries(real.src.rid).map(([rid,i])=>[rid,tid(i)]))}:null;
+    S.real={at:Date.now(),regWeeks:real.regWeeks,playoffTeams:real.playoffTeams,played:real.played,rec:mapT(real.rec),sched:mapW(real.sched),scores,src,lineupWeek:real.lineupWeek||null,lineups:real.lineups?mapT(real.lineups):null}}else S.real=null;SCHED=null;LIVE_LU=null;
+  if(S.real&&S.real.src)setTimeout(()=>loadSleeperLineups().then(()=>{recompute();render()}),0);
   const mi=teams.findIndex(t=>t.mine);S.me=S.teams[mi>=0?mi:0].id;S.log=[];S.example=false;S.imported={name,src};S.onboarded=true;IMP.open=undefined;hubSel=S.me;bump();buildLeagueForm();toast('Imported '+name);if(location.hash!=='#team')location.hash='team';else render();window.scrollTo({top:0,behavior:'smooth'});
   impMsg(`<div class="callout buy"><b>Imported ${esc(name)}.</b> ${teams.length} teams and your scoring are loaded.${miss?` ${miss} players aren't in TradeMetric's player list yet and were skipped.`:''}${mi<0?' Pick your team in Team rosters and press "This is my team".':''}</div>`)}
 
