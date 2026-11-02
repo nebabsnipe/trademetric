@@ -33,14 +33,14 @@
   <!-- MY TEAM -->
   <section class="view" id="v-team" hidden>
     <div class="hero">
-      <div><div class="kicker" id="team-kicker"></div><h1 id="team-title">Your Team</h1><p>Your optimal Week 9 lineup, scored to your league's exact settings. Select any player for his full profile.</p></div>
+      <div><div class="kicker" id="team-kicker"></div><h1 id="team-title">Your Team</h1><p>Your optimal <span class="wk-now">this week's</span> lineup, scored to your league's exact settings. Select any player for his full profile.</p></div>
       <span class="example" id="team-example">Sample league. Import yours in League Hub.</span>
     </div>
     <div class="tiles" id="team-tiles"></div>
     <div class="card" id="matchup"></div>
     <div class="grid2 even">
       <div class="stack">
-        <div class="card"><div class="card-h"><h2>Starting lineup</h2><span class="note">Week 9 projection</span></div>
+        <div class="card"><div class="card-h"><h2>Starting lineup</h2><span class="note"><span class="wk-now">This week's</span> projection</span></div>
           <div id="lineup"></div>
           <div class="total"><span>Projected total</span><b id="lineup-total">0.0</b></div></div>
         <div class="card"><div class="card-h"><h2>Bench</h2></div><div id="bench"></div></div>
@@ -67,7 +67,7 @@
     </div>
     <p class="note" id="rank-note" hidden style="margin:0;max-width:85ch"></p>
     <div class="tablebox"><table id="rank-table" style="min-width:1040px">
-      <thead><tr><th class="r" data-sort data-first="asc">#</th><th data-sort data-first="asc">Player</th><th data-sort data-first="asc">Pos</th><th class="r" data-sort>Wk 9</th><th class="r" data-sort title="Projected points per game for the rest of the season">Pts/G</th><th class="r" data-sort title="Last 3 games compared with his season average">Trend</th><th class="r" data-sort title="Share of his team's targets">Tgt share</th><th class="r" data-sort title="Share of his team's offensive snaps">Snap %</th><th class="r" data-sort title="Carries plus targets per game">Opp/G</th><th data-sort data-first="asc">League team</th></tr></thead>
+      <thead><tr><th class="r" data-sort data-first="asc">#</th><th data-sort data-first="asc">Player</th><th data-sort data-first="asc">Pos</th><th class="r" data-sort>Wk <span class="wk-num">9</span></th><th class="r" data-sort title="Projected points per game for the rest of the season">Pts/G</th><th class="r" data-sort title="Last 3 games compared with his season average">Trend</th><th class="r" data-sort title="Share of his team's targets">Tgt share</th><th class="r" data-sort title="Share of his team's offensive snaps">Snap %</th><th class="r" data-sort title="Carries plus targets per game">Opp/G</th><th data-sort data-first="asc">League team</th></tr></thead>
       <tbody id="rank-body"></tbody></table></div>
   </section>
 
@@ -87,8 +87,8 @@
       <div class="card"><div class="card-h"><h2>Players to trade for</h2><span class="note" id="tgt-count"></span></div>
         <input type="search" id="tgt-search" placeholder="Search players, NFL teams or league teams" style="width:100%;margin-bottom:10px">
         <div class="toolbar" style="margin-bottom:10px;justify-content:space-between"><div class="seg" id="tgt-pos"><button data-tpos="ALL" aria-pressed="true">All</button><button data-tpos="QB">QB</button><button data-tpos="RB">RB</button><button data-tpos="WR">WR</button><button data-tpos="TE">TE</button></div>
-          <div class="seg" id="tgt-sort" aria-label="Sort by"><button data-tsort="2" aria-pressed="true">Pts/G</button><button data-tsort="1">Wk 9 proj</button><button data-tsort="3">Snap %</button></div></div>
-        <div class="scrollbox"><table class="tgt-table" id="tgt-table"><thead><tr><th data-sort data-first="asc">Player</th><th class="r" data-sort>Wk 9</th><th class="r" data-sort>Pts/G</th><th class="r" data-sort>Snap %</th><th data-sort data-first="asc">Team</th><th></th></tr></thead><tbody id="targets"></tbody></table></div>
+          <div class="seg" id="tgt-sort" aria-label="Sort by"><button data-tsort="2" aria-pressed="true">Pts/G</button><button data-tsort="1">Wk <span class="wk-num">9</span> proj</button><button data-tsort="3">Snap %</button></div></div>
+        <div class="scrollbox"><table class="tgt-table" id="tgt-table"><thead><tr><th data-sort data-first="asc">Player</th><th class="r" data-sort>Wk <span class="wk-num">9</span></th><th class="r" data-sort>Pts/G</th><th class="r" data-sort>Snap %</th><th data-sort data-first="asc">Team</th><th></th></tr></thead><tbody id="targets"></tbody></table></div>
       </div>
     </div>
   </section>
@@ -116,7 +116,7 @@
     <div class="tiles" id="season-tiles"></div>
     <div class="grid2 grid-season">
       <div class="card"><div class="card-h"><h2>League odds</h2><span class="note">Tap a column to sort</span></div>
-        <div style="overflow-x:auto"><table class="sortable" id="sim-table" style="min-width:600px"><thead><tr><th data-sort data-first="asc">Team</th><th class="r" data-sort>Record</th><th class="r" data-sort>Points for</th><th class="r" data-sort>Proj. wins</th><th data-sort>Playoffs</th><th data-sort>Bye</th><th data-sort>Title</th></tr></thead><tbody id="sim-body"></tbody></table></div>
+        <div style="overflow-x:auto"><table class="sortable" id="sim-table"><thead><tr><th data-sort data-first="asc">Team</th><th class="r" data-sort>Record</th><th class="r" data-sort>Points for</th><th class="r" data-sort>Proj. wins</th><th data-sort>Playoffs</th><th data-sort>Bye</th><th data-sort>Title</th></tr></thead><tbody id="sim-body"></tbody></table></div>
         <p class="note" id="sim-note" style="margin:10px 0 0"></p></div>
       <div class="card"><div class="card-h"><h2>Your road</h2><span class="note">Win odds each week</span></div><div id="road"></div></div>
     </div>
@@ -124,7 +124,7 @@
 
   <!-- HELPER -->
   <section class="view" id="v-helper" hidden>
-    <div class="hero"><div><div class="kicker">AI Helper</div><h1>Week 9 game plan</h1><p>A weekly briefing built from your roster and matchup. Ask follow-up questions below; answers include one-click actions.</p></div></div>
+    <div class="hero"><div><div class="kicker">AI Helper</div><h1><span class="wk-now">This week's</span> game plan</h1><p>A weekly briefing built from your roster and matchup. Ask follow-up questions below; answers include one-click actions.</p></div></div>
     <div class="card" id="briefing"></div>
     <div class="helper-grid">
       <aside class="card hist"><div class="card-h"><h3>Past questions</h3><button class="btn small ghost" id="hist-clear">Clear</button></div><div id="hist"></div></aside>

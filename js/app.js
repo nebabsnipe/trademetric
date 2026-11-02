@@ -5,7 +5,7 @@ const tcVars=t=>{const c=TC[t]||['#333','#666','#fff'];return `--c1:${c[0]};--c2
 
 /* ===== Real 2026 data: nflverse snapshot ===== */
 const DATA=window.NFL_DATA;
-{const el=document.getElementById('week-pill');if(el){el.innerHTML=`<b>Week ${DATA.week}</b> · stats thru Wk ${DATA.played}`;el.title=`Real ${DATA.asOf.slice(0,4)} stats through Week ${DATA.played}, updated ${DATA.asOf}. Refreshed every morning.`}}
+document.querySelectorAll('.wk-now').forEach(x=>x.textContent='Week '+DATA.week);document.querySelectorAll('.wk-num').forEach(x=>x.textContent=DATA.week);{const el=document.getElementById('week-pill');if(el){el.innerHTML=`<b>Week ${DATA.week}</b> · stats thru Wk ${DATA.played}`;el.title=`Real ${DATA.asOf.slice(0,4)} stats through Week ${DATA.played}, updated ${DATA.asOf}. Refreshed every morning.`}}
 const FUM={QB:.2,RB:.09,WR:.04,TE:.04};
 const slug=n=>n.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');
 const Z={cmp:0,pyd:0,ptd:0,int:0,ratt:0,ryd:0,rtd:0,tgt:0,rec:0,recyd:0,rectd:0};
@@ -409,7 +409,7 @@ function renderTrade(){
   const me=myTeam();TD.give=TD.give.filter(id=>me.players.includes(id));TD.get=TD.get.filter(id=>OWN[id]&&OWN[id]!==S.me);
   $('give-chips').innerHTML=me.players.slice().sort((a,b)=>tv(b)-tv(a)).map(id=>{const p=byId[id];return `<button class="chip" data-give="${id}" aria-pressed="${TD.give.includes(id)}">${av(p,'sm')}${esc(p.n)} <span class="v">${p.pos}</span></button>`}).join('')||'<p class="empty">Add players to your team first.</p>';
   const partner=TD.get.length?teamById(OWN[TD.get[0]]):null;
-  $('get-chips').innerHTML=TD.get.map(id=>{const p=byId[id];return `<span class="chip" aria-pressed="true">${av(p,'sm')}${esc(p.n)} <span class="v">${p.pos}</span><button class="x" data-unget="${id}" aria-label="Remove ${esc(p.n)}">×</button></span>`}).join('')||'<p class="empty" style="padding:0">Pick players from the list on the right.</p>';
+  $('get-chips').innerHTML=TD.get.map(id=>{const p=byId[id];return `<span class="chip" aria-pressed="true">${av(p,'sm')}${esc(p.n)} <span class="v">${p.pos}</span><button class="x" data-unget="${id}" aria-label="Remove ${esc(p.n)}">×</button></span>`}).join('')||'<p class="empty" style="padding:0">Pick players from the list on the right (below on a phone).</p>';
   $('get-hint').textContent=partner?`Trading with ${partner.name}. Players from other teams will start a new deal.`:'';
   renderTargets();
   renderRating(partner);
@@ -533,7 +533,7 @@ function renderBriefing(){const el=$('briefing');if(!el)return;const me=myTeam()
   const tr=pickDiverse(allTrades(),1)[0];if(tr){const fr=fairness(tr.give,tr.get,tr.team);items.push({k:'Trade',h:`<p>Send ${tr.give.map(x=>esc(byId[x].n)).join(' and ')} to ${esc(teamById(tr.team).name)} for ${tr.get.map(x=>esc(byId[x].n)).join(' and ')}. ${fr.label}${tr.myGain>=.3?`, and it adds ${f1(tr.myGain)} points a week`:', and it adds long-term value'}.</p>`,acts:[['Open in trade builder',`trade|${tr.give.join(',')}|${tr.get.join(',')}`]]})}
   const bl=POOL.filter(p=>G[p.id].buy&&OWN[p.id]&&OWN[p.id]!==S.me).sort((a,b)=>V.pts[b.id]-V.pts[a.id])[0];
   if(bl)items.push({k:'Buy low',h:`<p><b>${esc(bl.n)}</b> on ${esc(teamById(OWN[bl.id]).name)}. ${esc(G[bl.id].buy[0])}</p>`,acts:[['View',`view|${bl.id}`]]});
-  el.innerHTML=`<div class="card-h"><h2>Week ${WEEK} briefing</h2>${AI?'<button class="btn small" data-q="Walk me through my Week 9 game plan: my lineup, my matchup, the best pickup and one trade worth making.">Talk me through it</button>':''}</div>
+  el.innerHTML=`<div class="card-h"><h2>Week ${WEEK} briefing</h2>${AI?'<button class="btn small" data-q="Walk me through my Week ${WEEK} game plan: my lineup, my matchup, the best pickup and one trade worth making.">Talk me through it</button>':''}</div>
    <div class="brief-grid">${items.map(x=>`<div class="brief"><span class="k">${x.k}</span>${x.h}${x.acts.length?`<div class="acts">${x.acts.map(([l,a])=>`<button class="btn small" data-act="${a}">${esc(l)}</button>`).join('')}</div>`:''}</div>`).join('')}</div>`}
 function doAct(a){const [k,x,y]=a.split('|');
   if(k==='goto'){location.hash=x;setTimeout(()=>{const el=$(y);if(el)el.scrollIntoView({behavior:'smooth',block:'start'})},80)}
@@ -822,7 +822,7 @@ Injury status: ${stOf(id)?ST_LABEL[stOf(id)]+(p.inj?' ('+p.inj+')':''):'no desig
 Role trend: ${roleTxt(p,g)}.${g.role?' '+g.role:''}
 Teammates out: ${g.mates.map(q=>q.n+' ('+ST_LABEL[stOf(q.id)]+')').join(', ')||'none reported'}.
 Next 4 opponents: ${schedOf(p.t,WEEK,WEEK+3).map(x=>x.g?`${x.g.home?'vs':'at'} ${x.g.opp} (${ord(defRank(x.g.opp,p.pos))} of 32 against ${p.pos}s, 32 = easiest)`:'bye').join(', ')}.
-Cover, in order: injury status and how much risk he carries, how his role is trending and why, the next few matchups, then the call. If injury history is not available, say so in a few words instead of guessing. Stats are real 2026 results through Week 8; do not invent news or injuries beyond what is given. Plain text, no headings or lists, 4 to 5 sentences.`;
+Cover, in order: injury status and how much risk he carries, how his role is trending and why, the next few matchups, then the call. If injury history is not available, say so in a few words instead of guessing. Stats are real 2026 results through Week ${PLAYED}; do not invent news or injuries beyond what is given. Plain text, no headings or lists, 4 to 5 sentences.`;
   try{const r=await AI(prompt);if(openId===id&&$('scout'))$('scout').innerHTML=`<p class="scout-text">${esc(r.text)}</p>`}
   catch(e){if($('scout'))$('scout').innerHTML=`<p class="note">${e&&e.code==='not_granted'?'Allow the AI to write reports to use this.':'Could not write the report. Try again.'}</p><button class="btn small" data-scout="${id}">Try again</button>`}
 }
