@@ -60,7 +60,8 @@ let S;try{S=JSON.parse(localStorage.getItem(KEY))}catch(e){S=null}
 const AUTH_HASH=/access_token=|error_description=/.test(location.hash)?location.hash.slice(1):null;
 function save(){S.savedAt=Date.now();try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}if(typeof cloudSave==='function')cloudSave()}
 let POOL=BUILTIN,byId={};
-function setPool(){POOL=(S.custom&&S.custom.length)?S.custom:BUILTIN;byId={};POOL.forEach(p=>byId[p.id]=p);
+function setPool(){const base=(S.custom&&S.custom.length)?S.custom:BUILTIN,have=new Set(base.map(p=>p.id));
+  POOL=base.concat((S.extraPlayers||[]).filter(x=>!have.has(x.id)).map(x=>({...Z,fl:0,id:x.id,n:x.n,pos:x.pos,t:x.t||'FA',status:'',extra:true})));byId={};POOL.forEach(p=>byId[p.id]=p);
   document.getElementById('dl-players').innerHTML=POOL.map(p=>`<option value="${esc(p.n)}">${p.pos} · ${p.t}</option>`).join('');
   if(S.teams)S.teams.forEach(T=>T.players=T.players.filter(id=>byId[id]))}
 
@@ -193,7 +194,7 @@ async function loadEspnWeek(){const src=S.real&&S.real.src;if(!src||src.type!=='
   try{readEspnWeek(await espnFetch(src.league,creds,WEEK))}catch(e){}}
 /* ===== Background league sync: rosters, team names, records, starters and points.
    Runs when the site opens and every few minutes. Scoring settings, follows and everything else stay as they are. ===== */
-var SLP_IDS=null,SYNC_AT=0;
+var SLP_IDS=null,SYNC_AT=0,POOL_DIRTY=false;
 async function sleeperIds(){if(SLP_IDS)return SLP_IDS;try{const r=await fetch('/api/players');if(r.ok)SLP_IDS=await r.json()}catch(e){}return SLP_IDS||{}}
 function rosterChanged(T,ids){const a=[...T.players].sort().join(),b=[...ids].sort().join();if(a===b)return false;T.players=ids;return true}
 async function syncSleeper(){const src=S.real&&S.real.src;if(!src||src.type!=='sleeper')return false;
@@ -203,14 +204,15 @@ async function syncSleeper(){const src=S.real&&S.real.src;if(!src||src.type!=='s
   if(ids&&Object.keys(ids).length)for(const [pid,id] of Object.entries(src.pmap)){const x=ids[pid],q=byId[id];if(x&&(!q||norm(q.n)!==norm(x[0])))delete src.pmap[pid]}
   for(const r of rosters){const tid=src.rid[r.roster_id],T=tid&&teamById(tid);if(!T)continue;
     const out=[];for(const pid of (r.players||[])){let id=src.pmap[pid]||sleeperDst(pid);
-      if(!id){const x=ids&&ids[pid];const q=x&&findExact(x[0],x[1],x[2]);if(q&&q.pos===x[1]){id=q.id;src.pmap[pid]=id}}
-      if(id&&byId[id])out.push(id)}
+      if(!id){const x=ids&&ids[pid];const q=x&&findExact(x[0],x[1],x[2]);if(q&&q.pos===x[1]){id=q.id;src.pmap[pid]=id}else if(x&&OFF.includes(x[1])){id=addExtraPlayer(x[0],x[1],x[2]);src.pmap[pid]=id;POOL_DIRTY=true}}
+      if(id&&(byId[id]||POOL_DIRTY))out.push(id)}
     if(rosterChanged(T,[...new Set(out)]))changed=true;
     const us=users.find(x=>x.user_id===r.owner_id),nm=(us&&us.metadata&&us.metadata.team_name)||(us&&us.display_name);if(nm&&nm!==T.name){T.name=nm;changed=true}
     const st=r.settings||{};S.real.rec[tid]={w:st.wins||0,l:st.losses||0,t:st.ties||0,pf:(st.fpts||0)+(st.fpts_decimal||0)/100}}
   return changed}
 function syncEspnRosters(d){const src=S.real&&S.real.src;if(!d||!src||src.type!=='espn')return false;let changed=false;
   (d.teams||[]).forEach(t=>{const tid=src.rid[t.id],T=tid&&teamById(tid);if(!T)return;
+    const EP={1:'QB',2:'RB',3:'WR',4:'TE'};((t.roster&&t.roster.entries)||[]).forEach(e=>{const pl=e.playerPoolEntry&&e.playerPoolEntry.player;if(pl&&EP[pl.defaultPositionId]&&!findExact(pl.fullName,EP[pl.defaultPositionId])){addExtraPlayer(pl.fullName,EP[pl.defaultPositionId]);POOL_DIRTY=true}});if(POOL_DIRTY)setPool();
     const out=((t.roster&&t.roster.entries)||[]).map(e=>e.playerPoolEntry&&e.playerPoolEntry.player).filter(Boolean).map(pl=>{const q=pl.defaultPositionId===16?(byId['dst-'+String(pl.proTeamAbbreviation||'').toLowerCase()]||findExact(pl.fullName)):findExact(pl.fullName);return q&&q.id}).filter(Boolean);
     if(out.length&&rosterChanged(T,[...new Set(out)]))changed=true;
     const nm=t.name||[t.location,t.nickname].filter(Boolean).join(' ');if(nm&&nm!==T.name){T.name=nm;changed=true}
@@ -220,7 +222,7 @@ async function loadPlatform(){const src=S.real&&S.real.src;if(!src)return;let ch
   try{if(src.type==='sleeper'){changed=await syncSleeper();await loadSleeperLineups()}
     else if(src.type==='espn'){const creds=src.priv?(IMP.espnCreds||espnSaved()):null;if(src.priv&&!(creds&&creds.s2))return;
       const d=await espnFetch(src.league,creds,WEEK);changed=syncEspnRosters(d);readEspnWeek(d)}}catch(e){}
-  SYNC_AT=Date.now();if(changed){REC_CACHE={v:-1};save();rebuildOwn()}}
+  SYNC_AT=Date.now();if(POOL_DIRTY){POOL_DIRTY=false;setPool();changed=true}if(changed){REC_CACHE={v:-1};save();rebuildOwn()}}
 async function syncNow(){if(!S.real||!S.real.src)return;await loadPlatform();recompute();const a=document.activeElement;if(!(a&&/INPUT|TEXTAREA|SELECT/.test(a.tagName)))render()}
 function lprojHtml(id){const g=G[id],l=liveOf(id);
   if(l)return `<div class="lproj live ${l.state}"><b>${f1(l.pts)}</b><span>${l.state==='post'?'final':'proj '+f1(g.projNext)}</span></div>`;
@@ -345,6 +347,9 @@ let toastT;function toast(m){const t=$('toast');t.textContent=m;t.hidden=false;c
 const norm=s=>s.toLowerCase().replace(/[.'’]/g,'').replace(/\b(jr|sr|ii|iii|iv)\b/g,'').replace(/[^a-z ]/g,' ').replace(/\s+/g,' ').trim();
 /* Exact full-name match only. Used for anything automatic (league imports, syncing, live stats, injuries),
    so a player TradeMetric doesn't track is skipped instead of being mistaken for someone else. */
+/* A rostered player TradeMetric has no stats for (e.g. a free agent): add him so nobody on a fantasy roster is skipped */
+function addExtraPlayer(n,pos,t){if(!n||!OFF.includes(pos))return null;const ex=findExact(n,pos);if(ex)return ex.id;
+  S.extraPlayers=S.extraPlayers||[];const id='x-'+norm(n).replace(/ /g,'-');if(!S.extraPlayers.some(x=>x.id===id))S.extraPlayers.push({id,n,pos,t:t||'FA'});return id}
 function findExact(v,pos,team){const q=norm(v||'');if(!q)return null;const m=POOL.filter(x=>norm(x.n)===q);if(m.length<2)return m[0]||null;
   return m.find(x=>(!pos||x.pos===pos)&&(!team||x.t===team))||m.find(x=>!pos||x.pos===pos)||m[0]}
 /* Forgiving match for names people type in. Last name must match exactly; with a first name, its first letter must match too. */
@@ -438,6 +443,8 @@ function renderRankings(){
     opp:'Opportunities: players who should get more work because a teammate at their position just got hurt.'};
   $('rank-note').hidden=!RN[rankOwn];$('rank-note').textContent=RN[rankOwn]||'';
   const L=V.list.filter(p=>(rankPos==='ALL'||p.pos===rankPos)&&(!q||p.n.toLowerCase().includes(q)||p.t.toLowerCase()===q)&&(rankOwn==='all'||(rankOwn==='free'&&!OWN[p.id])||(rankOwn==='buy'&&G[p.id].buy)||(rankOwn==='risk'&&G[p.id].risk)||(rankOwn==='opp'&&G[p.id].opp.length)));
+  const cap=q||RANK_ALL?L.length:300,more=L.length-cap;L.length=Math.min(L.length,cap);
+  setTimeout(()=>{const m=$('rank-more');if(m)m.innerHTML=more>0?`<button class="btn" id="rank-all">Show all ${(L.length+more).toLocaleString()} players</button>`:''},0);
   $('rank-body').innerHTML=L.map(p=>{const g=G[p.id],o=OWN[p.id];return `<tr><td class="r num">${V.rank[p.id]}</td><td data-v="${esc(p.n.toLowerCase())}"><div class="pl">${av(p,'sm')}<div class="meta"><span style="display:flex;gap:6px;align-items:center"><button class="pname" data-open="${p.id}">${esc(p.n)}</button>${o!==S.me?followBtn(p.id,true):''}${tagHtml(p.id)}${g.risk?'<span class="badge risk" title="Risk: open the player to see why">RISK</span>':''}${g.opp.length?'<span class="badge opp" title="More work with a teammate out">UP</span>':''}</span><span class="psub">${p.t} · ${oppHtml(p.id)}</span>${rankOwn==='buy'&&g.buy?`<span class="why-line">${esc(g.buy[0])}</span>`:rankOwn==='risk'&&g.risk?`<span class="why-line">${esc(g.risk[0])}</span>`:rankOwn==='opp'&&g.opp.length?`<span class="why-line">${esc(oppTxtLine(g.opp[0]))}</span>`:''}</div></div></td>
     <td data-v="${p.pos}${String(V.posRank[p.id]).padStart(3,'0')}"><span class="pos ${p.pos}">${p.pos}${V.posRank[p.id]}</span></td><td class="r strong" data-v="${g.next?g.projNext.toFixed(2):-1}">${g.next?f1(g.projNext):'<span class="tag bye">Bye</span>'}</td><td class="r num">${f1(V.pts[p.id])}</td><td class="r" data-v="${g.trendPct===null?-9:g.trendPct.toFixed(3)}">${trendHtml(g.trendPct)}</td><td class="r num" data-v="${g.tshare===null?-1:g.tshare.toFixed(1)}">${g.tshare===null?'<span class="muted">-</span>':Math.round(g.tshare)+'%'}</td><td class="r num" data-v="${g.snap===null?-1:g.snap.toFixed(1)}">${g.snap===null?'<span class="muted">-</span>':Math.round(g.snap)+'%'}</td><td class="r num" data-v="${g.oppg===null?-1:g.oppg.toFixed(2)}">${g.oppg===null?'<span class="muted">-</span>':f1(g.oppg)}</td><td data-v="${o?esc(teamById(o).name.toLowerCase()):'zzzz'}">${ownerHtml(p.id)}</td></tr>`}).join('')||'<tr><td colspan="10" class="empty">No players match.</td></tr>';
   sortTable('rank-table');
@@ -794,7 +801,7 @@ async function sleeperImport(i){
     const slots={QB:cnt('QB'),RB:cnt('RB'),WR:cnt('WR'),TE:cnt('TE'),FLEX:cnt('FLEX'),SFLEX:cnt('SUPER_FLEX'),DST:cnt('DEF'),BN:cnt('BN')};
     Object.assign(sc,{dsk:ss.sack??1,dint:ss.int??2,dfr:ss.fum_rec??2,dtd:ss.def_td??6,dsf:ss.safe??2,pa0:ss.pts_allow_0??10,pa6:ss.pts_allow_1_6??7,pa13:ss.pts_allow_7_13??4,pa20:ss.pts_allow_14_20??1,pa27:ss.pts_allow_21_27??0,pa34:ss.pts_allow_28_34??-1,pa35:ss.pts_allow_35p??-4});
     const teams=rosters.map(r=>{const us=users.find(x=>x.user_id===r.owner_id);return {name:(us&&us.metadata&&us.metadata.team_name)||(us&&us.display_name)||'Team '+r.roster_id,mine:r.owner_id===u.user_id,
-      names:(r.players||[]).map(pid=>SLEEPER_PLAYERS[pid]||(NICK[pid==='LA'?'LAR':pid]?{position:'DEF',team:pid}:null)).filter(x=>x&&(OFF.includes(x.position)||x.position==='DEF')).map(x=>x.position==='DEF'?(NICK[x.team==='LA'?'LAR':x.team]||x.team)+' D/ST':x.full_name)}});
+      names:(r.players||[]).map(pid=>SLEEPER_PLAYERS[pid]||(NICK[pid==='LA'?'LAR':pid]?{position:'DEF',team:pid}:null)).filter(x=>x&&(OFF.includes(x.position)||x.position==='DEF')).map(x=>x.position==='DEF'?(NICK[x.team==='LA'?'LAR':x.team]||x.team)+' D/ST':{n:x.full_name,pos:x.position,t:x.team==='LA'?'LAR':x.team})}});
     const rw=Math.max(1,((lg.settings&&lg.settings.playoff_week_start)||15)-1),ix={};rosters.forEach((r,i)=>ix[r.roster_id]=i);
     const weeks=await Promise.all(Array.from({length:rw},(_,i)=>getJSON(`https://api.sleeper.app/v1/league/${lg.league_id}/matchups/${i+1}`).catch(()=>[])));
     const real={regWeeks:rw,playoffTeams:(lg.settings&&lg.settings.playoff_teams)||null,sched:{},scores:{},rec:{},played:0};
@@ -844,7 +851,7 @@ async function espnImport(id,creds){
     const POSID={1:'QB',2:'RB',3:'WR',4:'TE',16:'DST'};
     const myId=creds&&creds.swid?('{'+creds.swid.replace(/[{}]/g,'')+'}').toUpperCase():null;
     const teams=(d.teams||[]).map(t=>({name:t.name||[t.location,t.nickname].filter(Boolean).join(' ')||'Team '+t.id,mine:!!myId&&[t.primaryOwner,...(t.owners||[])].some(o=>String(o||'').toUpperCase()===myId),
-      names:((t.roster&&t.roster.entries)||[]).map(e=>e.playerPoolEntry&&e.playerPoolEntry.player).filter(x=>x&&POSID[x.defaultPositionId]).map(x=>x.fullName)}));
+      names:((t.roster&&t.roster.entries)||[]).map(e=>e.playerPoolEntry&&e.playerPoolEntry.player).filter(x=>x&&POSID[x.defaultPositionId]).map(x=>POSID[x.defaultPositionId]==='DST'?x.fullName:{n:x.fullName,pos:POSID[x.defaultPositionId]})}));
     const ix={},ss=st.scheduleSettings||{},rw=ss.matchupPeriodCount||14;(d.teams||[]).forEach((t,i)=>ix[t.id]=i);
     const real={regWeeks:rw,playoffTeams:ss.playoffTeamCount||null,sched:{},scores:{},rec:{},played:0};
     (d.schedule||[]).forEach(m=>{const w=m.matchupPeriodId;if(!w||w>rw||!m.home||ix[m.home.teamId]==null)return;const a=ix[m.home.teamId],b=m.away&&ix[m.away.teamId]!=null?ix[m.away.teamId]:null;
@@ -861,12 +868,13 @@ async function espnImport(id,creds){
 }
 function applyImport(name,teams,sc,slots,src,real){
   let miss=0;S.league.name=name;S.league.sc={...S.league.sc,...sc};S.league.slots={...S.league.slots,...slots};S.league.teams=teams.length;
-  S.teams=teams.map((t,i)=>({id:'t'+(i+1),name:t.name,players:[...new Set(t.names.map(n=>{const p=findExact(n);if(!p)miss++;return p&&p.id}).filter(Boolean))]}));
+  teams.forEach(t=>t.names.forEach(x=>{if(typeof x==='object'&&!findExact(x.n,x.pos))addExtraPlayer(x.n,x.pos,x.t)}));setPool();
+  S.teams=teams.map((t,i)=>({id:'t'+(i+1),name:t.name,players:[...new Set(t.names.map(x=>{const p=typeof x==='object'?findExact(x.n,x.pos,x.t):findExact(x);if(!p)miss++;return p&&p.id}).filter(Boolean))]}));
   if(real){const tid=i=>S.teams[i]&&S.teams[i].id,mapW=o=>{const r={};for(const w in o)r[w]=o[w].map(([a,b])=>[tid(a),b==null?null:tid(b)]);return r},mapT=o=>{const r={};for(const k in o)r[tid(+k)]=o[k];return r};
     const scores={};for(const w in real.scores)scores[w]=mapT(real.scores[w]);
     const src=real.src?{...real.src,rid:Object.fromEntries(Object.entries(real.src.rid).map(([rid,i])=>[rid,tid(i)]))}:null;
     PLAT=null;S.real={at:Date.now(),regWeeks:real.regWeeks,playoffTeams:real.playoffTeams,played:real.played,rec:mapT(real.rec),sched:mapW(real.sched),scores,src,lineupWeek:real.lineupWeek||null,lineups:real.lineups?mapT(real.lineups):null}}else S.real=null;SCHED=null;LIVE_LU=null;
-  if(S.real&&S.real.src&&S.real.src.type==='sleeper')setTimeout(()=>loadSleeperLineups().then(()=>{recompute();render()}),0);
+  if(S.real&&S.real.src)setTimeout(syncNow,0);
   const mi=teams.findIndex(t=>t.mine);S.me=S.teams[mi>=0?mi:0].id;S.log=[];S.example=false;S.imported={name,src};S.onboarded=true;IMP.open=undefined;hubSel=S.me;bump();buildLeagueForm();toast('Imported '+name);if(location.hash!=='#team')location.hash='team';else render();window.scrollTo({top:0,behavior:'smooth'});
   impMsg(`<div class="callout buy"><b>Imported ${esc(name)}.</b> ${teams.length} teams and your scoring are loaded.${miss?` ${miss} players aren't in TradeMetric's player list yet and were skipped.`:''}${mi<0?' Pick your team in Team rosters and press "This is my team".':''}</div>`)}
 
@@ -1344,3 +1352,4 @@ function renderFollowPage(){const ft=S.followTeams||[],fp=(S.following||[]).filt
     <div class="card"><div class="card-h"><h2>Recommended</h2><span class="note">${recommendedFollows().length?'Most play clips the last two weeks':'Top-ranked players'}</span></div><div class="fol-list">${rec.map(folPlayerCard).join('')}</div></div></div>`;
   if(FOL_Q){const i=$('fol-search');i.focus();i.setSelectionRange(FOL_Q.length,FOL_Q.length)}}
 document.addEventListener('input',e=>{if(e.target.id==='fol-search'){FOL_Q=e.target.value;$('fol-results').innerHTML=folSearchHtml()}});
+var RANK_ALL=false;document.addEventListener('click',e=>{if(e.target.id==='rank-all'){RANK_ALL=true;renderRankings()}});

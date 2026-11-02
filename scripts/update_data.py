@@ -91,14 +91,17 @@ for pos in ['QB','RB','WR','TE']:
 F=['cmp','pyd','ptd','int','ratt','ryd','rtd','tgt','rec','recyd','rectd','fl']
 C={'cmp':'completions','pyd':'passing_yards','ptd':'passing_tds','int':'passing_interceptions','ratt':'carries','ryd':'rushing_yards','rtd':'rushing_tds','tgt':'targets','rec':'receptions','recyd':'receiving_yards','rectd':'receiving_tds','fl':'fl'}
 agg=w.groupby('player_id').agg(name=('player_display_name','last'),pos=('position','last'),g=('week','nunique'),ppr=('ppr','sum')).reset_index()
-keep=[]
-for pos,n in [('QB',40),('RB',95),('WR',125),('TE',55)]:
-    a=agg[agg.pos==pos].sort_values('ppr',ascending=False).head(n);keep+=list(a.player_id)
+# every QB/RB/WR/TE who has played this season, best first
+keep=list(agg.sort_values('ppr',ascending=False).player_id)
 keepset=set(keep)
 # preseason players missing from stats (injured all year) -> roster lookup
 ros['k']=ros.full_name.map(norm)
 statnames={norm(n) for n in agg[agg.player_id.isin(keepset)].name}
-extra=[k for k in pre if k not in statnames]
+# plus everyone else on an NFL roster at these spots (active, reserve, inactive, practice squad),
+# so any player a fantasy team rosters is in the list
+ROSTER_OK=('ACT','RES','INA','DEV')
+extra=[k for k in pre if k not in statnames]+[k for k in ros[ros.position.isin(['QB','RB','WR','TE'])&ros.status.isin(ROSTER_OK)].k if k not in statnames and k not in pre]
+extra=list(dict.fromkeys(extra))
 rosk=ros.set_index('k')
 out=[];FUMB={'QB':.2,'RB':.09,'WR':.04,'TE':.04}
 injk={norm(r.full_name):(r.report_status,r.report_primary_injury) for r in inj.itertuples() if pd.notna(r.report_status)}
@@ -142,9 +145,13 @@ for k in extra:
     if not len(rr):continue
     rr=rr.iloc[0]
     if rr.position not in ('QB','RB','WR','TE'):continue
-    name=rr.full_name;team=rr.team;pz=pre[k]
+    name=rr.full_name;team=rr.team
+    if team not in sched:continue
+    pz=pre.get(k)
+    if pz is None:  # no stats and no preseason estimate: a small depth-player baseline
+        pz={'QB':dict(cmp=1,pyd=10,ratt=.3,ryd=1),'RB':dict(ratt=1.5,ryd=6,tgt=.4,rec=.3,recyd=2),'WR':dict(tgt=.8,rec=.5,recyd=6),'TE':dict(tgt=.6,rec=.4,recyd=4)}[rr.position]
     st,note=status_for(k,rr.gsis_id)
-    if not st: st='O'
+    if not st and k in pre: st='O'
     log=[0 if sched[team][wk-1]==0 else [sched[team][wk-1][0],sched[team][wk-1][1]] for wk in range(1,PLAYED+1)]
     out.append([slug(name),name,rr.position,team,st,note,[round(pz.get(f,0),2) for f in F[:-1]]+[FUMB[rr.position]],log])
 # dedupe slugs

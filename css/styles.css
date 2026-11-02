@@ -719,3 +719,4 @@ body.signed-out .nav,body.signed-out #week-pill,body.signed-out #acct-btn{displa
 .fol-pl .rec-who{flex:1}
 @media (max-width:900px){.div-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media (max-width:520px){.div-grid{grid-template-columns:minmax(0,1fr)}}
+.rank-more{display:flex;justify-content:center;padding:14px 0 4px}
