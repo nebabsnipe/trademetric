@@ -1108,30 +1108,16 @@ document.addEventListener('click',e=>{const t=e.target;if(!t.closest)return;
 document.addEventListener('submit',e=>{if(e.target.id!=='auth-form')return;e.preventDefault();if(!AUTH_BUSY)authSubmit(e.target.dataset.mode)});
 initAccounts();
 
-/* ===== Highlights tab: results, video and news for your players and players you follow ===== */
-var FEED=null,FEED_AT=0,FEED_F='all',REC_CACHE2={at:-1,list:[]},FEED_LOADING=false,VIDS={};
+/* ===== Highlights tab: results, clips (ESPN + NFL on YouTube) and news for your team and everyone you follow ===== */
+var FEED=null,FEED_AT=0,FEED_F='all',FEED_LOADING=false,REC_CACHE2={at:-1,list:[]},PV={key:'',map:{}},CLIPS=[],CV_OBS=null,CV_CUR=-1;
+const FEED_LS='tm-feed-cache';
 const isFollowing=id=>(S.following||[]).includes(id);
 function followBtn(id,mini){const on=isFollowing(id);return mini?`<button class="star${on?' on':''}" data-follow="${id}" title="${on?'Following. Click to unfollow':'Follow this player in Highlights'}" aria-label="${on?'Unfollow':'Follow'}">${on?'★':'☆'}</button>`
   :`<button class="follow-btn${on?' on':''}" data-follow="${id}">${on?'★ Following':'☆ Follow'}</button>`}
 function toggleFollow(id){S.following=S.following||[];const i=S.following.indexOf(id);if(i>=0)S.following.splice(i,1);else S.following.unshift(id);save();
   toast(i>=0?`Unfollowed ${byId[id].n}`:`Following ${byId[id].n}. See him in Highlights.`);render()}
-async function loadFeed(force){if(FEED_LOADING||(!force&&FEED&&Date.now()-FEED_AT<4*60e3))return;FEED_LOADING=true;
-  try{const r=await fetch('/api/feed?week='+WEEK+'&b='+Math.floor(Date.now()/300000));if(r.ok){FEED=await r.json();FEED_AT=Date.now()}}catch(e){}
-  FEED_LOADING=false;if(tab==='feed')renderFeed()}
-setInterval(()=>{if(tab==='feed'&&!document.hidden)loadFeed()},5*60e3);
 function ago(t){const m=(Date.now()-Date.parse(t))/60e3;if(!isFinite(m))return '';if(m<60)return Math.max(1,Math.round(m))+'m ago';if(m<1440)return Math.round(m/60)+'h ago';return Math.round(m/1440)+'d ago'}
 const wordIn=(hay,w)=>new RegExp('(^|[^a-z])'+w.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'([^a-z]|$)').test(hay);
-function playerVideos(p){if(!FEED)return [];const full=norm(p.n),last=full.split(' ').pop();
-  const vids=FEED.videos.filter(v=>v.teams.includes(p.t));if(p.pos==='DST')return vids.filter(v=>/highlight/i.test(v.title)).slice(0,2).map(v=>({...v,game:true}));
-  const lastUnique=POOL.filter(q=>q.id!==p.id&&q.pos!=='DST'&&norm(q.n).split(' ').pop()===last&&vids.some(v=>v.teams.includes(q.t))).length===0;
-  const others=POOL.filter(q=>q.id!==p.id&&q.pos!=='DST'&&vids.some(v=>v.teams.includes(q.t))).map(q=>norm(q.n));
-  const hit=vids.filter(v=>{const h=norm(v.title+' '+v.desc),t=norm(v.title);if(v.athletes.some(a=>norm(a)===full)||wordIn(h,full))return true;
-    return lastUnique&&last.length>3&&wordIn(t,last)&&!others.some(o=>wordIn(t,o))});
-  const out=hit.sort((a,b)=>b.week-a.week||Date.parse(b.at||0)-Date.parse(a.at||0)).slice(0,4);
-  if(!out.length){const gh=vids.filter(v=>/highlight/i.test(v.title)).sort((a,b)=>b.week-a.week)[0];if(gh)out.push({...gh,game:true})}
-  return out}
-function playerNews(p){if(!FEED||p.pos==='DST')return [];const full=norm(p.n);
-  return FEED.news.filter(a=>a.athletes.some(x=>norm(x)===full)||wordIn(norm(a.title+' '+a.desc),full)).slice(0,3)}
 function statLineTxt(pos,s){if(!s)return '';const parts=[],n=x=>Math.round(x||0);
   if(pos==='DST')return `${n(s.dsk)} sack${n(s.dsk)===1?'':'s'}, ${n(s.dint)} INT, ${n(s.dfr)} fumble rec${s.dtd?`, ${n(s.dtd)} TD`:''}${s.pa!=null?`, ${n(s.pa)} pts allowed`:''}`;
   if(s.cmp||s.pyd)parts.push(`${n(s.cmp)} comp, ${n(s.pyd)} pass yds, ${n(s.ptd)} TD${s.int?`, ${n(s.int)} INT`:''}`);
@@ -1155,53 +1141,104 @@ function feedPlayers(){const me=myTeam();if(!me)return [];const out=[],seen=new 
   if(FEED_F!=='follow'){const lu=realLineup(S.me)||lineup(me.players,nextV);lu.slots.forEach(x=>{if(x.p)add(x.p.id,x.label)});me.players.forEach(id=>add(id,'BN'))}
   if(FEED_F!=='mine'){(S.following||[]).forEach(id=>add(id,'<span class="slot-star">★</span>'));(S.followTeams||[]).forEach(t=>teamStars(t).forEach(id=>add(id,t)))}
   return out}
-function renderFollowPanel(){const el=$('feed-follow');el.hidden=FEED_F!=='follow';if(el.hidden)return;
-  const ft=S.followTeams||[],teams=Object.keys(NICK).sort((a,b)=>teamName(a).localeCompare(teamName(b))),rec=recommendedFollows();
-  el.innerHTML=`<div class="fol-grid"><div><div class="card-h"><h2>Teams you follow</h2><span class="note">Their top fantasy players join your feed</span></div>
-      <div class="team-chips">${ft.map(t=>`<span class="tchip" style="${tcVars(t)}"><i></i>${esc(teamName(t))}<button data-fteam="${t}" aria-label="Unfollow ${esc(teamName(t))}">×</button></span>`).join('')}
-      <select id="team-add" aria-label="Follow a team"><option value="">+ Follow a team</option>${teams.filter(t=>!ft.includes(t)).map(t=>`<option value="${t}">${esc(teamName(t))} (${t})</option>`).join('')}</select></div></div>
-    <div><div class="card-h"><h2>Recommended</h2><span class="note">Most highlight clips the last two weeks</span></div>
-      ${!FEED?'<p class="note">Loading...</p>':rec.length?`<div class="rec-list">${rec.map(r=>{const p=byId[r.id];return `<div class="rec">${av(p,'sm')}<div class="rec-who"><button class="pname" data-open="${p.id}">${esc(p.n)}</button><span class="psub">${p.pos} · ${p.t} · ${r.n} clip${r.n>1?'s':''}</span></div>${followBtn(p.id,false).replace('follow-btn','follow-btn light')}</div>`}).join('')}</div>`:'<p class="note">No clips yet this week. Check back after the games.</p>'}</div></div>`}
-function vidThumb(v,big){VIDS[v.id]=v;const p=v.player?byId[v.player]:null;
-  return `<button class="vthumb${big?' big':''}" data-vid="${esc(v.id)}" title="${esc(v.title)}"><span class="vimg${v.thumb?'':' noimg'}" style="${v.thumb?`background-image:url('${esc(v.thumb)}')`:tcVars(p?p.t:v.teams[0])}"><span class="vplay" aria-hidden="true"></span>${v.dur?`<span class="vdur">${Math.floor(v.dur/60)}:${String(v.dur%60).padStart(2,'0')}</span>`:''}</span>
-    <span class="vtitle">${v.game?'<span class="vtag">Game</span>':''}${p&&big&&!norm(v.title).includes(norm(p.n))?`<b>${esc(p.n)}</b> · `:''}${esc(v.title)}</span><span class="note">Week ${v.week}${v.at?' · '+ago(v.at):''}</span></button>`}
+
+async function loadFeed(force){if(FEED_LOADING||(!force&&FEED&&Date.now()-FEED_AT<4*60e3))return;FEED_LOADING=true;
+  try{const r=await fetch('/api/feed?week='+WEEK+'&b='+Math.floor(Date.now()/300000));if(r.ok){const d=await r.json();if(d&&d.videos){FEED=d;FEED_AT=Date.now();try{localStorage.setItem(FEED_LS,JSON.stringify({at:FEED_AT,d}))}catch(e){}}}}catch(e){}
+  FEED_LOADING=false;if(tab==='feed')renderFeed()}
+/* show the last copy instantly, then refresh in the background */
+try{const c=JSON.parse(localStorage.getItem(FEED_LS)||'null');if(c&&c.d&&c.d.week===WEEK&&Date.now()-c.at<6*3600e3){FEED=c.d;FEED_AT=c.at-4*60e3}}catch(e){}
+setTimeout(()=>loadFeed(),1500);
+setInterval(()=>{if(tab==='feed'&&!document.hidden)loadFeed()},5*60e3);
+function playerVideos(p){if(!FEED)return [];const key=FEED_AT+'|'+VER;if(PV.key!==key)PV={key,map:{}};if(PV.map[p.id])return PV.map[p.id];
+  const full=norm(p.n),last=full.split(' ').pop();
+  const vids=FEED.videos.filter(v=>v.teams.includes(p.t)||(v.src==='youtube'&&!v.teams.length&&p.pos!=='DST'&&wordIn(norm(v.title),full)));
+  let out;
+  if(p.pos==='DST')out=vids.filter(v=>/highlight/i.test(v.title)).sort((a,b)=>b.week-a.week).slice(0,2).map(v=>({...v,game:true}));
+  else{const lastUnique=POOL.filter(q=>q.id!==p.id&&q.pos!=='DST'&&norm(q.n).split(' ').pop()===last&&vids.some(v=>v.teams.includes(q.t))).length===0;
+    const others=POOL.filter(q=>q.id!==p.id&&q.pos!=='DST'&&vids.some(v=>v.teams.includes(q.t))).map(q=>norm(q.n));
+    const hit=vids.filter(v=>{const h=norm(v.title+' '+v.desc),t=norm(v.title);if(v.athletes.some(a=>norm(a)===full)||wordIn(h,full))return true;
+      return lastUnique&&last.length>3&&wordIn(t,last)&&!others.some(o=>wordIn(t,o))});
+    out=hit.sort((a,b)=>b.week-a.week||Date.parse(b.at||0)-Date.parse(a.at||0)).slice(0,6);
+    const games=vids.filter(v=>/highlight/i.test(v.title)&&v.teams.includes(p.t)&&!out.some(o=>o.id===v.id)).sort((a,b)=>b.week-a.week||(a.src==='youtube'?-1:1));
+    if(games.length)out.push({...games[0],game:true})}
+  return PV.map[p.id]=out}
+function playerNews(p){if(!FEED||p.pos==='DST')return [];const full=norm(p.n);
+  return FEED.news.filter(a=>a.athletes.some(x=>norm(x)===full)||wordIn(norm(a.title+' '+a.desc),full)).slice(0,3)}
+const srcBadge=v=>`<span class="srcb ${v.src||'espn'}">${v.src==='youtube'?'YouTube':'ESPN'}</span>`;
+function thumbHtml(v,size){const i=CLIPS.findIndex(c=>c.id===v.id);const p=v.player?byId[v.player]:null;
+  return `<button class="hthumb ${size||''}" data-clip="${i}" title="${esc(v.title)}"><span class="vimg${v.thumb?'':' noimg'}" style="${tcVars(p?p.t:(v.teams[0]||''))}">${v.thumb?`<img src="${esc(v.thumb)}" alt="" loading="lazy" decoding="async" onerror="this.remove()">`:''}<span class="vplay" aria-hidden="true"></span>${srcBadge(v)}${v.dur?`<span class="vdur">${Math.floor(v.dur/60)}:${String(v.dur%60).padStart(2,'0')}</span>`:''}</span>
+    ${size==='xs'?'':`<span class="vtitle">${v.game?'<span class="vtag">Game</span>':''}${esc(v.title)}</span><span class="note">${p&&size!=='lg'?esc(p.n)+' · ':''}Week ${v.week}${v.at?' · '+ago(v.at):''}</span>`}</button>`}
+function buildClips(list){const own=[],games=[],seen=new Set();
+  list.forEach(({id})=>playerVideos(byId[id]).forEach(v=>{if(seen.has(v.id))return;seen.add(v.id);(v.game?games:own).push({...v,player:v.game?null:id})}));
+  own.sort((a,b)=>b.week-a.week||Date.parse(b.at||0)-Date.parse(a.at||0));games.sort((a,b)=>b.week-a.week||Date.parse(b.at||0)-Date.parse(a.at||0));
+  CLIPS=own.concat(games)}
 function renderFeed(){
-  if(!FEED)loadFeed();else if(Date.now()-FEED_AT>4*60e3)loadFeed();
+  if(!FEED||Date.now()-FEED_AT>4*60e3)loadFeed();
   $('feed-kicker').textContent=`Week ${WEEK} · ${FEED?'updated '+new Date(FEED.updated).toLocaleTimeString([], {hour:'numeric',minute:'2-digit'}):'loading'}`;
   document.querySelectorAll('#feed-filter button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.ff===FEED_F));
-  const fc=(S.following||[]).length+(S.followTeams||[]).length,fl=$('feed-filter').querySelector('[data-ff=follow]');fl.textContent=`Following${fc?' ('+fc+')':''}`;renderFollowPanel();
-  const list=feedPlayers();
-  /* highlight reel: newest player clips across the list */
-  const reel=[];list.forEach(({id})=>playerVideos(byId[id]).filter(v=>!v.game).forEach(v=>{if(!reel.some(x=>x.id===v.id))reel.push({...v,player:id})}));
-  reel.sort((a,b)=>b.week-a.week||Date.parse(b.at||0)-Date.parse(a.at||0));
-  $('feed-reel').innerHTML=!FEED?`<div class="reel-empty"><span class="spin"></span> Loading highlights...</div>`
-    :reel.length?`<div class="card-h"><h2>Latest highlights</h2><span class="note">${FEED_F==='follow'?'Players and teams you follow':FEED_F==='mine'?'Your team':'Your team and everyone you follow'} · tap to play</span></div><div class="reel">${reel.slice(0,10).map(v=>vidThumb(v,true)).join('')}</div>`
-    :`<div class="reel-empty">No player clips yet for this group. Game highlights show on each player below.</div>`;
-  if(!list.length){$('feed-list').innerHTML=`<div class="card empty-card">${FEED_F==='follow'?`<h2>Follow players and teams</h2><p class="note">Follow an NFL team above, pick from the recommended players, tap the ☆ next to anyone in Rankings, or use <b>☆ Follow</b> on a player's card.</p><button class="btn" data-goto="rankings">Find players in Rankings</button>`:'<p class="empty">No players here yet.</p>'}</div>`;return}
-  $('feed-list').innerHTML=list.map(({id,slot})=>{const p=byId[id],g=G[id],gm=feedGame(p),lv=liveOf(id),st=LIVEST[id];
+  const fc=(S.following||[]).length+(S.followTeams||[]).length,fl=$('feed-filter').querySelector('[data-ff=follow]');fl.textContent=`Following${fc?' ('+fc+')':''}`;
+  const list=feedPlayers();buildClips(list);
+  /* top: featured clip + up next + watch button */
+  const top=$('feed-top');
+  if(!FEED)top.innerHTML=`<div class="card hl-loading"><span class="spin"></span> Loading clips and news...</div>`;
+  else if(!CLIPS.length)top.innerHTML=`<div class="card hl-empty">No clips yet for these players. Clips appear here as games are played.</div>`;
+  else{const f=CLIPS[0],up=CLIPS.slice(1,5),fp=f.player?byId[f.player]:null;
+    top.innerHTML=`<div class="card hl-feature"><div class="hl-feat-main">${thumbHtml(f,'lg')}</div>
+      <div class="hl-feat-side"><div class="kicker">${CLIPS.length} clip${CLIPS.length>1?'s':''} · ${FEED_F==='mine'?'your team':FEED_F==='follow'?'players and teams you follow':'your team and follows'}</div>
+        <h2>${fp?esc(fp.n):'Latest highlights'}</h2>
+        <div class="hl-upnext">${up.map(v=>`<button class="hl-up" data-clip="${CLIPS.indexOf(v)}"><span class="vimg${v.thumb?'':' noimg'}" style="${tcVars(v.player?byId[v.player].t:(v.teams[0]||''))}">${v.thumb?`<img src="${esc(v.thumb)}" alt="" loading="lazy" decoding="async" onerror="this.remove()">`:''}</span><span><b>${esc(v.title)}</b><span class="note">${v.player?esc(byId[v.player].n)+' · ':''}${v.src==='youtube'?'YouTube':'ESPN'}</span></span></button>`).join('')}</div>
+        <button class="btn primary hl-watch" data-clip="0"><span class="play" aria-hidden="true"></span>Watch all clips</button></div></div>`}
+  /* player rows */
+  if(!list.length){$('feed-list').innerHTML=`<div class="card empty-card">${FEED_F==='follow'?`<h2>Follow players and teams</h2><p class="note">Follow an NFL team or a recommended player on the right, tap the ☆ next to anyone in Rankings, or use <b>☆ Follow</b> on a player's card.</p><button class="btn" data-goto="rankings">Find players in Rankings</button>`:'<p class="empty">No players here yet.</p>'}</div>`}
+  else $('feed-list').innerHTML=list.map(({id,slot})=>{const p=byId[id],g=G[id],gm=feedGame(p),lv=liveOf(id),st=LIVEST[id];
     let chip,pts,sub,line;
     if(!gm){const nx=OPP[p.t]&&OPP[p.t][WEEK];chip=`<span class="fchip">${nx?(nx.home?'vs ':'at ')+nx.opp:'Bye'}</span>`;pts=nx?g.projNext:null;sub=nx?'projected':'bye week'}
-    else if(gm.state==='pre'){chip=`<span class="fchip">${gm.start?new Date(gm.start).toLocaleString([], {weekday:'short',hour:'numeric',minute:'2-digit'}):'Upcoming'}</span>`;pts=g.projNext;sub='projected'}
-    else{chip=`<span class="fchip ${gm.state}">${gm.state==='post'?'Final':esc(gm.detail||'Live')} · ${gm.home?'vs':'at'} ${esc(gm.opp||'')} ${gm.score}-${gm.oppScore}</span>`;pts=lv?lv.pts:0;sub=gm.state==='post'?'points':'points so far';line=statLineTxt(p.pos,st)}
-    if(!line){const lastG=[...g.log].reverse().find(x=>!x.bye&&!x.dnp);if(lastG)line=`Last game (Week ${lastG.w}, ${lastG.home?'vs':'at'} ${lastG.opp}): ${f1(linePts(lastG,p.pos,S.league.sc))} pts · ${statLineTxt(p.pos,lastG)}`}
-    const vids=playerVideos(p),news=playerNews(p);
-    return `<article class="card fd-card"><header class="fd-h"><span class="fd-slot">${slot}</span>${av(p)}<div class="fd-who"><div class="fd-name"><button class="pname" data-open="${id}">${esc(p.n)}</button>${stHtml(id)}${OWN[id]!==S.me?followBtn(id,true):''}</div><div class="fd-meta"><span class="psub">${p.pos} · ${p.t}</span>${chip}</div></div><div class="fd-pts">${pts==null?'<b class="num">—</b>':`<b class="num">${f1(pts)}</b>`}<span class="note">${sub}</span></div></header>
-      ${line?`<p class="fd-line">${esc(line)}</p>`:''}
-      ${vids.length?`<div class="fd-vids">${vids.map(v=>vidThumb(v)).join('')}</div>`:''}
-      ${news.length?`<ul class="fd-news">${news.map(a=>`<li><a href="${esc(a.url||'#')}" target="_blank" rel="noopener"><b>${esc(a.title)}</b></a>${a.at?`<span class="note"> · ${ago(a.at)}</span>`:''}${a.desc&&a.desc!==a.title?`<p>${esc(a.desc.length>220?a.desc.slice(0,217)+'...':a.desc)}</p>`:''}</li>`).join('')}</ul>`:''}
-      ${!vids.length&&!news.length&&FEED?'<p class="note fd-none">No video or news yet this week.</p>':''}</article>`}).join('')}
-function openVideo(id){const v=VIDS[id];if(!v)return;const m=$('vid-modal');m.hidden=false;document.body.style.overflow='hidden';
-  m.innerHTML=`<div class="vm-box" role="dialog" aria-label="${esc(v.title)}"><button class="vm-x" data-vclose="1" aria-label="Close">×</button>
-    <div class="vm-frame"><iframe src="https://www.espn.com/core/video/iframe/_/id/${encodeURIComponent(v.id)}/endcard/false" allow="autoplay; fullscreen; encrypted-media; picture-in-picture" allowfullscreen title="${esc(v.title)}"></iframe></div>
-    <div class="vm-meta"><div><b>${esc(v.title)}</b>${v.desc&&v.desc!==v.title?`<p class="note">${esc(v.desc)}</p>`:''}</div>${v.url?`<a class="btn" href="${esc(v.url)}" target="_blank" rel="noopener">Watch on ESPN ↗</a>`:''}</div>
-    <p class="note vm-src">Video from ESPN. If it doesn't play here, use Watch on ESPN.</p></div>`}
-function closeVideo(){const m=$('vid-modal');if(m.hidden)return;m.hidden=true;m.innerHTML='';document.body.style.overflow=''}
+    else if(gm.state==='pre'){chip=`<span class="fchip">${gm.start?new Date(gm.start).toLocaleString([], {weekday:'short',hour:'numeric',minute:'2-digit'}):'Upcoming'} · ${gm.home?'vs':'at'} ${esc(gm.opp||'')}</span>`;pts=g.projNext;sub='projected'}
+    else{chip=`<span class="fchip ${gm.state}">${gm.state==='post'?'Final':esc(gm.detail||'Live')} · ${gm.home?'vs':'at'} ${esc(gm.opp||'')} ${gm.score}-${gm.oppScore}</span>`;pts=lv?lv.pts:0;sub=gm.state==='post'?'points':'so far';line=statLineTxt(p.pos,st)}
+    if(!line){const lastG=[...g.log].reverse().find(x=>!x.bye&&!x.dnp);if(lastG)line=`Week ${lastG.w} ${lastG.home?'vs':'at'} ${lastG.opp}: ${f1(linePts(lastG,p.pos,S.league.sc))} pts · ${statLineTxt(p.pos,lastG)}`}
+    const vids=playerVideos(p),news=playerNews(p)[0];
+    return `<article class="hl-row"><div class="hl-head"><span class="fd-slot">${slot}</span>${av(p)}<div class="fd-who"><div class="fd-name"><button class="pname" data-open="${id}">${esc(p.n)}</button>${stHtml(id)}${OWN[id]!==S.me?followBtn(id,true):''}</div><div class="fd-meta"><span class="psub">${p.pos} · ${p.t}</span>${chip}</div></div><div class="fd-pts">${pts==null?'<b class="num">—</b>':`<b class="num">${f1(pts)}</b>`}<span class="note">${sub}</span></div></div>
+      ${line?`<p class="hl-line">${esc(line)}</p>`:''}
+      ${vids.length?`<div class="hl-clips">${vids.map(v=>thumbHtml(v,'sm')).join('')}</div>`:''}
+      ${news?`<a class="hl-news1" href="${esc(news.url||'#')}" target="_blank" rel="noopener"><b>${esc(news.title)}</b>${news.at?`<span class="note"> · ${ago(news.at)}</span>`:''}</a>`:''}</article>`}).join('');
+  /* side: follow tools on Following, news for everyone in view */
+  const seenN=new Set(),allNews=[];list.forEach(({id})=>playerNews(byId[id]).forEach(a=>{if(!seenN.has(a.title)){seenN.add(a.title);allNews.push({...a,pid:id})}}));
+  allNews.sort((a,b)=>Date.parse(b.at||0)-Date.parse(a.at||0));
+  $('feed-side').innerHTML=(FEED_F==='follow'?followPanelHtml():'')+`<div class="card hl-newscard"><div class="card-h"><h2>News</h2><span class="note">${allNews.length?allNews.length+' stories':''}</span></div>
+    ${!FEED?'<p class="note">Loading...</p>':allNews.length?`<ul class="hl-news">${allNews.slice(0,15).map(a=>`<li><span class="hl-ntag">${esc(byId[a.pid].n)}</span><a href="${esc(a.url||'#')}" target="_blank" rel="noopener">${esc(a.title)}</a>${a.desc&&a.desc!==a.title?`<p>${esc(a.desc.length>160?a.desc.slice(0,157)+'...':a.desc)}</p>`:''}<span class="note">${a.at?ago(a.at):''}</span></li>`).join('')}</ul>`:'<p class="note">No news for these players right now.</p>'}</div>`}
+function followPanelHtml(){const ft=S.followTeams||[],teams=Object.keys(NICK).sort((a,b)=>teamName(a).localeCompare(teamName(b))),rec=recommendedFollows();
+  return `<div class="card hl-follow"><div class="card-h"><h2>Teams you follow</h2></div><p class="note" style="margin:-4px 0 10px">Their top fantasy players join your feed.</p>
+      <div class="team-chips">${ft.map(t=>`<span class="tchip" style="${tcVars(t)}"><i></i>${esc(teamName(t))}<button data-fteam="${t}" aria-label="Unfollow ${esc(teamName(t))}">×</button></span>`).join('')}
+      <select id="team-add" aria-label="Follow a team"><option value="">+ Follow a team</option>${teams.filter(t=>!ft.includes(t)).map(t=>`<option value="${t}">${esc(teamName(t))} (${t})</option>`).join('')}</select></div>
+    <div class="card-h" style="margin-top:20px"><h2>Recommended</h2></div><p class="note" style="margin:-4px 0 10px">Most highlight clips the last two weeks.</p>
+    ${!FEED?'<p class="note">Loading...</p>':rec.length?`<div class="rec-list">${rec.map(r=>{const p=byId[r.id];return `<div class="rec">${av(p,'sm')}<div class="rec-who"><button class="pname" data-open="${p.id}">${esc(p.n)}</button><span class="psub">${p.pos} · ${p.t} · ${r.n} clip${r.n>1?'s':''}</span></div>${followBtn(p.id,false).replace('follow-btn','follow-btn light')}</div>`}).join('')}</div>`:'<p class="note">No clips yet. Check back after the games.</p>'}</div>`}
+/* ===== Clip viewer: scroll through clips one at a time; only the clip on screen loads a player ===== */
+function posterHtml(v){return `<span class="vimg${v.thumb?'':' noimg'}" style="${tcVars(v.player?byId[v.player].t:(v.teams[0]||''))}">${v.thumb?`<img src="${esc(v.thumb)}" alt="" loading="lazy" decoding="async" onerror="this.remove()">`:''}<span class="vplay" aria-hidden="true"></span></span>`}
+function embedHtml(v){const src=v.src==='youtube'?`https://www.youtube-nocookie.com/embed/${encodeURIComponent(v.yt)}?autoplay=1&playsinline=1&rel=0&modestbranding=1`:`https://www.espn.com/core/video/iframe/_/id/${encodeURIComponent(v.id)}/endcard/false`;
+  return `<iframe src="${src}" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen title="${esc(v.title)}"></iframe>`}
+function openViewer(start){if(!CLIPS.length)return;const el=$('clipview');el.hidden=false;document.body.style.overflow='hidden';CV_CUR=-1;
+  el.innerHTML=`<div class="cv-bar"><span class="cv-brand"><span class="play" aria-hidden="true"></span>Highlights</span><span class="cv-count" id="cv-count"></span><button class="cv-x" data-cvclose="1" aria-label="Close">×</button></div>
+    <div class="cv-scroll" id="cv-scroll">${CLIPS.map((v,i)=>{const p=v.player?byId[v.player]:null;return `<section class="cv-slide" data-i="${i}"><div class="cv-media" data-cvplay="${i}">${posterHtml(v)}</div>
+      <div class="cv-info">${srcBadge(v)}<h3>${esc(v.title)}</h3><p class="note">${p?`<b>${esc(p.n)}</b> · ${p.pos} · ${p.t} · `:v.teams.length?esc(v.teams.join(' vs '))+' · ':''}Week ${v.week}${v.at?' · '+ago(v.at):''}</p>
+      ${v.url?`<a href="${esc(v.url)}" target="_blank" rel="noopener">Open on ${v.src==='youtube'?'YouTube':'ESPN'} ↗</a>`:''}</div></section>`}).join('')}</div>
+    <div class="cv-nav"><button data-cvstep="-1" aria-label="Previous clip">▲</button><button data-cvstep="1" aria-label="Next clip">▼</button></div>`;
+  const sc=$('cv-scroll');CV_OBS=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting)activateClip(+e.target.dataset.i)}),{root:sc,threshold:.65});
+  sc.querySelectorAll('.cv-slide').forEach(x=>CV_OBS.observe(x));
+  requestAnimationFrame(()=>{sc.scrollTop=sc.children[start].offsetTop;activateClip(start)})}
+function activateClip(i){const sc=$('cv-scroll');if(!sc||i===CV_CUR||!CLIPS[i])return;
+  if(CV_CUR>=0&&sc.children[CV_CUR])sc.children[CV_CUR].querySelector('.cv-media').innerHTML=posterHtml(CLIPS[CV_CUR]);
+  CV_CUR=i;sc.children[i].querySelector('.cv-media').innerHTML=embedHtml(CLIPS[i]);$('cv-count').textContent=`${i+1} / ${CLIPS.length}`;
+  [i+1,i+2].forEach(j=>{const v=CLIPS[j];if(v&&v.thumb){const im=new Image();im.src=v.thumb}})}
+function stepClip(d){const sc=$('cv-scroll');if(!sc)return;const j=Math.max(0,Math.min(CLIPS.length-1,CV_CUR+d));sc.scrollTo({top:sc.children[j].offsetTop,behavior:'smooth'})}
+function closeViewer(){const el=$('clipview');if(el.hidden)return;if(CV_OBS)CV_OBS.disconnect();CV_OBS=null;CV_CUR=-1;el.hidden=true;el.innerHTML='';document.body.style.overflow=''}
 document.addEventListener('click',e=>{const t=e.target;if(!t.closest)return;
   const f=t.closest('[data-follow]');if(f){e.preventDefault();e.stopPropagation();toggleFollow(f.dataset.follow);if(openId&&!$('scrim').hidden)openCard(openId);return}
   const ff=t.closest('[data-ff]');if(ff){FEED_F=ff.dataset.ff;renderFeed();return}
-  const vb=t.closest('[data-vid]');if(vb){openVideo(vb.dataset.vid);return}
-  if(t.closest('[data-vclose]')||t.id==='vid-modal'){closeVideo();return}
+  const cl=t.closest('[data-clip]');if(cl){openViewer(Math.max(0,+cl.dataset.clip));return}
+  const cp=t.closest('[data-cvplay]');if(cp){activateClip(+cp.dataset.cvplay);return}
+  const cs=t.closest('[data-cvstep]');if(cs){stepClip(+cs.dataset.cvstep);return}
+  if(t.closest('[data-cvclose]')){closeViewer();return}
   const gt=t.closest('[data-goto]');if(gt){location.hash=gt.dataset.goto;return}
   const fte=t.closest('[data-fteam]');if(fte){toggleTeam(fte.dataset.fteam);return}},true);
 document.addEventListener('change',e=>{if(e.target.id==='team-add'&&e.target.value)toggleTeam(e.target.value)});
-document.addEventListener('keydown',e=>{if(e.key==='Escape')closeVideo()});
+document.addEventListener('keydown',e=>{if($('clipview').hidden)return;if(e.key==='Escape')closeViewer();else if(e.key==='ArrowDown'||e.key==='j'){e.preventDefault();stepClip(1)}else if(e.key==='ArrowUp'||e.key==='k'){e.preventDefault();stepClip(-1)}});

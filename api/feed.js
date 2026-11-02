@@ -49,6 +49,45 @@ function articleOf(a) {
   };
 }
 
+/* ---- YouTube: the NFL's official channel ----
+   Without a key we read the channel's public RSS feed (latest 15 uploads).
+   With YOUTUBE_API_KEY set in Vercel we read the latest 200 uploads (4 quota units per refresh). */
+const NFL_CHANNEL = 'UCDVYQ4Zhbm3S2dlz7P1GBDg';
+const NICKS = { ARI:'Cardinals',ATL:'Falcons',BAL:'Ravens',BUF:'Bills',CAR:'Panthers',CHI:'Bears',CIN:'Bengals',CLE:'Browns',DAL:'Cowboys',DEN:'Broncos',DET:'Lions',GB:'Packers',HOU:'Texans',IND:'Colts',JAX:'Jaguars',KC:'Chiefs',LV:'Raiders',LAC:'Chargers',LAR:'Rams',MIA:'Dolphins',MIN:'Vikings',NE:'Patriots',NO:'Saints',NYG:'Giants',NYJ:'Jets',PHI:'Eagles',PIT:'Steelers',SF:'49ers',SEA:'Seahawks',TB:'Buccaneers',TEN:'Titans',WAS:'Commanders' };
+const teamsIn = t => Object.entries(NICKS).filter(([, n]) => new RegExp('\\b' + n + '\\b', 'i').test(t)).map(([k]) => k);
+const unxml = s => String(s || '').replace(/<!\[CDATA\[|\]\]>/g, '').replace(/&amp;/g, '&').replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&lt;/g, '<').replace(/&gt;/g, '>');
+async function ytUploads() {
+  const key = process.env.YOUTUBE_API_KEY, out = [];
+  if (key) {
+    let page = '';
+    for (let i = 0; i < 4; i++) {
+      const j = await cj(`https://www.googleapis.com/youtube/v3/playlistItems?part=snippet&maxResults=50&playlistId=UU${NFL_CHANNEL.slice(2)}&key=${key}${page ? '&pageToken=' + page : ''}`, 30 * 60e3);
+      (j.items || []).forEach(it => { const s = it.snippet || {}; const id = s.resourceId && s.resourceId.videoId; if (id) out.push({ id, title: s.title, desc: s.description || '', at: s.publishedAt }); });
+      if (!j.nextPageToken) break; page = j.nextPageToken;
+    }
+    return out;
+  }
+  const hit = mem.get('yt-rss');
+  if (hit && Date.now() - hit.at < 15 * 60e3) return hit.data;
+  const r = await fetch(`https://www.youtube.com/feeds/videos.xml?channel_id=${NFL_CHANNEL}`, { headers: { 'User-Agent': 'TradeMetric/1.0' } });
+  if (!r.ok) throw new Error('yt rss ' + r.status);
+  const xml = await r.text();
+  for (const m of xml.matchAll(/<entry>([\s\S]*?)<\/entry>/g)) {
+    const e = m[1], g = re => (e.match(re) || [])[1];
+    const id = g(/<yt:videoId>([^<]+)</);
+    if (id) out.push({ id, title: unxml(g(/<title>([^<]*)</)), desc: unxml(g(/<media:description>([\s\S]*?)<\/media:description>/)), at: g(/<published>([^<]+)</) });
+  }
+  mem.set('yt-rss', { at: Date.now(), data: out });
+  return out;
+}
+function ytVideo(v, week, games) {
+  const wk = +((v.title.match(/week\s*(\d{1,2})/i) || [])[1]) || null;
+  const curStart = Math.min(...games.filter(g => g.week === week).map(g => Date.parse(g.start)).filter(Boolean));
+  const w = wk || (Date.parse(v.at) >= curStart - 864e5 ? week : week - 1);
+  return { id: 'yt:' + v.id, src: 'youtube', yt: v.id, ev: null, week: w, teams: teamsIn(v.title), title: v.title, desc: (v.desc || '').slice(0, 300), dur: 0,
+    thumb: `https://i.ytimg.com/vi/${v.id}/mqdefault.jpg`, url: `https://www.youtube.com/watch?v=${v.id}`, athletes: [], at: v.at };
+}
+
 export default async function handler(req, res) {
   try {
     const state = await cj('https://api.sleeper.app/v1/state/nfl', 10 * 60e3);
@@ -63,7 +102,9 @@ export default async function handler(req, res) {
     const sums = await Promise.all(played.map(g =>
       cj(`${SITE}/summary?event=${g.id}`, g.state === 'post' ? 6 * 3600e3 : 2 * 60e3).catch(() => null)));
     const videos = [];
-    sums.forEach((s, i) => (s && s.videos || []).forEach(v => videos.push(videoOf(v, played[i]))));
+    sums.forEach((s, i) => (s && s.videos || []).forEach(v => videos.push({ ...videoOf(v, played[i]), src: 'espn' })));
+    const yt = await ytUploads().catch(() => []);
+    yt.forEach(v => { const x = ytVideo(v, week, games); if (x.week >= week - 1 && x.week <= week) videos.push(x); });
 
     const [fan, gen] = await Promise.all([
       cj('https://site.api.espn.com/apis/fantasy/v2/games/ffl/news/players?limit=200', 5 * 60e3).catch(() => null),
@@ -74,11 +115,12 @@ export default async function handler(req, res) {
     for (const a of raw) { const n = articleOf(a); const k = n.title + n.at; if (!n.title || seen.has(k)) continue; seen.add(k); news.push(n); }
     news.sort((a, b) => Date.parse(b.at || 0) - Date.parse(a.at || 0));
 
-    const out = { season, week, updated: new Date().toISOString(), games, videos, news: news.slice(0, 250) };
+    const vseen = new Set(), uniq = videos.filter(v => { v.id = String(v.id); if (vseen.has(v.id)) return false; vseen.add(v.id); return true; });
+    const out = { season, week, updated: new Date().toISOString(), games, videos: uniq, news: news.slice(0, 250) };
     if (req.query && req.query.debug) out.debug = {
       fanKeys: fan && Object.keys(fan), genKeys: gen && Object.keys(gen),
       video0: sums.find(s => s && s.videos && s.videos.length)?.videos[0] || null,
-      fan0: fan && (fan.feed || fan.articles || [])[0] || null,
+      fan0: fan && (fan.feed || fan.articles || [])[0] || null, yt: yt.length, ytKey: !!process.env.YOUTUBE_API_KEY,
     };
     res.setHeader('Cache-Control', 'public, max-age=0, s-maxage=300');
     return res.status(200).json(out);

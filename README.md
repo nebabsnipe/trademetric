@@ -13,7 +13,7 @@ Fantasy football trades, rankings and lineup advice built on your league's exact
 | `data/preseason.json` | Preseason expectations blended into projections. Replace each summer |
 | `api/ai.js` | Server function for the AI Helper, scouting reports and screenshot reading |
 | `api/live.js` | Live game-day data: scores, game clocks, player stats so far, injury news (cached 2 min during games, 10 min otherwise) |
-| `api/feed.js` | Highlights tab: game videos (this week and last), results and NFL news from ESPN, cached 5 minutes |
+| `api/feed.js` | Highlights tab: game videos (ESPN + the NFL's YouTube channel, this week and last), results and NFL news, cached 5 minutes. Optional `YOUTUBE_API_KEY` env var pulls the NFL's latest 200 YouTube uploads instead of 15 |
 | `api/espn.js` | Reads private ESPN leagues with the user's espn_s2 and SWID codes (never stored) |
 | `supabase/schema.sql` | Table that stores each user's saved league. Run once in Supabase's SQL Editor |
 | `supabase/accounts.sql` | Usernames, username sign-in and the wrong-password lockout. Run once after schema.sql |
