@@ -14,7 +14,8 @@ Fantasy football trades, rankings and lineup advice built on your league's exact
 | `api/ai.js` | Server function for the AI Helper, scouting reports and screenshot reading |
 | `api/live.js` | Live game-day data: scores, game clocks, player stats so far, injury news (cached 2 min during games, 10 min otherwise) |
 | `api/espn.js` | Reads private ESPN leagues with the user's espn_s2 and SWID codes (never stored) |
-| `supabase/schema.sql` | Database table for saved accounts. Run once in Supabase's SQL Editor |
+| `supabase/schema.sql` | Table that stores each user's saved league. Run once in Supabase's SQL Editor |
+| `supabase/accounts.sql` | Usernames, username sign-in and the wrong-password lockout. Run once after schema.sql |
 | `scripts/update_data.py` | Downloads fresh stats, injuries, schedules, betting lines and expert rankings |
 
 Handy places in `js/app.js`:
@@ -46,7 +47,7 @@ Data: [nflverse](https://github.com/nflverse/nflverse-data) (stats, schedules, b
 
 ## Accounts (Supabase)
 
-Sign-in is by emailed link. Each user's league is saved to the `user_state` table, and row-level security means people can only read their own row. The project URL and publishable key are at the bottom of `js/app.js` (search for `SUPA_URL`); both are safe to be public.
+People create an account with a username, email and password, and sign in with their username or email. "Keep me signed in" keeps them signed in on that device; without it they're signed out after 2 weeks (their league stays saved). Each user's league is saved to the `user_state` table, and row-level security means people can only read their own row. The project URL and publishable key are at the bottom of `js/app.js` (search for `SUPA_URL`); both are safe to be public.
 
 ## Coming next
 
