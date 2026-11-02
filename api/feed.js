@@ -1,5 +1,6 @@
 // Player feed: game results, highlight videos and news for the current and previous week.
-// Videos come only from the NFL's and the 32 teams' official YouTube channels (played with YouTube's own player).
+// Videos: ESPN's game clips (tagged with the players in them) plus the NFL's and 32 teams' official YouTube channels.
+// The page keeps only clips of a specific player's plays.
 // Game results and news headlines come from ESPN's public site API. Everything is the same for every visitor,
 // so it is cached at Vercel's edge (the page adds a 5-minute time bucket to the URL).
 
@@ -32,6 +33,15 @@ const names = cats => (cats || []).filter(c => c && (c.type === 'athlete' || c.a
   .map(c => pick(c.athlete && c.athlete.description, c.description, c.athlete && c.athlete.displayName)).filter(Boolean);
 const img = o => pick(o && o.thumbnail, o && o.images && o.images[0] && o.images[0].url, o && o.posterImages && o.posterImages.default && o.posterImages.default.href);
 
+function videoOf(v, ev) {
+  const links = v.links || {};
+  return {
+    id: String(v.id), src: 'espn', ev: ev.id, week: ev.week, teams: ev.teams.map(x => x.t),
+    title: v.headline || v.title || '', desc: v.description || '', dur: v.duration || 0,
+    thumb: img(v) || null, url: pick(links.web && links.web.href, links.web && links.web.self && links.web.self.href) || null,
+    athletes: names(v.categories), at: pick(v.originalPublishDate, v.lastModified, v.published) || null,
+  };
+}
 function articleOf(a) {
   const links = a.links || {};
   return {
@@ -97,7 +107,11 @@ export default async function handler(req, res) {
     const boards = await Promise.all(weeks.map(w =>
       cj(`${SITE}/scoreboard?seasontype=2&week=${w}&dates=${season}`, w === week ? 2 * 60e3 : 60 * 60e3).catch(() => null)));
     const games = boards.flatMap((b, i) => eventsOf(b, weeks[i]));
+    const played = games.filter(g => g.state !== 'pre');
+    const sums = await Promise.all(played.map(g =>
+      cj(`${SITE}/summary?event=${g.id}`, g.state === 'post' ? 6 * 3600e3 : 2 * 60e3).catch(() => null)));
     const videos = [];
+    sums.forEach((s, i) => (s && s.videos || []).forEach(v => videos.push(videoOf(v, played[i]))));
     const yt = await ytUploads(req.headers && req.headers.host || 'trademetric-rho.vercel.app').catch(() => []);
     yt.forEach(v => { const x = ytVideo(v, week, games); if (x.week >= week - 1 && x.week <= week) videos.push(x); });
 

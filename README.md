@@ -15,6 +15,7 @@ Fantasy football trades, rankings and lineup advice built on your league's exact
 | `api/live.js` | Live game-day data: scores, game clocks, player stats so far, injury news (cached 2 min during games, 10 min otherwise) |
 | `api/feed.js` | Highlights tab: clips from the NFL's and all 32 teams' official YouTube channels (this week and last), game results and news headlines, cached 5 minutes. Optional `YOUTUBE_API_KEY` env var reads 50 uploads per channel instead of 15 |
 | `scripts/yt_channels.py` | Finds each team's official YouTube channel ID (runs in the daily job, writes `data/yt_channels.json`) |
+| `api/players.js` | Compact Sleeper player list used to sync rosters in the background |
 | `api/espn.js` | Reads private ESPN leagues with the user's espn_s2 and SWID codes (never stored) |
 | `supabase/schema.sql` | Table that stores each user's saved league. Run once in Supabase's SQL Editor |
 | `supabase/accounts.sql` | Usernames, username sign-in and the wrong-password lockout. Run once after schema.sql |
@@ -43,7 +44,7 @@ Every change pushed to the `main` branch goes live automatically in about a minu
 
 ## Scoring
 
-When a league is imported from Sleeper or ESPN, live and final fantasy points for the week come from that platform, and lineups follow the starters set there. Projections are TradeMetric's own.
+When a league is imported from Sleeper or ESPN, it re-syncs in the background (rosters, team names, records, starters and points) when the site opens and every few minutes. Live and final fantasy points for the week come from that platform, and lineups follow the starters set there. Projections are TradeMetric's own.
 
 ## Fresh data every day
 

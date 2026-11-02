@@ -191,7 +191,35 @@ function readEspnWeek(d){const src=S.real&&S.real.src;if(!d||!src||src.type!=='e
 async function loadEspnWeek(){const src=S.real&&S.real.src;if(!src||src.type!=='espn')return;
   const creds=src.priv?(IMP.espnCreds||espnSaved()):null;if(src.priv&&!(creds&&creds.s2))return;
   try{readEspnWeek(await espnFetch(src.league,creds,WEEK))}catch(e){}}
-async function loadPlatform(){await loadSleeperLineups();await loadEspnWeek()}
+/* ===== Background league sync: rosters, team names, records, starters and points.
+   Runs when the site opens and every few minutes. Scoring settings, follows and everything else stay as they are. ===== */
+var SLP_IDS=null,SYNC_AT=0;
+async function sleeperIds(){if(SLP_IDS)return SLP_IDS;try{const r=await fetch('/api/players');if(r.ok)SLP_IDS=await r.json()}catch(e){}return SLP_IDS||{}}
+function rosterChanged(T,ids){const a=[...T.players].sort().join(),b=[...ids].sort().join();if(a===b)return false;T.players=ids;return true}
+async function syncSleeper(){const src=S.real&&S.real.src;if(!src||src.type!=='sleeper')return false;
+  const [rosters,users]=await Promise.all([getJSON(`https://api.sleeper.app/v1/league/${src.league}/rosters`),getJSON(`https://api.sleeper.app/v1/league/${src.league}/users`)]);
+  let changed=false,ids=null;
+  for(const r of rosters){const tid=src.rid[r.roster_id],T=tid&&teamById(tid);if(!T)continue;
+    const out=[];for(const pid of (r.players||[])){let id=src.pmap[pid]||sleeperDst(pid);
+      if(!id){ids=ids||await sleeperIds();const x=ids[pid];const q=x&&findByName(x[0]);if(q&&q.pos===x[1]){id=q.id;src.pmap[pid]=id}}
+      if(id&&byId[id])out.push(id)}
+    if(rosterChanged(T,[...new Set(out)]))changed=true;
+    const us=users.find(x=>x.user_id===r.owner_id),nm=(us&&us.metadata&&us.metadata.team_name)||(us&&us.display_name);if(nm&&nm!==T.name){T.name=nm;changed=true}
+    const st=r.settings||{};S.real.rec[tid]={w:st.wins||0,l:st.losses||0,t:st.ties||0,pf:(st.fpts||0)+(st.fpts_decimal||0)/100}}
+  return changed}
+function syncEspnRosters(d){const src=S.real&&S.real.src;if(!d||!src||src.type!=='espn')return false;let changed=false;
+  (d.teams||[]).forEach(t=>{const tid=src.rid[t.id],T=tid&&teamById(tid);if(!T)return;
+    const out=((t.roster&&t.roster.entries)||[]).map(e=>e.playerPoolEntry&&e.playerPoolEntry.player).filter(Boolean).map(pl=>{const q=pl.defaultPositionId===16?(findByName(pl.fullName)||null):findByName(pl.fullName);return q&&q.id}).filter(Boolean);
+    if(out.length&&rosterChanged(T,[...new Set(out)]))changed=true;
+    const nm=t.name||[t.location,t.nickname].filter(Boolean).join(' ');if(nm&&nm!==T.name){T.name=nm;changed=true}
+    const o=(t.record&&t.record.overall)||{};S.real.rec[tid]={w:o.wins||0,l:o.losses||0,t:o.ties||0,pf:o.pointsFor||0}});
+  return changed}
+async function loadPlatform(){const src=S.real&&S.real.src;if(!src)return;let changed=false;
+  try{if(src.type==='sleeper'){changed=await syncSleeper();await loadSleeperLineups()}
+    else if(src.type==='espn'){const creds=src.priv?(IMP.espnCreds||espnSaved()):null;if(src.priv&&!(creds&&creds.s2))return;
+      const d=await espnFetch(src.league,creds,WEEK);changed=syncEspnRosters(d);readEspnWeek(d)}}catch(e){}
+  SYNC_AT=Date.now();if(changed){REC_CACHE={v:-1};save();rebuildOwn()}}
+async function syncNow(){if(!S.real||!S.real.src)return;await loadPlatform();recompute();const a=document.activeElement;if(!(a&&/INPUT|TEXTAREA|SELECT/.test(a.tagName)))render()}
 function lprojHtml(id){const g=G[id],l=liveOf(id);
   if(l)return `<div class="lproj live ${l.state}"><b>${f1(l.pts)}</b><span>${l.state==='post'?'final':'proj '+f1(g.projNext)}</span></div>`;
   return `<div class="lproj">${g.next?`<b>${f1(g.projNext)}</b><span>${f1(g.season)} avg</span>`:'<b class="muted">—</b><span>Bye</span>'}</div>`}
@@ -1082,7 +1110,7 @@ function renderSignin(){const el=$('signin-card');if(!el)return;
      <label>New password<input type="password" id="auth-pw" autocomplete="new-password" minlength="8" required placeholder="At least 8 characters"></label>${msg}${btn('Save password')}</form>`;
   el.innerHTML=tabs+body;['auth-id','auth-user','auth-email'].forEach(k=>{const i=$(k);if(i&&AUTH_VALS[k])i.value=AUTH_VALS[k]});
   const f=[...el.querySelectorAll('input[type=text],input[type=email],input[type=password]')].find(i=>!i.value);if(f)setTimeout(()=>f.focus(),0)}
-function enterApp(){document.body.classList.remove('signed-out');AUTH_MODE='in';AUTH_MSG=null;
+function enterApp(){document.body.classList.remove('signed-out');setTimeout(syncNow,300);AUTH_MODE='in';AUTH_MSG=null;
   let t=TABS.includes(INTENDED)&&INTENDED!=='signin'?INTENDED:'team';INTENDED=null;if(!S.onboarded)t='welcome';
   if(location.hash.slice(1)===t)go(t);else location.hash=t}
 function leaveApp(){document.body.classList.add('signed-out');USER=null;PROFILE=null;AUTH_MODE='in';AUTH_MSG=null;if(location.hash!=='#signin')location.hash='signin';else go('signin');acctUI()}
@@ -1138,7 +1166,7 @@ initAccounts();
 
 /* ===== Highlights tab: results, clips (ESPN + NFL on YouTube) and news for your team and everyone you follow ===== */
 var FEED=null,FEED_AT=0,FEED_F='all',FEED_LOADING=false,REC_CACHE2={at:-1,list:[]},PV={key:'',map:{}},CLIPS=[],CV_OBS=null,CV_CUR=-1;
-const FEED_LS='tm-feed-cache2';
+const FEED_LS='tm-feed-cache3';
 const isFollowing=id=>(S.following||[]).includes(id);
 function followBtn(id,mini){const on=isFollowing(id);return mini?`<button class="star${on?' on':''}" data-follow="${id}" title="${on?'Following. Click to unfollow':'Follow this player in Highlights'}" aria-label="${on?'Unfollow':'Follow'}">${on?'★':'☆'}</button>`
   :`<button class="follow-btn${on?' on':''}" data-follow="${id}">${on?'★ Following':'☆ Follow'}</button>`}
@@ -1177,23 +1205,27 @@ async function loadFeed(force){if(FEED_LOADING||(!force&&FEED&&Date.now()-FEED_A
 try{const c=JSON.parse(localStorage.getItem(FEED_LS)||'null');if(c&&c.d&&c.d.week===WEEK&&Date.now()-c.at<6*3600e3){FEED=c.d;FEED_AT=c.at-4*60e3}}catch(e){}
 setTimeout(()=>loadFeed(),1500);
 setInterval(()=>{if(tab==='feed'&&!document.hidden)loadFeed()},5*60e3);
+/* Only clips of this player's own plays: ESPN clips tagged with him, plus YouTube clips whose title is a specific play by him.
+   Press conferences, interviews, recaps and full-game packages are left out. */
+const normT=x=>norm(String(x||'').replace(/['’]s\b/gi,''));
+const PLAY_RE=/\b(td|tds|touchdowns?|catch(es)?|grabs?|runs?|rush(es)?|scampers?|throws?|pass(es)?|dimes?|strikes?|connects?|finds|sacks?|interceptions?|picks?|int|fumbles?|scrambles?|scores?|yards?|yds?|yd|jukes?|hurdles?|stiff|breaks?|bursts?|receptions?|hauls?|snags?|plays|highlights|bombs?|deep|one-handed|toe-tap|leaps?)\b/i;
+const NOT_RE=/press conference|post-?game|pre-?game|interview|presser|availability|full game|game highlights|recap|podcast|mic'?d up|reacts?|reaction|breakdown|film room|locker room|practice|q ?& ?a|sound ?bites?|condensed|vs\.? .* highlights|highlights \| nfl/i;
 function playerVideos(p){if(!FEED)return [];const key=FEED_AT+'|'+VER;if(PV.key!==key)PV={key,map:{}};if(PV.map[p.id])return PV.map[p.id];
   const full=norm(p.n),last=full.split(' ').pop();
-  const vids=FEED.videos.filter(v=>v.src==='youtube'&&(v.teams.includes(p.t)||(!v.teams.length&&p.pos!=='DST'&&wordIn(norm(v.title),full))));
-  let out;
-  if(p.pos==='DST')out=vids.filter(v=>/highlight/i.test(v.title)).sort((a,b)=>b.week-a.week).slice(0,2).map(v=>({...v,game:true}));
-  else{const lastUnique=POOL.filter(q=>q.id!==p.id&&q.pos!=='DST'&&norm(q.n).split(' ').pop()===last&&vids.some(v=>v.teams.includes(q.t))).length===0;
-    const others=POOL.filter(q=>q.id!==p.id&&q.pos!=='DST'&&vids.some(v=>v.teams.includes(q.t))).map(q=>norm(q.n));
-    const hit=vids.filter(v=>{const h=norm(v.title+' '+v.desc),t=norm(v.title);if(v.athletes.some(a=>norm(a)===full)||wordIn(h,full))return true;
-      return lastUnique&&last.length>3&&wordIn(t,last)&&!others.some(o=>wordIn(t,o))});
-    out=hit.sort((a,b)=>b.week-a.week||Date.parse(b.at||0)-Date.parse(a.at||0)).slice(0,6);
-    const games=vids.filter(v=>/highlight/i.test(v.title)&&v.teams.includes(p.t)&&!out.some(o=>o.id===v.id)).sort((a,b)=>b.week-a.week||(a.src==='youtube'?-1:1));
-    if(games.length)out.push({...games[0],game:true})}
+  const near=FEED.videos.filter(v=>v.teams.includes(p.t)||(!v.teams.length&&wordIn(normT(v.title),full)));
+  let out=[];
+  if(p.pos==='DST')out=near.filter(v=>v.src==='espn'&&/\b(defense|sacks?|interceptions?|pick-?six|picks? off|fumble|safety|stop)\b/i.test(v.title)&&!NOT_RE.test(v.title)).slice(0,4);
+  else{const lastUnique=POOL.filter(q=>q.id!==p.id&&q.pos!=='DST'&&norm(q.n).split(' ').pop()===last&&near.some(v=>v.teams.includes(q.t))).length===0;
+    const others=POOL.filter(q=>q.id!==p.id&&q.pos!=='DST'&&near.some(v=>v.teams.includes(q.t))).map(q=>norm(q.n));
+    const named=v=>{const t=normT(v.title),h=normT(v.title+' '+v.desc);if(v.athletes.some(a=>norm(a)===full)||wordIn(v.src==='youtube'?t:h,full))return true;
+      return lastUnique&&last.length>3&&wordIn(t,last)&&!others.some(o=>wordIn(t,o))};
+    out=near.filter(v=>named(v)&&!NOT_RE.test(v.title)&&(v.src==='espn'||PLAY_RE.test(v.title)));
+    out.sort((a,b)=>b.week-a.week||(a.src==='espn'?0:1)-(b.src==='espn'?0:1)||Date.parse(b.at||0)-Date.parse(a.at||0));out=out.slice(0,8)}
   return PV.map[p.id]=out}
 function playerNews(p){if(!FEED||p.pos==='DST')return [];const full=norm(p.n);
-  return FEED.news.filter(a=>a.athletes.some(x=>norm(x)===full)||wordIn(norm(a.title+' '+a.desc),full)).slice(0,3)}
-const chName=v=>v.ch&&v.ch!=='NFL'?(NICK[v.ch]||v.ch):'NFL';
-const srcBadge=v=>`<span class="srcb youtube">${esc(chName(v))}</span>`;
+  return FEED.news.filter(a=>a.athletes.some(x=>norm(x)===full)||wordIn(normT(a.title+' '+a.desc),full)).slice(0,3)}
+const chName=v=>v.src==='espn'?'ESPN':v.ch&&v.ch!=='NFL'?(NICK[v.ch]||v.ch):'NFL';
+const srcBadge=v=>`<span class="srcb ${v.src==='espn'?'espn':'youtube'}">${esc(chName(v))}</span>`;
 const nflUrl=p=>p.pos==='DST'?`https://www.nfl.com/teams/`:`https://www.nfl.com/players/${p.id}/`;
 function thumbHtml(v,size){const i=CLIPS.findIndex(c=>c.id===v.id);const p=v.player?byId[v.player]:null;
   return `<button class="hthumb ${size||''}" data-clip="${i}" title="${esc(v.title)}"><span class="vimg${v.thumb?'':' noimg'}" style="${tcVars(p?p.t:(v.teams[0]||''))}">${v.thumb?`<img src="${esc(v.thumb)}" alt="" loading="lazy" decoding="async" onerror="this.remove()">`:''}<span class="vplay" aria-hidden="true"></span>${srcBadge(v)}${v.dur?`<span class="vdur">${Math.floor(v.dur/60)}:${String(v.dur%60).padStart(2,'0')}</span>`:''}</span>
@@ -1207,19 +1239,21 @@ function renderFeed(){
   $('feed-kicker').textContent=`Week ${WEEK} · ${FEED?'updated '+new Date(FEED.updated).toLocaleTimeString([], {hour:'numeric',minute:'2-digit'}):'loading'}`;
   document.querySelectorAll('#feed-filter button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.ff===FEED_F));
   const fc=(S.following||[]).length+(S.followTeams||[]).length,fl=$('feed-filter').querySelector('[data-ff=follow]');fl.textContent=`Following${fc?' ('+fc+')':''}`;
+  const fp=FEED_F==='follow';$('feed-follow-page').hidden=!fp;$('feed-top').hidden=fp;document.querySelector('#v-feed .hl-grid').hidden=fp;
+  if(fp){renderFollowPage();return}
   const list=feedPlayers();buildClips(list);
   /* top: featured clip + up next + watch button */
   const top=$('feed-top');
   if(!FEED)top.innerHTML=`<div class="card hl-loading"><span class="spin"></span> Loading clips and news...</div>`;
-  else if(!CLIPS.length)top.innerHTML=`<div class="card hl-empty">No clips yet for these players. Clips appear here as games are played.</div>`;
+  else if(!CLIPS.length)top.innerHTML=`<div class="card hl-empty">No play clips yet for these players. They show up here as games are played.</div>`;
   else{const f=CLIPS[0],up=CLIPS.slice(1,5),fp=f.player?byId[f.player]:null;
     top.innerHTML=`<div class="card hl-feature"><div class="hl-feat-main">${thumbHtml(f,'lg')}</div>
       <div class="hl-feat-side"><div class="kicker">${CLIPS.length} clip${CLIPS.length>1?'s':''} · ${FEED_F==='mine'?'your team':FEED_F==='follow'?'players and teams you follow':'your team and follows'}</div>
         <h2>${fp?esc(fp.n):'Latest highlights'}</h2>
-        <div class="hl-upnext">${up.map(v=>`<button class="hl-up" data-clip="${CLIPS.indexOf(v)}"><span class="vimg${v.thumb?'':' noimg'}" style="${tcVars(v.player?byId[v.player].t:(v.teams[0]||''))}">${v.thumb?`<img src="${esc(v.thumb)}" alt="" loading="lazy" decoding="async" onerror="this.remove()">`:''}</span><span><b>${esc(v.title)}</b><span class="note">${v.player?esc(byId[v.player].n)+' · ':''}${esc(chName(v))} on YouTube</span></span></button>`).join('')}</div>
+        <div class="hl-upnext">${up.map(v=>`<button class="hl-up" data-clip="${CLIPS.indexOf(v)}"><span class="vimg${v.thumb?'':' noimg'}" style="${tcVars(v.player?byId[v.player].t:(v.teams[0]||''))}">${v.thumb?`<img src="${esc(v.thumb)}" alt="" loading="lazy" decoding="async" onerror="this.remove()">`:''}</span><span><b>${esc(v.title)}</b><span class="note">${v.player?esc(byId[v.player].n)+' · ':''}${v.src==='espn'?'ESPN':esc(chName(v))+' on YouTube'}</span></span></button>`).join('')}</div>
         <button class="btn primary hl-watch" data-clip="0"><span class="play" aria-hidden="true"></span>Watch all clips</button></div></div>`}
   /* player rows */
-  if(!list.length){$('feed-list').innerHTML=`<div class="card empty-card">${FEED_F==='follow'?`<h2>Follow players and teams</h2><p class="note">Follow an NFL team or a recommended player on the right, tap the ☆ next to anyone in Rankings, or use <b>☆ Follow</b> on a player's card.</p><button class="btn" data-goto="rankings">Find players in Rankings</button>`:'<p class="empty">No players here yet.</p>'}</div>`}
+  if(!list.length){$('feed-list').innerHTML=`<div class="card empty-card">${FEED_F==='follow'?`<h2>Follow players and teams</h2><p class="note">Pick teams and players in the Following tab.</p><button class="btn" data-ff="follow">Choose who to follow</button>`:'<p class="empty">No players here yet.</p>'}</div>`}
   else $('feed-list').innerHTML=list.map(({id,slot})=>{const p=byId[id],g=G[id],gm=feedGame(p),lv=liveOf(id),st=LIVEST[id];
     let chip,pts,sub,line;
     if(!gm){const nx=OPP[p.t]&&OPP[p.t][WEEK];chip=`<span class="fchip">${nx?(nx.home?'vs ':'at ')+nx.opp:'Bye'}</span>`;pts=nx?g.projNext:null;sub=nx?'projected':'bye week'}
@@ -1235,7 +1269,7 @@ function renderFeed(){
   /* side: follow tools on Following, news for everyone in view */
   const seenN=new Set(),allNews=[];list.forEach(({id})=>playerNews(byId[id]).forEach(a=>{if(!seenN.has(a.title)){seenN.add(a.title);allNews.push({...a,pid:id})}}));
   allNews.sort((a,b)=>Date.parse(b.at||0)-Date.parse(a.at||0));
-  $('feed-side').innerHTML=(FEED_F==='follow'?followPanelHtml():'')+`<div class="card hl-newscard"><div class="card-h"><h2>News</h2><span class="note">${allNews.length?allNews.length+' stories':''}</span></div>
+  $('feed-side').innerHTML=`<div class="card hl-newscard"><div class="card-h"><h2>News</h2><span class="note">${allNews.length?allNews.length+' stories':''}</span></div>
     ${!FEED?'<p class="note">Loading...</p>':allNews.length?`<ul class="hl-news">${allNews.slice(0,15).map(a=>`<li><span class="hl-ntag">${esc(byId[a.pid].n)}</span><a href="${esc(a.url||'#')}" target="_blank" rel="noopener">${esc(a.title)}</a>${a.desc&&a.desc!==a.title?`<p>${esc(a.desc.length>160?a.desc.slice(0,157)+'...':a.desc)}</p>`:''}<span class="note">${a.at?ago(a.at):''}</span></li>`).join('')}</ul>`:'<p class="note">No news for these players right now.</p>'}</div>`}
 function followPanelHtml(){const ft=S.followTeams||[],teams=Object.keys(NICK).sort((a,b)=>teamName(a).localeCompare(teamName(b))),rec=recommendedFollows();
   return `<div class="card hl-follow"><div class="card-h"><h2>Teams you follow</h2></div><p class="note" style="margin:-4px 0 10px">Their top fantasy players join your feed.</p>
@@ -1245,13 +1279,13 @@ function followPanelHtml(){const ft=S.followTeams||[],teams=Object.keys(NICK).so
     ${!FEED?'<p class="note">Loading...</p>':rec.length?`<div class="rec-list">${rec.map(r=>{const p=byId[r.id];return `<div class="rec">${av(p,'sm')}<div class="rec-who"><button class="pname" data-open="${p.id}">${esc(p.n)}</button><span class="psub">${p.pos} · ${p.t} · ${r.n} clip${r.n>1?'s':''}</span></div>${followBtn(p.id,false).replace('follow-btn','follow-btn light')}</div>`}).join('')}</div>`:'<p class="note">No clips yet. Check back after the games.</p>'}</div>`}
 /* ===== Clip viewer: scroll through clips one at a time; only the clip on screen loads a player ===== */
 function posterHtml(v){return `<span class="vimg${v.thumb?'':' noimg'}" style="${tcVars(v.player?byId[v.player].t:(v.teams[0]||''))}">${v.thumb?`<img src="${esc(v.thumb)}" alt="" loading="lazy" decoding="async" onerror="this.remove()">`:''}<span class="vplay" aria-hidden="true"></span></span>`}
-function embedHtml(v){const src=`https://www.youtube-nocookie.com/embed/${encodeURIComponent(v.yt)}?autoplay=1&playsinline=1&rel=0&modestbranding=1`;
+function embedHtml(v){const src=v.src==='espn'?`https://www.espn.com/core/video/iframe/_/id/${encodeURIComponent(v.id)}/endcard/false`:`https://www.youtube-nocookie.com/embed/${encodeURIComponent(v.yt)}?autoplay=1&playsinline=1&rel=0&modestbranding=1`;
   return `<iframe src="${src}" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen title="${esc(v.title)}"></iframe>`}
 function openViewer(start){if(!CLIPS.length)return;const el=$('clipview');el.hidden=false;document.body.style.overflow='hidden';CV_CUR=-1;
   el.innerHTML=`<div class="cv-bar"><span class="cv-brand"><span class="play" aria-hidden="true"></span>Highlights</span><span class="cv-count" id="cv-count"></span><button class="cv-x" data-cvclose="1" aria-label="Close">×</button></div>
     <div class="cv-scroll" id="cv-scroll">${CLIPS.map((v,i)=>{const p=v.player?byId[v.player]:null;return `<section class="cv-slide" data-i="${i}"><div class="cv-media" data-cvplay="${i}">${posterHtml(v)}</div>
       <div class="cv-info">${srcBadge(v)}<h3>${esc(v.title)}</h3><p class="note">${p?`<b>${esc(p.n)}</b> · ${p.pos} · ${p.t} · `:v.teams.length?esc(v.teams.join(' vs '))+' · ':''}Week ${v.week}${v.at?' · '+ago(v.at):''}</p>
-      <span class="cv-links">${v.url?`<a href="${esc(v.url)}" target="_blank" rel="noopener">Open on YouTube ↗</a>`:''}${p?`<a href="${nflUrl(p)}" target="_blank" rel="noopener">${esc(p.n)} on NFL.com ↗</a>`:''}</span></div></section>`}).join('')}</div>
+      <span class="cv-links">${v.url?`<a href="${esc(v.url)}" target="_blank" rel="noopener">Open on ${v.src==='espn'?'ESPN':'YouTube'} ↗</a>`:''}${p?`<a href="${nflUrl(p)}" target="_blank" rel="noopener">${esc(p.n)} on NFL.com ↗</a>`:''}</span></div></section>`}).join('')}</div>
     <div class="cv-nav"><button data-cvstep="-1" aria-label="Previous clip">▲</button><button data-cvstep="1" aria-label="Next clip">▼</button></div>`;
   const sc=$('cv-scroll');CV_OBS=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting)activateClip(+e.target.dataset.i)}),{root:sc,threshold:.65});
   sc.querySelectorAll('.cv-slide').forEach(x=>CV_OBS.observe(x));
@@ -1277,8 +1311,29 @@ document.addEventListener('keydown',e=>{if($('clipview').hidden)return;if(e.key=
 function cardHighlights(id){const p=byId[id];if(!FEED){loadFeed();return `<h4>Highlights</h4><p class="note">Loading clips...</p>`}
   const vids=playerVideos(p);
   return `<h4>Highlights</h4>${vids.length?`<div class="hl-clips card-clips">${vids.map((v,i)=>`<button class="hthumb sm" data-pclip="${id}|${i}" title="${esc(v.title)}"><span class="vimg${v.thumb?'':' noimg'}" style="${tcVars(p.t)}">${v.thumb?`<img src="${esc(v.thumb)}" alt="" loading="lazy" decoding="async" onerror="this.remove()">`:''}<span class="vplay" aria-hidden="true"></span>${srcBadge(v)}</span><span class="vtitle">${v.game?'<span class="vtag">Game</span>':''}${esc(v.title)}</span><span class="note">Week ${v.week}${v.at?' · '+ago(v.at):''}</span></button>`).join('')}</div>`
-    :`<p class="note">No clips from this week or last week yet.</p>`}<p class="note" style="margin:8px 0 0"><a href="${nflUrl(p)}" target="_blank" rel="noopener">More on NFL.com ↗</a></p>`}
+    :`<p class="note">No clips of his plays from this week or last week yet.</p>`}<p class="note" style="margin:8px 0 0"><a href="${nflUrl(p)}" target="_blank" rel="noopener">More on NFL.com ↗</a></p>`}
 function openPlayerClips(id,i){CLIPS=playerVideos(byId[id]).map(v=>({...v,player:v.game?null:id}));openViewer(Math.max(0,i||0))}
 document.addEventListener('click',e=>{const t=e.target;if(!t.closest)return;
   const pc=t.closest('[data-pclip]');if(pc){const [id,i]=pc.dataset.pclip.split('|');openPlayerClips(id,+i);return}
   const pcs=t.closest('[data-pclips]');if(pcs){openPlayerClips(pcs.dataset.pclips,0)}},true);
+setInterval(()=>{if(USER&&!document.hidden&&Date.now()-SYNC_AT>4*60e3)syncNow()},60e3);
+document.addEventListener('visibilitychange',()=>{if(!document.hidden&&USER&&Date.now()-SYNC_AT>2*60e3)syncNow()});
+/* ===== Following: pick teams and players (no clips here) ===== */
+const DIVS=[['AFC East',['BUF','MIA','NE','NYJ']],['AFC North',['BAL','CIN','CLE','PIT']],['AFC South',['HOU','IND','JAX','TEN']],['AFC West',['DEN','KC','LV','LAC']],
+  ['NFC East',['DAL','NYG','PHI','WAS']],['NFC North',['CHI','DET','GB','MIN']],['NFC South',['ATL','CAR','NO','TB']],['NFC West',['ARI','LAR','SF','SEA']]];
+var FOL_Q='';
+function folPlayerCard(id){const p=byId[id],o=OWN[id];return `<div class="fol-pl">${av(p)}<div class="rec-who"><button class="pname" data-open="${id}">${esc(p.n)}</button><span class="psub">${p.pos}${V.posRank[id]} · ${p.t}${o?` · ${o===S.me?'yours':esc(teamById(o).name)}`:''}</span></div>${o===S.me?'<span class="note">Your team</span>':followBtn(id,false).replace('follow-btn','follow-btn light')}</div>`}
+function folSearchHtml(){const q=norm(FOL_Q);if(!q)return '';const hits=POOL.filter(p=>norm(p.n).includes(q)||(p.pos==='DST'&&norm(NICK[p.t]||'').includes(q))).sort((a,b)=>V.rank[a.id]-V.rank[b.id]).slice(0,8);
+  return hits.length?hits.map(p=>folPlayerCard(p.id)).join(''):'<p class="note">No players match.</p>'}
+function renderFollowPage(){const ft=S.followTeams||[],fp=(S.following||[]).filter(id=>byId[id]);let rec=recommendedFollows().map(r=>r.id);
+  if(rec.length<6){const skip=new Set([...fp,...rec,...(myTeam()?myTeam().players:[])]);rec=rec.concat(V.list.filter(p=>p.pos!=='DST'&&!skip.has(p.id)).slice(0,8-rec.length).map(p=>p.id))}
+  $('feed-follow-page').innerHTML=`<div class="card"><div class="card-h"><h2>Teams</h2><span class="note">${ft.length?`Following ${ft.length}`:'Tap a team to follow it'} · their top fantasy players join your feed</span></div>
+    <div class="div-grid">${DIVS.map(([d,ts])=>`<div class="div-col"><div class="div-name">${d}</div>${ts.map(t=>{const on=ft.includes(t),c=TC[t]||['#333','#666','#fff'];
+      return `<button class="tteam${on?' on':''}" data-fteam="${t}" style="--c1:${c[0]};--c2:${c[1]};--ct:${c[2]}" aria-pressed="${on}"><span class="tt-abbr">${t}</span><span class="tt-name">${esc(NICK[t]||t)}</span><span class="tt-check" aria-hidden="true">${on?'✓':'+'}</span></button>`}).join('')}</div>`).join('')}</div></div>
+   <div class="grid2 even fol-two"><div class="card"><div class="card-h"><h2>Players</h2><span class="note">${fp.length?`Following ${fp.length}`:'Not following anyone yet'}</span></div>
+      <input type="search" id="fol-search" class="fol-search" placeholder="Search any player or team defense" autocomplete="off" value="${esc(FOL_Q)}">
+      <div class="fol-list" id="fol-results">${folSearchHtml()}</div>
+      ${fp.length?`<div class="div-name" style="margin-top:14px">Following</div><div class="fol-list">${fp.map(folPlayerCard).join('')}</div>`:''}</div>
+    <div class="card"><div class="card-h"><h2>Recommended</h2><span class="note">${recommendedFollows().length?'Most play clips the last two weeks':'Top-ranked players'}</span></div><div class="fol-list">${rec.map(folPlayerCard).join('')}</div></div></div>`;
+  if(FOL_Q){const i=$('fol-search');i.focus();i.setSelectionRange(FOL_Q.length,FOL_Q.length)}}
+document.addEventListener('input',e=>{if(e.target.id==='fol-search'){FOL_Q=e.target.value;$('fol-results').innerHTML=folSearchHtml()}});

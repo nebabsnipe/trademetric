@@ -700,3 +700,22 @@ body.signed-out .nav,body.signed-out #week-pill,body.signed-out #acct-btn{displa
 #sim-table tr.me-row td:first-child{box-shadow:inset 4px 0 0 var(--accent)}
 #sim-table tbody tr:hover td{background:var(--surface-2)}
 #card-hl a{color:var(--accent);font-weight:600;text-decoration:none}#card-hl a:hover{text-decoration:underline}
+/* Following screen */
+.fol-page{display:flex;flex-direction:column;gap:18px}
+.div-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px 14px}
+.div-col{display:flex;flex-direction:column;gap:8px}
+.div-name{font-size:11px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.tteam{appearance:none;cursor:pointer;display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:10px;padding:10px 12px;border-radius:12px;border:2px solid transparent;
+  background:linear-gradient(120deg,var(--c1) 0%,var(--c2) 140%);color:var(--ct);font:inherit;text-align:left;opacity:.72;filter:saturate(.7);transition:opacity .15s,filter .15s,transform .1s,box-shadow .15s}
+.tteam:hover{opacity:.85;filter:none;transform:translateY(-1px)}
+.tteam.on{opacity:1;filter:none;border-color:var(--ink);box-shadow:0 4px 14px rgba(0,0,0,.18)}
+.tt-abbr{font:800 12px var(--f-mono,monospace);background:rgba(0,0,0,.25);color:#fff;border-radius:6px;padding:3px 6px}
+.tt-name{font-weight:800;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.35)}
+.tt-check{width:24px;height:24px;border-radius:50%;display:grid;place-items:center;font-weight:900;font-size:13px;background:rgba(255,255,255,.25);color:#fff}
+.tteam.on .tt-check{background:#fff;color:#111}
+.fol-search{width:100%;padding:11px 12px;font-size:14.5px;border-radius:10px;margin-bottom:6px}
+.fol-list{display:flex;flex-direction:column}
+.fol-pl{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--line)}.fol-pl:last-child{border-bottom:0}
+.fol-pl .rec-who{flex:1}
+@media (max-width:900px){.div-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:520px){.div-grid{grid-template-columns:minmax(0,1fr)}}
