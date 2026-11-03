@@ -16,7 +16,7 @@
 <body class="signed-out">
 <div class="topbar">
   <div class="wrap topbar-in">
-    <a class="logo" href="#team" aria-label="TradeMetric home"><span class="logo-mark"><i></i><i></i><i></i></span><b>Trade<span>Metric</span></b></a>
+    <a class="logo" href="#team" aria-label="TradeMetric home"><svg class="logo-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="14" fill="#141414"/><path d="M16 8V26H48V8M32 26V56" fill="none" stroke="#fff" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/><path d="M8 50L22 40L33 45L50 20" fill="none" stroke="#ff6b1a" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M56 11L55.3 20.2L47.9 15.2Z" fill="#ff6b1a"/></svg><b>Trade<span>Metric</span></b></a>
     <nav class="nav" aria-label="Sections">
       <button data-tab="team">My Team</button>
       <button data-tab="feed" class="nav-hot"><span class="play" aria-hidden="true"></span>Highlights</button>
@@ -24,8 +24,6 @@
       <button data-tab="rankings">Rankings</button>
       <button data-tab="hub"><span class="lbl-l">League Hub</span><span class="lbl-s">Hub</span></button>
       <button data-tab="season"><span class="lbl-l">Season Sim</span><span class="lbl-s">Sim</span></button>
-      <button data-tab="helper"><span class="lbl-l">AI Helper</span><span class="lbl-s">AI</span></button>
-      <button data-tab="league"><span class="lbl-l">League Setup</span><span class="lbl-s">Setup</span></button>
     </nav>
     <div class="topbar-right">
       <span class="demo-pill" id="week-pill"></span>
@@ -104,7 +102,7 @@
   <!-- HUB -->
   <section class="view" id="v-hub" hidden>
     <div class="hero"><div><div class="kicker" id="hub-kicker"></div><h1>League Hub</h1><p>Every roster in your league. Import your league or add rosters manually; TradeMetric uses them for power rankings, trade analysis and the Season Sim.</p></div>
-      <div class="toolbar"><button class="btn" id="load-sample">Load sample league</button><button class="btn ghost" id="clear-league">Clear other rosters</button></div></div>
+      <div class="toolbar"><a class="btn primary" href="#league" id="lg-settings-btn">League settings</a><button class="btn" id="load-sample">Load sample league</button><button class="btn ghost" id="clear-league">Clear other rosters</button></div></div>
     <div class="card" id="import-card"></div>
     <div class="card lg-card" id="league-list"></div>
     <div class="grid2 even">
@@ -131,25 +129,7 @@
   </section>
 
   <!-- HELPER -->
-  <section class="view" id="v-helper" hidden>
-    <div class="hero"><div><div class="kicker">AI Helper</div><h1><span class="wk-now">This week's</span> game plan</h1><p>A weekly briefing built from your roster and matchup. Ask follow-up questions below; answers include one-click actions.</p></div></div>
-    <div class="card" id="briefing"></div>
-    <div class="helper-grid">
-      <aside class="card hist"><div class="card-h"><h3>Past questions</h3><button class="btn small ghost" id="hist-clear">Clear</button></div><div id="hist"></div></aside>
-      <div class="card chat">
-        <div class="quick" id="quick">
-          <button class="btn small" data-q="Who should I start this week? Point out any close calls.">Who should I start?</button>
-          <button class="btn small" data-q="Who is the best pickup for my team this week, and who should I drop?">Best pickup this week?</button>
-          <button class="btn small" data-q="Find me a fair trade with one team that makes my team better.">Find me a trade</button>
-          <button class="btn small" data-q="Which of my players should I sell high, and who should I target instead?">Who to sell?</button>
-          <button class="btn small" data-q="What is my biggest weakness and how do I fix it before the playoffs?">Fix my weakness</button>
-        </div>
-        <div class="answers" id="answers"></div>
-        <div class="ask-box"><textarea id="helper-q" rows="2" placeholder="Ask about your team, a player or a trade"></textarea><button class="btn accent" id="helper-ask">Ask</button></div>
-        <p class="note" id="helper-status" style="margin:0"></p>
-      </div>
-    </div>
-  </section>
+
 
   <!-- WELCOME -->
   <!-- HIGHLIGHTS -->
@@ -182,7 +162,7 @@
 
   <!-- LEAGUE SETUP -->
   <section class="view" id="v-league" hidden>
-    <div class="hero"><div><div class="kicker">Settings</div><h1>League setup</h1><p>Your league's scoring and roster rules. Every ranking, lineup and trade updates instantly as you edit.</p></div></div>
+    <div class="hero"><div><div class="kicker"><a href="#hub" class="back-link">← League Hub</a></div><h1>League settings</h1><p>Your league's scoring and roster rules. Every ranking, lineup and trade updates instantly as you edit.</p></div></div>
   <div class="card"><div class="card-h"><h3>Start from a preset</h3></div>
       <div class="presets" id="presets">
         <button class="btn" data-preset="std">Standard</button><button class="btn" data-preset="half">Half PPR</button><button class="btn" data-preset="ppr">Full PPR</button><button class="btn" data-preset="sf">Superflex + TE premium</button><button class="btn" data-preset="2qb">2QB, 6-pt pass TD</button>
@@ -213,6 +193,27 @@
 <div class="scrim" id="scrim" hidden><div class="modal" id="modal" role="dialog" aria-modal="true" aria-label="Player card"></div></div>
 <div class="toast" id="toast" hidden></div>
 
+  <button class="ai-fab" id="ai-fab" type="button" aria-label="Open AI Helper" aria-expanded="false"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M12 2l1.9 5.6L19.5 9.5l-5.6 1.9L12 17l-1.9-5.6L4.5 9.5l5.6-1.9z" fill="currentColor"/><path d="M19 14l.9 2.6 2.6.9-2.6.9L19 21l-.9-2.6-2.6-.9 2.6-.9z" fill="currentColor"/></svg><span>Ask AI</span></button>
+  <div class="ai-scrim" id="ai-scrim" hidden></div>
+  <aside class="ai-drawer" id="ai-drawer" aria-label="AI Helper" aria-hidden="true">
+    <div class="ai-head"><div><div class="kicker">AI Helper</div><h2><span class="wk-now">This week's</span> game plan</h2></div><button class="btn small ghost" id="ai-close" aria-label="Close AI Helper">✕</button></div>
+    <div class="ai-body" id="ai-body">
+      <details class="ai-brief" open><summary>Weekly briefing</summary><div class="card" id="briefing"></div></details>
+        <div class="quick" id="quick">
+          <button class="btn small" data-q="Who should I start this week? Point out any close calls.">Who should I start?</button>
+          <button class="btn small" data-q="Who is the best pickup for my team this week, and who should I drop?">Best pickup this week?</button>
+          <button class="btn small" data-q="Find me a fair trade with one team that makes my team better.">Find me a trade</button>
+          <button class="btn small" data-q="Which of my players should I sell high, and who should I target instead?">Who to sell?</button>
+          <button class="btn small" data-q="What is my biggest weakness and how do I fix it before the playoffs?">Fix my weakness</button>
+        </div>
+      <div class="answers" id="answers"></div>
+      <details class="ai-hist"><summary>Past questions</summary><div id="hist"></div><button class="btn small ghost" id="hist-clear" type="button">Clear history</button></details>
+    </div>
+    <div class="ai-foot">
+        <div class="ask-box"><textarea id="helper-q" rows="2" placeholder="Ask about your team, a player or a trade"></textarea><button class="btn accent" id="helper-ask">Ask</button></div>
+        <p class="note" id="helper-status" style="margin:0"></p>
+    </div>
+  </aside>
 <script>
 /* Load the stats snapshot, then start the app */
 fetch('data/nfl.json',{cache:'no-cache'}).then(r=>r.json()).then(d=>{

@@ -719,7 +719,7 @@ function sparkSvg(id){const pts=G[id].pts.filter(x=>x!==null);if(pts.length<2)re
   return `<svg class="spark" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" aria-hidden="true"><path d="${path} L${w} ${h} L0 ${h}Z" fill="var(--accent-soft)"/><path d="${path}" fill="none" stroke="var(--accent)" stroke-width="2" vector-effect="non-scaling-stroke"/><circle cx="${xy[xy.length-1][0]}" cy="${xy[xy.length-1][1]}" r="3" fill="var(--accent)"/></svg>`}
 async function askHelper(q){
   if(!AI||!q||!q.trim()||asking)return;asking=true;$('helper-ask').disabled=true;$('helper-status').textContent='';$('helper-q').value='';
-  if(tab!=='helper')location.hash='helper';
+  openAI();
   const entry={id:Date.now().toString(36),q:q.trim(),status:'thinking',ts:Date.now()};S.chat.push(entry);renderAnswers();
   setTimeout(()=>{const el=$('msg-'+entry.id);if(el)el.scrollIntoView({behavior:'smooth',block:'start'})},50);
   const prior=S.chat.filter(x=>x.status==='done').slice(-2).map(x=>`Earlier question: ${x.q}\nYour answer: ${x.data.headline}. ${x.data.answer}`).join('\n');
@@ -873,7 +873,7 @@ function renderSeason(){
   $('sim-hero').innerHTML=`<div class="card sim-hero"><div class="dial-wrap ${tone}">${dialSvg(o.playoff)}<div class="dial-num"><b>${pct(o.playoff)}</b><span>playoff odds</span></div></div>
     <div class="sim-sum"><div class="kicker">${esc(myTeam().name)} · ${recTxt(me)}</div><h2>${o.playoff>=.75?'In good shape':o.playoff>=.45?'On the bubble':o.playoff>=.08?'Behind, but alive':'Long shot'}</h2>
       <p>${myRank}${['st','nd','rd'][myRank-1]||'th'} best playoff odds in the league. The top ${P} of ${n} make it${P===6?', and seeds 1 and 2 get a bye':''}. ${left>0?`${left} regular-season week${left>1?'s':''} left.`:'Regular season is over.'}</p>
-      <div class="sim-stats"><div><b>${pct(o.title)}</b><span>Title odds</span></div><div><b>${o.wins.toFixed(1)}-${(REG_WEEKS-o.wins).toFixed(1)}</b><span>Projected record</span></div>${P===6?`<div><b>${pct(o.bye)}</b><span>First-round bye</span></div>`:''}<div><b>${f1(rec[me].pf)}</b><span>Points for</span></div></div></div></div>`;
+      <div class="sim-stats"><div><b>${pct(o.title)}</b><span>Title odds</span></div><div><b>${Math.round(o.wins)}-${REG_WEEKS-Math.round(o.wins)}</b><span>Projected record</span></div>${P===6?`<div><b>${pct(o.bye)}</b><span>First-round bye</span></div>`:''}<div><b>${f1(rec[me].pf)}</b><span>Points for</span></div></div></div></div>`;
   /* race: a clean ranked table with the playoff line */
   const bar=x=>`<div class="pr-bar"><i style="width:${Math.max(1.5,x*100)}%"></i></div>`;
   $('sim-race').innerHTML=`<div class="card-h"><h2>Playoff race</h2><span class="note">Top ${P} of ${n} make the playoffs</span></div>
@@ -881,7 +881,7 @@ function renderSeason(){
     ${ord.map((t,i)=>{const T=teamById(t),x=sim[t],cls=x.playoff>=.75?'hi':x.playoff>=.35?'md':'lo';return `${i===P?`<div class="r2-cut"><span>Playoff line</span></div>`:''}
       <div class="r2${t===me?' me':''}${P===6?'':' nobye'}"><span class="r2-rk">${i+1}</span>
         <span class="r2-team"><i class="tsq" style="background:${teamColor(t)}"></i><span class="r2-nm"><b>${esc(T.name)}</b><small>${recTxt(t)} · ${f1(rec[t].pf)} pts</small></span>${t===me?'<span class="tag mine">You</span>':''}</span>
-        <span class="r2-odds ${cls}">${bar(x.playoff)}<b>${pct(x.playoff)}</b></span>${P===6?`<span class="r2-c r2-bye">${pct(x.bye)}</span>`:''}<span class="r2-c">${pct(x.title)}</span><span class="r2-c r2-pw">${x.wins.toFixed(1)}-${(REG_WEEKS-x.wins).toFixed(1)}</span></div>`}).join('')}</div>
+        <span class="r2-odds ${cls}">${bar(x.playoff)}<b>${pct(x.playoff)}</b></span>${P===6?`<span class="r2-c r2-bye">${pct(x.bye)}</span>`:''}<span class="r2-c">${pct(x.title)}</span><span class="r2-c r2-pw">${Math.round(x.wins)}-${REG_WEEKS-Math.round(x.wins)}</span></div>`}).join('')}</div>
     <p class="note" style="margin:12px 0 0">Weeks 1 to ${sim.P0||PLAYED} use real results. The rest of the season is simulated ${N_SIM.toLocaleString()} times from projected lineups, byes and matchups. Ties in the standings go to points scored.</p>`;
   renderNeed(sim,rec);
   let road='';for(let w=WEEK;w<=REG_WEEKS;w++){const oid=oppOf(me,w);if(!oid)continue;const A=weekLine(myTeam().players,w,me),Bm=weekLine(teamById(oid).players,w,oid),p=Phi((A.m-Bm.m)/Math.sqrt(A.sd**2+Bm.sd**2));
@@ -912,7 +912,7 @@ function renderNeed(sim,rec){const el=$('sim-need');if(!el)return;const me=S.me,
   else if(safe)hero=`<div class="need-hero ${safe.k<=L/2?'good':'mid'}"><span class="need-k">${safe.k}<small>of ${L}</small></span><div><b>Win ${safe.k} of your last ${L} to be safe</b><p>If you ${go(safe.k)} and finish ${rc(safe.k)}, you make it ${pct(safe.odds)} of the time.${coin&&coin.k<safe.k?` At ${rc(coin.k)} it's ${pct(coin.odds)}.`:''}</p></div></div>`;
   else{const top=rows[0];hero=`<div class="need-hero bad"><span class="need-k">${L}<small>of ${L}</small></span><div><b>Win out and get some help</b><p>Even at ${rc(L)} you make it ${pct(top?top.odds:0)} of the time. You need teams above you to lose.</p></div></div>`}
   const lock=ck===0?'':ck!=null?`<div class="need-lock"><span>🔒</span><p><b>Win ${ck} more to clinch.</b> At ${rc(ck)} no one can catch you, whatever else happens.</p></div>`:`<div class="need-lock"><span>🔒</span><p><b>No record guarantees a spot yet.</b> Too many teams can still tie you, and ties go to points scored.</p></div>`;
-  const tbl=`<div class="need-tbl"><div class="nt nt-h"><span>Finish</span><span>Rest of season</span><span>Playoff odds</span><span class="r">How likely</span></div>${rows.map(x=>`<div class="nt ${x.odds>=.9?'good':x.odds>=.5?'mid':x.odds>=.1?'low':'bad'}${safe&&x.k===safe.k?' key':''}"><b class="num">${rc(x.k)}</b><span>${go(x.k)}</span><span class="nt-odds"><span class="pr-bar"><i style="width:${Math.max(1.5,x.odds*100)}%"></i></span><b>${pct(x.odds)}</b></span><span class="r note">${x.reach<.01?'<1%':pct(x.reach)}</span></div>`).join('')}</div>`;
+  const tbl=`<div class="need-tbl"><div class="nt nt-h"><span>Finish</span><span>Rest of season</span><span>Playoff odds</span><span class="r">How likely</span></div>${rows.map(x=>`<div class="nt ${x.odds>=.9?'good':x.odds>=.5?'mid':x.odds>=.1?'low':'bad'}${safe&&x.k===safe.k?' key':''}"><b class="num">${rc(x.k)}</b><span class="num">${x.k}-${L-x.k}</span><span class="nt-odds"><span class="pr-bar"><i style="width:${Math.max(1.5,x.odds*100)}%"></i></span><b>${pct(x.odds)}</b></span><span class="r note">${x.reach<.01?'<1%':pct(x.reach)}</span></div>`).join('')}</div>`;
   const sw=(sim.swing||[]).map(g=>{const pa=g.n[0]?g.m[0]/g.n[0]:0,pb=g.n[1]?g.m[1]/g.n[1]:0;return {...g,d:Math.abs(pa-pb),root:pa>=pb?g.a:g.b,vs:pa>=pb?g.b:g.a,hi:Math.max(pa,pb),lo:Math.min(pa,pb)}}).filter(g=>g.d>=.015).sort((a,b)=>b.d-a.d).slice(0,3);
   const root=sw.length?`<div class="need-root"><h4>Root for this week${sim.W1?` (Week ${sim.W1})`:''}</h4>${sw.map(g=>`<div class="root-row"><span class="owner"><i style="background:${teamColor(g.root)}"></i><b>${esc(teamById(g.root).name)}</b></span><span class="note">over ${esc(teamById(g.vs).name)}</span><span class="gain">+${Math.round(g.d*100)} pts</span></div>`).join('')}</div>`:'';
   el.innerHTML=head+hero+lock+tbl+root+`<p class="note" style="margin:14px 0 0">How this works: out of ${N_SIM.toLocaleString()} simulated seasons, we group the ones where you finish with each record and count how often you make the top ${sim.P}. "How likely" is how often you end up with that record.</p>`}
@@ -1134,10 +1134,10 @@ function applyTheme(){if(themePref)document.documentElement.setAttribute('data-t
 $('theme-btn').addEventListener('click',()=>{themePref=isDark()?'light':'dark';try{localStorage.setItem('hashmark-theme',themePref)}catch(e){}applyTheme()});
 
 /* ===== Routing & events ===== */
-const TABS=['team','feed','trade','rankings','hub','season','helper','league','welcome','signin','account'];let tab='team';
-function go(t){if(!USER&&t!=='signin')t='signin';tab=TABS.includes(t)?t:'team';if(tab!=='welcome'&&S&&!S.onboarded){S.onboarded=true;save()}document.querySelectorAll('.nav button').forEach(b=>{if(b.dataset.tab===tab)b.setAttribute('aria-current','page');else b.removeAttribute('aria-current')});
+const TABS=['team','feed','trade','rankings','hub','season','league','welcome','signin','account'];let tab='team';
+function go(t){if(t==='helper'){if(USER)openAI();t=TABS.includes(tab)?tab:'team';history.replaceState(null,'','#'+t)}if(!USER&&t!=='signin')t='signin';tab=TABS.includes(t)?t:'team';if(tab!=='welcome'&&S&&!S.onboarded){S.onboarded=true;save()}document.querySelectorAll('.nav button').forEach(b=>{if(b.dataset.tab===tab)b.setAttribute('aria-current','page');else b.removeAttribute('aria-current')});
   TABS.forEach(x=>$('v-'+x).hidden=x!==tab);render();window.scrollTo(0,0)}
-function render(){({team:renderTeam,rankings:renderRankings,trade:renderTrade,hub:renderHub,season:renderSeason,helper:renderHelper,welcome:renderWelcome,league:fillLeagueForm,signin:renderSignin,feed:renderFeed,account:renderAccount})[tab]();if(openId&&!$('scrim').hidden)openCard(openId);queueBalance()}
+function render(){({team:renderTeam,rankings:renderRankings,trade:renderTrade,hub:renderHub,season:renderSeason,welcome:renderWelcome,league:fillLeagueForm,signin:renderSignin,feed:renderFeed,account:renderAccount})[tab]();if(openId&&!$('scrim').hidden)openCard(openId);queueBalance()}
 document.querySelectorAll('.nav button').forEach(b=>b.addEventListener('click',()=>{location.hash=b.dataset.tab}));
 window.addEventListener('hashchange',()=>{closeCard();go(location.hash.slice(1))});
 function loadTrade(str){const [g,r]=str.split('|');TD.give=g?g.split(','):[];TD.get=r?r.split(','):[];closeCard();if(tab==='trade')renderTrade();else location.hash='trade';setTimeout(()=>$('rating').scrollIntoView({behavior:'smooth',block:'center'}),60)}
@@ -1608,3 +1608,12 @@ function renderAccount(){const el=$('account-body');if(!el)return;if(!USER){el.i
           ${row('League sync',save,'acc-wrap')}
           ${row('Theme',document.documentElement.dataset.theme==='dark'?'Dark':'Light')}</div>
       </div></div>`}
+
+/* ===== AI Helper: floating button + slide-over panel on every page ===== */
+function openAI(){const d=$('ai-drawer');if(!d||!USER)return;if(!document.body.classList.contains('ai-open')){document.body.classList.add('ai-open');d.setAttribute('aria-hidden','false');$('ai-scrim').hidden=false;$('ai-fab').setAttribute('aria-expanded','true');renderHelper();setTimeout(()=>{const q=$('helper-q');if(q&&innerWidth>820)q.focus()},250)}}
+function closeAI(){document.body.classList.remove('ai-open');const d=$('ai-drawer');if(d)d.setAttribute('aria-hidden','true');$('ai-scrim').hidden=true;$('ai-fab').setAttribute('aria-expanded','false')}
+document.addEventListener('click',e=>{const t=e.target;if(!t.closest)return;
+  if(t.closest('#ai-fab')){document.body.classList.contains('ai-open')?closeAI():openAI();return}
+  if(t.closest('#ai-close')||t.id==='ai-scrim'){closeAI();return}
+  if(t.closest('#ai-drawer [data-act]'))setTimeout(closeAI,0)});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&document.body.classList.contains('ai-open'))closeAI()});
