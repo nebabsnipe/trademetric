@@ -5,7 +5,7 @@ const tcVars=t=>{const c=TC[t]||['#333','#666','#fff'];return `--c1:${c[0]};--c2
 
 /* ===== Real 2026 data: nflverse snapshot ===== */
 const DATA=window.NFL_DATA;
-function weekLabels(){document.querySelectorAll('.wk-now').forEach(x=>x.textContent='Week '+WEEK);document.querySelectorAll('.wk-num').forEach(x=>x.textContent=WEEK);{const el=document.getElementById('week-pill');if(el){el.innerHTML=`<b>Week ${WEEK}</b> · stats thru Wk ${DATA.played}`;el.title=`Real ${DATA.asOf.slice(0,4)} stats through Week ${DATA.played}, updated ${DATA.asOf}. Refreshed every morning.`}}}
+function weekLabels(){document.querySelectorAll('.wk-now').forEach(x=>x.textContent='Week '+WEEK);document.querySelectorAll('.wk-num').forEach(x=>x.textContent=WEEK);{const el=document.getElementById('week-pill');if(el){el.innerHTML=`<b>Week ${WEEK}</b><span class="wk-thru"> · stats thru Wk ${DATA.played}</span>`;el.title=`Real ${DATA.asOf.slice(0,4)} stats through Week ${DATA.played}, updated ${DATA.asOf}. Refreshed every morning.`}}}
 const FUM={QB:.2,RB:.09,WR:.04,TE:.04};
 const slug=n=>n.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');
 const Z={cmp:0,pyd:0,ptd:0,int:0,ratt:0,ryd:0,rtd:0,tgt:0,rec:0,recyd:0,rectd:0};
@@ -820,16 +820,21 @@ function simulate(over){
   const P0=realPlayed();ids.forEach(t=>{M[t]={};for(let w=Math.min(P0,PLAYED)+1;w<=17;w++)M[t][w]=weekLine(pl(t),w,over&&over[t]?null:t)});
   const r=mulberry32(90210);let spare=null;
   const z=()=>{if(spare!==null){const x=spare;spare=null;return x}let u=0;while(u===0)u=r();const v=r(),m=Math.sqrt(-2*Math.log(u));spare=m*Math.sin(2*Math.PI*v);return m*Math.cos(2*Math.PI*v)};
-  const PT=(S.real&&S.real.playoffTeams)||(ids.length>=10?6:ids.length>=6?4:2),P=Math.min(PT,ids.length),BP=P>=6?6:P>=4?4:2,out={P,P0,samples:[]};ids.forEach(t=>out[t]={wins:0,playoff:0,bye:0,title:0,seed:ids.map(()=>0)});
+  const PT=(S.real&&S.real.playoffTeams)||(ids.length>=10?6:ids.length>=6?4:2),P=Math.min(PT,ids.length),BP=P>=6?6:P>=4?4:2,out={P,P0,samples:[]};ids.forEach(t=>out[t]={wins:0,playoff:0,bye:0,title:0,seed:ids.map(()=>0),need:[]});
+  const W1=P0+1,swing={},me0=S.me;
   const play=(a,b,w)=>M[a][w].m+M[a][w].sd*z()>=M[b][w].m+M[b][w].sd*z()?a:b;
   for(let s=0;s<N_SIM;s++){const W={},PF={},traj=s<5?{[P0]:{}}:null;ids.forEach(t=>{W[t]=rec[t].w+rec[t].t/2;PF[t]=rec[t].pf;if(traj)traj[P0][t]=W[t]});
-    for(let w=P0+1;w<=REG_WEEKS;w++){(sched[w]||[]).forEach(([a,b])=>{if(!a||!b)return;const x=M[a][w].m+M[a][w].sd*z(),y=M[b][w].m+M[b][w].sd*z();PF[a]+=x;PF[b]+=y;if(x>=y)W[a]++;else W[b]++});if(traj)traj[w]=Object.fromEntries(ids.map(t=>[t,W[t]]))}
+    const W0={...W},wk1=[];
+    for(let w=P0+1;w<=REG_WEEKS;w++){(sched[w]||[]).forEach(([a,b])=>{if(!a||!b)return;const x=M[a][w].m+M[a][w].sd*z(),y=M[b][w].m+M[b][w].sd*z();PF[a]+=x;PF[b]+=y;if(x>=y)W[a]++;else W[b]++;if(w===W1&&a!==me0&&b!==me0)wk1.push([a,b,x>=y?a:b])});if(traj)traj[w]=Object.fromEntries(ids.map(t=>[t,W[t]]))}
     const seeds=[...ids].sort((a,b)=>W[b]-W[a]||PF[b]-PF[a]),po=seeds.slice(0,BP);ids.forEach(t=>out[t].wins+=W[t]);seeds.forEach((t,i)=>out[t].seed[i]++);if(traj)out.samples.push({traj,seeds});seeds.slice(0,P).forEach(t=>out[t].playoff++);
+    const inSet=new Set(seeds.slice(0,P));ids.forEach(t=>{const k=Math.round(W[t]-W0[t]),nd=out[t].need;nd[k]=nd[k]||[0,0];nd[k][0]++;if(inSet.has(t))nd[k][1]++});
+    if(me0)wk1.forEach(([a,b,win])=>{const g=a+'|'+b;swing[g]=swing[g]||{a,b,n:[0,0],m:[0,0]};const i=win===a?0:1;swing[g].n[i]++;if(inSet.has(me0))swing[g].m[i]++});
     let champ;
     if(BP===6){out[po[0]].bye++;out[po[1]].bye++;const a=play(po[2],po[5],15),b=play(po[3],po[4],15),low=seeds.indexOf(a)>seeds.indexOf(b)?a:b,high=low===a?b:a;champ=play(play(po[0],low,16),play(po[1],high,16),17)}
     else if(BP===4)champ=play(play(po[0],po[3],16),play(po[1],po[2],16),17);
     else champ=play(po[0],po[1],17);
     out[champ].title++}
+  out.swing=Object.values(swing);out.W1=W1;
   ids.forEach(t=>{const o=out[t];o.wins/=N_SIM;o.playoff/=N_SIM;o.bye/=N_SIM;o.title/=N_SIM;o.seed=o.seed.map(x=>x/N_SIM)});
   SIM_CACHE[key]=out;return out}
 function oddsLineOld(t){const me=myTeam(),T=teamById(t.team),sb=simulate(),sa=simulate({[S.me]:me.players.filter(x=>!t.give.includes(x)).concat(t.get),[t.team]:T.players.filter(x=>!t.get.includes(x)).concat(t.give)});
@@ -856,13 +861,12 @@ function renderMatchup(){const el=$('matchup');const oid=oppOf(S.me,WEEK);
    <div class="mu-bar"><i style="width:${pw*100}%;background:${teamColor(S.me)}"></i><i style="width:${(1-pw)*100}%;background:${versusColor(teamColor(S.me),teamColor(oid))}"></i></div>
    <div class="mu-swing">${kp(keyP(A.lu,Bm.lu),'Your key player')}${kp(keyP(Bm.lu,A.lu),'Their key player')}</div>
    <details class="mu-details"><summary>Position-by-position comparison</summary><div class="mu-table"><table><thead><tr><th>You</th><th class="r">${anyLive?'Pts':'Proj'}</th><th style="text-align:center">Slot</th><th>${anyLive?'Pts':'Proj'}</th><th>${esc(O.name)}</th></tr></thead><tbody>${rows}</tbody></table></div></details>`}
-var REPLAY={s:0,w:null,timer:null};
 function dialSvg(x){const r=86,c=Math.PI*r,len=c*Math.max(0,Math.min(1,x));
   return `<svg viewBox="0 0 200 116" class="dial" aria-hidden="true"><path d="M14 104 A86 86 0 0 1 186 104" class="dial-bg"/><path d="M14 104 A86 86 0 0 1 186 104" class="dial-fg" style="stroke-dasharray:${len} ${c}"/></svg>`}
 function seedBars(o,P,n){const mx=Math.max(...o.seed,.01);return `<div class="seedwrap"><div class="seedbars" title="How often they finish in each spot">${o.seed.map((x,i)=>`<i class="${i<P?'in':''}" style="height:${Math.max(4,x/mx*100)}%"></i>`).join('')}</div><div class="seedax"><span>1st</span><span>${n}th</span></div></div>`}
 function renderSeason(){
   const sim=simulate(),me=S.me;$('season-kicker').textContent=`${S.league.name||'My League'} · ${N_SIM.toLocaleString()} simulated seasons`;
-  if(!sim){$('sim-hero').innerHTML='<div class="card"><p class="empty" style="margin:0">Add at least two teams in League Hub.</p></div>';$('sim-race').innerHTML=$('sim-replay').innerHTML=$('road').innerHTML='';return}
+  if(!sim){$('sim-hero').innerHTML='<div class="card"><p class="empty" style="margin:0">Add at least two teams in League Hub.</p></div>';$('sim-race').innerHTML=$('sim-need').innerHTML=$('road').innerHTML=$('tiebreak').innerHTML='';return}
   const rec=records(),o=sim[me],ids=S.teams.map(T=>T.id),n=ids.length,P=sim.P,ord=[...ids].sort((a,b)=>sim[b].playoff-sim[a].playoff||sim[b].wins-sim[a].wins),myRank=ord.indexOf(me)+1;
   const tone=o.playoff>=.6?'good':o.playoff>=.3?'mid':'bad',left=REG_WEEKS-(sim.P0||PLAYED);
   /* hero: dial */
@@ -870,35 +874,49 @@ function renderSeason(){
     <div class="sim-sum"><div class="kicker">${esc(myTeam().name)} · ${recTxt(me)}</div><h2>${o.playoff>=.75?'In good shape':o.playoff>=.45?'On the bubble':o.playoff>=.08?'Behind, but alive':'Long shot'}</h2>
       <p>${myRank}${['st','nd','rd'][myRank-1]||'th'} best playoff odds in the league. The top ${P} of ${n} make it${P===6?', and seeds 1 and 2 get a bye':''}. ${left>0?`${left} regular-season week${left>1?'s':''} left.`:'Regular season is over.'}</p>
       <div class="sim-stats"><div><b>${pct(o.title)}</b><span>Title odds</span></div><div><b>${o.wins.toFixed(1)}-${(REG_WEEKS-o.wins).toFixed(1)}</b><span>Projected record</span></div>${P===6?`<div><b>${pct(o.bye)}</b><span>First-round bye</span></div>`:''}<div><b>${f1(rec[me].pf)}</b><span>Points for</span></div></div></div></div>`;
-  /* race: team cards ordered by odds with the playoff line */
-  $('sim-race').innerHTML=`<div class="card-h"><h2>Playoff race</h2><span class="note">Ordered by playoff odds · bars show where each team tends to finish</span></div>
-    <div class="race">${ord.map((t,i)=>{const T=teamById(t),x=sim[t];return `${i===P?`<div class="cut"><span>Playoff line · top ${P}</span></div>`:''}
-      <div class="rcard${t===me?' me':''}" style="--tc:${teamColor(t)}"><div class="rc-top"><span class="rc-rank">${i+1}</span><div class="rc-name"><b>${esc(T.name)}${t===me?' <em>you</em>':''}</b><span>${recTxt(t)} · ${f1(rec[t].pf)} pts</span></div>
-        <div class="rc-odds"><b>${pct(x.playoff)}</b><span>playoffs</span></div></div>
-        <div class="rc-bot">${seedBars(x,P,n)}<div class="rc-mini"><span><b>${pct(x.title)}</b> title</span><span><b>${x.wins.toFixed(1)}</b> proj. wins</span></div></div></div>`}).join('')}</div>
-    <p class="note" style="margin:12px 0 0">Weeks 1 to ${sim.P0||PLAYED} use real results; the rest of the regular season and the playoffs are simulated ${N_SIM.toLocaleString()} times from projected lineups, byes and matchups.</p>`;
-  renderReplay(sim);
+  /* race: a clean ranked table with the playoff line */
+  const bar=x=>`<div class="pr-bar"><i style="width:${Math.max(1.5,x*100)}%"></i></div>`;
+  $('sim-race').innerHTML=`<div class="card-h"><h2>Playoff race</h2><span class="note">Top ${P} of ${n} make the playoffs</span></div>
+    <div class="race2"><div class="r2 r2-h"><span>#</span><span>Team</span><span class="r2-odds">Playoff odds</span>${P===6?'<span class="r2-c r2-bye">Bye</span>':''}<span class="r2-c">Title</span><span class="r2-c r2-pw">Proj.</span></div>
+    ${ord.map((t,i)=>{const T=teamById(t),x=sim[t],cls=x.playoff>=.75?'hi':x.playoff>=.35?'md':'lo';return `${i===P?`<div class="r2-cut"><span>Playoff line</span></div>`:''}
+      <div class="r2${t===me?' me':''}${P===6?'':' nobye'}"><span class="r2-rk">${i+1}</span>
+        <span class="r2-team"><i class="tsq" style="background:${teamColor(t)}"></i><span class="r2-nm"><b>${esc(T.name)}</b><small>${recTxt(t)} · ${f1(rec[t].pf)} pts</small></span>${t===me?'<span class="tag mine">You</span>':''}</span>
+        <span class="r2-odds ${cls}">${bar(x.playoff)}<b>${pct(x.playoff)}</b></span>${P===6?`<span class="r2-c r2-bye">${pct(x.bye)}</span>`:''}<span class="r2-c">${pct(x.title)}</span><span class="r2-c r2-pw">${x.wins.toFixed(1)}-${(REG_WEEKS-x.wins).toFixed(1)}</span></div>`}).join('')}</div>
+    <p class="note" style="margin:12px 0 0">Weeks 1 to ${sim.P0||PLAYED} use real results. The rest of the season is simulated ${N_SIM.toLocaleString()} times from projected lineups, byes and matchups. Ties in the standings go to points scored.</p>`;
+  renderNeed(sim,rec);
   let road='';for(let w=WEEK;w<=REG_WEEKS;w++){const oid=oppOf(me,w);if(!oid)continue;const A=weekLine(myTeam().players,w,me),Bm=weekLine(teamById(oid).players,w,oid),p=Phi((A.m-Bm.m)/Math.sqrt(A.sd**2+Bm.sd**2));
     road+=`<div class="road-row"><span class="slot">Wk ${w}</span><span class="owner"><i style="background:${teamColor(oid)}"></i>${esc(teamById(oid).name)}</span><span class="note">${recTxt(oid)}</span><div class="road-bar"><i class="${p>=.6?'good':p<.4?'bad':''}" style="width:${p*100}%"></i></div><span class="wp ${p>=.6?'good':p<.4?'bad':''}">${pct(p)}</span></div>`}
   $('road').innerHTML=road||'<p class="empty">Regular season is over.</p>';
+  /* tiebreaker watch: points for among teams around the playoff line */
+  const win=rec2=>rec2.w+rec2.t/2,near=ord.filter(t=>Math.abs(win(rec[t])-win(rec[me]))<=1).sort((a,b)=>Math.abs(rec[a].pf-rec[me].pf)-Math.abs(rec[b].pf-rec[me].pf)).slice(0,6).sort((a,b)=>rec[b].pf-rec[a].pf);
+  $('tiebreak').innerHTML=`<div class="card-h"><h2>Tiebreaker watch</h2><span class="note">Ties go to points scored</span></div>
+    <div class="tb-row tb-h"><span>Closest teams within a win</span><span class="num">Rec.</span><span class="num">Points</span><span class="num">vs you</span></div>
+    ${near.map(t=>`<div class="tb-row${t===me?' me':''}"><span class="owner"><i style="background:${teamColor(t)}"></i>${esc(teamById(t).name)}</span><span class="num">${recTxt(t)}</span><span class="num">${f1(rec[t].pf)}</span><span class="num ${t===me?'':rec[t].pf>rec[me].pf?'bad':'good'}">${t===me?'—':(rec[t].pf>rec[me].pf?'+':'−')+f1(Math.abs(rec[t].pf-rec[me].pf))}</span></div>`).join('')}
+    <p class="note" style="margin:10px 0 0">${(()=>{const above=near.filter(t=>t!==me&&rec[t].pf>rec[me].pf).length,below=near.length-1-above;return below>=above?`You win the points tiebreaker against ${below} of the ${near.length-1} teams near your record.`:`You'd lose a points tiebreaker to ${above} of the ${near.length-1} teams near your record, so wins matter more.`})()}</p>`;
 }
-/* replay: watch one simulated season unfold week by week */
-function renderReplay(sim){sim=sim||simulate();const el=$('sim-replay');if(!sim||!sim.samples.length){el.innerHTML='';return}
-  const smp=sim.samples[REPLAY.s%sim.samples.length],weeks=Object.keys(smp.traj).map(Number).sort((a,b)=>a-b),w=REPLAY.w==null||!weeks.includes(REPLAY.w)?weeks[weeks.length-1]:REPLAY.w;
-  const W=smp.traj[w],ids=Object.keys(W),P=sim.P,mx=Math.max(1,...Object.values(smp.traj[weeks[weeks.length-1]]));
-  const ord=[...ids].sort((a,b)=>W[b]-W[a]||(smp.seeds.indexOf(a)-smp.seeds.indexOf(b)));
-  el.innerHTML=`<div class="card-h"><h2>Replay a season</h2><span class="note">One of the ${N_SIM.toLocaleString()} simulated seasons, week by week</span></div>
-    <div class="rp-ctl"><div class="seg">${sim.samples.map((_,i)=>`<button data-rps="${i}" aria-pressed="${i===REPLAY.s%sim.samples.length}"><span class="rp-s">Season </span>${i+1}</button>`).join('')}</div>
-      <button class="btn small" id="rp-play">${REPLAY.timer?'Pause':'▶ Play'}</button>
-      <input type="range" id="rp-week" min="${weeks[0]}" max="${weeks[weeks.length-1]}" value="${w}" aria-label="Week"><b class="rp-wk">${w===weeks[0]?'Today':'After Week '+w}</b></div>
-    <div class="rp-bars">${ord.map((t,i)=>`${i===P?'<div class="rp-cut"><span>Playoff line</span></div>':''}<div class="rp-row${t===S.me?' me':''}"><span class="rp-name">${esc(teamById(t).name)}</span><div class="rp-track"><i style="width:${W[t]/mx*100}%;background:${teamColor(t)}"></i></div><b>${W[t]%1?W[t].toFixed(1):W[t]}</b></div>`).join('')}</div>
-    ${w===weeks[weeks.length-1]?`<p class="note" style="margin:10px 0 0">${smp.seeds.slice(0,P).includes(S.me)?`You make the playoffs as the ${smp.seeds.indexOf(S.me)+1}${['st','nd','rd'][smp.seeds.indexOf(S.me)]||'th'} seed in this one.`:'You miss the playoffs in this one.'}</p>`:''}`}
-document.addEventListener('click',e=>{const t=e.target;if(!t.closest)return;
-  const b=t.closest('[data-rps]');if(b){REPLAY.s=+b.dataset.rps;REPLAY.w=null;stopReplay();renderReplay();return}
-  if(t.id==='rp-play'){if(REPLAY.timer){stopReplay();renderReplay();return}const sim=simulate(),smp=sim.samples[REPLAY.s%sim.samples.length],weeks=Object.keys(smp.traj).map(Number).sort((a,b)=>a-b);
-    let i=0;REPLAY.w=weeks[0];REPLAY.timer=setInterval(()=>{i++;if(i>=weeks.length||tab!=='season'){stopReplay();renderReplay();return}REPLAY.w=weeks[i];renderReplay()},650);renderReplay()}});
-document.addEventListener('input',e=>{if(e.target.id==='rp-week'){stopReplay();REPLAY.w=+e.target.value;renderReplay()}});
-function stopReplay(){if(REPLAY.timer){clearInterval(REPLAY.timer);REPLAY.timer=null}}
+/* what needs to happen: the record you need over the rest of the season */
+function gamesLeft(t,from){const sc=schedule();let n=0;for(let w=from;w<=REG_WEEKS;w++)if((sc[w]||[]).some(([a,b])=>a===t&&b||b===t&&a))n++;return n}
+function clinchK(sim,rec){const me=S.me,from=(sim.P0||PLAYED)+1,cur=t=>rec[t].w+rec[t].t/2,L=gamesLeft(me,from);
+  for(let k=0;k<=L;k++){const myW=cur(me)+k;const threats=S.teams.filter(T=>T.id!==me&&cur(T.id)+gamesLeft(T.id,from)>=myW).length;if(threats<sim.P)return k}return null}
+function elimK(sim,rec){const me=S.me,from=(sim.P0||PLAYED)+1,cur=t=>rec[t].w+rec[t].t/2,myMax=cur(me)+gamesLeft(me,from);
+  return S.teams.filter(T=>T.id!==me&&cur(T.id)>myMax).length>=sim.P}
+function renderNeed(sim,rec){const el=$('sim-need');if(!el)return;const me=S.me,o=sim[me],from=(sim.P0||PLAYED)+1,L=gamesLeft(me,from),r=rec[me],w0=r.w,l0=r.l,tt=r.t?'-'+r.t:'';
+  const head=`<div class="card-h"><h2>What needs to happen</h2><span class="note">${L} game${L===1?'':'s'} left</span></div>`;
+  if(!L){el.innerHTML=head+`<p class="empty" style="margin:0">The regular season is over. ${o.playoff>=.999?'You made the playoffs.':o.playoff<=.001?'You missed the playoffs this year.':''}</p>`;return}
+  if(elimK(sim,rec)){el.innerHTML=head+`<div class="need-hero bad"><b>Out of the race</b><p>Even winning out, ${sim.P} teams already have more wins than you can reach.</p></div>`;return}
+  const rows=[];for(let k=L;k>=0;k--){const c=o.need[k];if(!c||!c[0])continue;rows.push({k,odds:c[1]/c[0],reach:c[0]/N_SIM})}
+  const ck=clinchK(sim,rec),safe=rows.filter(x=>x.odds>=.9).sort((a,b)=>a.k-b.k)[0],coin=rows.filter(x=>x.odds>=.5).sort((a,b)=>a.k-b.k)[0];
+  const rc=k=>`${w0+k}-${l0+L-k}${tt}`,go=k=>k===L?`win out (${k}-0)`:k===0?`lose out (0-${L})`:`go ${k}-${L-k}`;
+  let hero;
+  if(ck===0)hero=`<div class="need-hero good"><b>Clinched</b><p>You're in the playoffs no matter what happens from here.</p></div>`;
+  else if(safe)hero=`<div class="need-hero ${safe.k<=L/2?'good':'mid'}"><span class="need-k">${safe.k}<small>of ${L}</small></span><div><b>Win ${safe.k} of your last ${L} to be safe</b><p>If you ${go(safe.k)} and finish ${rc(safe.k)}, you make it ${pct(safe.odds)} of the time.${coin&&coin.k<safe.k?` At ${rc(coin.k)} it's ${pct(coin.odds)}.`:''}</p></div></div>`;
+  else{const top=rows[0];hero=`<div class="need-hero bad"><span class="need-k">${L}<small>of ${L}</small></span><div><b>Win out and get some help</b><p>Even at ${rc(L)} you make it ${pct(top?top.odds:0)} of the time. You need teams above you to lose.</p></div></div>`}
+  const lock=ck===0?'':ck!=null?`<div class="need-lock"><span>🔒</span><p><b>Win ${ck} more to clinch.</b> At ${rc(ck)} no one can catch you, whatever else happens.</p></div>`:`<div class="need-lock"><span>🔒</span><p><b>No record guarantees a spot yet.</b> Too many teams can still tie you, and ties go to points scored.</p></div>`;
+  const tbl=`<div class="need-tbl"><div class="nt nt-h"><span>Finish</span><span>Rest of season</span><span>Playoff odds</span><span class="r">How likely</span></div>${rows.map(x=>`<div class="nt ${x.odds>=.9?'good':x.odds>=.5?'mid':x.odds>=.1?'low':'bad'}${safe&&x.k===safe.k?' key':''}"><b class="num">${rc(x.k)}</b><span>${go(x.k)}</span><span class="nt-odds"><span class="pr-bar"><i style="width:${Math.max(1.5,x.odds*100)}%"></i></span><b>${pct(x.odds)}</b></span><span class="r note">${x.reach<.01?'<1%':pct(x.reach)}</span></div>`).join('')}</div>`;
+  const sw=(sim.swing||[]).map(g=>{const pa=g.n[0]?g.m[0]/g.n[0]:0,pb=g.n[1]?g.m[1]/g.n[1]:0;return {...g,d:Math.abs(pa-pb),root:pa>=pb?g.a:g.b,vs:pa>=pb?g.b:g.a,hi:Math.max(pa,pb),lo:Math.min(pa,pb)}}).filter(g=>g.d>=.015).sort((a,b)=>b.d-a.d).slice(0,3);
+  const root=sw.length?`<div class="need-root"><h4>Root for this week${sim.W1?` (Week ${sim.W1})`:''}</h4>${sw.map(g=>`<div class="root-row"><span class="owner"><i style="background:${teamColor(g.root)}"></i><b>${esc(teamById(g.root).name)}</b></span><span class="note">over ${esc(teamById(g.vs).name)}</span><span class="gain">+${Math.round(g.d*100)} pts</span></div>`).join('')}</div>`:'';
+  el.innerHTML=head+hero+lock+tbl+root+`<p class="note" style="margin:14px 0 0">How this works: out of ${N_SIM.toLocaleString()} simulated seasons, we group the ones where you finish with each record and count how often you make the top ${sim.P}. "How likely" is how often you end up with that record.</p>`}
+
 
 /* ===== Platform import ===== */
 const SEASON=2026;let IMP={status:'',html:''};
@@ -1116,10 +1134,10 @@ function applyTheme(){if(themePref)document.documentElement.setAttribute('data-t
 $('theme-btn').addEventListener('click',()=>{themePref=isDark()?'light':'dark';try{localStorage.setItem('hashmark-theme',themePref)}catch(e){}applyTheme()});
 
 /* ===== Routing & events ===== */
-const TABS=['team','feed','trade','rankings','hub','season','helper','league','welcome','signin'];let tab='team';
+const TABS=['team','feed','trade','rankings','hub','season','helper','league','welcome','signin','account'];let tab='team';
 function go(t){if(!USER&&t!=='signin')t='signin';tab=TABS.includes(t)?t:'team';if(tab!=='welcome'&&S&&!S.onboarded){S.onboarded=true;save()}document.querySelectorAll('.nav button').forEach(b=>{if(b.dataset.tab===tab)b.setAttribute('aria-current','page');else b.removeAttribute('aria-current')});
   TABS.forEach(x=>$('v-'+x).hidden=x!==tab);render();window.scrollTo(0,0)}
-function render(){({team:renderTeam,rankings:renderRankings,trade:renderTrade,hub:renderHub,season:renderSeason,helper:renderHelper,welcome:renderWelcome,league:fillLeagueForm,signin:renderSignin,feed:renderFeed})[tab]();if(openId&&!$('scrim').hidden)openCard(openId);queueBalance()}
+function render(){({team:renderTeam,rankings:renderRankings,trade:renderTrade,hub:renderHub,season:renderSeason,helper:renderHelper,welcome:renderWelcome,league:fillLeagueForm,signin:renderSignin,feed:renderFeed,account:renderAccount})[tab]();if(openId&&!$('scrim').hidden)openCard(openId);queueBalance()}
 document.querySelectorAll('.nav button').forEach(b=>b.addEventListener('click',()=>{location.hash=b.dataset.tab}));
 window.addEventListener('hashchange',()=>{closeCard();go(location.hash.slice(1))});
 function loadTrade(str){const [g,r]=str.split('|');TD.give=g?g.split(','):[];TD.get=r?r.split(','):[];closeCard();if(tab==='trade')renderTrade();else location.hash='trade';setTimeout(()=>$('rating').scrollIntoView({behavior:'smooth',block:'center'}),60)}
@@ -1243,11 +1261,7 @@ function renderSignin(){const el=$('signin-card');if(!el)return;
   const keep=`<label class="auth-keep"><input type="checkbox" id="auth-keep" ${lsGet(KEEP_KEY)==='1'?'checked':''}> Keep me signed in<span class="note">Otherwise you're signed out after 2 weeks. Your league stays saved either way.</span></label>`;
   const btn=t=>`<button class="btn primary auth-go" type="submit" ${AUTH_BUSY?'disabled':''}>${AUTH_BUSY?'One moment...':t}</button>`;
   if(!SB){el.innerHTML=SB_FAILED?`<h1>Can't sign in</h1><p class="note">Sign-in didn't load. Check your connection and refresh the page.</p>`:`<h1>Loading</h1><p class="note">One moment...</p>`;return}
-  if(USER&&AUTH_MODE!=='reset'){const v=lsGet(EXP_KEY);
-    el.innerHTML=`<div class="kicker">Your account</div><h1>${esc(acctName())}</h1>${PROFILE&&USER.email?`<p class="note">${esc(USER.email)}</p>`:''}
-     <div class="auth-rows"><div><span>League saved</span><b>${CLOUD.err?`<span style="color:var(--bad)">Couldn't save: ${esc(CLOUD.err)}</span>`:CLOUD.busy?'Saving...':CLOUD.last?'Saved '+new Date(CLOUD.last).toLocaleTimeString([], {hour:'numeric',minute:'2-digit'}):'Yes'}</b></div>
-     <div><span>On this device</span><b>${!v||v==='0'?'Stays signed in':'Signed in until '+new Date(+v).toLocaleDateString([], {month:'short',day:'numeric'})}</b></div></div>
-     ${msg}<div class="toolbar"><button class="btn primary" type="button" data-auth-home="1">Back to my team</button><button class="btn" type="button" id="auth-out">Sign out</button></div>`;return}
+  if(USER&&AUTH_MODE!=='reset'){el.innerHTML='';setTimeout(()=>{if(tab==='signin'&&USER)location.hash='account'},0);return}
   const tabs=AUTH_MODE==='in'||AUTH_MODE==='up'?`<div class="seg auth-tabs"><button type="button" data-auth-mode="in" aria-pressed="${AUTH_MODE==='in'}">Sign in</button><button type="button" data-auth-mode="up" aria-pressed="${AUTH_MODE==='up'}">Create account</button></div>`:'';
   let body='';
   if(AUTH_MODE==='in')body=`<h1>Welcome back</h1><form id="auth-form" data-mode="in">
@@ -1311,7 +1325,8 @@ async function initAccounts(){
     if(USER&&USER.id!==was){startSessionClock();loadProfile();cloudPull();if(tab==='signin'&&AUTH_MODE!=='reset'&&!AUTH_BUSY)enterApp()}acctUI()});
   setInterval(checkExpiry,60*60e3)}
 document.addEventListener('click',e=>{const t=e.target;if(!t.closest)return;
-  if(t.closest('#acct-btn')){location.hash='signin';return}
+  if(t.closest('#acct-btn')){location.hash=USER?'account':'signin';return}
+  if(t.closest('[data-acct-pw]')){AUTH_MODE='reset';AUTH_MSG=null;location.hash='signin';return}
   const m=t.closest('[data-auth-mode]');if(m){AUTH_MODE=m.dataset.authMode;AUTH_MSG=null;renderSignin();return}
   if(t.closest('[data-auth-home]')){location.hash='team';return}
   if(t.id==='auth-out'){SB.auth.signOut({scope:'local'}).then(()=>{lsDel(EXP_KEY);leaveApp();toast('Signed out. Your league is saved.')})}});
@@ -1508,14 +1523,16 @@ function switchLeague(key){if(key===S.leagueKey)return;saveCurrentLeague();const
   lkeys().forEach(k=>S[k]=clone(e.snap[k]));if(!S.league.sc)S.league.sc={...BASE_SC};S.league.sc={...BASE_SC,...S.league.sc};S.leagueKey=key;
   setPool();SCHED=null;LIVE_LU=null;PLAT=null;REC_CACHE={v:-1};TD.give=[];TD.get=[];hubSel=S.me;shotState=null;save();recompute();buildLeagueForm();render();leagueSwitcher();toast(`Switched to ${e.name}`);setTimeout(syncNow,0)}
 function removeLeague(key){if(!confirmRemove(key))return;S.leagues=(S.leagues||[]).filter(x=>x.key!==key);save();renderLeagueList();leagueSwitcher();toast('League removed')}
-function confirmRemove(key){if(key===S.leagueKey){toast('Switch to another league before removing this one');return false}return true}
-function leagueSwitcher(){const el=$('league-switch');if(!el)return;const L=S.leagues||[];el.hidden=L.length<2;
+function confirmRemove(key){const L=S.leagues||[];if(L.length<2){toast('You need at least one league');return false}const x=L.find(l=>l.key===key);if(!confirm(`Remove ${x?x.name:'this league'} from your account?`))return false;if(key===S.leagueKey)switchLeague(L.find(l=>l.key!==key).key);return true}
+function leagueSwitcher(){const el=$('league-switch');if(!el)return;const L=S.leagues||[];el.hidden=L.length<2;document.body.classList.toggle('multi-lg',L.length>=2);
   el.innerHTML=L.map(x=>`<option value="${esc(x.key)}" ${x.key===S.leagueKey?'selected':''}>${esc(x.name)}${x.src&&x.src!=='Manual'?` · ${esc(x.src)}`:''}</option>`).join('')+'<option value="__add">+ Import another league</option>'}
-function renderLeagueList(){const el=$('league-list');if(!el)return;const L=S.leagues||[];
-  el.innerHTML=`<div class="card-h"><h2>Your leagues</h2><span class="note">${L.length} saved to your account</span></div>${L.map(x=>{const me=x.snap&&x.snap.teams&&x.snap.teams.find(t=>t.id===x.snap.me);
-    return `<div class="lg-row${x.key===S.leagueKey?' on':''}"><div><b>${esc(x.name)}</b><span class="note">${esc(x.src||'')}${me?` · your team: ${esc(me.name)}`:''}</span></div>${x.key===S.leagueKey?'<span class="lg-cur">Current</span>':`<button class="btn small" data-lswitch="${esc(x.key)}">Switch</button><button class="btn small ghost" data-lremove="${esc(x.key)}" aria-label="Remove ${esc(x.name)}">Remove</button>`}</div>`}).join('')}
-    <p class="note" style="margin:10px 0 0">Import another league below and it's added here. Each league keeps its own scoring, rosters, trade log and your team.</p>`}
-document.addEventListener('change',e=>{if(e.target.id!=='league-switch')return;const v=e.target.value;if(v==='__add'){leagueSwitcher();location.hash='hub';setTimeout(()=>{IMP.open=true;renderImport();const c=$('import-card');if(c)c.scrollIntoView({behavior:'smooth'})},50);return}switchLeague(v)});
+function renderLeagueList(){const el=$('league-list');if(!el)return;const L=S.leagues||[],cur=L.find(x=>x.key===S.leagueKey);
+  const me=S.teams&&S.teams.length?myTeam():null,src=cur&&cur.src||'Manual';
+  el.innerHTML=`<div class="lg-bar"><div class="lg-pick"><label for="hub-league">Your leagues <span class="note">· ${L.length} saved</span></label>
+      <select id="hub-league" aria-label="Switch league">${L.map(x=>`<option value="${esc(x.key)}" ${x.key===S.leagueKey?'selected':''}>${esc(x.name)}${x.src&&x.src!=='Manual'?` · ${esc(x.src)}`:''}</option>`).join('')}<option value="__add">+ Import another league</option></select></div>
+    <div class="lg-meta"><div><span>Platform</span><b>${esc(src)}</b></div><div><span>Your team</span><b title="${me?esc(me.name):''}">${me?esc(me.name):'—'}</b></div><div><span>Teams</span><b>${S.teams.length}</b></div></div>
+    ${L.length>1?`<button class="btn small ghost lg-rm" data-lremove="${esc(S.leagueKey)}">Remove</button>`:''}</div>`}
+document.addEventListener('change',e=>{if(e.target.id!=='league-switch'&&e.target.id!=='hub-league')return;const v=e.target.value;if(v==='__add'){leagueSwitcher();renderLeagueList();location.hash='hub';setTimeout(()=>{IMP.open=true;renderImport();const c=$('import-card');if(c)c.scrollIntoView({behavior:'smooth',block:'start'})},50);return}switchLeague(v)});
 document.addEventListener('click',e=>{const t=e.target;if(!t.closest)return;const sw=t.closest('[data-lswitch]');if(sw){switchLeague(sw.dataset.lswitch);return}const rm=t.closest('[data-lremove]');if(rm)removeLeague(rm.dataset.lremove)});
 /* first run: register the league already loaded */
 if(!S.leagues||!S.leagues.length){S.leagueKey=leagueKeyOf();upsertLeague();save()}else if(!S.leagueKey)S.leagueKey=leagueKeyOf();
@@ -1560,3 +1577,34 @@ function queueBalance(){cancelAnimationFrame(BAL);BAL=requestAnimationFrame(bala
 addEventListener('resize',queueBalance);
 try{const ro=new ResizeObserver(queueBalance);document.querySelectorAll('.grid2>*').forEach(c=>ro.observe(c));
   document.querySelectorAll('.grid2>.stack>*').forEach(c=>ro.observe(c))}catch(e){}
+
+/* ===== Account page ===== */
+function fmtDate(d,time){if(!d)return '—';const x=new Date(d);if(isNaN(x))return '—';return x.toLocaleDateString([], {month:'short',day:'numeric',year:'numeric'})+(time?' · '+x.toLocaleTimeString([], {hour:'numeric',minute:'2-digit'}):'')}
+function renderAccount(){const el=$('account-body');if(!el)return;if(!USER){el.innerHTML='';return}acctUI();
+  const name=acctName(),email=USER.email||'',v=lsGet(EXP_KEY),L=S.leagues||[],cur=L.find(x=>x.key===S.leagueKey),me=myTeam&&S.teams&&S.teams.length?myTeam():null;
+  const prov=(USER.app_metadata&&USER.app_metadata.provider)||'email';
+  const row=(k,val,cls='')=>`<div class="acc-row"><span class="acc-k">${k}</span><span class="acc-v ${cls}">${val}</span></div>`;
+  const save=CLOUD.err?`<span style="color:var(--bad)">Couldn't save: ${esc(CLOUD.err)}</span>`:CLOUD.busy?'Saving...':CLOUD.last?'Saved at '+new Date(CLOUD.last).toLocaleTimeString([], {hour:'numeric',minute:'2-digit'}):'Saved';
+  el.innerHTML=`<div class="card acc-head"><div class="acc-av" aria-hidden="true">${esc((name[0]||'?').toUpperCase())}</div>
+      <div class="acc-id"><h2 class="acc-name" title="${esc(name)}">${esc(name)}</h2><p class="acc-email" title="${esc(email)}">${esc(email)}</p>
+        <div class="acc-badges"><span class="acc-badge ok">Signed in</span>${USER.email_confirmed_at?'<span class="acc-badge">Email verified</span>':'<span class="acc-badge warn">Email not verified</span>'}</div></div>
+      <div class="acc-act"><button class="btn" type="button" data-acct-pw="1">Change password</button><button class="btn" type="button" id="auth-out">Sign out</button></div></div>
+    <div class="grid2 acc-grid">
+      <div class="card"><div class="card-h"><h2>Profile</h2></div>
+        ${row('Username',PROFILE&&PROFILE.username?esc(PROFILE.username):'<span class="note">Not set</span>','acc-wrap')}
+        ${row('Email',esc(email)||'—','acc-wrap')}
+        ${row('Sign-in method',prov==='email'?'Username or email + password':esc(prov))}
+        ${row('Member since',fmtDate(USER.created_at))}
+        ${row('Last sign-in',fmtDate(USER.last_sign_in_at,true))}
+        ${row('Account ID',`<code title="${esc(USER.id)}">${esc(USER.id)}</code>`,'acc-trunc')}</div>
+      <div class="stack">
+        <div class="card"><div class="card-h"><h2>Leagues</h2><a class="note" href="#hub">Manage in League Hub</a></div>
+          ${row('Current league',cur?esc(cur.name):esc(S.league&&S.league.name||'—'),'acc-wrap')}
+          ${row('Your team',me?esc(me.name):'—','acc-wrap')}
+          ${row('Platform',cur&&cur.src?esc(cur.src):'—')}
+          ${row('Saved leagues',String(L.length))}</div>
+        <div class="card"><div class="card-h"><h2>This device</h2></div>
+          ${row('Session',!v||v==='0'?'Stays signed in':'Signed in until '+fmtDate(+v))}
+          ${row('League sync',save,'acc-wrap')}
+          ${row('Theme',document.documentElement.dataset.theme==='dark'?'Dark':'Light')}</div>
+      </div></div>`}
