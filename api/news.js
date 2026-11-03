@@ -86,7 +86,7 @@ function matches(item, name) {
 
 const RANK = { ESPN: 0, RotoBaller: 1, FantasyPros: 1, ProFootballTalk: 2, 'CBS Sports': 2, 'Yahoo Sports': 2, 'Sports Illustrated': 3, 'Google News': 4 };
 
-async function collect(name, team, probe) {
+export async function collect(name, team, probe) {
   const list = [...SHARED.map(s => ({ ...s, ttl: 5 * 60e3 })), ...perPlayer(name, team).map(s => ({ ...s, ttl: 20 * 60e3 }))];
   const report = [];
   const got = await Promise.all(list.map(async s => {
