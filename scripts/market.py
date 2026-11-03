@@ -51,13 +51,24 @@ for key, qbs in (('fc1', 1), ('fc2', 2)):
 try:
     html = get('https://keeptradecut.com/fantasy-rankings', js=False)
     print('ktc page', len(html), 'chars; playersArray at', html.find('playersArray'), file=sys.stderr)
-    m = re.search(r'playersArray\s*=\s*(\[.*?\]);', html, re.S)
-    arr = json.loads(m.group(1)) if m else []
+    i0 = html.find('[', html.find('playersArray'))
+    depth, j = 0, i0
+    for j in range(i0, len(html)):  # take the whole bracketed array, nested values included
+        ch = html[j]
+        if ch == '[': depth += 1
+        elif ch == ']':
+            depth -= 1
+            if depth == 0: break
+    arr = json.loads(html[i0:j + 1]) if i0 > 0 else []
+    if arr: print('ktc sample keys', list(arr[0].keys())[:25], {k: arr[0].get(k) for k in ('playerName', 'position', 'team')}, file=sys.stderr)
+    def val(r, k):
+        x = r.get(k)
+        return x.get('value') if isinstance(x, dict) else x
     v1, v2 = {}, {}
     for r in arr:
-        i = pid(r.get('playerName'), r.get('position'))
+        i = pid(r.get('playerName') or r.get('name'), r.get('position'))
         if not i: continue
-        a = (r.get('oneQBValues') or {}).get('value'); b = (r.get('superflexValues') or {}).get('value')
+        a = val(r, 'oneQBValues') or val(r, 'value'); b = val(r, 'superflexValues')
         if a: v1[i] = a
         if b: v2[i] = b
     if len(v1) > 50:
