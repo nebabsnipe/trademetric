@@ -19,10 +19,11 @@ jobs:
       - run: pip install pandas numpy
       - run: python scripts/update_data.py
       - run: python scripts/yt_channels.py || true
+      - run: python scripts/market.py || true
       - name: Commit if the data changed
         run: |
           git config user.name "trademetric-bot"
           git config user.email "trademetric-bot@users.noreply.github.com"
-          git add data/nfl.json data/yt_channels.json
+          git add data/nfl.json data/yt_channels.json data/market.json
           git diff --cached --quiet || git commit -m "Update NFL data $(date -u +%F)"
           git push
