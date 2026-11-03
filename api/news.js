@@ -7,7 +7,7 @@
 
 const API_KEY = process.env.ANTHROPIC_API_KEY || process.env.APIKEY1;
 const MODEL = process.env.NEWS_MODEL || 'claude-haiku-5-5';
-const UA = 'Mozilla/5.0 (compatible; TradeMetric/1.0; +https://trademetric-rho.vercel.app)';
+const UA = 'Mozilla/5.0 (compatible; TradeMetric/1.0; +https://trademetric.app)';
 const ESPN_TEAM = { ARI: 22, ATL: 1, BAL: 33, BUF: 2, CAR: 29, CHI: 3, CIN: 4, CLE: 5, DAL: 6, DEN: 7, DET: 8, GB: 9, HOU: 34, IND: 11, JAX: 30, KC: 12, LV: 13, LAC: 24, LAR: 14, MIA: 15, MIN: 16, NE: 17, NO: 18, NYG: 19, NYJ: 20, PHI: 21, PIT: 23, SF: 25, SEA: 26, TB: 27, TEN: 10, WAS: 28 };
 
 // League-wide feeds are shared by every player, so they are cached in memory for a few minutes.

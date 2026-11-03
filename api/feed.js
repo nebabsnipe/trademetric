@@ -112,7 +112,7 @@ export default async function handler(req, res) {
       cj(`${SITE}/summary?event=${g.id}`, g.state === 'post' ? 6 * 3600e3 : 2 * 60e3).catch(() => null)));
     const videos = [];
     sums.forEach((s, i) => (s && s.videos || []).forEach(v => videos.push(videoOf(v, played[i]))));
-    const yt = await ytUploads(req.headers && req.headers.host || 'trademetric-rho.vercel.app').catch(() => []);
+    const yt = await ytUploads(req.headers && req.headers.host || 'trademetric.app').catch(() => []);
     yt.forEach(v => { const x = ytVideo(v, week, games); if (x.week >= week - 1 && x.week <= week) videos.push(x); });
 
     const [fan, gen] = await Promise.all([

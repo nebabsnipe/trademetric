@@ -1,5 +1,7 @@
 # TradeMetric
 
+Live at https://trademetric.app
+
 Fantasy football trades, rankings and lineup advice built on your league's exact settings.
 
 ## What's where
