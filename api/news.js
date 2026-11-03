@@ -134,7 +134,7 @@ ${list}`;
     const r = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST', signal: ctl.signal,
       headers: { 'content-type': 'application/json', 'x-api-key': API_KEY, 'anthropic-version': '2023-06-01' },
-      body: JSON.stringify({ model: MODEL, max_tokens: 1500, messages: [{ role: 'user', content: prompt }] }),
+      body: JSON.stringify({ model: MODEL, max_tokens: 2000, thinking: { type: 'disabled' }, messages: [{ role: 'user', content: prompt }] }),
     });
     if (!r.ok) { LAST_ERR = 'HTTP ' + r.status + ' ' + (await r.text()).slice(0, 200); return null; }
     const j = await r.json(); const text = (j.content || []).map(c => c.text || '').join('');
