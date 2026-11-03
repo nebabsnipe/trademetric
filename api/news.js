@@ -115,6 +115,7 @@ function parseJSON(text) {
   return null;
 }
 
+let LAST_ERR = null;
 async function summarize(name, team, pos, items) {
   if (!API_KEY || !items.length) return null;
   const list = items.map((x, i) => `[${i}] ${x.outlet}, ${x.at ? x.at.slice(0, 10) : 'date unknown'}\nHeadline: ${x.title}${x.alts.length ? '\nOther outlets\' headlines for the same story: ' + x.alts.join(' | ') : ''}\nText: ${(x.desc || '(headline only)').slice(0, 1200)}`).join('\n\n');
@@ -135,10 +136,10 @@ ${list}`;
       headers: { 'content-type': 'application/json', 'x-api-key': API_KEY, 'anthropic-version': '2023-06-01' },
       body: JSON.stringify({ model: MODEL, max_tokens: 1500, messages: [{ role: 'user', content: prompt }] }),
     });
-    if (!r.ok) return null;
+    if (!r.ok) { LAST_ERR = 'HTTP ' + r.status + ' ' + (await r.text()).slice(0, 200); return null; }
     const j = await r.json(); const text = (j.content || []).map(c => c.text || '').join('');
-    const arr = parseJSON(text); return Array.isArray(arr) ? arr : null;
-  } catch { return null; } finally { clearTimeout(t); }
+    const arr = parseJSON(text); if (!Array.isArray(arr)) LAST_ERR = 'unparsed: ' + text.slice(0, 150); return Array.isArray(arr) ? arr : null;
+  } catch (e) { LAST_ERR = String(e && e.message || e).slice(0, 150); return null; } finally { clearTimeout(t); }
 }
 
 const clip = (s, n) => { s = String(s || ''); if (s.length <= n) return s; const c = s.slice(0, n); const k = Math.max(c.lastIndexOf('. '), c.lastIndexOf(' ')); return c.slice(0, k > n * .6 ? k + 1 : n).trim() + '…'; };
@@ -162,6 +163,7 @@ export default async function handler(req, res) {
     return { title: (a && a.title) || x.title, summary: (a && a.summary) || clip(x.desc, 260), headline: x.title, outlet: x.outlet, also: x.also.slice(0, 3), url: x.url, at: x.at, relevant: a ? a.relevant !== false : true, ai: !!a };
   }).filter(x => x.relevant);
   const v = { name, updated: new Date().toISOString(), ai: !!ai, items: out.slice(0, 6) };
+  if (!ai && items.length) { v.aiError = LAST_ERR; }
   cache.set(key, { at: Date.now(), v });
   res.setHeader('Cache-Control', 's-maxage=1800, stale-while-revalidate=3600');
   return res.status(200).json(v);
