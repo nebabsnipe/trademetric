@@ -14,6 +14,7 @@ Fantasy football trades, rankings and lineup advice built on your league's exact
 | `api/ai.js` | Server function for the AI Helper, scouting reports and screenshot reading |
 | `api/live.js` | Live game-day data: scores, game clocks, player stats so far, injury news (cached 2 min during games, 10 min otherwise) |
 | `api/feed.js` | Highlights tab: clips from the NFL's and all 32 teams' official YouTube channels (this week and last), game results and news headlines, cached 5 minutes. Optional `YOUTUBE_API_KEY` env var reads 50 uploads per channel instead of 15 |
+| `scripts/market.py` | Daily redraft market snapshot (FantasyCalc, KeepTradeCut) saved to `data/market.json` for the trade model |
 | `scripts/yt_channels.py` | Finds each team's official YouTube channel ID (runs in the daily job, writes `data/yt_channels.json`) |
 | `api/players.js` | Compact Sleeper player list used to sync rosters in the background |
 | `api/espn.js` | Reads private ESPN leagues with the user's espn_s2 and SWID codes (never stored) |
@@ -41,6 +42,15 @@ Then open http://localhost:3000. (Needs Node 18+.) The AI features only work on 
 3. Optional: **Settings → Domains** to add your own domain.
 
 Every change pushed to the `main` branch goes live automatically in about a minute.
+
+## Trade model (redraft)
+
+1. **Player value:** rest-of-season points per game x chance he plays each week (injury status; IR/PUP/suspended = 0 until an estimated return week) x matchup; fantasy playoff weeks count 1.75x.
+2. **Team impact:** week-by-week change in the best starting lineup + bench insurance + best free agent for a freed roster spot.
+3. **Would they accept:** market value (FantasyCalc, KeepTradeCut, FantasyPros snapshot) + their lineup change + need bonus.
+4. **Final score:** Season Sim playoff/title odds change + Weeks 15-17 points, weighted by team mode, minus injury and stacking risk. Grades A+ to F for both sides.
+
+Weights live in `MODE_W` and `PO_WT` in `js/app.js`.
 
 ## Scoring
 

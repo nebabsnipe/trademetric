@@ -50,7 +50,8 @@ for key, qbs in (('fc1', 1), ('fc2', 2)):
 # KeepTradeCut redraft rankings (values embedded in the rankings page)
 try:
     html = get('https://keeptradecut.com/fantasy-rankings', js=False)
-    m = re.search(r'var\s+playersArray\s*=\s*(\[.*?\]);', html, re.S)
+    print('ktc page', len(html), 'chars; playersArray at', html.find('playersArray'), file=sys.stderr)
+    m = re.search(r'playersArray\s*=\s*(\[.*?\]);', html, re.S)
     arr = json.loads(m.group(1)) if m else []
     v1, v2 = {}, {}
     for r in arr:

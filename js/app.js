@@ -277,52 +277,132 @@ const tptsV=id=>V.tpts[id];
 const tradeGrade=x=>x>=3?'A+':x>=2?'A':x>=1.2?'B+':x>=.5?'B':x>=-.5?'C':x>=-1.5?'D':'F';
 function subsets(arr,max){const res=[];const rec=(i,cur)=>{if(cur.length)res.push(cur);if(cur.length===max)return;for(let j=i;j<arr.length;j++)rec(j+1,[...cur,arr[j]])};rec(0,[]);return res}
 let TR_CACHE={v:-1,list:[]},TR_LOOSE={v:-1,list:[]};
+/* ================= Trade model (redraft) =================
+   1 Player value   rest-of-season points per game x chance he plays that week x matchup, playoff weeks count 1.75x
+   2 Team impact    week-by-week change in the best starting lineup + bench insurance + a freed roster spot
+   3 Will they      market value (FantasyCalc, KeepTradeCut, FantasyPros) + their lineup change + filling a need
+   4 Final score    season sim odds + playoff-week points, weighted by team mode, minus injury and stacking risk */
+var MARKET=null;
+fetch('data/market.json',{cache:'no-cache'}).then(r=>r.ok?r.json():null).then(d=>{if(d){MARKET=d;VER++;if(typeof render==='function'&&tab==='trade')render()}}).catch(()=>{});
+const PO_WT=1.75;
+const poWeeks=()=>{const r=(S.real&&S.real.regWeeks)||14;return [r+1,r+2,r+3].filter(w=>w<=18)};
+const tmWeeks=()=>{const out=[];for(let w=WEEK;w<=Math.max(...poWeeks());w++)out.push(w);return out};
+const wkWt=w=>poWeeks().includes(w)?PO_WT:1;
+/* when a player on IR / PUP / suspended / out should be back (an estimate: the injury feed has no return dates) */
+function retWeek(id){const s=stOf(id);return s==='IR'||s==='PUP'?WEEK+4:s==='SUS'?WEEK+2:s==='O'?WEEK+1:WEEK}
+function playChance(id,w){const r=retWeek(id);if(w<r)return 0;const s=stOf(id);if(w===WEEK){if(s==='Q')return .8;if(s==='D')return .3}return w===r&&r>WEEK?.85:.96}
+let EWK={v:-1,m:{}};
+function ewk(id,w){if(EWK.v!==VER)EWK={v:VER,m:{}};const k=id+'|'+w;if(k in EWK.m)return EWK.m[k];const p=byId[id];let v=0;
+  if(p&&BYE[p.t]!==w){const o=OPP[p.t]&&OPP[p.t][w];if(o||w===WEEK)v=(w===WEEK&&G[id]?G[id].projNext:V.pts[id]*(o?matchF(o.opp,p.pos):1))*playChance(id,w)}
+  return EWK.m[k]=v}
+let PVC={v:-1,m:{}},MVC={v:-1,m:{}};
+function playerValue(id){if(PVC.v!==VER)PVC={v:VER,m:{}};const c=PVC.m[id];if(c!=null)return c;return PVC.m[id]=sum(tmWeeks(),w=>ewk(id,w)*wkWt(w))}
+const ELIG={QB:['QB'],RB:['RB'],WR:['WR'],TE:['TE'],FLEX:['RB','WR','TE'],SF:OFF,K:['K'],DST:['DST']};
+/* best lineup for one week plus "bench insurance": a backup's points x the chance the starter ahead of him misses */
+function weekTeam(players,w){const f=id=>ewk(id,w),lu=lineup(players,f);let ins=0;
+  lu.slots.forEach(x=>{if(!x.p)return;const miss=1-playChance(x.p.id,w)+.04;if(miss<=.05)return;
+    const b=lu.bench.filter(id=>ELIG[x.label]&&ELIG[x.label].includes(byId[id].pos)).reduce((m,id)=>Math.max(m,f(id)),0);ins+=Math.min(1,miss)*b*.9});
+  return {pts:lu.total,ins,lu}}
+/* roster after the deal: drop the least valuable bench player if over the limit, or add the best free agent with a freed spot */
+function rosterAfter(players,out,inn,taken){let after=players.filter(x=>!out.includes(x)).concat(inn),drop=null,fa=null;const lim=rosterSize();
+  while(after.length>Math.max(lim,players.length)){const st=new Set(lineup(after,id=>playerValue(id)).slots.filter(x=>x.p).map(x=>x.p.id));
+    const c=after.filter(id=>!st.has(id)&&!inn.includes(id)).sort((a,b)=>playerValue(a)-playerValue(b))[0];if(!c)break;drop=c;after=after.filter(x=>x!==c)}
+  if(after.length<players.length){const best=POOL.filter(p=>!OWN[p.id]&&!taken.has(p.id)&&p.pos!=='DST'&&p.pos!=='K').map(p=>p.id).sort((a,b)=>playerValue(b)-playerValue(a))[0];if(best){fa=best;after=after.concat(best)}}
+  return {after,drop,fa}}
+function teamImpact(before,after){const W=tmWeeks(),PO=poWeeks();let tot=0,po=0,poB=0,poA=0;const weeks=[];
+  W.forEach(w=>{const b=weekTeam(before,w),a=weekTeam(after,w),d=(a.pts+a.ins)-(b.pts+b.ins);tot+=d*wkWt(w);
+    if(PO.includes(w)){po+=a.pts-b.pts;poB+=b.pts;poA+=a.pts;weeks.push({w,b:b.pts,a:a.pts})}});
+  const wsum=sum(W,wkWt)||1;return {perWeek:tot/wsum,po:po/Math.max(1,PO.length),poB,poA,weeks}}
+/* market value: each source's ranking mapped onto this league's points-above-replacement scale, then averaged */
+let MKT={v:-1};
+function marketTable(){if(MKT.v===VER)return MKT;const sf=sfLeague(),vor=POOL.filter(p=>p.pos!=='K'&&p.pos!=='DST').map(p=>Math.max(0,V.vor[p.id])).sort((a,b)=>b-a);
+  const srcs={};const add=(name,vals)=>{if(!vals)return;const ids=Object.keys(vals).filter(id=>byId[id]).sort((a,b)=>vals[b]-vals[a]);if(ids.length<50)return;const m={};ids.forEach((id,i)=>m[id]=vor[i]||0);srcs[name]=m};
+  if(MARKET){add('FantasyCalc',MARKET[sf?'fc2':'fc1']);add('KeepTradeCut',MARKET[sf?'ktc2':'ktc1'])}
+  const fp={};POOL.forEach(p=>{if(ECR[p.id]!=null)fp[p.id]=Math.max(0,V.cons[p.id]-V.repl[p.pos])});if(Object.keys(fp).length>50)srcs.FantasyPros=fp;
+  MKT={v:VER,srcs};return MKT}
+function marketValue(id){if(MVC.v!==VER)MVC={v:VER,m:{}};if(MVC.m[id]!=null)return MVC.m[id];return MVC.m[id]=marketValue0(id)}
+function marketValue0(id){const m=marketTable().srcs,vals=Object.values(m).map(x=>x[id]).filter(x=>x!=null);
+  let v=vals.length?avg(vals):aboveRepl(id);if(byId[id].pos==='QB'&&!sfLeague())v*=QB_1QB;return starW(Math.max(0,v))}
+function marketLabel(){const s=(MARKET&&MARKET.sources)||{},d=x=>x?new Date(x+'T12:00:00').toLocaleDateString([], {month:'short',day:'numeric'}):'';const parts=[];
+  if(marketTable().srcs.FantasyCalc)parts.push(`FantasyCalc ${d(s.fantasycalc&&s.fantasycalc.date)}`);if(marketTable().srcs.KeepTradeCut)parts.push(`KeepTradeCut ${d(s.keeptradecut&&s.keeptradecut.date)}`);
+  if(marketTable().srcs.FantasyPros)parts.push(`FantasyPros ${d(DATA.ecrDate)}`);return parts.length?`Market values: saved snapshot from ${parts.join(', ')}`:'Market values: TradeMetric projections (no market snapshot loaded)'}
+/* risk: injury-prone players coming in, and too many starters from one NFL team */
+function injRisk(id){const g=G[id],s=stOf(id),p=byId[id];let r={Q:.35,D:.7,O:.5,IR:.6,PUP:.6,SUS:.3}[s]||0;
+  const teamG=g.log.filter(x=>!x.bye).length;if(teamG)r+=Math.max(0,(teamG-g.gp)/teamG)*1.2;return r*Math.max(.5,V.pts[id]/10)}
+function stackPen(players){const st=lineup(players,id=>playerValue(id)).slots.filter(x=>x.p&&x.p.pos!=='DST'&&x.p.pos!=='K').map(x=>x.p.t),c={};st.forEach(t=>c[t]=(c[t]||0)+1);return sum(Object.values(c),n=>Math.max(0,n-2))*.5}
+function teamMode(po){return po>=.6?'contender':po<=.25?'longshot':'middle'}
+const MODE_W={contender:{L:.4,P:1,PO:.15,T:.6,U:0,SH:0,R:1},middle:{L:.7,P:.6,PO:.3,T:.3,U:.2,SH:.2,R:1},longshot:{L:.6,P:.25,PO:.35,T:.25,U:.5,SH:.6,R:.6}};
+const MODE_TXT={contender:'Contender: title odds and playoff weeks count most',middle:'In the hunt: playoff odds count most',longshot:'Long shot: upside and selling high count more'};
+function evalTrade(give,get,partnerId,opts={}){
+  const me=myTeam(),P=teamById(partnerId),taken=new Set([...give,...get]);
+  const mine=rosterAfter(me.players,give,get,taken);if(mine.fa)taken.add(mine.fa);const theirs=P?rosterAfter(P.players,get,give,taken):{after:[],drop:null,fa:null};
+  const you=teamImpact(me.players,mine.after),them=P?teamImpact(P.players,theirs.after):{perWeek:0,po:0,weeks:[]};
+  const vIn=sum(get,playerValue),vOut=sum(give,playerValue);
+  /* will they accept */
+  const mIn=sum(give,marketValue),mOut=sum(get,marketValue),tn=P?needsOf(partnerId):[];
+  const theirStart=P?new Set(lineup(theirs.after,id=>playerValue(id)).slots.filter(x=>x.p).map(x=>x.p.id)):new Set();
+  const fillsNeed=give.some(id=>tn.includes(byId[id].pos)&&theirStart.has(id));
+  const themNet=.55*(mIn-mOut)+.45*them.perWeek+(fillsNeed?.6:0);
+  /* your side */
+  let sb=null,sa=null;if(opts.sim!==false){sb=simulate();sa=simulate({[S.me]:mine.after,...(P?{[partnerId]:theirs.after}:{})})}
+  const po0=sb?sb[S.me].playoff:.5,mode=teamMode(po0),Wm=MODE_W[mode];
+  const dPO=sb&&sa?(sa[S.me].playoff-sb[S.me].playoff)*100:0,dT=sb&&sa?(sa[S.me].title-sb[S.me].title)*100:0;
+  const boom=ids=>sum(ids,id=>(G[id].boom||0)*V.pts[id]);const upside=(boom(get)-boom(give))/3;
+  const sellHigh=give.filter(id=>G[id].tag==='sell').length-get.filter(id=>G[id].tag==='sell').length+get.filter(id=>G[id].tag==='buy').length*.5;
+  const risk=(sum(get,injRisk)-sum(give,injRisk))*.6+(stackPen(mine.after)-stackPen(me.players));
+  const parts={L:Wm.L*you.perWeek,P:Wm.P*you.po,PO:Wm.PO*dPO,T:Wm.T*dT,U:Wm.U*upside,SH:Wm.SH*sellHigh,R:-Wm.R*risk};
+  const youNet=sum(Object.values(parts),x=>x);
+  return {mode,parts,youNet,themNet,d:youNet-themNet,gYou:tradeGrade(youNet),gThem:tradeGrade(themNet),myLG:you.perWeek,thLG:them.perWeek,
+    vIn,vOut,mIn,mOut,fillsNeed,you,them,mine,theirs,dPO,dT,po0,po1:sa?sa[S.me].playoff:null,t0:sb?sb[S.me].title:null,t1:sa?sa[S.me].title:null,risk,upside,sellHigh}}
+function fairness(give,get,partnerId,mode=RATE_MODE,pre){
+  const e=pre||evalTrade(give,get,partnerId),d=mode==='hm'?e.d:e.myLG-e.thLG,share=1/(1+Math.exp(-d/(mode==='hm'?3:4))),x=share-.5,ad=Math.abs(x);
+  const who=x>0?'you':'them',label=ad<.04?'Even trade':ad<.1?`Slightly favors ${who}`:ad<.2?`Favors ${who}`:`Heavily favors ${who}`;
+  return {share,label,d,e,mode}}
+/* suggestions: a quick screen on value and market, then the full model (with the season sim) on the best candidates */
 function allTrades(loose=false){
   if(!loose&&TR_CACHE.v===VER)return TR_CACHE.list;if(loose&&TR_LOOSE.v===VER)return TR_LOOSE.list;
-  const me=myTeam(),out=[];if(!me||me.players.length<2){TR_CACHE={v:VER,list:[]};return []}
-  const ok=id=>!LONG_OUT.includes(stOf(id))&&byId[id].pos!=='DST'&&byId[id].pos!=='K'&&tval(id)>=.3;
-  const mine=me.players.filter(id=>ok(id)&&!['O','D'].includes(stOf(id))).sort((a,b)=>tval(b)-tval(a)).slice(0,9);
-  const mk=arr=>subsets(arr,2).map(s=>({s,w:sum(s,tval),c:sum(s,cval),min:Math.min(...s.map(tval))}));
-  const mySubs=mk(mine),needs=id=>needsOf(id);
-  S.teams.forEach(T=>{
-    if(T.id===S.me||T.players.length<4)return;
-    const thSubs=mk(T.players.filter(ok).sort((a,b)=>tval(b)-tval(a)).slice(0,10)),tn=needs(T.id);
-    for(const g of mySubs)for(const r of thSubs){
-      const n=g.s.length+r.s.length;if(n>3)continue;
-      if(n===3&&Math.min(g.min,r.min)<1)continue;               /* no empty throw-ins */
-      if(g.c<r.c*(loose?.85:.93)-(loose?.3:.1))continue;                    /* they must get fair value by consensus, or they'd say no */
-      if(g.c>r.c*1.6+2)continue;                                 /* don't overpay by consensus */
-      const e=evalTrade(g.s,r.s,T.id);
-      if(e.youNet<(loose?.2:.6)||e.myLG<(loose?-.4:0))continue;  /* must help you, and not cost you starters' points */
-      if(e.thLG<(loose?-1.6:-.8)||e.themNet<(loose?-1.5:-.6))continue; /* can't gut their team */
-      if(e.d>(loose?2.9:2.4))continue;                            /* too one-sided to get accepted */
-      const fillsNeed=g.s.some(id=>tn.includes(byId[id].pos));
-      out.push({team:T.id,give:g.s,get:r.s,myGain:e.myLG,thGain:e.thLG,fillsNeed,e,score:e.youNet+.5*Math.min(e.themNet,1.5)+(fillsNeed?.3:0)-.35*(n-2)});
-    }});
+  const me=myTeam();if(!me||me.players.length<2){TR_CACHE={v:VER,list:[]};return []}
+  const ok=id=>byId[id].pos!=='DST'&&byId[id].pos!=='K'&&(tval(id)>=.3||marketValue(id)>=.5);
+  const mine=me.players.filter(ok).sort((a,b)=>playerValue(b)-playerValue(a)).slice(0,9);
+  const mk=arr=>subsets(arr,2).map(s=>({s,pv:sum(s,playerValue),mv:sum(s,marketValue),min:Math.min(...s.map(marketValue))}));
+  const mySubs=mk(mine),quick=[],wsum=sum(tmWeeks(),wkWt)||1;
+  S.teams.forEach(T=>{if(T.id===S.me||T.players.length<4)return;
+    const thSubs=mk(T.players.filter(ok).sort((a,b)=>playerValue(b)-playerValue(a)).slice(0,10));
+    for(const g of mySubs)for(const r of thSubs){const n=g.s.length+r.s.length;if(n>3)continue;if(n===3&&Math.min(g.min,r.min)<.6)continue;
+      if(g.mv<r.mv*(loose?.75:.85)-(loose?.6:.3))continue;if(g.mv>r.mv*1.8+2.5)continue;
+      const q=r.pv-g.pv;if(q<(loose?-30:-15))continue;const youP=q/wsum,themP=.55*(g.mv-r.mv);quick.push({team:T.id,give:g.s,get:r.s,q:Math.min(youP,themP+.6)+.15*(youP+themP)})}});
+  quick.sort((a,b)=>b.q-a.q);
+  const pre=quick.slice(0,loose?180:160).map(t=>({...t,e:evalTrade(t.give,t.get,t.team,{sim:false})}))
+    .filter(t=>t.e.themNet>=(loose?-1.2:-.6)&&t.e.youNet>(loose?-.3:0)).sort((a,b)=>(b.e.youNet+.3*Math.min(b.e.themNet,1.5))-(a.e.youNet+.3*Math.min(a.e.themNet,1.5)));
+  const out=[];
+  for(const t of pre){const e=t.e;if(e.youNet<(loose?.05:.3)||e.d>(loose?3.2:2.8))continue;
+    out.push({team:t.team,give:t.give,get:t.get,e,full:false,myGain:e.myLG,thGain:e.thLG,fillsNeed:e.fillsNeed,score:e.youNet+.4*Math.min(e.themNet,1.5)-.3*(t.give.length+t.get.length-2)})}
   out.sort((a,b)=>b.score-a.score);if(loose){TR_LOOSE={v:VER,list:out};return out}TR_CACHE={v:VER,list:out};return out;
 }
-function oddsDelta(t){const me=myTeam(),T=teamById(t.team),sb=simulate(),sa=simulate({[S.me]:me.players.filter(x=>!t.give.includes(x)).concat(t.get),[t.team]:T.players.filter(x=>!t.get.includes(x)).concat(t.give)});return sb&&sa?(sa[S.me].playoff-sb[S.me].playoff)+(sa[S.me].title-sb[S.me].title):0}
+function fullEval(t){if(!t.full){t.e=evalTrade(t.give,t.get,t.team);t.full=true;t.myGain=t.e.myLG;t.thGain=t.e.thLG}return t}
+function oddsDelta(t){fullEval(t);return (t.e.dPO+t.e.dT)/100}
 function pickDiverse(list,n,skip=0,loose=false,qbTaken=0){
-  const res=[],usedP=new Set(),usedT=new Set();let checked=0,qb=qbTaken;const hasQB=t=>t.give.concat(t.get).some(id=>byId[id].pos==='QB');
-  for(const t of list.slice(skip).concat(list.slice(0,skip))){if(res.length>=n||checked>=30)break;if(usedT.has(t.team)||t.give.concat(t.get).some(id=>usedP.has(id))||(qb&&hasQB(t)))continue;checked++;if(!loose&&oddsDelta(t)<-.004)continue;res.push(t);if(hasQB(t))qb++;usedT.add(t.team);t.give.concat(t.get).forEach(id=>usedP.add(id))}
+  const res=[],usedP=new Set(),usedT=new Set();let qb=qbTaken;const hasQB=t=>t.give.concat(t.get).some(id=>byId[id].pos==='QB');
+  for(const t of list.slice(skip).concat(list.slice(0,skip))){if(res.length>=n)break;if(usedT.has(t.team)||t.give.concat(t.get).some(id=>usedP.has(id))||(qb&&hasQB(t)))continue;fullEval(t);if(!loose&&(t.e.dPO<-1||t.e.youNet<.2))continue;res.push(t);if(hasQB(t))qb++;usedT.add(t.team);t.give.concat(t.get).forEach(id=>usedP.add(id))}
   return res}
 let RATE_MODE='hm';
 function needsOf(teamId){const r=teamStats().rows.find(x=>x.T.id===teamId);if(!r)return [];return r.needs.length?r.needs:(teamId===S.me?weakList(r).slice(0,1):[])}
-function evalTrade(give,get,partnerId){
-  const me=myTeam(),P=teamById(partnerId);
-  const myLG=lineup(me.players.filter(x=>!give.includes(x)).concat(get),tptsV).total-lineup(me.players,tptsV).total;
-  const thLG=P?lineup(P.players.filter(x=>!get.includes(x)).concat(give),tptsV).total-lineup(P.players,tptsV).total:0;
-  const vIn=sum(get,tval),vOut=sum(give,tval);
-  const youNet=TS_W.value*(vIn-vOut)+TS_W.lineup*myLG,themNet=TS_W.value*(vOut-vIn)+TS_W.lineup*thLG;
-  return {myLG,thLG,vIn,vOut,youNet,themNet,d:youNet-themNet,gYou:tradeGrade(youNet),gThem:tradeGrade(themNet)};
-}
-const TS_W={value:.55,lineup:.45};
-function fairness(give,get,partnerId,mode=RATE_MODE){
-  const e=evalTrade(give,get,partnerId),d=mode==='hm'?e.d:e.myLG-e.thLG,share=1/(1+Math.exp(-d/(mode==='hm'?3.5:4))),x=share-.5,ad=Math.abs(x);
-  const who=x>0?'you':'them',label=ad<.04?'Even trade':ad<.1?`Slightly favors ${who}`:ad<.2?`Favors ${who}`:`Heavily favors ${who}`;
-  return {share,label,d,e,mode}}
+/* playoff impact panel: before vs after for odds, Weeks 15-17 points and those weeks' matchups */
+function playoffPanel(e,give,get,compact){const PO=poWeeks(),d=e.you.poA-e.you.poB,dpo=e.dPO;
+  const call=d>=2&&dpo>=-1?['good','Better for your playoff run']:d<=-2&&dpo<=1?['bad','Hurts your playoff run']:d<=-2&&dpo>1?['mixed','Helps you make the playoffs, weaker in the playoff weeks']:d>=2&&dpo<-1?['mixed','Stronger in the playoff weeks, lower odds of getting there']:dpo>=2?['good','Better odds of making the playoffs']:dpo<=-2?['bad','Lowers your playoff odds']:['even','About even for the playoffs'];
+  const opp=(id,w)=>{const p=byId[id],o=OPP[p.t]&&OPP[p.t][w];if(!o)return `<span class="mu-chip bye">Bye</span>`;const r=defRank(o.opp,p.pos);return `<span class="mu-chip ${r>=24?'easy':r<=8?'hard':''}">${o.home?'':'@'}${o.opp}</span>`};
+  const who=ids=>ids.filter(id=>byId[id].pos!=='DST'&&byId[id].pos!=='K');
+  const pr=(l,a,b,fmt)=>`<tr><td>${l}</td><td class="r num">${fmt(a)}</td><td class="r num"><b>${fmt(b)}</b></td><td class="r num ${b-a>=0?'up':'down'}">${b-a>=0?'+':'−'}${fmt(Math.abs(b-a)).replace('%','')}${fmt===pct?' pts':''}</td></tr>`;
+  const wkRows=e.you.weeks.map(x=>`<tr><td>Wk ${x.w}</td><td class="r num">${f1(x.b)}</td><td class="r num"><b>${f1(x.a)}</b></td><td class="r num ${x.a-x.b>=0?'up':'down'}">${sgn(x.a-x.b)}</td>${compact?'':`<td class="po-mu">${who(get).map(id=>`<span>${esc(byId[id].n.split(' ').pop())} ${opp(id,x.w)}</span>`).join('')}${who(give).length?`<span class="po-out">${who(give).map(id=>`${esc(byId[id].n.split(' ').pop())} ${opp(id,x.w)}`).join(' ')}</span>`:''}</td>`}</tr>`).join('');
+  return `<div class="po-panel"><div class="po-call ${call[0]}">${call[1]}</div>
+    <table class="po-t"><thead><tr><th>Playoff impact</th><th class="r">Now</th><th class="r">After</th><th class="r">Change</th>${compact?'':'<th></th>'}</tr></thead><tbody>
+    ${e.po1!=null?pr('Playoff odds',e.po0,e.po1,pct)+pr('Title odds',e.t0,e.t1,pct):''}
+    ${pr(`Weeks ${PO[0]}–${PO[PO.length-1]} points`,e.you.poB,e.you.poA,f1)}${wkRows}</tbody></table>
+    ${compact?`<p class="po-mus">${who(get).map(id=>`<b>${esc(byId[id].n)}</b> ${PO.map(w=>opp(id,w)).join('')}`).join(' ')}</p>`:''}</div>`}
+const gcls=g=>g[0]==='A'?'ga':g[0]==='B'?'gb':g==='C'?'gc':'gd';
 function tradeWhy(t){const T=teamById(t.team),gp=t.get.map(id=>byId[id]),giv=t.give.map(id=>byId[id]);
-  const bits=[t.myGain>=.3?`Adds ${t.myGain.toFixed(1)} pts/week to your lineup`:'Adds rest-of-season value'];
+  const e=t.e||{},bits=[t.myGain>=.3?`Adds ${t.myGain.toFixed(1)} pts/week to your lineup`:e.you&&e.you.po>=.5?`Adds ${f1(e.you.po)} pts/week in the playoffs`:'Adds rest-of-season value'];
+  if(e.mine&&e.mine.fa)bits.push(`frees a spot for ${byId[e.mine.fa].n}`);
   if(t.fillsNeed)bits.push(`gives ${T.name} the ${giv.map(p=>p.pos).filter((v,i,a)=>a.indexOf(v)===i).join('/')} help they need`);else if(t.thGain>.3)bits.push(`improves their lineup too`);
   if(t.get.some(id=>G[id].tag==='buy'))bits.push(`buys low on ${gp.find(p=>G[p.id].tag==='buy').n}`);
   if(t.give.some(id=>G[id].tag==='sell'))bits.push(`sells high on ${giv.find(p=>G[p.id].tag==='sell').n}`);
@@ -422,11 +502,11 @@ function tradeTitle(t,focus,used){const gp=t.get.map(id=>byId[id]).sort((a,b)=>t
   c.push(`${gpos} upgrade`,'Smart swap','Lineup boost');
   const h=c.find(x=>!used||!used.has(x))||c[0];if(used)used.add(h);
   return `<small>Target · ${esc(f.n)}</small>${h}`}
-function tradeCardHtml(t,title){const fr=fairness(t.give,t.get,t.team),T=teamById(t.team);
+function tradeCardHtml(t,title){const fr=fairness(t.give,t.get,t.team,RATE_MODE,t.e),T=teamById(t.team);
   const side=ids=>ids.map(id=>{const p=byId[id];return `<div class="tp">${av(p,'sm')}<div class="meta"><span style="display:flex;gap:5px;align-items:center;min-width:0"><button class="pname" data-open="${id}">${esc(p.n)}</button>${tagHtml(id)}</span><span class="psub">${p.pos}${V.posRank[id]} · ${f1(V.pts[id])}/G</span></div></div>`}).join('');
   return `<div class="tcard">${title?`<div class="t-title">${title}</div>`:''}<div class="with"><span>Trade with</span><b><i class="tsq" style="background:${teamColor(t.team)}"></i>${esc(T.name)}</b></div>
    <div class="sides"><div><div class="lab">You give</div>${side(t.give)}</div><div><div class="lab get">You get</div>${side(t.get)}</div></div>
-   ${balanceHtml(fr,T.name,true)}<p class="why">${esc(tradeWhy(t))}</p>${oddsLine(t)}<button class="btn primary" data-load="${t.give.join(',')}|${t.get.join(',')}">Open in trade builder</button></div>`}
+   ${balanceHtml(fr,T.name,true)}<div class="t-grades"><span>You <b class="g ${gcls(t.e.gYou)}">${t.e.gYou}</b></span><span>${esc(T.name)} <b class="g ${gcls(t.e.gThem)}">${t.e.gThem}</b></span></div><p class="why">${esc(tradeWhy(t))}</p>${playoffPanel(t.e,t.give,t.get,true)}<button class="btn primary" data-load="${t.give.join(',')}|${t.get.join(',')}">Open in trade builder</button></div>`}
 function renderFix(mine){
   const me=myTeam(),before=lineup(me.players,projV).total,wl=weakList(mine),focus=wl.filter((x,i)=>i===0||mine.rel[x]<0).slice(0,2);
   const faFor=pos=>POOL.filter(p=>p.pos===pos&&!OWN[p.id]).map(p=>{const drop=dropFor(p.id);return {p,drop,g:drop?lineup(me.players.filter(x=>x!==drop).concat(p.id),projV).total-before:0}}).sort((a,b)=>b.g-a.g||V.pts[b.p.id]-V.pts[a.p.id]).slice(0,2);
@@ -497,20 +577,28 @@ function renderRating(partner){
   const el=$('rating');
   if(!TD.give.length||!TD.get.length){el.innerHTML=`<div class="card-h"><h2>Trade rating</h2></div><p class="empty" style="margin:0">Pick at least one player to give and one to get, and the rating shows who comes out ahead.</p>`;return}
   const me=myTeam(),fr=fairness(TD.give,TD.get,partner.id),e=fr.e,hm=RATE_MODE==='hm',over=me.players.length-TD.give.length+TD.get.length-rosterSize();
-  const sb=simulate(),sa=simulate({[S.me]:me.players.filter(x=>!TD.give.includes(x)).concat(TD.get),[partner.id]:partner.players.filter(x=>!TD.get.includes(x)).concat(TD.give)});
-  const oRow=(l,t)=>`<tr><td>${l}</td><td class="r num">${pct(sb[t].playoff)} → <b>${pct(sa[t].playoff)}</b></td><td class="r num">${pct(sb[t].title)} → <b>${pct(sa[t].title)}</b></td></tr>`;
-  const oddsHtml=sb&&sa?`<table class="bd"><thead><tr><th>Season Sim</th><th class="r">Playoff odds</th><th class="r">Title odds</th></tr></thead><tbody>${oRow('You',S.me)}${oRow(esc(partner.name),partner.id)}</tbody></table>`:'';
-  const cls=v=>v>=0?'up':'down',row=(l,a,b)=>`<tr><td>${l}</td><td class="r num">${sgn(a)}</td><td class="r num">${sgn(b)}</td></tr>`;
+  const cls=v=>v>=0?'up':'down',row=(l,v,note)=>`<tr><td>${l}${note?`<span class="note"> · ${note}</span>`:''}</td><td class="r num ${cls(v)}">${sgn(v)}</td></tr>`,P=e.parts;
   el.innerHTML=`<div class="card-h"><h2>Trade rating</h2><div class="seg"><button data-rmode="hm" aria-pressed="${hm}">Trade Score</button><button data-rmode="pw" aria-pressed="${!hm}">Points per week</button></div></div>
    ${balanceHtml(fr,partner.name,false)}
-   <div class="kv" style="margin-top:14px">${hm?`<div><span class="note">Your grade</span><b class="${cls(e.youNet)}">${e.gYou} <small style="font-size:.6em">${sgn(e.youNet)}</small></b></div><div><span class="note">${esc(partner.name)}</span><b class="${cls(e.themNet)}">${e.gThem} <small style="font-size:.6em">${sgn(e.themNet)}</small></b></div>`
+   <div class="kv" style="margin-top:14px">${hm?`<div><span class="note">Your grade</span><b class="${cls(e.youNet)}">${e.gYou} <small style="font-size:.6em">${sgn(e.youNet)}</small></b></div><div><span class="note">${esc(partner.name)}'s grade</span><b class="${cls(e.themNet)}">${e.gThem} <small style="font-size:.6em">${sgn(e.themNet)}</small></b></div>`
      :`<div><span class="note">Your lineup</span><b class="${cls(e.myLG)}">${sgn(e.myLG)}/wk</b></div><div><span class="note">${esc(partner.name)} lineup</span><b class="${cls(e.thLG)}">${sgn(e.thLG)}/wk</b></div>`}</div>
-   ${oddsHtml}
-   ${hm?`<table class="bd"><thead><tr><th>Part of the score</th><th class="r">You</th><th class="r">Them</th></tr></thead><tbody>${row('Player value, stars weighted × 0.55',TS_W.value*(e.vIn-e.vOut),TS_W.value*(e.vOut-e.vIn))}${row('Starting lineup gain × 0.45',TS_W.lineup*e.myLG,TS_W.lineup*e.thLG)}</tbody><tfoot>${row('Total',e.youNet,e.themNet)}</tfoot></table>`:''}
+   ${playoffPanel(e,TD.give,TD.get,false)}
+   ${hm?`<table class="bd"><thead><tr><th>Your score · ${esc(MODE_TXT[e.mode])}</th><th class="r">Pts</th></tr></thead><tbody>
+      ${row('Lineup change, all remaining weeks',P.L,`${sgn(e.myLG)}/wk incl. bench insurance`)}${row('Playoff weeks lineup change',P.P,`${sgn(e.you.po)}/wk in Weeks ${poWeeks()[0]}–${poWeeks().slice(-1)[0]}`)}
+      ${row('Playoff odds',P.PO,`${sgn(e.dPO)} pts`)}${row('Title odds',P.T,`${sgn(e.dT)} pts`)}${e.mode!=='contender'?row('Upside',P.U)+row('Sell high / buy low',P.SH):''}${row('Injury and stacking risk',P.R)}</tbody>
+      <tfoot><tr><td>Your score</td><td class="r num">${sgn(e.youNet)}</td></tr></tfoot></table>
+     <table class="bd"><thead><tr><th>Would ${esc(partner.name)} accept?</th><th class="r">Pts</th></tr></thead><tbody>
+      ${row('Market value they get',.55*(e.mIn-e.mOut),Object.keys(marketTable().srcs).join(' / ')||'projections')}${row('Their lineup change',.45*e.thLG,`${sgn(e.thLG)}/wk`)}${e.fillsNeed?row('Fills one of their needs',.6):''}</tbody>
+      <tfoot><tr><td>Their score</td><td class="r num">${sgn(e.themNet)}</td></tr></tfoot></table>`:''}
+   ${e.mine.fa||e.mine.drop||e.theirs.fa||e.theirs.drop?`<p class="note" style="margin:10px 0 0">${[e.mine.fa?`You'd pick up ${esc(byId[e.mine.fa].n)} with the open roster spot.`:'',e.mine.drop?`You'd drop ${esc(byId[e.mine.drop].n)} to make room.`:'',e.theirs.drop?`${esc(partner.name)} would drop ${esc(byId[e.theirs.drop].n)}.`:'',e.theirs.fa?`${esc(partner.name)} would pick up ${esc(byId[e.theirs.fa].n)}.`:''].filter(Boolean).join(' ')}</p>`:''}
    ${over>0?`<p class="note" style="margin:10px 0 0">You would be ${over} over your roster limit and need to drop ${over>1?'players':'a player'}.</p>`:''}
    <div class="toolbar" style="margin-top:14px"><button class="btn accent" id="accept-trade">Mark as accepted</button><span class="note">Moves the players and adds it to the trade log.</span></div>
-   <p class="formula">${hm?`<b>How the Trade Score works.</b> We value each player by how many points per week he scores above a replacement-level starter in your league's scoring, blending our projection (60%) with this week's expert consensus rankings (40%). Stars count extra: value is raised to the 1.5 power, so one great player beats two good ones. In one-QB leagues, quarterbacks are discounted 40% because good ones are easy to find. Then we check what each starting lineup actually gains, since bench depth rarely wins weeks. Grades run from A+ to F. Suggested trades must also look fair to the other manager by consensus, or they'd turn them down.`
-     :`<b>How points per week works.</b> It compares how much each team's best starting lineup gains or loses per week, using rest-of-season projections in your scoring. It ignores depth, long-term value and positional need.`}</p>`;
+   <p class="formula">${hm?`<b>How the Trade Score works</b> (redraft). <b>1 · Player value:</b> rest-of-season points per game in your scoring × the chance he plays each week (injury status; players on IR, PUP or suspended count 0 until an estimated return week, then full value) × that week's matchup. Fantasy playoff weeks ${poWeeks()[0]}–${poWeeks().slice(-1)[0]} count ${PO_WT}x.
+     <b>2 · Your team:</b> the week-by-week change in your best starting lineup (bench players who never start add almost nothing), plus bench insurance (a backup's points × the chance the starter misses), plus the best free agent you could add with a spot freed in a 2-for-1.
+     <b>3 · Would they accept:</b> the market value they get, blended from FantasyCalc, KeepTradeCut and FantasyPros, plus their own lineup change and a bonus if the deal fills one of their needs.
+     <b>4 · Final score:</b> your change in playoff odds and title odds from the Season Sim, plus your Weeks ${poWeeks()[0]}–${poWeeks().slice(-1)[0]} points with matchups, weighted by your team mode (contenders weight title odds and playoff weeks most; long shots weight upside and selling high), minus risk from injury-prone players and stacking one NFL team. Grades run A+ to F; the bar compares your score with theirs.
+     <span class="mkt-src">${esc(marketLabel())}.</span>`
+     :`<b>How points per week works.</b> It compares how much each team's best starting lineup gains or loses per week over the rest of the season, with injuries and matchups included. It ignores market value, playoff odds and risk.`}</p>`;
 }
 
 /* ===== HUB ===== */
@@ -601,7 +689,7 @@ function renderBriefing(){const el=$('briefing');if(!el)return;const me=myTeam()
   items.push({k:'Lineup',h:worries.length?`<ul>${worries.slice(0,3).map(w=>`<li>${w[1]}</li>`).join('')}</ul>`:'<p>No lineup concerns. Your starters are healthy and active.</p>',acts:worries.length?[[`View ${byId[worries[0][0]].n}`,'view|'+worries[0][0]]]:[]});
   const pk=bestPickups()[0];if(pk&&pk.g>.2)items.push({k:'Pickup',h:`<p>Add <b>${esc(pk.p.n)}</b> (${pk.p.pos}, ${pk.p.t})${pk.drop?` and drop ${esc(byId[pk.drop].n)}`:''}. That adds ${f1(pk.g)} points a week to your lineup.</p>`,acts:[[`Add ${pk.p.n}`,`add|${pk.p.id}|${pk.drop||''}`],['View','view|'+pk.p.id]]});
   else items.push({k:'Pickup',h:'<p>No available player improves your lineup this week. Hold your waiver priority.</p>',acts:[]});
-  const tr=pickDiverse(allTrades(),1)[0];if(tr){const fr=fairness(tr.give,tr.get,tr.team);items.push({k:'Trade',h:`<p>Send ${tr.give.map(x=>esc(byId[x].n)).join(' and ')} to ${esc(teamById(tr.team).name)} for ${tr.get.map(x=>esc(byId[x].n)).join(' and ')}. ${fr.label}${tr.myGain>=.3?`, and it adds ${f1(tr.myGain)} points a week`:', and it adds long-term value'}.</p>`,acts:[['Open in trade builder',`trade|${tr.give.join(',')}|${tr.get.join(',')}`]]})}
+  const tr=pickDiverse(allTrades(),1)[0];if(tr){const fr=fairness(tr.give,tr.get,tr.team,RATE_MODE,tr.e);items.push({k:'Trade',h:`<p>Send ${tr.give.map(x=>esc(byId[x].n)).join(' and ')} to ${esc(teamById(tr.team).name)} for ${tr.get.map(x=>esc(byId[x].n)).join(' and ')}. ${fr.label}${tr.myGain>=.3?`, and it adds ${f1(tr.myGain)} points a week`:', and it adds long-term value'}.</p>`,acts:[['Open in trade builder',`trade|${tr.give.join(',')}|${tr.get.join(',')}`]]})}
   const bl=POOL.filter(p=>G[p.id].buy&&OWN[p.id]&&OWN[p.id]!==S.me).sort((a,b)=>V.pts[b.id]-V.pts[a.id])[0];
   if(bl)items.push({k:'Buy low',h:`<p><b>${esc(bl.n)}</b> on ${esc(teamById(OWN[bl.id]).name)}. ${esc(G[bl.id].buy[0])}</p>`,acts:[['View',`view|${bl.id}`]]});
   el.innerHTML=`<div class="card-h"><h2>Week ${WEEK} briefing</h2>${AI?'<button class="btn small" data-q="Walk me through my Week ${WEEK} game plan: my lineup, my matchup, the best pickup and one trade worth making.">Talk me through it</button>':''}</div>
@@ -731,7 +819,7 @@ function simulate(over){
     out[champ].title++}
   ids.forEach(t=>{const o=out[t];o.wins/=N_SIM;o.playoff/=N_SIM;o.bye/=N_SIM;o.title/=N_SIM});
   SIM_CACHE[key]=out;return out}
-function oddsLine(t){const me=myTeam(),T=teamById(t.team),sb=simulate(),sa=simulate({[S.me]:me.players.filter(x=>!t.give.includes(x)).concat(t.get),[t.team]:T.players.filter(x=>!t.get.includes(x)).concat(t.give)});
+function oddsLineOld(t){const me=myTeam(),T=teamById(t.team),sb=simulate(),sa=simulate({[S.me]:me.players.filter(x=>!t.give.includes(x)).concat(t.get),[t.team]:T.players.filter(x=>!t.get.includes(x)).concat(t.give)});
   if(!sb||!sa)return '';const d=sa[S.me].playoff-sb[S.me].playoff;return `<p class="why odds">Playoff odds ${pct(sb[S.me].playoff)} → ${pct(sa[S.me].playoff)} (${d>=0?'+':''}${Math.round(d*100)} pts) in Season Sim</p>`}
 function renderOppCard(){const el=$('opp-card');if(!el)return;
   const best=p=>Math.max(...G[p.id].opp.map(o=>o.mult)),list=POOL.filter(p=>G[p.id].opp.length).sort((a,b)=>best(b)-best(a));

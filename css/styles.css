@@ -720,3 +720,22 @@ body.signed-out .nav,body.signed-out #week-pill,body.signed-out #acct-btn{displa
 @media (max-width:900px){.div-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media (max-width:520px){.div-grid{grid-template-columns:minmax(0,1fr)}}
 .rank-more{display:flex;justify-content:center;padding:14px 0 4px}
+/* playoff impact panel + grades */
+.t-grades{display:flex;gap:16px;font-size:12.5px;color:var(--muted);margin:6px 0 2px}
+.t-grades b.g,.g{display:inline-grid;place-items:center;min-width:30px;height:22px;padding:0 5px;border-radius:6px;font:800 12.5px var(--f-mono,monospace);color:#fff;margin-left:4px}
+.g.ga{background:var(--good)}.g.gb{background:#3d8f6a}.g.gc{background:var(--warn)}.g.gd{background:var(--bad)}
+.po-panel{border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin:10px 0;background:var(--surface-2)}
+.po-call{font-weight:800;font-size:13.5px;margin-bottom:6px;display:flex;align-items:center;gap:7px}
+.po-call::before{content:"";width:9px;height:9px;border-radius:50%;background:var(--muted)}
+.po-call.good{color:var(--good)}.po-call.good::before{background:var(--good)}
+.po-call.bad{color:var(--bad)}.po-call.bad::before{background:var(--bad)}
+.po-t{width:100%;border-collapse:collapse;font-size:12.5px}
+.po-t th{font-size:10.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:700;text-align:left;padding:3px 4px;border-bottom:1px solid var(--line)}
+.po-t td{padding:4px;border-bottom:1px solid var(--line)}.po-t tr:last-child td{border-bottom:0}
+.po-t .up{color:var(--good);font-weight:700}.po-t .down{color:var(--bad);font-weight:700}
+.po-mu{display:flex;flex-wrap:wrap;gap:4px 10px;font-size:12px}.po-mu .po-out{color:var(--muted);text-decoration:line-through;text-decoration-color:rgba(0,0,0,.25)}
+.mu-chip{display:inline-block;font:600 10.5px var(--f-mono,monospace);padding:1px 5px;border-radius:4px;background:var(--surface);margin-left:3px;color:var(--muted)}
+.mu-chip.easy{background:var(--good-soft);color:var(--good)}.mu-chip.hard{background:var(--bad-soft);color:var(--bad)}.mu-chip.bye{opacity:.7}
+.po-mus{margin:6px 0 0;font-size:12px;line-height:1.7}
+.mkt-src{display:block;margin-top:6px;font-style:italic}
+.po-call.mixed{color:var(--warn)}.po-call.mixed::before{background:var(--warn)}
