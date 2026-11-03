@@ -5,7 +5,7 @@ const tcVars=t=>{const c=TC[t]||['#333','#666','#fff'];return `--c1:${c[0]};--c2
 
 /* ===== Real 2026 data: nflverse snapshot ===== */
 const DATA=window.NFL_DATA;
-document.querySelectorAll('.wk-now').forEach(x=>x.textContent='Week '+DATA.week);document.querySelectorAll('.wk-num').forEach(x=>x.textContent=DATA.week);{const el=document.getElementById('week-pill');if(el){el.innerHTML=`<b>Week ${DATA.week}</b> · stats thru Wk ${DATA.played}`;el.title=`Real ${DATA.asOf.slice(0,4)} stats through Week ${DATA.played}, updated ${DATA.asOf}. Refreshed every morning.`}}
+function weekLabels(){document.querySelectorAll('.wk-now').forEach(x=>x.textContent='Week '+WEEK);document.querySelectorAll('.wk-num').forEach(x=>x.textContent=WEEK);{const el=document.getElementById('week-pill');if(el){el.innerHTML=`<b>Week ${WEEK}</b> · stats thru Wk ${DATA.played}`;el.title=`Real ${DATA.asOf.slice(0,4)} stats through Week ${DATA.played}, updated ${DATA.asOf}. Refreshed every morning.`}}}
 const FUM={QB:.2,RB:.09,WR:.04,TE:.04};
 const slug=n=>n.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');
 const Z={cmp:0,pyd:0,ptd:0,int:0,ratt:0,ryd:0,rtd:0,tgt:0,rec:0,recyd:0,rectd:0};
@@ -22,11 +22,12 @@ function seed(str){let h=2166136261;for(const c of str){h^=c.charCodeAt(0);h=Mat
 function shuffle(arr,r){const a=[...arr];for(let i=a.length-1;i>0;i--){const j=Math.floor(r()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a}
 const ord=k=>k+((k%100>=11&&k%100<=13)?'th':(['th','st','nd','rd'][k%10]||'th'));
 function schedOf(t,from,to){const o=[];for(let w=from;w<=to;w++)o.push({w,g:OPP[t]&&OPP[t][w]||null});return o}
-const WEEK=DATA.week,PLAYED=DATA.played,BYE=DATA.bye,DEF=DATA.def,VEGAS=DATA.vegas,OPP={};
+let WEEK=DATA.week;const PLAYED=DATA.played,BYE=DATA.bye,DEF=DATA.def,VEGAS=DATA.vegas,OPP={};
+weekLabels();
 Object.entries(DATA.sched).forEach(([t,arr])=>{OPP[t]={};arr.forEach((x,k)=>{if(x)OPP[t][k+1]={opp:x[0],home:!!x[1]}})});
 const defRank=(t,pos)=>(DEF[t]&&DEF[t][pos])||16;
 const matchF=(t,pos)=>1+((defRank(t,pos)-16.5)/16.5)*.15;
-const vegasF=t=>VEGAS[t]?1+(VEGAS[t]-22.5)/22.5*.5:1;
+const vegasF=t=>WEEK===DATA.week&&VEGAS[t]?1+(VEGAS[t]-22.5)/22.5*.5:1;
 function sosOf(p,from,to){const r=schedOf(p.t,from,to).filter(x=>x.g).map(x=>defRank(x.g.opp,p.pos));return r.length?r.reduce((a,b)=>a+b,0)/r.length:16.5}
 const LOGS={};
 function genLog(p){
@@ -62,7 +63,7 @@ const MY_EXAMPLE=['jalen-hurts','dak-prescott','bryce-young','zach-charbonnet','
 const KEY='trademetric-v1';
 let S;try{S=JSON.parse(localStorage.getItem(KEY))}catch(e){S=null}
 const AUTH_HASH=/access_token=|error_description=/.test(location.hash)?location.hash.slice(1):null;
-function save(){S.savedAt=Date.now();try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}if(typeof cloudSave==='function')cloudSave()}
+function save(){S.savedAt=Date.now();if(S.leagues&&S.leagueKey&&typeof upsertLeague==='function'&&S.teams&&S.teams.length)upsertLeague();try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}if(typeof cloudSave==='function')cloudSave()}
 let POOL=BUILTIN,byId={};
 function setPool(){const base=(S.custom&&S.custom.length)?S.custom:BUILTIN,have=new Set(base.map(p=>p.id));
   POOL=base.concat((S.extraPlayers||[]).filter(x=>!have.has(x.id)).map(x=>({...Z,...KZ,fl:0,id:x.id,n:x.n,pos:x.pos,t:x.t||'FA',status:'',extra:true})));byId={};POOL.forEach(p=>byId[p.id]=p);
@@ -164,11 +165,15 @@ function applyLive(){
 function liveStatus(){if(!LIVE||!LIVE.injuries)return;const keep=['IR','PUP','SUS'];
   LIVE.injuries.forEach(([n,t,st])=>{const p=findExact(n);if(!p||p.pos==='DST'||(p.t!==t&&norm(p.n)!==norm(n)))return;
     if(st)p.status=st;else if(!keep.includes(String(p.status||'').toUpperCase()))p.status=''})}
+var ROLLED=false;
+function checkRollover(){if(!LIVE||LIVE.week!==WEEK||WEEK>=18)return false;const gs=Object.values(LIVE.games||{});
+  const playing=Object.keys(OPP).filter(t=>OPP[t][WEEK]);if(!gs.length||gs.length<playing.length*.9||!gs.every(g=>g.state==='post'))return false;
+  WEEK++;ROLLED=true;LIVE=null;LIVEST={};LIVE_LU=null;PLAT=null;SCHED=null;weekLabels();return true}
 async function loadLive(){
   clearTimeout(LIVE_TIMER);let next=10*60e3;
   try{const r=await fetch('/api/live?week='+WEEK+'&b='+Math.floor(Date.now()/120000));if(r.ok){const j=await r.json();
     if(j&&j.games){await loadPlatform();LIVE=j;LIVEST={};(j.players||[]).forEach(x=>{const p=x.pos==='DST'?byId['dst-'+String(x.t).toLowerCase()]:findExact(x.n);if(p&&p.pos===x.pos)LIVEST[p.id]=x.s});
-      liveStatus();recompute();const a=document.activeElement;if(!(a&&/INPUT|TEXTAREA|SELECT/.test(a.tagName)))render();if(j.live||Object.values(j.games).some(g=>g.state==='pre'&&Date.parse(g.start)-Date.now()<30*60e3))next=2*60e3}}}catch(e){}
+      liveStatus();if(checkRollover()){setTimeout(loadLive,500);await loadPlatform()}recompute();const a=document.activeElement;if(!(a&&/INPUT|TEXTAREA|SELECT/.test(a.tagName)))render();if(j.live||Object.values(j.games).some(g=>g.state==='pre'&&Date.parse(g.start)-Date.now()<30*60e3))next=2*60e3}}}catch(e){}
   LIVE_TIMER=setTimeout(()=>{if(document.hidden)document.addEventListener('visibilitychange',loadLive,{once:true});else loadLive()},next)}
 const liveOf=id=>G[id]&&G[id].live;
 /* Real starting lineups from the league's platform. Sleeper refreshes with live data; ESPN is captured at import. */
@@ -214,7 +219,7 @@ async function syncSleeper(){const src=S.real&&S.real.src;if(!src||src.type!=='s
     if(rosterChanged(T,[...new Set(out)]))changed=true;
     const us=users.find(x=>x.user_id===r.owner_id),nm=(us&&us.metadata&&us.metadata.team_name)||(us&&us.display_name);if(nm&&nm!==T.name){T.name=nm;changed=true}
     const st=r.settings||{};S.real.rec[tid]={w:st.wins||0,l:st.losses||0,t:st.ties||0,pf:(st.fpts||0)+(st.fpts_decimal||0)/100}}
-  return changed}
+  syncPlayed();return changed}
 function syncEspnRosters(d){const src=S.real&&S.real.src;if(!d||!src||src.type!=='espn')return false;let changed=false;
   (d.teams||[]).forEach(t=>{const tid=src.rid[t.id],T=tid&&teamById(tid);if(!T)return;
     const EP={1:'QB',2:'RB',3:'WR',4:'TE',5:'K'};((t.roster&&t.roster.entries)||[]).forEach(e=>{const pl=e.playerPoolEntry&&e.playerPoolEntry.player;if(pl&&EP[pl.defaultPositionId]&&!findExact(pl.fullName,EP[pl.defaultPositionId])){addExtraPlayer(pl.fullName,EP[pl.defaultPositionId]);POOL_DIRTY=true}});if(POOL_DIRTY)setPool();
@@ -222,7 +227,8 @@ function syncEspnRosters(d){const src=S.real&&S.real.src;if(!d||!src||src.type!=
     if(out.length&&rosterChanged(T,[...new Set(out)]))changed=true;
     const nm=t.name||[t.location,t.nickname].filter(Boolean).join(' ');if(nm&&nm!==T.name){T.name=nm;changed=true}
     const o=(t.record&&t.record.overall)||{};S.real.rec[tid]={w:o.wins||0,l:o.losses||0,t:o.ties||0,pf:o.pointsFor||0}});
-  return changed}
+  syncPlayed();return changed}
+function syncPlayed(){if(!S.real||!S.real.rec)return;const g=Math.max(0,...Object.values(S.real.rec).map(r=>(r.w||0)+(r.l||0)+(r.t||0)));if(g>(S.real.played||0)){S.real.played=g;SCHED=null;REC_CACHE={v:-1}}}
 async function loadPlatform(){const src=S.real&&S.real.src;if(!src)return;let changed=false;
   try{if(src.type==='sleeper'){changed=await syncSleeper();await loadSleeperLineups()}
     else if(src.type==='espn'){const creds=src.priv?(IMP.espnCreds||espnSaved()):null;if(src.priv&&!(creds&&creds.s2))return;
@@ -309,10 +315,10 @@ function rosterAfter(players,out,inn,taken){let after=players.filter(x=>!out.inc
     const c=after.filter(id=>!st.has(id)&&!inn.includes(id)).sort((a,b)=>playerValue(a)-playerValue(b))[0];if(!c)break;drop=c;after=after.filter(x=>x!==c)}
   if(after.length<players.length){const best=POOL.filter(p=>!OWN[p.id]&&!taken.has(p.id)&&p.pos!=='DST'&&p.pos!=='K').map(p=>p.id).sort((a,b)=>playerValue(b)-playerValue(a))[0];if(best){fa=best;after=after.concat(best)}}
   return {after,drop,fa}}
-function teamImpact(before,after){const W=tmWeeks(),PO=poWeeks();let tot=0,po=0,poB=0,poA=0;const weeks=[];
-  W.forEach(w=>{const b=weekTeam(before,w),a=weekTeam(after,w),d=(a.pts+a.ins)-(b.pts+b.ins);tot+=d*wkWt(w);
+function teamImpact(before,after){const W=tmWeeks(),PO=poWeeks(),RW=(S.real&&S.real.regWeeks)||14;let tot=0,po=0,poB=0,poA=0,reg=0,nReg=0;const weeks=[];
+  W.forEach(w=>{const b=weekTeam(before,w),a=weekTeam(after,w),d=(a.pts+a.ins)-(b.pts+b.ins);tot+=d*wkWt(w);if(w<=RW){reg+=a.pts-b.pts;nReg++}
     if(PO.includes(w)){po+=a.pts-b.pts;poB+=b.pts;poA+=a.pts;weeks.push({w,b:b.pts,a:a.pts})}});
-  const wsum=sum(W,wkWt)||1;return {perWeek:tot/wsum,po:po/Math.max(1,PO.length),poB,poA,weeks}}
+  const wsum=sum(W,wkWt)||1;return {perWeek:tot/wsum,po:po/Math.max(1,PO.length),reg:nReg?reg/nReg:0,poB,poA,weeks}}
 /* market value: each source's ranking mapped onto this league's points-above-replacement scale, then averaged */
 let MKT={v:-1};
 function marketTable(){if(MKT.v===VER)return MKT;const sf=sfLeague(),vor=POOL.filter(p=>p.pos!=='K'&&p.pos!=='DST').map(p=>Math.max(0,V.vor[p.id])).sort((a,b)=>b-a);
@@ -330,9 +336,10 @@ function marketLabel(){const s=(MARKET&&MARKET.sources)||{},d=x=>x?new Date(x+'T
 function injRisk(id){const g=G[id],s=stOf(id),p=byId[id];let r={Q:.35,D:.7,O:.5,IR:.6,PUP:.6,SUS:.3}[s]||0;
   const teamG=g.log.filter(x=>!x.bye).length;if(teamG)r+=Math.max(0,(teamG-g.gp)/teamG)*1.2;return r*Math.max(.5,V.pts[id]/10)}
 function stackPen(players){const st=lineup(players,id=>playerValue(id)).slots.filter(x=>x.p&&x.p.pos!=='DST'&&x.p.pos!=='K').map(x=>x.p.t),c={};st.forEach(t=>c[t]=(c[t]||0)+1);return sum(Object.values(c),n=>Math.max(0,n-2))*.5}
-function teamMode(po){return po>=.6?'contender':po<=.25?'longshot':'middle'}
-const MODE_W={contender:{L:.4,P:1,PO:.15,T:.6,U:0,SH:0,R:1},middle:{L:.7,P:.6,PO:.3,T:.3,U:.2,SH:.2,R:1},longshot:{L:.6,P:.25,PO:.35,T:.25,U:.5,SH:.6,R:.6}};
-const MODE_TXT={contender:'Contender: title odds and playoff weeks count most',middle:'In the hunt: playoff odds count most',longshot:'Long shot: upside and selling high count more'};
+/* behind but alive: win now; bubble: balance; comfortably in: playoff weeks and title; nearly out: sell */
+function teamMode(po){return po>=.75?'contender':po>=.45?'middle':po>=.08?'behind':'longshot'}
+const MODE_W={contender:{N:.2,L:.3,P:1,PO:.1,T:.6,U:0,SH:0,R:1},middle:{N:.6,L:.3,P:.5,PO:.35,T:.3,U:.1,SH:.1,R:1},behind:{N:1,L:.2,P:.15,PO:.45,T:.1,U:.1,SH:0,R:1},longshot:{N:.2,L:.6,P:.2,PO:.3,T:.2,U:.5,SH:.6,R:.6}};
+const MODE_TXT={contender:'Comfortably in: playoff weeks and title odds count most',middle:'On the bubble: winning now and playoff weeks both count',behind:'Behind but alive: winning the next few weeks and getting in count most',longshot:'Nearly out: upside and selling high count more'};
 function evalTrade(give,get,partnerId,opts={}){
   const me=myTeam(),P=teamById(partnerId),taken=new Set([...give,...get]);
   const mine=rosterAfter(me.players,give,get,taken);if(mine.fa)taken.add(mine.fa);const theirs=P?rosterAfter(P.players,get,give,taken):{after:[],drop:null,fa:null};
@@ -344,13 +351,13 @@ function evalTrade(give,get,partnerId,opts={}){
   const fillsNeed=give.some(id=>tn.includes(byId[id].pos)&&theirStart.has(id));
   const themNet=.55*(mIn-mOut)+.45*them.perWeek+(fillsNeed?.6:0);
   /* your side */
-  let sb=null,sa=null;if(opts.sim!==false){sb=simulate();sa=simulate({[S.me]:mine.after,...(P?{[partnerId]:theirs.after}:{})})}
+  let sb=simulate(),sa=null;if(opts.sim!==false)sa=simulate({[S.me]:mine.after,...(P?{[partnerId]:theirs.after}:{})});
   const po0=sb?sb[S.me].playoff:.5,mode=teamMode(po0),Wm=MODE_W[mode];
   const dPO=sb&&sa?(sa[S.me].playoff-sb[S.me].playoff)*100:0,dT=sb&&sa?(sa[S.me].title-sb[S.me].title)*100:0;
   const boom=ids=>sum(ids,id=>(G[id].boom||0)*V.pts[id]);const upside=(boom(get)-boom(give))/3;
   const sellHigh=give.filter(id=>G[id].tag==='sell').length-get.filter(id=>G[id].tag==='sell').length+get.filter(id=>G[id].tag==='buy').length*.5;
   const risk=(sum(get,injRisk)-sum(give,injRisk))*.6+(stackPen(mine.after)-stackPen(me.players));
-  const parts={L:Wm.L*you.perWeek,P:Wm.P*you.po,PO:Wm.PO*dPO,T:Wm.T*dT,U:Wm.U*upside,SH:Wm.SH*sellHigh,R:-Wm.R*risk};
+  const parts={N:Wm.N*you.reg,L:Wm.L*you.perWeek,P:Wm.P*you.po,PO:Wm.PO*dPO,T:Wm.T*dT,U:Wm.U*upside,SH:Wm.SH*sellHigh,R:-Wm.R*risk};
   const youNet=sum(Object.values(parts),x=>x);
   return {mode,parts,youNet,themNet,d:youNet-themNet,gYou:tradeGrade(youNet),gThem:tradeGrade(themNet),myLG:you.perWeek,thLG:them.perWeek,
     vIn,vOut,mIn,mOut,fillsNeed,you,them,mine,theirs,dPO,dT,po0,po1:sa?sa[S.me].playoff:null,t0:sb?sb[S.me].title:null,t1:sa?sa[S.me].title:null,risk,upside,sellHigh}}
@@ -388,8 +395,14 @@ function pickDiverse(list,n,skip=0,loose=false,qbTaken=0){
 let RATE_MODE='hm';
 function needsOf(teamId){const r=teamStats().rows.find(x=>x.T.id===teamId);if(!r)return [];return r.needs.length?r.needs:(teamId===S.me?weakList(r).slice(0,1):[])}
 /* playoff impact panel: before vs after for odds, Weeks 15-17 points and those weeks' matchups */
-function playoffPanel(e,give,get,compact){const PO=poWeeks(),d=e.you.poA-e.you.poB,dpo=e.dPO;
-  const call=d>=2&&dpo>=-1?['good','Better for your playoff run']:d<=-2&&dpo<=1?['bad','Hurts your playoff run']:d<=-2&&dpo>1?['mixed','Helps you make the playoffs, weaker in the playoff weeks']:d>=2&&dpo<-1?['mixed','Stronger in the playoff weeks, lower odds of getting there']:dpo>=2?['good','Better odds of making the playoffs']:dpo<=-2?['bad','Lowers your playoff odds']:['even','About even for the playoffs'];
+function playoffCall(e){const d=e.you.poA-e.you.poB,dpo=e.dPO,po0=e.po0??.5,ps=x=>pct(x);
+  const ifIn=d>=2?'Stronger if you make it':d<=-2?'Weaker if you make it':'';
+  if(po0<.75&&e.po1!=null&&Math.abs(dpo)>=1){const up=dpo>0;return [up?'good':'bad',`${up?'Raises':'Lowers'} your playoff odds ${ps(e.po0)} → ${ps(e.po1)}`,ifIn]}
+  if(po0<.75&&e.po1!=null)return [d>=2?'good':d<=-2?'bad':'even','Playoff odds about the same',ifIn];
+  return d>=2?['good','Better for your playoff run','']:d<=-2?['bad','Hurts your playoff run','']:['even','About even for the playoffs','']}
+function playoffPanel(e,give,get,compact){const PO=poWeeks(),c=playoffCall(e),call=[c[0],c[1]+(c[2]?`<span class="po-sub">${c[2]}</span>`:'')];
+  if(compact==='mini'){const r=(l,a,b,f)=>`<span class="po-mini-i">${l} <b>${f(a)} → ${f(b)}</b></span>`;
+    return `<div class="po-panel mini"><div class="po-call ${call[0]}">${call[1]}</div><div class="po-mini">${e.po1!=null?r('Playoff odds',e.po0,e.po1,pct):''}${r(`Wks ${PO[0]}–${PO[PO.length-1]} pts`,e.you.poB,e.you.poA,f1)}</div></div>`}
   const opp=(id,w)=>{const p=byId[id],o=OPP[p.t]&&OPP[p.t][w];if(!o)return `<span class="mu-chip bye">Bye</span>`;const r=defRank(o.opp,p.pos);return `<span class="mu-chip ${r>=24?'easy':r<=8?'hard':''}">${o.home?'':'@'}${o.opp}</span>`};
   const who=ids=>ids.filter(id=>byId[id].pos!=='DST'&&byId[id].pos!=='K');
   const pr=(l,a,b,fmt)=>`<tr><td>${l}</td><td class="r num">${fmt(a)}</td><td class="r num"><b>${fmt(b)}</b></td><td class="r num ${b-a>=0?'up':'down'}">${b-a>=0?'+':'−'}${fmt(Math.abs(b-a)).replace('%','')}${fmt===pct?' pts':''}</td></tr>`;
@@ -502,11 +515,11 @@ function tradeTitle(t,focus,used){const gp=t.get.map(id=>byId[id]).sort((a,b)=>t
   c.push(`${gpos} upgrade`,'Smart swap','Lineup boost');
   const h=c.find(x=>!used||!used.has(x))||c[0];if(used)used.add(h);
   return `<small>Target · ${esc(f.n)}</small>${h}`}
-function tradeCardHtml(t,title){const fr=fairness(t.give,t.get,t.team,RATE_MODE,t.e),T=teamById(t.team);
+function tradeCardHtml(t,title,mini){const fr=fairness(t.give,t.get,t.team,RATE_MODE,t.e),T=teamById(t.team);
   const side=ids=>ids.map(id=>{const p=byId[id];return `<div class="tp">${av(p,'sm')}<div class="meta"><span style="display:flex;gap:5px;align-items:center;min-width:0"><button class="pname" data-open="${id}">${esc(p.n)}</button>${tagHtml(id)}</span><span class="psub">${p.pos}${V.posRank[id]} · ${f1(V.pts[id])}/G</span></div></div>`}).join('');
   return `<div class="tcard">${title?`<div class="t-title">${title}</div>`:''}<div class="with"><span>Trade with</span><b><i class="tsq" style="background:${teamColor(t.team)}"></i>${esc(T.name)}</b></div>
    <div class="sides"><div><div class="lab">You give</div>${side(t.give)}</div><div><div class="lab get">You get</div>${side(t.get)}</div></div>
-   ${balanceHtml(fr,T.name,true)}<div class="t-grades"><span>You <b class="g ${gcls(t.e.gYou)}">${t.e.gYou}</b></span><span>${esc(T.name)} <b class="g ${gcls(t.e.gThem)}">${t.e.gThem}</b></span></div><p class="why">${esc(tradeWhy(t))}</p>${playoffPanel(t.e,t.give,t.get,true)}<button class="btn primary" data-load="${t.give.join(',')}|${t.get.join(',')}">Open in trade builder</button></div>`}
+   ${balanceHtml(fr,T.name,true)}<div class="t-grades"><span>You <b class="g ${gcls(t.e.gYou)}">${t.e.gYou}</b></span><span>${esc(T.name)} <b class="g ${gcls(t.e.gThem)}">${t.e.gThem}</b></span></div><p class="why">${esc(tradeWhy(t))}</p>${playoffPanel(t.e,t.give,t.get,mini?'mini':true)}<button class="btn primary" data-load="${t.give.join(',')}|${t.get.join(',')}">Open in trade builder</button></div>`}
 function renderFix(mine){
   const me=myTeam(),before=lineup(me.players,projV).total,wl=weakList(mine),focus=wl.filter((x,i)=>i===0||mine.rel[x]<0).slice(0,2);
   const faFor=pos=>POOL.filter(p=>p.pos===pos&&!OWN[p.id]).map(p=>{const drop=dropFor(p.id);return {p,drop,g:drop?lineup(me.players.filter(x=>x!==drop).concat(p.id),projV).total-before:0}}).sort((a,b)=>b.g-a.g||V.pts[b.p.id]-V.pts[a.p.id]).slice(0,2);
@@ -515,8 +528,8 @@ function renderFix(mine){
   const used=new Set(forWeak.map(t=>t.team)),other=pickDiverse(trades.filter(t=>!used.has(t.team)&&!t.get.some(id=>focus.includes(byId[id].pos))),1);
   $('fix-card').innerHTML=`<div class="fix-head"><b>${focus.join(' · ')}</b><span>${focus.length>1?'Weakest positions':'Weakest position'}: ${focus.map(x=>`${x}, ${f1(Math.abs(mine.rel[x]))} pts/wk below the league average`).join('; ')}. Recommended moves below.</span></div>
    ${focus.map(x=>{const f=faFor(x);return `<h4>Waiver options · ${x}</h4>${f.length?f.map(faRow).join(''):'<p class="empty">No waiver options improve this position.</p>'}`}).join('')}
-   <h4>Trade targets</h4>${forWeak.length?`<div class="fix-trades">${(()=>{const u=new Set();return forWeak.map(t=>tradeCardHtml(t,tradeTitle(t,focus,u)))})().join('')}</div>`:'<p class="empty">No balanced trades available for this position right now.</p>'}
-   ${other.length?`<h4>More trade options</h4><div class="fix-trades">${other.map(t=>tradeCardHtml(t,tradeTitle(t))).join('')}</div>`:''}`;
+   <h4>Trade targets</h4>${forWeak.length?`<div class="fix-trades">${(()=>{const u=new Set();return forWeak.map(t=>tradeCardHtml(t,tradeTitle(t,focus,u),true))})().join('')}</div>`:'<p class="empty">No balanced trades available for this position right now.</p>'}
+   ${other.length?`<h4>More trade options</h4><div class="fix-trades">${other.map(t=>tradeCardHtml(t,tradeTitle(t),true)).join('')}</div>`:''}`;
 }
 
 /* ===== RANKINGS ===== */
@@ -584,8 +597,8 @@ function renderRating(partner){
      :`<div><span class="note">Your lineup</span><b class="${cls(e.myLG)}">${sgn(e.myLG)}/wk</b></div><div><span class="note">${esc(partner.name)} lineup</span><b class="${cls(e.thLG)}">${sgn(e.thLG)}/wk</b></div>`}</div>
    ${playoffPanel(e,TD.give,TD.get,false)}
    ${hm?`<table class="bd"><thead><tr><th>Your score · ${esc(MODE_TXT[e.mode])}</th><th class="r">Pts</th></tr></thead><tbody>
-      ${row('Lineup change, all remaining weeks',P.L,`${sgn(e.myLG)}/wk incl. bench insurance`)}${row('Playoff weeks lineup change',P.P,`${sgn(e.you.po)}/wk in Weeks ${poWeeks()[0]}–${poWeeks().slice(-1)[0]}`)}
-      ${row('Playoff odds',P.PO,`${sgn(e.dPO)} pts`)}${row('Title odds',P.T,`${sgn(e.dT)} pts`)}${e.mode!=='contender'?row('Upside',P.U)+row('Sell high / buy low',P.SH):''}${row('Injury and stacking risk',P.R)}</tbody>
+      ${row(`Next ${Math.max(0,((S.real&&S.real.regWeeks)||14)-WEEK+1)} weeks (regular season)`,P.N,`${sgn(e.you.reg)}/wk`)}${row('Lineup change, all remaining weeks',P.L,`${sgn(e.myLG)}/wk incl. bench insurance`)}${row('Playoff weeks lineup change',P.P,`${sgn(e.you.po)}/wk in Weeks ${poWeeks()[0]}–${poWeeks().slice(-1)[0]}`)}
+      ${row('Playoff odds',P.PO,`${sgn(e.dPO)} pts`)}${row('Title odds',P.T,`${sgn(e.dT)} pts`)}${P.U||P.SH?row('Upside',P.U)+row('Sell high / buy low',P.SH):''}${row('Injury and stacking risk',P.R)}</tbody>
       <tfoot><tr><td>Your score</td><td class="r num">${sgn(e.youNet)}</td></tr></tfoot></table>
      <table class="bd"><thead><tr><th>Would ${esc(partner.name)} accept?</th><th class="r">Pts</th></tr></thead><tbody>
       ${row('Market value they get',.55*(e.mIn-e.mOut),Object.keys(marketTable().srcs).join(' / ')||'projections')}${row('Their lineup change',.45*e.thLG,`${sgn(e.thLG)}/wk`)}${e.fillsNeed?row('Fills one of their needs',.6):''}</tbody>
@@ -596,14 +609,14 @@ function renderRating(partner){
    <p class="formula">${hm?`<b>How the Trade Score works</b> (redraft). <b>1 · Player value:</b> rest-of-season points per game in your scoring × the chance he plays each week (injury status; players on IR, PUP or suspended count 0 until an estimated return week, then full value) × that week's matchup. Fantasy playoff weeks ${poWeeks()[0]}–${poWeeks().slice(-1)[0]} count ${PO_WT}x.
      <b>2 · Your team:</b> the week-by-week change in your best starting lineup (bench players who never start add almost nothing), plus bench insurance (a backup's points × the chance the starter misses), plus the best free agent you could add with a spot freed in a 2-for-1.
      <b>3 · Would they accept:</b> the market value they get, blended from FantasyCalc, KeepTradeCut and FantasyPros, plus their own lineup change and a bonus if the deal fills one of their needs.
-     <b>4 · Final score:</b> your change in playoff odds and title odds from the Season Sim, plus your Weeks ${poWeeks()[0]}–${poWeeks().slice(-1)[0]} points with matchups, weighted by your team mode (contenders weight title odds and playoff weeks most; long shots weight upside and selling high), minus risk from injury-prone players and stacking one NFL team. Grades run A+ to F; the bar compares your score with theirs.
+     <b>4 · Final score:</b> your change in playoff odds and title odds from the Season Sim, plus your Weeks ${poWeeks()[0]}–${poWeeks().slice(-1)[0]} points with matchups, weighted by where your team stands (behind but alive: winning the next few weeks and getting in count most; on the bubble: a balance; comfortably in: playoff weeks and title odds; nearly out: upside and selling high), minus risk from injury-prone players and stacking one NFL team. Grades run A+ to F; the bar compares your score with theirs.
      <span class="mkt-src">${esc(marketLabel())}.</span>`
      :`<b>How points per week works.</b> It compares how much each team's best starting lineup gains or loses per week over the rest of the season, with injuries and matchups included. It ignores market value, playoff odds and risk.`}</p>`;
 }
 
 /* ===== HUB ===== */
 let hubSel=null,shotState=null;
-function renderHub(){
+function renderHub(){renderLeagueList();
   $('hub-kicker').textContent=`${S.league.name||'My League'} · ${S.teams.length} teams`;
   const st=teamStats();if(!hubSel||!teamById(hubSel))hubSel=S.me;
   const pr=powerRanks();
@@ -807,17 +820,17 @@ function simulate(over){
   const P0=realPlayed();ids.forEach(t=>{M[t]={};for(let w=Math.min(P0,PLAYED)+1;w<=17;w++)M[t][w]=weekLine(pl(t),w,over&&over[t]?null:t)});
   const r=mulberry32(90210);let spare=null;
   const z=()=>{if(spare!==null){const x=spare;spare=null;return x}let u=0;while(u===0)u=r();const v=r(),m=Math.sqrt(-2*Math.log(u));spare=m*Math.sin(2*Math.PI*v);return m*Math.cos(2*Math.PI*v)};
-  const PT=(S.real&&S.real.playoffTeams)||(ids.length>=10?6:ids.length>=6?4:2),P=Math.min(PT,ids.length),BP=P>=6?6:P>=4?4:2,out={P};ids.forEach(t=>out[t]={wins:0,playoff:0,bye:0,title:0});
+  const PT=(S.real&&S.real.playoffTeams)||(ids.length>=10?6:ids.length>=6?4:2),P=Math.min(PT,ids.length),BP=P>=6?6:P>=4?4:2,out={P,P0,samples:[]};ids.forEach(t=>out[t]={wins:0,playoff:0,bye:0,title:0,seed:ids.map(()=>0)});
   const play=(a,b,w)=>M[a][w].m+M[a][w].sd*z()>=M[b][w].m+M[b][w].sd*z()?a:b;
-  for(let s=0;s<N_SIM;s++){const W={},PF={};ids.forEach(t=>{W[t]=rec[t].w+rec[t].t/2;PF[t]=rec[t].pf});
-    for(let w=P0+1;w<=REG_WEEKS;w++)(sched[w]||[]).forEach(([a,b])=>{if(!a||!b)return;const x=M[a][w].m+M[a][w].sd*z(),y=M[b][w].m+M[b][w].sd*z();PF[a]+=x;PF[b]+=y;if(x>=y)W[a]++;else W[b]++});
-    const seeds=[...ids].sort((a,b)=>W[b]-W[a]||PF[b]-PF[a]),po=seeds.slice(0,BP);ids.forEach(t=>out[t].wins+=W[t]);seeds.slice(0,P).forEach(t=>out[t].playoff++);
+  for(let s=0;s<N_SIM;s++){const W={},PF={},traj=s<5?{[P0]:{}}:null;ids.forEach(t=>{W[t]=rec[t].w+rec[t].t/2;PF[t]=rec[t].pf;if(traj)traj[P0][t]=W[t]});
+    for(let w=P0+1;w<=REG_WEEKS;w++){(sched[w]||[]).forEach(([a,b])=>{if(!a||!b)return;const x=M[a][w].m+M[a][w].sd*z(),y=M[b][w].m+M[b][w].sd*z();PF[a]+=x;PF[b]+=y;if(x>=y)W[a]++;else W[b]++});if(traj)traj[w]=Object.fromEntries(ids.map(t=>[t,W[t]]))}
+    const seeds=[...ids].sort((a,b)=>W[b]-W[a]||PF[b]-PF[a]),po=seeds.slice(0,BP);ids.forEach(t=>out[t].wins+=W[t]);seeds.forEach((t,i)=>out[t].seed[i]++);if(traj)out.samples.push({traj,seeds});seeds.slice(0,P).forEach(t=>out[t].playoff++);
     let champ;
     if(BP===6){out[po[0]].bye++;out[po[1]].bye++;const a=play(po[2],po[5],15),b=play(po[3],po[4],15),low=seeds.indexOf(a)>seeds.indexOf(b)?a:b,high=low===a?b:a;champ=play(play(po[0],low,16),play(po[1],high,16),17)}
     else if(BP===4)champ=play(play(po[0],po[3],16),play(po[1],po[2],16),17);
     else champ=play(po[0],po[1],17);
     out[champ].title++}
-  ids.forEach(t=>{const o=out[t];o.wins/=N_SIM;o.playoff/=N_SIM;o.bye/=N_SIM;o.title/=N_SIM});
+  ids.forEach(t=>{const o=out[t];o.wins/=N_SIM;o.playoff/=N_SIM;o.bye/=N_SIM;o.title/=N_SIM;o.seed=o.seed.map(x=>x/N_SIM)});
   SIM_CACHE[key]=out;return out}
 function oddsLineOld(t){const me=myTeam(),T=teamById(t.team),sb=simulate(),sa=simulate({[S.me]:me.players.filter(x=>!t.give.includes(x)).concat(t.get),[t.team]:T.players.filter(x=>!t.get.includes(x)).concat(t.give)});
   if(!sb||!sa)return '';const d=sa[S.me].playoff-sb[S.me].playoff;return `<p class="why odds">Playoff odds ${pct(sb[S.me].playoff)} → ${pct(sa[S.me].playoff)} (${d>=0?'+':''}${Math.round(d*100)} pts) in Season Sim</p>`}
@@ -843,21 +856,49 @@ function renderMatchup(){const el=$('matchup');const oid=oppOf(S.me,WEEK);
    <div class="mu-bar"><i style="width:${pw*100}%;background:${teamColor(S.me)}"></i><i style="width:${(1-pw)*100}%;background:${versusColor(teamColor(S.me),teamColor(oid))}"></i></div>
    <div class="mu-swing">${kp(keyP(A.lu,Bm.lu),'Your key player')}${kp(keyP(Bm.lu,A.lu),'Their key player')}</div>
    <details class="mu-details"><summary>Position-by-position comparison</summary><div class="mu-table"><table><thead><tr><th>You</th><th class="r">${anyLive?'Pts':'Proj'}</th><th style="text-align:center">Slot</th><th>${anyLive?'Pts':'Proj'}</th><th>${esc(O.name)}</th></tr></thead><tbody>${rows}</tbody></table></div></details>`}
+var REPLAY={s:0,w:null,timer:null};
+function dialSvg(x){const r=86,c=Math.PI*r,len=c*Math.max(0,Math.min(1,x));
+  return `<svg viewBox="0 0 200 116" class="dial" aria-hidden="true"><path d="M14 104 A86 86 0 0 1 186 104" class="dial-bg"/><path d="M14 104 A86 86 0 0 1 186 104" class="dial-fg" style="stroke-dasharray:${len} ${c}"/></svg>`}
+function seedBars(o,P,n){const mx=Math.max(...o.seed,.01);return `<div class="seedwrap"><div class="seedbars" title="How often they finish in each spot">${o.seed.map((x,i)=>`<i class="${i<P?'in':''}" style="height:${Math.max(4,x/mx*100)}%"></i>`).join('')}</div><div class="seedax"><span>1st</span><span>${n}th</span></div></div>`}
 function renderSeason(){
   const sim=simulate(),me=S.me;$('season-kicker').textContent=`${S.league.name||'My League'} · ${N_SIM.toLocaleString()} simulated seasons`;
-  if(!sim){$('season-tiles').innerHTML='';$('sim-body').innerHTML='<tr><td colspan="7" class="empty">Add at least two teams in League Hub.</td></tr>';$('road').innerHTML='';return}
-  const rec=records(),o=sim[me],ids=S.teams.map(T=>T.id),bar=x=>`<div class="pbar"><i class="${x>=.66?'hi':x>=.33?'mid':'lo'}" style="width:${x*100}%"></i><span>${pct(x)}</span></div>`;
-  $('season-tiles').innerHTML=`<div class="tile hot"><div class="lab">Playoff odds</div><div class="val">${pct(o.playoff)}</div><div class="sub">Top ${sim.P} of ${ids.length} make it</div></div>
-   <div class="tile"><div class="lab">Title odds</div><div class="val">${pct(o.title)}</div><div class="sub">Win the Week 17 final</div></div>
-   <div class="tile"><div class="lab">Record now</div><div class="val">${recTxt(me)}</div><div class="sub">${f1(rec[me].pf)} points for</div></div>
-   <div class="tile"><div class="lab">Projected finish</div><div class="val">${o.wins.toFixed(1)}-${(REG_WEEKS-o.wins).toFixed(1)}</div><div class="sub">Average record after Week ${REG_WEEKS}</div></div>`;
-  $('sim-body').innerHTML=ids.map(t=>{const T=teamById(t),r=rec[t],x=sim[t];return `<tr class="${t===me?'me-row':''}"><td data-v="${esc(T.name.toLowerCase())}"><span class="owner${t===me?' me':''}"><i style="background:${teamColor(t)}"></i>${esc(T.name)}${t===me?' (you)':''}</span></td><td class="r num" data-v="${r.w+r.t/2+r.pf/1e5}">${recTxt(t)}</td><td class="r num">${f1(r.pf)}</td><td class="r num">${x.wins.toFixed(1)}</td><td data-v="${x.playoff}">${bar(x.playoff)}</td><td data-v="${x.bye}">${sim.P===6?bar(x.bye):'<span class="note">-</span>'}</td><td data-v="${x.title}">${bar(x.title)}</td></tr>`}).join('');
-  sortTable('sim-table');
-  $('sim-note').textContent=`Weeks 1 to ${PLAYED} use real 2026 scores; Weeks ${PLAYED+1} to ${REG_WEEKS} and the playoffs are simulated from projected lineups, byes and matchups. ${sim.P===6?'Seeds 1 and 2 get a first-round bye.':''}`;
+  if(!sim){$('sim-hero').innerHTML='<div class="card"><p class="empty" style="margin:0">Add at least two teams in League Hub.</p></div>';$('sim-race').innerHTML=$('sim-replay').innerHTML=$('road').innerHTML='';return}
+  const rec=records(),o=sim[me],ids=S.teams.map(T=>T.id),n=ids.length,P=sim.P,ord=[...ids].sort((a,b)=>sim[b].playoff-sim[a].playoff||sim[b].wins-sim[a].wins),myRank=ord.indexOf(me)+1;
+  const tone=o.playoff>=.6?'good':o.playoff>=.3?'mid':'bad',left=REG_WEEKS-(sim.P0||PLAYED);
+  /* hero: dial */
+  $('sim-hero').innerHTML=`<div class="card sim-hero"><div class="dial-wrap ${tone}">${dialSvg(o.playoff)}<div class="dial-num"><b>${pct(o.playoff)}</b><span>playoff odds</span></div></div>
+    <div class="sim-sum"><div class="kicker">${esc(myTeam().name)} · ${recTxt(me)}</div><h2>${o.playoff>=.75?'In good shape':o.playoff>=.45?'On the bubble':o.playoff>=.08?'Behind, but alive':'Long shot'}</h2>
+      <p>${myRank}${['st','nd','rd'][myRank-1]||'th'} best playoff odds in the league. The top ${P} of ${n} make it${P===6?', and seeds 1 and 2 get a bye':''}. ${left>0?`${left} regular-season week${left>1?'s':''} left.`:'Regular season is over.'}</p>
+      <div class="sim-stats"><div><b>${pct(o.title)}</b><span>Title odds</span></div><div><b>${o.wins.toFixed(1)}-${(REG_WEEKS-o.wins).toFixed(1)}</b><span>Projected record</span></div>${P===6?`<div><b>${pct(o.bye)}</b><span>First-round bye</span></div>`:''}<div><b>${f1(rec[me].pf)}</b><span>Points for</span></div></div></div></div>`;
+  /* race: team cards ordered by odds with the playoff line */
+  $('sim-race').innerHTML=`<div class="card-h"><h2>Playoff race</h2><span class="note">Ordered by playoff odds · bars show where each team tends to finish</span></div>
+    <div class="race">${ord.map((t,i)=>{const T=teamById(t),x=sim[t];return `${i===P?`<div class="cut"><span>Playoff line · top ${P}</span></div>`:''}
+      <div class="rcard${t===me?' me':''}" style="--tc:${teamColor(t)}"><div class="rc-top"><span class="rc-rank">${i+1}</span><div class="rc-name"><b>${esc(T.name)}${t===me?' <em>you</em>':''}</b><span>${recTxt(t)} · ${f1(rec[t].pf)} pts</span></div>
+        <div class="rc-odds"><b>${pct(x.playoff)}</b><span>playoffs</span></div></div>
+        <div class="rc-bot">${seedBars(x,P,n)}<div class="rc-mini"><span><b>${pct(x.title)}</b> title</span><span><b>${x.wins.toFixed(1)}</b> proj. wins</span></div></div></div>`}).join('')}</div>
+    <p class="note" style="margin:12px 0 0">Weeks 1 to ${sim.P0||PLAYED} use real results; the rest of the regular season and the playoffs are simulated ${N_SIM.toLocaleString()} times from projected lineups, byes and matchups.</p>`;
+  renderReplay(sim);
   let road='';for(let w=WEEK;w<=REG_WEEKS;w++){const oid=oppOf(me,w);if(!oid)continue;const A=weekLine(myTeam().players,w,me),Bm=weekLine(teamById(oid).players,w,oid),p=Phi((A.m-Bm.m)/Math.sqrt(A.sd**2+Bm.sd**2));
-    road+=`<div class="road-row"><span class="slot">Wk ${w}</span><span class="owner"><i style="background:${teamColor(oid)}"></i>${esc(teamById(oid).name)}</span><span class="note">${recTxt(oid)}</span><span class="wp ${p>=.6?'good':p<.4?'bad':''}">${pct(p)}</span></div>`}
+    road+=`<div class="road-row"><span class="slot">Wk ${w}</span><span class="owner"><i style="background:${teamColor(oid)}"></i>${esc(teamById(oid).name)}</span><span class="note">${recTxt(oid)}</span><div class="road-bar"><i class="${p>=.6?'good':p<.4?'bad':''}" style="width:${p*100}%"></i></div><span class="wp ${p>=.6?'good':p<.4?'bad':''}">${pct(p)}</span></div>`}
   $('road').innerHTML=road||'<p class="empty">Regular season is over.</p>';
 }
+/* replay: watch one simulated season unfold week by week */
+function renderReplay(sim){sim=sim||simulate();const el=$('sim-replay');if(!sim||!sim.samples.length){el.innerHTML='';return}
+  const smp=sim.samples[REPLAY.s%sim.samples.length],weeks=Object.keys(smp.traj).map(Number).sort((a,b)=>a-b),w=REPLAY.w==null||!weeks.includes(REPLAY.w)?weeks[weeks.length-1]:REPLAY.w;
+  const W=smp.traj[w],ids=Object.keys(W),P=sim.P,mx=Math.max(1,...Object.values(smp.traj[weeks[weeks.length-1]]));
+  const ord=[...ids].sort((a,b)=>W[b]-W[a]||(smp.seeds.indexOf(a)-smp.seeds.indexOf(b)));
+  el.innerHTML=`<div class="card-h"><h2>Replay a season</h2><span class="note">One of the ${N_SIM.toLocaleString()} simulated seasons, week by week</span></div>
+    <div class="rp-ctl"><div class="seg">${sim.samples.map((_,i)=>`<button data-rps="${i}" aria-pressed="${i===REPLAY.s%sim.samples.length}"><span class="rp-s">Season </span>${i+1}</button>`).join('')}</div>
+      <button class="btn small" id="rp-play">${REPLAY.timer?'Pause':'▶ Play'}</button>
+      <input type="range" id="rp-week" min="${weeks[0]}" max="${weeks[weeks.length-1]}" value="${w}" aria-label="Week"><b class="rp-wk">${w===weeks[0]?'Today':'After Week '+w}</b></div>
+    <div class="rp-bars">${ord.map((t,i)=>`${i===P?'<div class="rp-cut"><span>Playoff line</span></div>':''}<div class="rp-row${t===S.me?' me':''}"><span class="rp-name">${esc(teamById(t).name)}</span><div class="rp-track"><i style="width:${W[t]/mx*100}%;background:${teamColor(t)}"></i></div><b>${W[t]%1?W[t].toFixed(1):W[t]}</b></div>`).join('')}</div>
+    ${w===weeks[weeks.length-1]?`<p class="note" style="margin:10px 0 0">${smp.seeds.slice(0,P).includes(S.me)?`You make the playoffs as the ${smp.seeds.indexOf(S.me)+1}${['st','nd','rd'][smp.seeds.indexOf(S.me)]||'th'} seed in this one.`:'You miss the playoffs in this one.'}</p>`:''}`}
+document.addEventListener('click',e=>{const t=e.target;if(!t.closest)return;
+  const b=t.closest('[data-rps]');if(b){REPLAY.s=+b.dataset.rps;REPLAY.w=null;stopReplay();renderReplay();return}
+  if(t.id==='rp-play'){if(REPLAY.timer){stopReplay();renderReplay();return}const sim=simulate(),smp=sim.samples[REPLAY.s%sim.samples.length],weeks=Object.keys(smp.traj).map(Number).sort((a,b)=>a-b);
+    let i=0;REPLAY.w=weeks[0];REPLAY.timer=setInterval(()=>{i++;if(i>=weeks.length||tab!=='season'){stopReplay();renderReplay();return}REPLAY.w=weeks[i];renderReplay()},650);renderReplay()}});
+document.addEventListener('input',e=>{if(e.target.id==='rp-week'){stopReplay();REPLAY.w=+e.target.value;renderReplay()}});
+function stopReplay(){if(REPLAY.timer){clearInterval(REPLAY.timer);REPLAY.timer=null}}
 
 /* ===== Platform import ===== */
 const SEASON=2026;let IMP={status:'',html:''};
@@ -961,7 +1002,8 @@ async function espnImport(id,creds){
   catch(e){impMsg(`<p class="note" style="color:var(--bad)">Couldn't read that ESPN league (${esc(e.message)}).</p>`)}
 }
 function applyImport(name,teams,sc,slots,src,real){
-  let miss=0;S.league.name=name;S.league.sc={...S.league.sc,...sc};S.league.slots={...S.league.slots,...slots};S.league.teams=teams.length;
+  saveCurrentLeague();const key=real&&real.src?real.src.type+':'+real.src.league:'import:'+name,prev=(S.leagues||[]).find(x=>x.key===key);
+  let miss=0;S.league={...S.league,name,sc:{...BASE_SC,...((prev&&prev.snap.league.sc)||{}),...sc},slots:{...BASE_SLOTS,...slots}};S.league.teams=teams.length;
   teams.forEach(t=>t.names.forEach(x=>{if(typeof x==='object'&&!findExact(x.n,x.pos))addExtraPlayer(x.n,x.pos,x.t)}));setPool();
   S.teams=teams.map((t,i)=>({id:'t'+(i+1),name:t.name,players:[...new Set(t.names.map(x=>{const p=typeof x==='object'?findExact(x.n,x.pos,x.t):findExact(x);if(!p)miss++;return p&&p.id}).filter(Boolean))]}));
   if(real){const tid=i=>S.teams[i]&&S.teams[i].id,mapW=o=>{const r={};for(const w in o)r[w]=o[w].map(([a,b])=>[tid(a),b==null?null:tid(b)]);return r},mapT=o=>{const r={};for(const k in o)r[tid(+k)]=o[k];return r};
@@ -969,7 +1011,9 @@ function applyImport(name,teams,sc,slots,src,real){
     const src=real.src?{...real.src,rid:Object.fromEntries(Object.entries(real.src.rid).map(([rid,i])=>[rid,tid(i)]))}:null;
     PLAT=null;S.real={at:Date.now(),regWeeks:real.regWeeks,playoffTeams:real.playoffTeams,played:real.played,rec:mapT(real.rec),sched:mapW(real.sched),scores,src,lineupWeek:real.lineupWeek||null,lineups:real.lineups?mapT(real.lineups):null}}else S.real=null;SCHED=null;LIVE_LU=null;
   if(S.real&&S.real.src)setTimeout(syncNow,0);
-  const mi=teams.findIndex(t=>t.mine);S.me=S.teams[mi>=0?mi:0].id;S.log=[];S.example=false;S.imported={name,src};S.onboarded=true;IMP.open=undefined;hubSel=S.me;bump();buildLeagueForm();toast('Imported '+name);if(location.hash!=='#team')location.hash='team';else render();window.scrollTo({top:0,behavior:'smooth'});
+  let mi=teams.findIndex(t=>t.mine);
+  if(mi<0&&prev&&prev.meRef!=null&&S.real&&S.real.src){const t=S.real.src.rid[prev.meRef];const k=S.teams.findIndex(x=>x.id===t);if(k>=0)mi=k}
+  S.me=S.teams[mi>=0?mi:0].id;S.log=prev&&prev.snap.log||[];S.example=false;S.imported={name,src};S.leagueKey=key;upsertLeague();S.onboarded=true;IMP.open=undefined;hubSel=S.me;bump();buildLeagueForm();toast('Imported '+name);if(location.hash!=='#team')location.hash='team';else render();window.scrollTo({top:0,behavior:'smooth'});
   impMsg(`<div class="callout buy"><b>Imported ${esc(name)}.</b> ${teams.length} teams and your scoring are loaded.${miss?` ${miss} players aren't in TradeMetric's player list yet and were skipped.`:''}${mi<0?' Pick your team in Team rosters and press "This is my team".':''}</div>`)}
 
 /* ===== AI scouting report ===== */
@@ -1075,7 +1119,7 @@ $('theme-btn').addEventListener('click',()=>{themePref=isDark()?'light':'dark';t
 const TABS=['team','feed','trade','rankings','hub','season','helper','league','welcome','signin'];let tab='team';
 function go(t){if(!USER&&t!=='signin')t='signin';tab=TABS.includes(t)?t:'team';if(tab!=='welcome'&&S&&!S.onboarded){S.onboarded=true;save()}document.querySelectorAll('.nav button').forEach(b=>{if(b.dataset.tab===tab)b.setAttribute('aria-current','page');else b.removeAttribute('aria-current')});
   TABS.forEach(x=>$('v-'+x).hidden=x!==tab);render();window.scrollTo(0,0)}
-function render(){({team:renderTeam,rankings:renderRankings,trade:renderTrade,hub:renderHub,season:renderSeason,helper:renderHelper,welcome:renderWelcome,league:fillLeagueForm,signin:renderSignin,feed:renderFeed})[tab]();if(openId&&!$('scrim').hidden)openCard(openId)}
+function render(){({team:renderTeam,rankings:renderRankings,trade:renderTrade,hub:renderHub,season:renderSeason,helper:renderHelper,welcome:renderWelcome,league:fillLeagueForm,signin:renderSignin,feed:renderFeed})[tab]();if(openId&&!$('scrim').hidden)openCard(openId);queueBalance()}
 document.querySelectorAll('.nav button').forEach(b=>b.addEventListener('click',()=>{location.hash=b.dataset.tab}));
 window.addEventListener('hashchange',()=>{closeCard();go(location.hash.slice(1))});
 function loadTrade(str){const [g,r]=str.split('|');TD.give=g?g.split(','):[];TD.get=r?r.split(','):[];closeCard();if(tab==='trade')renderTrade();else location.hash='trade';setTimeout(()=>$('rating').scrollIntoView({behavior:'smooth',block:'center'}),60)}
@@ -1098,7 +1142,7 @@ document.addEventListener('click',e=>{
     if(!s2.trim()||!swid.trim()){toast('Paste both codes first');return}const c={s2:s2.trim(),swid:swid.trim()};
     try{if(rem)localStorage.setItem(ESPN_KEY,JSON.stringify(c));else localStorage.removeItem(ESPN_KEY)}catch(e){}espnImport(d.espnPrivate,c)}
   else if(d.espnForget){try{localStorage.removeItem(ESPN_KEY)}catch(e){}impMsg(espnPrivateForm(IMP.espnId||''));toast('ESPN codes forgotten')}
-  else if(t.id==='set-me'){S.me=hubSel;S.example=false;bump();toast(teamById(S.me).name+' is now your team')}
+  else if(t.id==='set-me'){S.me=hubSel;S.example=false;upsertLeague();bump();toast(teamById(S.me).name+' is now your team')}
   else if(d.assignMe){assign(d.assignMe,S.me);toast('Added '+byId[d.assignMe].n);render()}
   else if(d.unassign){const n=byId[d.unassign].n;assign(d.unassign,null);toast('Removed '+n);render()}
   else if(d.give){TD.give=TD.give.includes(d.give)?TD.give.filter(x=>x!==d.give):[...TD.give,d.give];renderTrade()}
@@ -1145,7 +1189,7 @@ $('wl-skip').addEventListener('click',()=>{S.onboarded=true;save();location.hash
 $('wl-hand').addEventListener('click',()=>{freshLeague(+$('wl-teams').value);location.hash='hub';toast('Empty league ready. Add players to each team.')});
 $('wl-shot').addEventListener('change',e=>{const f=e.target.files[0];if(!f)return;freshLeague(+$('wl-teams').value);location.hash='hub';go('hub');readScreenshot(f);e.target.value=''});
 $('hist-clear').addEventListener('click',()=>{S.chat=[];save();renderHelper()});
-$('load-sample').addEventListener('click',()=>{S.imported=null;S.real=null;SCHED=null;S.league.teams=S.league.teams||12;exampleLeague();hubSel=S.me;shotState=null;render();toast('Sample league loaded')});
+$('load-sample').addEventListener('click',()=>{saveCurrentLeague();S.leagueKey='sample';S.imported=null;S.real=null;SCHED=null;S.league.teams=S.league.teams||12;exampleLeague();upsertLeague();save();leagueSwitcher();hubSel=S.me;shotState=null;render();toast('Sample league loaded')});
 $('clear-league').addEventListener('click',()=>{S.teams.forEach(T=>{if(T.id!==S.me)T.players=[]});S.example=false;bump();toast('Other rosters cleared. Your team was kept.')});
 $('v-league').addEventListener('input',e=>{const i=e.target;
   if(i.dataset.sc!==undefined){const v=parseFloat(i.value);if(isNaN(v))return;S.league.sc[i.dataset.sc]=v}
@@ -1449,3 +1493,70 @@ function renderFollowPage(){const ft=S.followTeams||[],fp=(S.following||[]).filt
   if(FOL_Q){const i=$('fol-search');i.focus();i.setSelectionRange(FOL_Q.length,FOL_Q.length)}}
 document.addEventListener('input',e=>{if(e.target.id==='fol-search'){FOL_Q=e.target.value;$('fol-results').innerHTML=folSearchHtml()}});
 var RANK_ALL=false;document.addEventListener('click',e=>{if(e.target.id==='rank-all'){RANK_ALL=true;renderRankings()}});
+
+/* ===== Saved leagues: every league you import is kept (with your team) and you can switch between them ===== */
+/* function declarations (hoisted) so save() can use them during startup */
+function lkeys(){return ['league','teams','me','log','real','imported','example','extraPlayers']}
+function clone(x){return x==null?x:JSON.parse(JSON.stringify(x))}
+function leagueKeyOf(){return S.real&&S.real.src?S.real.src.type+':'+S.real.src.league:S.example?'sample':'custom'}
+function meRefOf(){const src=S.real&&S.real.src;if(!src)return null;const k=Object.keys(src.rid||{}).find(r=>src.rid[r]===S.me);return k??null}
+function upsertLeague(){S.leagues=S.leagues||[];if(!S.leagueKey)S.leagueKey=leagueKeyOf();const snap={};lkeys().forEach(k=>snap[k]=clone(S[k]));
+  const e={key:S.leagueKey,name:(S.league&&S.league.name)||'My League',src:S.imported?S.imported.src:S.example?'Sample':'Manual',meRef:meRefOf(),snap,at:Date.now()};
+  const i=S.leagues.findIndex(x=>x.key===e.key);if(i>=0)S.leagues[i]=e;else{S.leagues.push(e);setTimeout(leagueSwitcher,0)}}
+function saveCurrentLeague(){if(S&&S.teams&&S.teams.length)upsertLeague()}
+function switchLeague(key){if(key===S.leagueKey)return;saveCurrentLeague();const e=(S.leagues||[]).find(x=>x.key===key);if(!e)return;
+  lkeys().forEach(k=>S[k]=clone(e.snap[k]));if(!S.league.sc)S.league.sc={...BASE_SC};S.league.sc={...BASE_SC,...S.league.sc};S.leagueKey=key;
+  setPool();SCHED=null;LIVE_LU=null;PLAT=null;REC_CACHE={v:-1};TD.give=[];TD.get=[];hubSel=S.me;shotState=null;save();recompute();buildLeagueForm();render();leagueSwitcher();toast(`Switched to ${e.name}`);setTimeout(syncNow,0)}
+function removeLeague(key){if(!confirmRemove(key))return;S.leagues=(S.leagues||[]).filter(x=>x.key!==key);save();renderLeagueList();leagueSwitcher();toast('League removed')}
+function confirmRemove(key){if(key===S.leagueKey){toast('Switch to another league before removing this one');return false}return true}
+function leagueSwitcher(){const el=$('league-switch');if(!el)return;const L=S.leagues||[];el.hidden=L.length<2;
+  el.innerHTML=L.map(x=>`<option value="${esc(x.key)}" ${x.key===S.leagueKey?'selected':''}>${esc(x.name)}${x.src&&x.src!=='Manual'?` · ${esc(x.src)}`:''}</option>`).join('')+'<option value="__add">+ Import another league</option>'}
+function renderLeagueList(){const el=$('league-list');if(!el)return;const L=S.leagues||[];
+  el.innerHTML=`<div class="card-h"><h2>Your leagues</h2><span class="note">${L.length} saved to your account</span></div>${L.map(x=>{const me=x.snap&&x.snap.teams&&x.snap.teams.find(t=>t.id===x.snap.me);
+    return `<div class="lg-row${x.key===S.leagueKey?' on':''}"><div><b>${esc(x.name)}</b><span class="note">${esc(x.src||'')}${me?` · your team: ${esc(me.name)}`:''}</span></div>${x.key===S.leagueKey?'<span class="lg-cur">Current</span>':`<button class="btn small" data-lswitch="${esc(x.key)}">Switch</button><button class="btn small ghost" data-lremove="${esc(x.key)}" aria-label="Remove ${esc(x.name)}">Remove</button>`}</div>`}).join('')}
+    <p class="note" style="margin:10px 0 0">Import another league below and it's added here. Each league keeps its own scoring, rosters, trade log and your team.</p>`}
+document.addEventListener('change',e=>{if(e.target.id!=='league-switch')return;const v=e.target.value;if(v==='__add'){leagueSwitcher();location.hash='hub';setTimeout(()=>{IMP.open=true;renderImport();const c=$('import-card');if(c)c.scrollIntoView({behavior:'smooth'})},50);return}switchLeague(v)});
+document.addEventListener('click',e=>{const t=e.target;if(!t.closest)return;const sw=t.closest('[data-lswitch]');if(sw){switchLeague(sw.dataset.lswitch);return}const rm=t.closest('[data-lremove]');if(rm)removeLeague(rm.dataset.lremove)});
+/* first run: register the league already loaded */
+if(!S.leagues||!S.leagues.length){S.leagueKey=leagueKeyOf();upsertLeague();save()}else if(!S.leagueKey)S.leagueKey=leagueKeyOf();
+leagueSwitcher();
+
+/* ===== Even desktop columns: move "float" cards to the shorter column, size fill boxes ===== */
+var BAL=0;
+function balanceCols(){
+  document.querySelectorAll('[data-float]').forEach((c,i)=>{if(!c._home){c._home=c.parentNode;c._ord=i}});
+  const grids=[...document.querySelectorAll('.view:not([hidden]) .grid2')].filter(g=>g.children.length===2);
+  const wide=innerWidth>900;
+  for(const g of grids){
+    const cols=[...g.children];
+    // restore floats to their home column, in original order
+    const fl=[...g.querySelectorAll('[data-float]')].sort((a,b)=>a._ord-b._ord);
+    fl.forEach(c=>{if(c.parentNode!==c._home)c._home.appendChild(c)});
+    fl.filter(c=>c._home.lastElementChild!==c).forEach(c=>c._home.appendChild(c));
+    const fills=[...g.querySelectorAll('[data-fill]')];fills.forEach(f=>{f.style.maxHeight='';if(f.tagName==='TEXTAREA')f.style.height=''});
+    cols.forEach(c=>c.style.rowGap='');
+    if(!wide)continue;
+    const bot=c=>c.getBoundingClientRect().bottom;
+    for(let k=0;k<4;k++){
+      const [a,b]=cols;const d=bot(a)-bot(b);const T=d>0?a:b,Sh=d>0?b:a,D=Math.abs(d);
+      if(!Sh.classList.contains('stack'))break;
+      let best=null,bv=D;
+      for(const c of T.querySelectorAll(':scope>[data-float]')){const h=c.getBoundingClientRect().height+22;const v=Math.abs(D-2*h);if(v<bv-8){bv=v;best=c}}
+      if(!best)break;Sh.appendChild(best);
+    }
+    for(const f of fills){
+      const mine=cols.find(c=>c.contains(f)),other=cols.find(c=>c!==mine);
+      const want=f.getBoundingClientRect().height+(bot(other)-bot(mine));
+      if(f.tagName==='TEXTAREA'){f.style.height=Math.max(+f.dataset.fill||90,want)+'px';continue}
+      f.style.maxHeight=Math.max(300,Math.min(want,f.scrollHeight+2))+'px';
+    }
+    // whatever gap is left: spread it between the cards of the shorter column
+    const d=bot(cols[0])-bot(cols[1]);const Sh=d>0?cols[1]:cols[0];
+    if(Sh.classList.contains('stack')&&Sh.children.length>1&&Math.abs(d)>4){const n=Sh.children.length-1,base=parseFloat(getComputedStyle(Sh).rowGap)||0;
+      Sh.style.rowGap=(base+Math.min(120,Math.abs(d)/n))+'px'}
+  }
+}
+function queueBalance(){cancelAnimationFrame(BAL);BAL=requestAnimationFrame(balanceCols)}
+addEventListener('resize',queueBalance);
+try{const ro=new ResizeObserver(queueBalance);document.querySelectorAll('.grid2>*').forEach(c=>ro.observe(c));
+  document.querySelectorAll('.grid2>.stack>*').forEach(c=>ro.observe(c))}catch(e){}

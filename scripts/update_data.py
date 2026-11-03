@@ -58,6 +58,9 @@ _g=pd.read_csv(D+'games.csv',low_memory=False);_g=_g[(_g.season==SEASON)&(_g.gam
 _done={int(k):bool(v) for k,v in _g.groupby('week').home_score.apply(lambda x:x.notna().all()).items()}
 PLAYED=0
 while _done.get(PLAYED+1):PLAYED+=1
+# ...and only once nflverse has posted stats for every team that played that week
+_teams=lambda wk:set(_g[_g.week==wk].home_team.map(fix))|set(_g[_g.week==wk].away_team.map(fix))
+while PLAYED>0 and not _teams(PLAYED)<=set(w[(w.week==PLAYED)&(w.season_type=='REG')].team.map(fix)):PLAYED-=1
 WEEK=PLAYED+1
 w=w[w.week<=PLAYED].copy()
 w['fl']=w[['sack_fumbles_lost','rushing_fumbles_lost','receiving_fumbles_lost']].fillna(0).sum(axis=1)
