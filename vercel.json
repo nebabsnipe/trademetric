@@ -19,7 +19,7 @@
           "value": "trademetric-rho.vercel.app"
         }
       ],
-      "destination": "https://trademetric.app/:path*",
+      "destination": "https://www.trademetric.app/:path*",
       "permanent": false
     }
   ]
