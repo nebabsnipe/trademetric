@@ -77,16 +77,51 @@ const LONG_OUT=['IR','PUP','SUS'],isOut=id=>{const s=stOf(id);return s==='O'||LO
 const grpOf=pos=>pos==='RB'?'RB':pos==='QB'?'QB':pos==='DST'?'DST':pos==='K'?'K':'REC';
 const volOf=p=>p.pos==='RB'?p.ratt+p.tgt:p.tgt;
 const hasStatusData=()=>POOL.some(p=>'status' in p);
-let BOOST={},WBOOST={},OPPS=[];
-function computeBoosts(){BOOST={};WBOOST={};OPPS=[];
+let BOOST={},WBOOST={},OPPS=[],ROLE_UP={};
+const DEPTH=DATA.depth||{},PRAC=DATA.practice||{};
+/* Injury work split. When a starter is out, his lost work does not split evenly:
+   - role: the next man up on the depth chart (or by current usage) gets the most,
+   - evidence: games this season the starter missed show who actually got the work,
+   - type of work: carries vs targets go to the backs who get them; targets go mostly to the same position (slot to slot). */
+function compUse(q,c,withoutId){const r=RAWLOG[q.id],rx=RAWLOG[withoutId];if(!r||!rx)return null;const I=c==='ratt'?6:9;let w=[0,0],wo=[0,0];
+  for(let i=0;i<Math.min(PLAYED,r.length);i++){const e=r[i],x=rx[i];if(!Array.isArray(e)||e.length<=2)continue;const out=Array.isArray(x)&&x.length===2;const v=e[I]||0;if(out){wo[0]+=v;wo[1]++}else if(Array.isArray(x)&&x.length>2){w[0]+=v;w[1]++}}
+  return {with:w[1]?w[0]/w[1]:null,without:wo[1]?wo[0]/wo[1]:null,n:wo[1]}}
+const DEPTH_W=[1,.42,.18,.08,.04];
+function computeBoosts(){BOOST={};WBOOST={};OPPS=[];const sc=S.league.sc;
   const recent=x=>{const r=RAWLOG[x.id];if(!r)return true;const last=r.slice(-3).filter(e=>e!==0);return last.filter(e=>e&&e.length>2).length>=Math.min(2,last.length)};
   POOL.filter(x=>isOut(x.id)&&x.pos!=='QB'&&volOf(x)>=(x.pos==='RB'?10:5)&&recent(x)).forEach(x=>{const long=LONG_OUT.includes(stOf(x.id));
-    const mates=POOL.filter(q=>q.t===x.t&&q.id!==x.id&&grpOf(q.pos)===grpOf(x.pos)&&!isOut(q.id)&&volOf(q)>=2),tot=mates.reduce((a,q)=>a+volOf(q),0),lost=volOf(x)*.7;if(!tot||!lost)return;
-    mates.forEach(q=>{const own=volOf(q)||.5,mult=Math.min(1.4,1+lost*(volOf(q)/tot)/own*.6);if(mult<1.1)return;const map=long?BOOST:WBOOST;map[q.id]=(map[q.id]||1)*mult;OPPS.push({id:q.id,from:x.id,mult,long})})})}
+    const mates=POOL.filter(q=>q.t===x.t&&q.id!==x.id&&grpOf(q.pos)===grpOf(x.pos)&&!isOut(q.id)&&q.pos!=='QB');if(!mates.length)return;
+    const comps=x.pos==='RB'?[['ratt',.8],['tgt',.55]]:[['tgt',.75]],gain={};mates.forEach(q=>gain[q.id]={ratt:0,tgt:0});
+    comps.forEach(([c,frac])=>{const lost=(x[c]||0)*frac;if(lost<.5)return;
+      const cand=mates.filter(q=>x.pos==='RB'?q.pos==='RB':true);if(!cand.length)return;
+      // role order: depth chart rank, then current usage
+      const rk=q=>DEPTH[q.id]?DEPTH[q.id][0]:99,ord2=L=>[...L].sort((a,b)=>(rk(a)-rk(b))||((b[c]||0)-(a[c]||0)));
+      const same=ord2(cand.filter(q=>q.pos===x.pos)),other=ord2(cand.filter(q=>q.pos!==x.pos));
+      const tot=cand.reduce((a,q)=>a+(q[c]||0),0)||1,xs=DEPTH[x.id]&&DEPTH[x.id][1];
+      const prior={};[[same,1],[other,.45]].forEach(([L,f])=>L.forEach((q,i)=>{let w=DEPTH_W[Math.min(i,4)]*f;
+        const qs=DEPTH[q.id]&&DEPTH[q.id][1];if(x.pos==='WR'&&q.pos==='WR'&&xs&&qs)w*=(xs===8)===(qs===8)?1.3:.8;
+        w*=.4+.6*Math.min(1,(q[c]||0)/tot*2);prior[q.id]=w}));
+      // evidence from games the starter missed
+      const ev={};let n=0,es=0;cand.forEach(q=>{const u=compUse(q,c,x.id);if(u&&u.without!=null&&u.with!=null){ev[q.id]=Math.max(0,u.without-u.with);n=Math.max(n,u.n);es+=ev[q.id]}});
+      const ps=Object.values(prior).reduce((a,b)=>a+b,0)||1,al=es>.5?Math.min(.7,.25*n):0;
+      cand.forEach(q=>{const w=(1-al)*prior[q.id]/ps+(al?al*(ev[q.id]||0)/es:0);gain[q.id][c]+=lost*w})});
+    const xPts=projPts(x,sc);
+    mates.forEach(q=>{const g=gain[q.id];if(g.ratt+g.tgt<.4)return;const r=k=>(q.ratt>.5?q[k]/q.ratt:0),t=k=>(q.tgt>.5?q[k]/q.tgt:0);
+      const cl=(v,d,lo,hi)=>Math.max(lo,Math.min(hi,v||d));const add={...q,ratt:q.ratt+g.ratt,ryd:q.ryd+g.ratt*cl(r('ryd'),4.1,3.4,5),rtd:q.rtd+g.ratt*cl(r('rtd'),.028,.015,.04),tgt:q.tgt+g.tgt,rec:q.rec+g.tgt*cl(t('rec'),.64,.5,.78),recyd:q.recyd+g.tgt*cl(t('recyd'),7.2,5.5,9.5),rectd:q.rectd+g.tgt*cl(t('rectd'),.04,.02,.06)};
+      const p0=Math.max(.5,projPts(q,sc));let p1=projPts(add,sc);p1=Math.min(p1,p0+xPts*.8);const mult=p1/p0;
+      if(p1-p0<.8||mult<1.06)return;const map=long?BOOST:WBOOST;map[q.id]=(map[q.id]||1)*mult;
+      OPPS.push({id:q.id,from:x.id,mult,long,dp:p1-p0,dc:g.ratt,dt:g.tgt})})});
+  // role tags: who moves up the team's pecking order at his position
+  ROLE_UP={};const byTeamPos={};POOL.forEach(p=>{if(['RB','WR','TE'].includes(p.pos))(byTeamPos[p.t+p.pos]=byTeamPos[p.t+p.pos]||[]).push(p)});
+  Object.values(byTeamPos).forEach(L=>{const base=p=>projPts(p,sc),before=[...L].sort((a,b)=>base(b)-base(a)),after=L.filter(p=>!isOut(p.id)).sort((a,b)=>base(b)*(BOOST[b.id]||1)-base(a)*(BOOST[a.id]||1));
+    after.forEach((p,i)=>{const b=before.indexOf(p);if(i<b&&i<=2&&OPPS.some(o=>o.id===p.id))ROLE_UP[p.id]={pos:p.pos,rank:i+1,was:b+1}})})}
+
+function roleTxt2(id){const r=ROLE_UP[id];if(!r)return '';return r.pos==='RB'&&r.rank===1?'Lead back now':`Moves up to ${r.pos}${r.rank}`}
+function roleTag(id){const t=roleTxt2(id);return t?`<span class="tag up" title="Was ${ROLE_UP[id].pos}${ROLE_UP[id].was} on his team before the injury">▲ ${t}</span>`:''}
 function weekMult(id){const s=stOf(id);return (s==='O'||LONG_OUT.includes(s)?0:s==='D'?.3:s==='Q'?.92:1)*(WBOOST[id]||1)}
 function matesOut(p){return POOL.filter(q=>q.t===p.t&&q.id!==p.id&&grpOf(q.pos)===grpOf(p.pos)&&isOut(q.id)&&volOf(q)>=3)}
 const stHtml=id=>{const s=stOf(id);return s?`<span class="st st-${s}" title="${ST_LABEL[s]}${byId[id].inj?': '+esc(byId[id].inj):''}">${s}</span>`:''};
-const oppTxtLine=o=>`Projected up ${Math.round((o.mult-1)*100)}% with ${byId[o.from].n} ${o.long?'on '+ST_LABEL[stOf(o.from)].toLowerCase():'out this week'}.`;
+const oppTxtLine=o=>{const pl=(n,w)=>`+${n} ${w}${n===1?'':'s'}`,w=[o.dc>=1?pl(Math.round(o.dc),'carry').replace('carrys','carries'):'',o.dt>=1?pl(Math.round(o.dt),'target'):''].filter(Boolean).join(', ');return `+${f1(o.dp)} pts a game${w?` (${w})`:''} with ${byId[o.from].n} ${o.long?'on '+ST_LABEL[stOf(o.from)].toLowerCase():'out this week'}.`};
 
 /* ===== Scoring engine ===== */
 function erf(x){const s=Math.sign(x);x=Math.abs(x);const t=1/(1+.3275911*x);return s*(1-(((((1.061405429*t-1.453152027)*t)+1.421413741)*t-.284496736)*t+.254829592)*t*Math.exp(-x*x))}
@@ -523,7 +558,7 @@ function tradeCardHtml(t,title,mini){const fr=fairness(t.give,t.get,t.team,RATE_
 function renderFix(mine){
   const me=myTeam(),before=lineup(me.players,projV).total,wl=weakList(mine),focus=wl.filter((x,i)=>i===0||mine.rel[x]<0).slice(0,2);
   const faFor=pos=>POOL.filter(p=>p.pos===pos&&!OWN[p.id]).map(p=>{const drop=dropFor(p.id);return {p,drop,g:drop?lineup(me.players.filter(x=>x!==drop).concat(p.id),projV).total-before:0}}).sort((a,b)=>b.g-a.g||V.pts[b.p.id]-V.pts[a.p.id]).slice(0,2);
-  const faRow=({p,drop,g})=>`<div class="fa-row">${plCell(p,`${p.pos}${V.posRank[p.id]} · ${f1(V.pts[p.id])} pts/G · ${oppHtml(p.id)}`)}${g>.05?`<span class="gain">+${f1(g)}/wk</span>`:'<span class="note">Depth</span>'}<button class="btn small" data-swap="${p.id}|${drop}">Swap</button>${drop?`<div class="swap">Drop <button class="pname" data-open="${drop}">${esc(byId[drop].n)}</button><span>${byId[drop].pos}${V.posRank[drop]} · ${f1(V.pts[drop])} pts/G</span></div>`:''}</div>`;
+  const faRow=({p,drop,g})=>`<div class="fa-row">${plCell(p,`${p.pos}${V.posRank[p.id]} · ${f1(V.pts[p.id])} pts/G · ${oppHtml(p.id)}${roleTag(p.id)?' '+roleTag(p.id):''}`)}${g>.05?`<span class="gain">+${f1(g)}/wk</span>`:'<span class="note">Depth</span>'}<button class="btn small" data-swap="${p.id}|${drop}">Swap</button>${drop?`<div class="swap">Drop <button class="pname" data-open="${drop}">${esc(byId[drop].n)}</button><span>${byId[drop].pos}${V.posRank[drop]} · ${f1(V.pts[drop])} pts/G</span></div>`:''}</div>`;
   const trades=allTrades(),forWeak=pickDiverse(trades.filter(t=>t.get.some(id=>focus.includes(byId[id].pos))),2);
   const used=new Set(forWeak.map(t=>t.team)),other=pickDiverse(trades.filter(t=>!used.has(t.team)&&!t.get.some(id=>focus.includes(byId[id].pos))),1);
   $('fix-card').innerHTML=`<div class="fix-head"><b>${focus.join(' · ')}</b><span>${focus.length>1?'Weakest positions':'Weakest position'}: ${focus.map(x=>`${x}, ${f1(Math.abs(mine.rel[x]))} pts/wk below the league average`).join('; ')}. Recommended moves below.</span></div>
@@ -842,7 +877,7 @@ function oddsLineOld(t){const me=myTeam(),T=teamById(t.team),sb=simulate(),sa=si
 function renderOppCard(){const el=$('opp-card');if(!el)return;
   const best=p=>Math.max(...G[p.id].opp.map(o=>o.mult)),list=POOL.filter(p=>G[p.id].opp.length).sort((a,b)=>best(b)-best(a));
   const show=[...list.filter(p=>OWN[p.id]===S.me),...list.filter(p=>!OWN[p.id])].slice(0,6);
-  el.innerHTML=`<div class="card-h"><h2>Injury opportunities</h2><span class="note">Players gaining work from teammate injuries</span></div>`+(show.length?show.map(p=>`<div class="mini-row">${plCell(p,oppTxtLine(G[p.id].opp[0]))}${OWN[p.id]===S.me?'<span class="tag mine">Yours</span>':'<span class="gain">Pickup</span>'}${OWN[p.id]?'<span></span>':`<button class="btn small" data-assign-me="${p.id}">Add</button>`}</div>`).join('')
+  el.innerHTML=`<div class="card-h"><h2>Injury opportunities</h2><span class="note">Players gaining work from teammate injuries</span></div>`+(show.length?show.map(p=>`<div class="mini-row">${plCell(p,`${roleTag(p.id)?roleTag(p.id)+' ':''}${oppTxtLine(G[p.id].opp[0])}`)}${OWN[p.id]===S.me?'<span class="tag mine">Yours</span>':'<span class="gain">Pickup</span>'}${OWN[p.id]?'<span></span>':`<button class="btn small" data-assign-me="${p.id}">Add</button>`}</div>`).join('')
    :`<p class="empty" style="margin:0">When a starter is ruled out or lands on injured reserve, the teammates who inherit his work show up here as pickups. This turns on with the live injury feed, or now if you import projections with a status column.</p>`)}
 function renderMatchup(){const el=$('matchup');const oid=oppOf(S.me,WEEK);
   if(!oid){el.innerHTML=`<div class="card-h"><h2>Week ${WEEK} matchup</h2></div><p class="empty">No opponent this week.</p>`;return}
@@ -1064,7 +1099,7 @@ function newsItems(p,g){const out=[];const s=stOf(p.id);
   g.mates.forEach(q=>out.push({t:`<b>${esc(q.n)} is ${ST_LABEL[stOf(q.id)].toLowerCase()}.</b> More ${p.pos==='RB'?'carries':'targets'} should go to ${esc(p.n)}.`}));
   g.opp.forEach(o=>out.push({t:`<b>${oppTxtLine(o)}</b> ${OWN[p.id]?'':'He is a free agent in your league.'}`}));
   if(g.role&&!g.mates.length)out.push({t:esc(g.role)});
-  out.push({q:true,t:'Full news write-ups and practice reports arrive with the live data feed.'});return out}
+  return out}
 function openCard(id){if(openId!==id)delete SORTS['log-table'];openId=id;const p=byId[id];if(!p)return;const g=G[id],sc=S.league.sc;
   const games=g.log.filter(x=>!x.bye&&!x.dnp),teamGames=g.log.filter(x=>!x.bye).length,tot=k=>sum(games,x=>x[k]),n=Math.max(1,games.length),season=sum(g.pts.filter(x=>x!==null),x=>x);
   const cols=p.pos==='K'?[['FG 0-39','k39'],['FG 40-49','k49'],['FG 50+','k50'],['MISS','kmiss'],['XP','xpm'],['XP MISS','xpmiss']]:p.pos==='DST'?[['SACK','dsk'],['INT','dint'],['FR','dfr'],['TD','dtd'],['SFTY','dsf'],['PA','pa']]:p.pos==='QB'?[['CMP','cmp'],['YDS','pyd'],['TD','ptd'],['INT','int'],['CAR','ratt'],['RYDS','ryd'],['RTD','rtd']]:p.pos==='RB'?[['CAR','ratt'],['YDS','ryd'],['TD','rtd'],['TGT','tgt'],['REC','rec'],['RYDS','recyd'],['RTD','rectd']]:[['TGT','tgt'],['REC','rec'],['YDS','recyd'],['TD','rectd']].concat(p.ratt?[['CAR','ratt'],['RUSH','ryd']]:[]);
@@ -1084,6 +1119,7 @@ function openCard(id){if(openId!==id)delete SORTS['log-table'];openId=id;const p
     ${g.risk?`<div class="callout risk"><b>Why he is a risk</b><ul class="reasons">${g.risk.map(x=>`<li>${esc(x)}</li>`).join('')}</ul></div>`:''}
     ${g.role?`<div class="callout buy"><b>Hot streak with a reason.</b> ${esc(g.role)}</div>`:''}
     <div class="msec" id="card-hl">${cardHighlights(id)}</div>
+    <div class="msec"><h4>News and practice</h4>${(()=>{const st=newsItems(p,g);return st.length?`<ul class="news">${st.map(x=>`<li><span>${x.t}</span></li>`).join('')}</ul>`:''})()}${pracHtml(id)}<div id="card-news">${newsHtml(id)}</div></div>
     <div class="msec"><h4>Scouting report</h4><div class="scout-grid">
       <div><span class="lab2">Status</span>${stOf(id)?`<b>${ST_LABEL[stOf(id)]}</b>${p.inj?`<span class="note">${esc(p.inj)}</span>`:''}`:'<b>No injury designation</b>'}<span class="note">${S.custom?'From your imported data':`From the Week ${DATA.injWeek} injury report`}</span></div>
       <div><span class="lab2">Injury history</span><b>Played ${games.length} of ${teamGames} team games</b><span class="note">${games.length<teamGames?`Missed ${teamGames-games.length} this season`:'Has not missed a game this season'}</span></div>
@@ -1099,9 +1135,8 @@ function openCard(id){if(openId!==id)delete SORTS['log-table'];openId=id;const p
     <div class="msec"><h4>Schedule ahead</h4><div class="schedbox"><div class="sched">${schedOf(p.t,WEEK,17).map(x=>x.g?`<div class="sw ${defRank(x.g.opp,p.pos)>=24?'easy':defRank(x.g.opp,p.pos)<=8?'hard':''}${x.w>=15?' po':''}"><span>Wk ${x.w}</span><b>${x.g.home?'vs':'at'} ${x.g.opp}</b><em>${ord(defRank(x.g.opp,p.pos))}</em></div>`:`<div class="sw${x.w>=15?' po':''}"><span>Wk ${x.w}</span><b>BYE</b><em>-</em></div>`).join('')}</div></div>
       <p class="note" style="margin:6px 0 0">Defense rank against ${p.pos}s. Green is an easy matchup, red is tough. Weeks 15 to 17, underlined, are the fantasy playoffs.</p></div>
     <div class="msec"><h4>${isMine?'Trade him for similar value':own?'What it would take from your roster':'Similar value on your roster'}</h4>${comps.length?comps.map(q=>`<div class="mini-row">${plCell(q,`${q.pos}${V.posRank[q.id]} · ${f1(V.pts[q.id])} pts/G · ${OWN[q.id]===S.me?'your team':esc(teamById(OWN[q.id]).name)}`)}${tagHtml(q.id)||'<span></span>'}<button class="btn small" data-load="${isMine?id:q.id}|${isMine?q.id:id}" ${(!isMine&&!own)?'hidden':''}>Trade</button></div>`).join(''):'<p class="empty">No close matches in your league right now.</p>'}</div>
-    <div class="msec"><h4>News</h4><ul class="news">${newsItems(p,g).map(x=>`<li${x.q?' class="q"':''}>${x.t}</li>`).join('')}</ul></div>
    </div>`;
-  sortTable('log-table');$('scrim').hidden=false;document.body.style.overflow='hidden';$('mclose').focus();
+  sortTable('log-table');loadNews(id);$('scrim').hidden=false;document.body.style.overflow='hidden';$('mclose').focus();
 }
 function closeCard(){$('scrim').hidden=true;document.body.style.overflow='';openId=null}
 
@@ -1617,3 +1652,22 @@ document.addEventListener('click',e=>{const t=e.target;if(!t.closest)return;
   if(t.closest('#ai-close')||t.id==='ai-scrim'){closeAI();return}
   if(t.closest('#ai-drawer [data-act]'))setTimeout(closeAI,0)});
 document.addEventListener('keydown',e=>{if(e.key==='Escape'&&document.body.classList.contains('ai-open'))closeAI()});
+
+/* ===== Player news (several sources, AI-written titles and summaries) and practice reports ===== */
+const NEWS={};
+const PRAC_TXT={DNP:'Did not practice',LP:'Limited',FP:'Full practice'};
+function pracHtml(id){const L=PRAC[id];if(!L||!L.length)return '';
+  return `<div class="prac"><span class="lab2">Practice reports</span>${L.slice().reverse().map(([w,c,inj,gs])=>`<div class="prac-row"><span class="prac-wk">Wk ${w}</span><span class="pchip ${(c||'na').toLowerCase()}">${PRAC_TXT[c]||'No report'}</span><span class="prac-inj">${esc(inj&&!/not injury related/i.test(inj)?inj:inj?'Rest day':'')}</span>${gs?`<span class="prac-gs ${gs==='Out'?'bad':gs==='Questionable'?'warn':''}">${esc(gs)}</span>`:''}</div>`).join('')}
+    <span class="note">Final practice of each week from the official NFL injury report.</span></div>`}
+function newsHtml(id){const n=NEWS[id];
+  if(!n||n.loading)return `<div class="nws-load"><span class="spin"></span> Loading news from ESPN, CBS, Yahoo, RotoBaller and more...</div>`;
+  if(n.error)return `<p class="note">News couldn't load right now. <button class="linkish" data-news-retry="${id}">Try again</button></p>`;
+  if(!n.items.length)return `<p class="note">No recent news stories about ${esc(byId[id].n)} in the last three weeks.</p>`;
+  return `<div class="nws">${n.items.map(x=>`<article class="nw"><h5>${esc(x.title)}</h5>${x.summary?`<p>${esc(x.summary)}</p>`:''}
+    <div class="nw-meta"><span>${esc(x.outlet)}${x.also&&x.also.length?` <span class="note">+ ${x.also.length} more</span>`:''}</span>${x.at?`<span>${ago(x.at)}</span>`:''}${x.url?`<a href="${esc(x.url)}" target="_blank" rel="noopener">Read story ↗</a>`:''}</div></article>`).join('')}</div>
+    <p class="note" style="margin:8px 0 0">${n.ai?'Titles and summaries written by AI from each story. ':''}Duplicate stories from different outlets are combined.</p>`}
+async function loadNews(id){const p=byId[id];if(!p||p.pos==='DST')return;const c=NEWS[id];if(c&&!c.error&&(c.loading||Date.now()-c.at<20*60e3))return;
+  NEWS[id]={loading:true};const paint=()=>{if(openId===id){const el=$('card-news');if(el)el.innerHTML=newsHtml(id)}};paint();
+  try{const r=await fetch(`/api/news?name=${encodeURIComponent(p.n)}&team=${encodeURIComponent(p.t||'')}&pos=${encodeURIComponent(p.pos)}`);if(!r.ok)throw new Error(r.status);const j=await r.json();NEWS[id]={items:j.items||[],ai:j.ai,at:Date.now()}}
+  catch(e){NEWS[id]={error:true,at:Date.now()}}paint()}
+document.addEventListener('click',e=>{const b=e.target.closest&&e.target.closest('[data-news-retry]');if(b){delete NEWS[b.dataset.newsRetry];loadNews(b.dataset.newsRetry)}});

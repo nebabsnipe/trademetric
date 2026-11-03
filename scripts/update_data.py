@@ -21,6 +21,7 @@ SOURCES={
   f'injuries_{SEASON}.csv':           NV+f'injuries/injuries_{SEASON}.csv',
   f'roster_{SEASON}.csv':             NV+f'rosters/roster_{SEASON}.csv',
   f'snap_counts_{SEASON}.csv':        NV+f'snap_counts/snap_counts_{SEASON}.csv',
+  f'depth_charts_{SEASON}.csv':       NV+f'depth_charts/depth_charts_{SEASON}.csv',
   'fp_latest_weekly.csv':             'https://raw.githubusercontent.com/dynastyprocess/data/master/files/fp_latest_weekly.csv',
 }
 os.makedirs(RAW,exist_ok=True)
@@ -29,7 +30,7 @@ for name,url in SOURCES.items():
         urllib.request.urlretrieve(url,RAW+name);print('downloaded',name,file=sys.stderr)
     except Exception as e:
         print('could not download',name,e,file=sys.stderr)
-        if not os.path.exists(RAW+name) and name!='fp_latest_weekly.csv':sys.exit(1)
+        if not os.path.exists(RAW+name) and name not in ('fp_latest_weekly.csv',f'depth_charts_{SEASON}.csv'):sys.exit(1)
 ECR_FILE=RAW+'fp_latest_weekly.csv' if os.path.exists(RAW+'fp_latest_weekly.csv') else None
 PREV=json.load(open(OUT)) if os.path.exists(OUT) else {}
 
@@ -67,7 +68,29 @@ w['fl']=w[['sack_fumbles_lost','rushing_fumbles_lost','receiving_fumbles_lost']]
 w['team']=w.team.map(fix);w['opponent_team']=w.opponent_team.map(fix)
 ros=pd.read_csv(D+'roster_'+str(SEASON)+'.csv',low_memory=False);ros=ros[ros.week==ros.week.max()]
 ros['team']=ros.team.map(fix)
-inj=pd.read_csv(D+'injuries_'+str(SEASON)+'.csv',low_memory=False);IW=int(inj.week.max());inj=inj[inj.week==IW]
+injall=pd.read_csv(D+'injuries_'+str(SEASON)+'.csv',low_memory=False);IW=int(injall.week.max());inj=injall[injall.week==IW]
+# practice reports: the last 3 weekly reports per player (latest practice participation, injury, game status)
+PRAC_CODE={'Did Not Participate In Practice':'DNP','Limited Participation in Practice':'LP','Full Participation in Practice':'FP','Out (Definitely Will Not Play)':'DNP'}
+prac={}
+for r in injall[(injall.week>IW-3)&(injall.season_type=='REG')].sort_values('week').itertuples():
+    if not isinstance(r.gsis_id,str):continue
+    code=PRAC_CODE.get(r.practice_status,'') if isinstance(r.practice_status,str) else ''
+    ij=r.practice_primary_injury if isinstance(r.practice_primary_injury,str) else (r.report_primary_injury if isinstance(r.report_primary_injury,str) else '')
+    gs=r.report_status if isinstance(r.report_status,str) else ''
+    if not code and not gs:continue
+    prac.setdefault(r.gsis_id,[]).append([int(r.week),code,ij,gs])
+# depth charts: latest chart per team -> [rank at position, slot] (WR slot 8 = slot receiver)
+depth={}
+try:
+    dc=pd.read_csv(D+f'depth_charts_{SEASON}.csv',low_memory=False)
+    dc=dc[dc.pos_abb.isin(['QB','RB','WR','TE'])]
+    dc=dc[dc.dt==dc.groupby('team').dt.transform('max')]
+    for r in dc.itertuples():
+        if isinstance(r.gsis_id,str) and r.gsis_id not in depth:depth[r.gsis_id]=[int(r.pos_rank),int(r.pos_slot)]
+    print(len(depth),'depth chart entries',file=sys.stderr)
+except Exception as e:
+    print('no depth charts',e,file=sys.stderr)
+GID={}
 snap=pd.read_csv(D+'snap_counts_'+str(SEASON)+'.csv',low_memory=False);snap['team']=snap.team.map(fix)
 snap['k']=snap.player.map(norm)
 snapd={(r.k,r.team,int(r.week)):float(r.offense_pct) for r in snap.itertuples()}
@@ -141,7 +164,7 @@ for pid in keep:
         elif sch==0: log.append(0)
         else: log.append([sch[0],sch[1]])  # did not play
     st,note=status_for(k,pid)
-    out.append([slug(name),name,pos,team,st,note,[round(proj[f],2) for f in F],log])
+    out.append([slug(name),name,pos,team,st,note,[round(proj[f],2) for f in F],log]);GID.setdefault(slug(name),pid)
 # preseason players with no 2026 stats (e.g. season-long injuries)
 for k in extra:
     rr=ros[ros.k==k]
@@ -156,13 +179,15 @@ for k in extra:
     st,note=status_for(k,rr.gsis_id)
     if not st and k in pre: st='O'
     log=[0 if sched[team][wk-1]==0 else [sched[team][wk-1][0],sched[team][wk-1][1]] for wk in range(1,PLAYED+1)]
-    out.append([slug(name),name,rr.position,team,st,note,[round(pz.get(f,0),2) for f in F[:-1]]+[FUMB[rr.position]],log])
+    out.append([slug(name),name,rr.position,team,st,note,[round(pz.get(f,0),2) for f in F[:-1]]+[FUMB[rr.position]],log]);GID.setdefault(slug(name),rr.gsis_id)
 # dedupe slugs
 seen=set();final=[]
 for p in out:
     if p[0] in seen: continue
     seen.add(p[0]);final.append(p)
 data={'week':WEEK,'played':PLAYED,'injWeek':IW,'asOf':datetime.date.today().isoformat(),'fields':F,'players':final,'sched':sched,'bye':bye,'vegas':vegas,'def':DEF}
+data['depth']={p[0]:depth[GID[p[0]]] for p in final if GID.get(p[0]) in depth}
+data['practice']={p[0]:prac[GID[p[0]]] for p in final if GID.get(p[0]) in prac}
 js=json.dumps(data,separators=(',',':'))
 print(len(final),'players',len(js)//1024,'KB','week',WEEK,file=sys.stderr)
 print(sum(1 for p in final if p[4]),'with status',file=sys.stderr)

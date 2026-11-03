@@ -70,7 +70,9 @@ function parseESPN(txt) {
 
 const norm = s => String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/['’.]/g, '').replace(/\b(jr|sr|ii|iii|iv)\b/g, '').replace(/[^a-z0-9]+/g, ' ').trim();
 const words = s => new Set(norm(s).split(' ').filter(w => w.length > 2));
-function similar(a, b) { const A = words(a), B = words(b); if (!A.size || !B.size) return false; let n = 0; A.forEach(w => B.has(w) && n++); return n / Math.min(A.size, B.size) >= .7; }
+// same story? compare headline words, ignoring the player's own name and filler words
+const STOP = new Set(['the', 'and', 'for', 'with', 'his', 'from', 'after', 'week', 'nfl', 'fantasy', 'football', 'game', 'vs']);
+function similar(a, b, skip) { const f = s => new Set([...words(s)].filter(w => !skip.has(w) && !STOP.has(w))); const A = f(a), B = f(b); if (A.size < 2 || B.size < 2) return false; let n = 0; A.forEach(w => B.has(w) && n++); return n >= 2 && n / Math.min(A.size, B.size) >= .6; }
 
 function matches(item, name) {
   const full = norm(name); if (!full) return false;
@@ -84,7 +86,7 @@ const FANTASY = /\b(injur|ruled out|out for|questionable|doubtful|practice|limit
 const FLUFF = /\b(costume|halloween|podcast|mailbag|power rankings|odds|betting|picks against|mock draft)/i;
 const score = i => (Date.parse(i.at || 0) / 864e5) + (i.desc ? 1.2 : 0) + (FANTASY.test(i.title + ' ' + i.desc) ? 1.5 : 0) - (FLUFF.test(i.title) ? 4 : 0) - (RANK[i.src] ?? 4) * .15;
 
-export async function collect(name, team, probe) {
+async function collect(name, team, probe) {
   const list = [...SHARED.map(s => ({ ...s, ttl: 5 * 60e3 })), ...perPlayer(name, team).map(s => ({ ...s, ttl: 20 * 60e3 }))];
   const report = [];
   const got = await Promise.all(list.map(async s => {
@@ -98,9 +100,9 @@ export async function collect(name, team, probe) {
   const cutoff = Date.now() - 21 * 864e5;
   // stories with real text first, so a duplicate keeps the version that has the article text
   const all = got.flat().filter(i => !i.at || Date.parse(i.at) > cutoff).sort((a, b) => (!!b.desc - !!a.desc) || ((RANK[a.src] ?? 5) - (RANK[b.src] ?? 5)));
-  const out = [];
+  const out = [], skip = words(name);
   for (const i of all) {                                   // de-duplicate the same story from different outlets
-    const d = out.find(o => similar(o.title, i.title) || o.alts.some(t => similar(t, i.title)));
+    const d = out.find(o => similar(o.title, i.title, skip) || o.alts.some(t => similar(t, i.title, skip)));
     if (d) { if (!d.also.includes(i.outlet) && d.outlet !== i.outlet) d.also.push(i.outlet); if (d.alts.length < 4 && !d.alts.includes(i.title) && i.title !== d.title) d.alts.push(i.title); if (i.at && (!d.at || i.at > d.at)) d.at = i.at; continue; }
     out.push({ ...i, also: [], alts: [] });
   }
@@ -123,7 +125,7 @@ async function summarize(name, team, pos, items) {
 
 For each story below, write:
 - "title": a plain statement of what happened, under 70 characters, written from the facts (for example "Ruled out Sunday with a hamstring injury" or "Played 82% of snaps in Week 8 win"). No clickbait, no questions, no outlet names.
-- "summary": one to three short sentences giving the actual information in the story: what happened, any numbers, injury details and timelines, who is affected and what it means for his role. Use only facts in the headline and text. If the story only has a headline, write one short sentence and do not add anything the headline does not say.
+- "summary": one to three short sentences giving the actual information in the story: what happened, any numbers, injury details and timelines, who is affected and what it means for his role. Use only facts in the headline and text. Never comment on what other outlets did or did not say. If the story only has a headline, write one short sentence and do not add anything the headline does not say.
 - "relevant": false if the story is not really about ${name} (he is only mentioned in passing) or has nothing useful for fantasy football (costumes, off-field fluff, general opinion pieces with no new facts); otherwise true.
 
 Reply with only a JSON array like [{"i":0,"title":"...","summary":"...","relevant":true}].
