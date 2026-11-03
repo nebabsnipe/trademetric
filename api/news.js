@@ -138,7 +138,7 @@ ${list}`;
     });
     if (!r.ok) { LAST_ERR = 'HTTP ' + r.status + ' ' + (await r.text()).slice(0, 200); return null; }
     const j = await r.json(); const text = (j.content || []).map(c => c.text || '').join('');
-    const arr = parseJSON(text); if (!Array.isArray(arr)) LAST_ERR = 'unparsed: ' + text.slice(0, 150); return Array.isArray(arr) ? arr : null;
+    const arr = parseJSON(text); if (!Array.isArray(arr)) LAST_ERR = 'unparsed: ' + text.slice(0, 150) + ' | stop=' + j.stop_reason + ' types=' + (j.content || []).map(c => c.type).join(',') + ' model=' + j.model; return Array.isArray(arr) ? arr : null;
   } catch (e) { LAST_ERR = String(e && e.message || e).slice(0, 150); return null; } finally { clearTimeout(t); }
 }
 
