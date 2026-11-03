@@ -18,8 +18,14 @@ const SHARED = [
   { src: 'Yahoo Sports', kind: 'rss', url: 'https://sports.yahoo.com/nfl/rss/' },
   { src: 'ProFootballTalk', kind: 'rss', url: 'https://www.nbcsports.com/profootballtalk.rss' },
   { src: 'RotoBaller', kind: 'rss', url: 'https://www.rotoballer.com/player-news/feed?sport=nfl' },
-  { src: 'FantasyPros', kind: 'rss', url: 'https://www.fantasypros.com/nfl/rss/player-news.xml' },
-  { src: 'Sports Illustrated', kind: 'rss', url: 'https://www.si.com/nfl/.rss/full/' },
+  { src: 'CBS Sports', kind: 'rss', url: 'https://www.cbssports.com/rss/headlines/fantasy/football/' },
+  { src: 'RotoBaller', kind: 'rss', url: 'https://www.rotoballer.com/category/nfl/feed' },
+  { src: 'FantasyPros', kind: 'rss', url: 'https://www.fantasypros.com/nfl/rss/news.xml' },
+  { src: 'FantasyPros', kind: 'rss', url: 'https://www.fantasypros.com/rss/nfl/news.xml' },
+  { src: 'Pro Football Network', kind: 'rss', url: 'https://www.profootballnetwork.com/feed/' },
+  { src: 'Sports Illustrated', kind: 'rss', url: 'https://www.si.com/nfl/rss' },
+  { src: 'Bleacher Report', kind: 'rss', url: 'https://bleacherreport.com/articles/feed?tag_id=16' },
+  { src: 'The Athletic', kind: 'rss', url: 'https://www.nytimes.com/athletic/rss/nfl/' },
 ];
 const perPlayer = (name, team) => [
   { src: 'Google News', kind: 'rss', url: `https://news.google.com/rss/search?q=${encodeURIComponent(`"${name}" NFL when:14d`)}&hl=en-US&gl=US&ceid=US:en` },
@@ -31,7 +37,7 @@ async function getText(url, ttl) {
   const c = mem.get(url); if (c && Date.now() - c.at < ttl) return c.v;
   const ctl = new AbortController(); const t = setTimeout(() => ctl.abort(), 6000);
   try {
-    const r = await fetch(url, { headers: { 'User-Agent': UA, Accept: 'application/json, application/rss+xml, application/xml, text/xml, */*' }, signal: ctl.signal });
+    const r = await fetch(url, { headers: { 'User-Agent': url.includes('espn.com') ? 'TradeMetric/1.0' : UA, Accept: url.includes('espn.com') ? 'application/json' : 'application/rss+xml, application/xml, text/xml, */*' }, signal: ctl.signal });
     if (!r.ok) throw new Error('HTTP ' + r.status);
     const v = await r.text(); mem.set(url, { at: Date.now(), v }); return v;
   } finally { clearTimeout(t); }
