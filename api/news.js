@@ -12,19 +12,13 @@ const ESPN_TEAM = { ARI: 22, ATL: 1, BAL: 33, BUF: 2, CAR: 29, CHI: 3, CIN: 4, C
 
 // League-wide feeds are shared by every player, so they are cached in memory for a few minutes.
 const SHARED = [
-  { src: 'ESPN', kind: 'espn', url: 'https://site.api.espn.com/apis/fantasy/v2/games/ffl/news/players?limit=200' },
   { src: 'ESPN', kind: 'espn', url: 'https://site.api.espn.com/apis/site/v2/sports/football/nfl/news?limit=100' },
   { src: 'CBS Sports', kind: 'rss', url: 'https://www.cbssports.com/rss/headlines/nfl/' },
   { src: 'Yahoo Sports', kind: 'rss', url: 'https://sports.yahoo.com/nfl/rss/' },
   { src: 'ProFootballTalk', kind: 'rss', url: 'https://www.nbcsports.com/profootballtalk.rss' },
   { src: 'RotoBaller', kind: 'rss', url: 'https://www.rotoballer.com/player-news/feed?sport=nfl' },
-  { src: 'CBS Sports', kind: 'rss', url: 'https://www.cbssports.com/rss/headlines/fantasy/football/' },
   { src: 'RotoBaller', kind: 'rss', url: 'https://www.rotoballer.com/category/nfl/feed' },
-  { src: 'FantasyPros', kind: 'rss', url: 'https://www.fantasypros.com/nfl/rss/news.xml' },
-  { src: 'FantasyPros', kind: 'rss', url: 'https://www.fantasypros.com/rss/nfl/news.xml' },
   { src: 'Pro Football Network', kind: 'rss', url: 'https://www.profootballnetwork.com/feed/' },
-  { src: 'Sports Illustrated', kind: 'rss', url: 'https://www.si.com/nfl/rss' },
-  { src: 'Bleacher Report', kind: 'rss', url: 'https://bleacherreport.com/articles/feed?tag_id=16' },
   { src: 'The Athletic', kind: 'rss', url: 'https://www.nytimes.com/athletic/rss/nfl/' },
 ];
 const perPlayer = (name, team) => [
@@ -56,6 +50,7 @@ function parseRSS(xml, src) {
     if (src === 'Google News') { const k = title.lastIndexOf(' - '); if (k > 20) { outlet = outlet === src ? title.slice(k + 3) : outlet; title = title.slice(0, k); } }
     let desc = decode(tag(it, 'description') || tag(it, 'content:encoded'));
     if (src === 'Google News') desc = '';                       // Google's description just repeats the headline
+    title = title.replace(/\s+[-|]\s+(NFL News|Fantasy Football|Fantasy).*$/i, '').trim();
     const link = decode(tag(it, 'link')) || (it.match(/<link[^>]*href="([^"]+)"/i) || [])[1] || '';
     const at = tag(it, 'pubDate') || tag(it, 'dc:date') || tag(it, 'updated');
     out.push({ title, desc, url: link, at: at ? new Date(decode(at)).toISOString() : null, src, outlet });
@@ -84,7 +79,10 @@ function matches(item, name) {
   return hay.includes(' ' + full + ' ');
 }
 
-const RANK = { ESPN: 0, RotoBaller: 1, FantasyPros: 1, ProFootballTalk: 2, 'CBS Sports': 2, 'Yahoo Sports': 2, 'Sports Illustrated': 3, 'Google News': 4 };
+const RANK = { ESPN: 0, RotoBaller: 1, ProFootballTalk: 2, 'The Athletic': 2, 'CBS Sports': 2, 'Yahoo Sports': 2, 'Pro Football Network': 3, 'Google News': 4 };
+const FANTASY = /\b(injur|ruled out|out for|questionable|doubtful|practice|limited|ir\b|reserve|return|snap|target|carries|touches|role|depth chart|start|sit|waiver|pick ?up|week \d+|touchdown|td\b|yards|suspend|trade|released|signed|benched|concussion|hamstring|ankle|knee)/i;
+const FLUFF = /\b(costume|halloween|podcast|mailbag|power rankings|odds|betting|picks against|mock draft)/i;
+const score = i => (Date.parse(i.at || 0) / 864e5) + (i.desc ? 1.2 : 0) + (FANTASY.test(i.title + ' ' + i.desc) ? 1.5 : 0) - (FLUFF.test(i.title) ? 4 : 0) - (RANK[i.src] ?? 4) * .15;
 
 export async function collect(name, team, probe) {
   const list = [...SHARED.map(s => ({ ...s, ttl: 5 * 60e3 })), ...perPlayer(name, team).map(s => ({ ...s, ttl: 20 * 60e3 }))];
@@ -98,15 +96,16 @@ export async function collect(name, team, probe) {
     } catch (e) { report.push({ src: s.src, url: s.url.slice(0, 90), ok: false, error: String(e.message || e).slice(0, 80) }); return []; }
   }));
   const cutoff = Date.now() - 21 * 864e5;
-  const all = got.flat().filter(i => !i.at || Date.parse(i.at) > cutoff)
-    .sort((a, b) => (Date.parse(b.at || 0) - Date.parse(a.at || 0)) || ((RANK[a.src] ?? 5) - (RANK[b.src] ?? 5)));
+  // stories with real text first, so a duplicate keeps the version that has the article text
+  const all = got.flat().filter(i => !i.at || Date.parse(i.at) > cutoff).sort((a, b) => (!!b.desc - !!a.desc) || ((RANK[a.src] ?? 5) - (RANK[b.src] ?? 5)));
   const out = [];
   for (const i of all) {                                   // de-duplicate the same story from different outlets
-    const d = out.find(o => similar(o.title, i.title));
-    if (d) { if (!d.also.includes(i.outlet) && d.outlet !== i.outlet) d.also.push(i.outlet); if (!d.desc && i.desc) { d.desc = i.desc; } continue; }
-    out.push({ ...i, also: [] });
+    const d = out.find(o => similar(o.title, i.title) || o.alts.some(t => similar(t, i.title)));
+    if (d) { if (!d.also.includes(i.outlet) && d.outlet !== i.outlet) d.also.push(i.outlet); if (d.alts.length < 4 && !d.alts.includes(i.title) && i.title !== d.title) d.alts.push(i.title); if (i.at && (!d.at || i.at > d.at)) d.at = i.at; continue; }
+    out.push({ ...i, also: [], alts: [] });
   }
-  return { items: out.slice(0, 8), report };
+  out.sort((a, b) => score(b) - score(a));
+  return { items: out.slice(0, 9), report };
 }
 
 function parseJSON(text) {
@@ -118,13 +117,13 @@ function parseJSON(text) {
 
 async function summarize(name, team, pos, items) {
   if (!API_KEY || !items.length) return null;
-  const list = items.map((x, i) => `[${i}] ${x.outlet}, ${x.at ? x.at.slice(0, 10) : 'date unknown'}\nHeadline: ${x.title}\nText: ${(x.desc || '(headline only)').slice(0, 1200)}`).join('\n\n');
+  const list = items.map((x, i) => `[${i}] ${x.outlet}, ${x.at ? x.at.slice(0, 10) : 'date unknown'}\nHeadline: ${x.title}${x.alts.length ? '\nOther outlets\' headlines for the same story: ' + x.alts.join(' | ') : ''}\nText: ${(x.desc || '(headline only)').slice(0, 1200)}`).join('\n\n');
   const prompt = `You write the news section of a fantasy football app. Player: ${name} (${pos}, ${team}).
 
 For each story below, write:
 - "title": a plain statement of what happened, under 70 characters, written from the facts (for example "Ruled out Sunday with a hamstring injury" or "Played 82% of snaps in Week 8 win"). No clickbait, no questions, no outlet names.
 - "summary": one to three short sentences giving the actual information in the story: what happened, any numbers, injury details and timelines, who is affected and what it means for his role. Use only facts in the headline and text. If the story only has a headline, write one short sentence and do not add anything the headline does not say.
-- "relevant": false if the story is not really about ${name} (for example he is only mentioned in passing), otherwise true.
+- "relevant": false if the story is not really about ${name} (he is only mentioned in passing) or has nothing useful for fantasy football (costumes, off-field fluff, general opinion pieces with no new facts); otherwise true.
 
 Reply with only a JSON array like [{"i":0,"title":"...","summary":"...","relevant":true}].
 
