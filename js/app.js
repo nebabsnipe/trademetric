@@ -323,7 +323,7 @@ async function loadProj(){clearTimeout(PROJ_TIMER);
     if(j&&j.sources&&j.week===WEEK){readProj(j);recompute();const a=document.activeElement;if(!(a&&/INPUT|TEXTAREA|SELECT/.test(a.tagName)))render()}}}catch(e){}
   PROJ_TIMER=setTimeout(()=>{if(document.hidden)document.addEventListener('visibilitychange',loadProj,{once:true});else loadProj()},20*60e3)}
 function platHtml(g){const x=g.plat;if(!x||!g.next)return '';const it=[x.espn!=null?`ESPN <b>${f1(x.espn)}</b>`:'',x.sleeper!=null?`Sleeper <b>${f1(x.sleeper)}</b>`:'',`TradeMetric <b>${f1(x.ours)}</b>`].filter(Boolean).join(' · ');
-  return `<p class="plat-line"><span class="lab2">Week ${WEEK} projection ${f1(g.projNext)}</span>${it}<em>90% ESPN and Sleeper, 10% TradeMetric, in your league's scoring</em></p>`}
+  return `<p class="plat-line"><span class="lab2">Week ${WEEK} projection ${f1(g.projNext)}</span>${it}<em>${x.plat===0?'ESPN and Sleeper both project zero, which usually means he is ruled out or not expected to play. Check his news below.':'90% ESPN and Sleeper, 10% TradeMetric, in your league\'s scoring'}</em></p>`}
 /* ===== Live game-day data (/api/live) ===== */
 let LIVE=null,LIVEST={},LIVE_TIMER=null;
 function applyLive(){
@@ -894,7 +894,7 @@ function blobToB64(b){return new Promise((ok,no)=>{const f=new FileReader();f.on
   if(!AI){$('helper-status').textContent='The AI Helper is not available in this view.';$('helper-ask').disabled=true}})();
 function leagueContext(){
   const L=S.league,sc=L.sc,me=myTeam(),LU=lineup(me.players,nextV),st=teamStats(),mine=st.rows.find(r=>r.T.id===S.me);
-  const line=id=>{const p=byId[id],g=G[id];return `${p.n} (${p.pos}${V.posRank[id]}, ${p.t}) proj ${f1(g.projNext)} wk${WEEK} ${g.next?oppTxt(id):'BYE'}, ${f1(V.pts[id])}/G season proj, last3 ${f1(g.last3)}${g.tag?', '+(g.tag==='buy'?'BUY LOW':'SELL HIGH'):''}`};
+  const line=id=>{const p=byId[id],g=G[id];return `${p.n} (${p.pos}${V.posRank[id]}, ${p.t}) proj ${f1(g.projNext)} wk${WEEK} ${g.next?oppTxt(id):'BYE'}, ${f1(V.pts[id])}/G season proj, last3 ${f1(g.last3)}${g.tag?', '+(g.tag==='buy'?'BUY LOW':'SELL HIGH'):''}${stOf(id)?`, status ${ST_LABEL[stOf(id)]||stOf(id)}${p.inj?' ('+p.inj+')':''}`:''}${g.plat?`, platform projections ESPN ${g.plat.espn!=null?f1(g.plat.espn):'n/a'} / Sleeper ${g.plat.sleeper!=null?f1(g.plat.sleeper):'n/a'}${g.plat.plat===0?' (BOTH PLATFORMS PROJECT ZERO: he is almost certainly ruled out, inactive or not expected to play; check the news below for why)':''}`:''}`};
   return `League "${L.name}": ${L.teams} teams. Slots QB${L.slots.QB} RB${L.slots.RB} WR${L.slots.WR} TE${L.slots.TE} FLEX${L.slots.FLEX} SUPERFLEX${L.slots.SFLEX} BENCH${L.slots.BN}.
 Scoring: 1pt/${sc.pyd} pass yds, pass TD ${sc.ptd}, INT ${sc.int}, 1pt/${sc.ryd} rush yds, rush TD ${sc.rtd}, rec RB ${sc.recRB}/WR ${sc.recWR}/TE ${sc.recTE}, 1pt/${sc.recyd} rec yds, rec TD ${sc.rectd}, first down ${sc.fd}, fumble ${sc.fl}, bonuses 300pass ${sc.p300} 100rush ${sc.r100} 100rec ${sc.rec100}.
 It is Week ${WEEK}. My team "${me.name}" power rank ${mine.rank}/${S.teams.length}; weakest position ${mine.weak}.
@@ -930,15 +930,26 @@ function renderHelper(){renderBriefing();renderHist();renderAnswers()}
 function sparkSvg(id){const pts=G[id].pts.filter(x=>x!==null);if(pts.length<2)return '';const mx=Math.max(...pts,1),w=200,h=30,step=w/(pts.length-1);
   const xy=pts.map((v,i)=>[i*step,h-3-(v/mx)*(h-6)]);const path=xy.map((p,i)=>(i?'L':'M')+p[0].toFixed(1)+' '+p[1].toFixed(1)).join(' ');
   return `<svg class="spark" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" aria-hidden="true"><path d="${path} L${w} ${h} L0 ${h}Z" fill="var(--accent-soft)"/><path d="${path}" fill="none" stroke="var(--accent)" stroke-width="2" vector-effect="non-scaling-stroke"/><circle cx="${xy[xy.length-1][0]}" cy="${xy[xy.length-1][1]}" r="3" fill="var(--accent)"/></svg>`}
+/* recent news for the players this question is about: my roster plus anyone named in the question */
+function newsContext(q){const items=(FEED&&FEED.news)||[];if(!items.length)return 'Recent news: none available right now.';
+  const me=myTeam(),ql=norm(q||''),ids=new Set(me.players);
+  POOL.forEach(p=>{const n=norm(p.n);if(n.length>4&&ql.includes(n))ids.add(p.id)});
+  const names=[...ids].map(id=>byId[id]).filter(Boolean),cut=Date.now()-10*864e5,out=[];
+  items.forEach(a=>{if(out.length>=30||(a.at&&Date.parse(a.at)<cut))return;const txt=norm((a.title||'')+' '+(a.desc||'')+' '+(a.athletes||[]).join(' '));
+    const who=names.filter(p=>txt.includes(norm(p.n)));if(!who.length)return;
+    out.push(`- ${a.at?new Date(a.at).toLocaleDateString('en-US',{month:'short',day:'numeric'}):''} [${who.map(p=>p.n).join(', ')}] ${a.title}${a.desc&&a.desc!==a.title?': '+String(a.desc).slice(0,280):''}`)});
+  return `Recent news for my players and players in the question (newest first):\n${out.join('\n')||'- No recent stories about these players.'}`}
 async function askHelper(q){
   if(!AI||!q||!q.trim()||asking)return;asking=true;$('helper-ask').disabled=true;$('helper-status').textContent='';$('helper-q').value='';
   openAI();
   const entry={id:Date.now().toString(36),q:q.trim(),status:'thinking',ts:Date.now()};S.chat.push(entry);renderAnswers();
   setTimeout(()=>{const el=$('msg-'+entry.id);if(el)el.scrollIntoView({behavior:'smooth',block:'start'})},50);
+  await Promise.race([loadFeed(),new Promise(r=>setTimeout(r,4000))]);
   const prior=S.chat.filter(x=>x.status==='done').slice(-2).map(x=>`Earlier question: ${x.q}\nYour answer: ${x.data.headline}. ${x.data.answer}`).join('\n');
-  const prompt=`You are the AI Helper inside TradeMetric, a fantasy football app that tailors advice to one league's exact settings. Use only the data below. Stats are real 2026 results through Week ${PLAYED}; projections blend preseason expectations with 2026 production; injury status comes from the Week ${DATA.injWeek} report. There is no live news feed.
+  const prompt=`You are the AI Helper inside TradeMetric, a fantasy football app that tailors advice to one league's exact settings. Use only the data below. Stats are real 2026 results through Week ${PLAYED}; projections blend preseason expectations with 2026 production; injury status comes from the Week ${DATA.injWeek} report plus live designations. Weekly projections are 90% ESPN and Sleeper (which update with injury news through the day) and 10% TradeMetric's model. Recent player news from ESPN and other outlets is listed below, newest first: use it to explain injuries, role changes and zero projections, mention the date when it matters, and never invent news that isn't listed.
 
 ${leagueContext()}
+${newsContext(q)}
 ${prior?'\n'+prior+'\n':''}
 Question: ${q}
 
