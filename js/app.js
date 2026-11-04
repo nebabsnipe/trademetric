@@ -931,25 +931,31 @@ function sparkSvg(id){const pts=G[id].pts.filter(x=>x!==null);if(pts.length<2)re
   const xy=pts.map((v,i)=>[i*step,h-3-(v/mx)*(h-6)]);const path=xy.map((p,i)=>(i?'L':'M')+p[0].toFixed(1)+' '+p[1].toFixed(1)).join(' ');
   return `<svg class="spark" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" aria-hidden="true"><path d="${path} L${w} ${h} L0 ${h}Z" fill="var(--accent-soft)"/><path d="${path}" fill="none" stroke="var(--accent)" stroke-width="2" vector-effect="non-scaling-stroke"/><circle cx="${xy[xy.length-1][0]}" cy="${xy[xy.length-1][1]}" r="3" fill="var(--accent)"/></svg>`}
 /* recent news for the players this question is about: my roster plus anyone named in the question */
-function newsContext(q){const items=(FEED&&FEED.news)||[];if(!items.length)return 'Recent news: none available right now.';
-  const me=myTeam(),ql=norm(q||''),ids=new Set(me.players);
-  POOL.forEach(p=>{const n=norm(p.n);if(n.length>4&&ql.includes(n))ids.add(p.id)});
-  const names=[...ids].map(id=>byId[id]).filter(Boolean),cut=Date.now()-10*864e5,out=[];
-  items.forEach(a=>{if(out.length>=30||(a.at&&Date.parse(a.at)<cut))return;const txt=norm((a.title||'')+' '+(a.desc||'')+' '+(a.athletes||[]).join(' '));
-    const who=names.filter(p=>txt.includes(norm(p.n)));if(!who.length)return;
-    out.push(`- ${a.at?new Date(a.at).toLocaleDateString('en-US',{month:'short',day:'numeric'}):''} [${who.map(p=>p.n).join(', ')}] ${a.title}${a.desc&&a.desc!==a.title?': '+String(a.desc).slice(0,280):''}`)});
-  return `Recent news for my players and players in the question (newest first):\n${out.join('\n')||'- No recent stories about these players.'}`}
+async function newsContext(q){const items=(FEED&&FEED.news)||[];
+  const me=myTeam(),ql=norm(q||''),named=POOL.filter(p=>{const n=norm(p.n);return n.length>4&&ql.includes(n)}).map(p=>p.id);
+  const ids=new Set([...named,...me.players]);
+  const names=[...ids].map(id=>byId[id]).filter(Boolean),cut=Date.now()-10*864e5,out=[],dt=at=>at?new Date(at).toLocaleDateString('en-US',{month:'short',day:'numeric'}):'';
+  /* player news from ESPN, RotoBaller, CBS, Yahoo, PFT and more (raw headlines, cached 10 minutes on the server) */
+  try{const qs=names.filter(p=>p.pos!=='DST').slice(0,30).map(p=>encodeURIComponent(p.n+'|'+p.t)).join(';');
+    const r=await Promise.race([fetch('/api/news?batch='+qs+'&b='+Math.floor(Date.now()/600000)),new Promise((_,j)=>setTimeout(()=>j(0),9000))]);
+    if(r.ok){const d=await r.json();names.forEach(p=>((d.items||{})[p.n]||[]).forEach(a=>{if(a.at&&Date.parse(a.at)<cut)return;
+      out.push({at:a.at,line:`- ${dt(a.at)} [${p.n}] ${a.title}${a.desc&&a.desc!==a.title?': '+a.desc:''} (${a.outlet})`,k:norm(a.title)})}))}}catch(e){}
+  items.forEach(a=>{if(a.at&&Date.parse(a.at)<cut)return;const txt=norm((a.title||'')+' '+(a.desc||'')+' '+(a.athletes||[]).join(' '));
+    const who=names.filter(p=>txt.includes(norm(p.n)));if(!who.length||out.some(o=>o.k===norm(a.title)))return;
+    out.push({at:a.at,line:`- ${dt(a.at)} [${who.map(p=>p.n).join(', ')}] ${a.title}${a.desc&&a.desc!==a.title?': '+String(a.desc).slice(0,280):''}`,k:norm(a.title)})});
+  out.sort((a,b)=>Date.parse(b.at||0)-Date.parse(a.at||0));
+  return `Recent news for my players and players in the question (newest first):\n${out.slice(0,45).map(o=>o.line).join('\n')||'- No recent stories about these players.'}`}
 async function askHelper(q){
   if(!AI||!q||!q.trim()||asking)return;asking=true;$('helper-ask').disabled=true;$('helper-status').textContent='';$('helper-q').value='';
   openAI();
   const entry={id:Date.now().toString(36),q:q.trim(),status:'thinking',ts:Date.now()};S.chat.push(entry);renderAnswers();
   setTimeout(()=>{const el=$('msg-'+entry.id);if(el)el.scrollIntoView({behavior:'smooth',block:'start'})},50);
-  await Promise.race([loadFeed(),new Promise(r=>setTimeout(r,4000))]);
+  await Promise.race([loadFeed(),new Promise(r=>setTimeout(r,4000))]);const news=await newsContext(q);
   const prior=S.chat.filter(x=>x.status==='done').slice(-2).map(x=>`Earlier question: ${x.q}\nYour answer: ${x.data.headline}. ${x.data.answer}`).join('\n');
   const prompt=`You are the AI Helper inside TradeMetric, a fantasy football app that tailors advice to one league's exact settings. Use only the data below. Stats are real 2026 results through Week ${PLAYED}; projections blend preseason expectations with 2026 production; injury status comes from the Week ${DATA.injWeek} report plus live designations. Weekly projections are 90% ESPN and Sleeper (which update with injury news through the day) and 10% TradeMetric's model. Recent player news from ESPN and other outlets is listed below, newest first: use it to explain injuries, role changes and zero projections, mention the date when it matters, and never invent news that isn't listed.
 
 ${leagueContext()}
-${newsContext(q)}
+${news}
 ${prior?'\n'+prior+'\n':''}
 Question: ${q}
 
