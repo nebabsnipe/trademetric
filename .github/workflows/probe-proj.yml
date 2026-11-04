@@ -14,10 +14,12 @@ jobs:
           cat > /tmp/run.mjs <<'JS'
           import h from '/tmp/proj.mjs';
           const res={h:{},setHeader(k,v){this.h[k]=v},status(c){this.c=c;return this},json(o){this.o=o;return this}};
-          await h({query:{}},res);
+          await h({query:{}},res);(await import('fs')).writeFileSync('/tmp/out.json',JSON.stringify(res.o));
           const o=res.o;console.log('status',res.c,'week',o.week,'season',o.season,'errors',JSON.stringify(o.errors||o));
           for(const [k,a] of Object.entries(o.sources||{})){console.log(k,'rows',a.length,'byPos',JSON.stringify(a.reduce((m,x)=>(m[x.pos]=(m[x.pos]||0)+1,m),{})));
             for(const n of ['Mike Gesicki','Jahmyr Gibbs','Josh Allen','Ja\'Marr Chase']){const r=a.find(x=>x.n===n);console.log(' ',n,JSON.stringify(r))}
             console.log('  DST',JSON.stringify(a.filter(x=>x.pos==='DST').slice(0,2)),'K',JSON.stringify(a.filter(x=>x.pos==='K').slice(0,2)))}
           JS
           node /tmp/run.mjs
+      - uses: actions/upload-artifact@v4
+        with: { name: proj, path: /tmp/out.json }
