@@ -7,10 +7,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - run: |
-          curl -s -o /tmp/f.json "https://www.trademetric.app/api/feed?week=9"
-          python3 -c "
-          import json;d=json.load(open('/tmp/f.json'));n=d.get('news',[]);print('NEWSCOUNT',len(n))
-          for a in n:
-            t=(a.get('title','')+' '+a.get('desc',''))
-            if any(k in t for k in ['Lamar','Darnold','Dart']): print('HIT',a.get('at'),a.get('title'),'|',a.get('desc','')[:200])
-          "
+          curl -s "https://www.trademetric.app/api/feed?week=9&debug=1&b=$RANDOM" | python3 -c "import json,sys;d=json.load(sys.stdin);print('DBG',json.dumps(d.get('debug'))[:1500])"
+          curl -s -w "\nCODE %{http_code}\n" "https://site.api.espn.com/apis/fantasy/v2/games/ffl/news/players?limit=5" | head -c 1500; echo
+          curl -s -w "\nCODE %{http_code}\n" "https://site.api.espn.com/apis/fantasy/v2/games/ffl/news/players?limit=200&playerId=3916387" | head -c 800; echo
