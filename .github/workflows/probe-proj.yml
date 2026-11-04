@@ -6,19 +6,6 @@ jobs:
   probe:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with: { node-version: 20 }
       - run: |
-          cp api/proj.js /tmp/proj.mjs
-          cat > /tmp/run.mjs <<'JS'
-          import h from '/tmp/proj.mjs';
-          const res={h:{},setHeader(k,v){this.h[k]=v},status(c){this.c=c;return this},json(o){this.o=o;return this}};
-          await h({query:{}},res);(await import('fs')).writeFileSync('/tmp/out.json',JSON.stringify(res.o));
-          const o=res.o;console.log('status',res.c,'week',o.week,'season',o.season,'errors',JSON.stringify(o.errors||o));
-          for(const [k,a] of Object.entries(o.sources||{})){console.log(k,'rows',a.length,'byPos',JSON.stringify(a.reduce((m,x)=>(m[x.pos]=(m[x.pos]||0)+1,m),{})));
-            for(const n of ['Mike Gesicki','Jahmyr Gibbs','Josh Allen','Ja\'Marr Chase']){const r=a.find(x=>x.n===n);console.log(' ',n,JSON.stringify(r))}
-            console.log('  DST',JSON.stringify(a.filter(x=>x.pos==='DST').slice(0,2)),'K',JSON.stringify(a.filter(x=>x.pos==='K').slice(0,2)))}
-          JS
-          node /tmp/run.mjs
-      - run: gzip -c /tmp/out.json | base64 -w0 | sed 's/^/PROJB64:/'; echo
+          curl -s -o /tmp/p.json -w "HTTP %{http_code} %{time_total}s\n" "https://www.trademetric.app/api/proj?week=9"
+          python3 -c "import json;d=json.load(open('/tmp/p.json'));print('week',d.get('week'),'errors',d.get('errors'),{k:len(v) for k,v in d.get('sources',{}).items()}, d.get('error'), d.get('detail'))"
