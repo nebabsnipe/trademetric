@@ -7,5 +7,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - run: |
-          curl -s -o /tmp/p.json -w "HTTP %{http_code} %{time_total}s\n" "https://www.trademetric.app/api/proj?week=9"
-          python3 -c "import json;d=json.load(open('/tmp/p.json'));print('week',d.get('week'),'errors',d.get('errors'),{k:len(v) for k,v in d.get('sources',{}).items()}, d.get('error'), d.get('detail'))"
+          curl -s -o /tmp/f.json "https://www.trademetric.app/api/feed?week=9"
+          python3 -c "
+          import json;d=json.load(open('/tmp/f.json'));n=d.get('news',[]);print('NEWSCOUNT',len(n))
+          for a in n:
+            t=(a.get('title','')+' '+a.get('desc',''))
+            if any(k in t for k in ['Lamar','Darnold','Dart']): print('HIT',a.get('at'),a.get('title'),'|',a.get('desc','')[:200])
+          "
