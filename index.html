@@ -9,7 +9,7 @@
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <meta name="theme-color" content="#141414">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@700;800;900&family=Archivo:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700;800&family=Barlow:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
 <meta name="description" content="Fantasy football trades, rankings and lineup advice built on your league's exact settings.">
 <link rel="stylesheet" href="css/styles.css">
 </head>
@@ -23,7 +23,7 @@
       <button data-tab="rankings" data-hash="players">Players</button>
       <button data-tab="trade">Trades</button>
       <button data-tab="season"><span class="lbl-l">Season Sim</span><span class="lbl-s">Sim</span></button>
-      <button data-tab="hub" data-hash="league-hub">League</button>
+      <button data-tab="hub">League</button>
       <button data-tab="draft" class="nav-draft">Draft</button>
     </nav>
     <div class="topbar-right">
@@ -41,7 +41,7 @@
   <!-- MY TEAM -->
   <section class="view" id="v-team" hidden>
     <div class="hero">
-      <div><div class="kicker" id="team-kicker"></div><h1 id="team-title">Your Team</h1><p>Your optimal <span class="wk-now">this week's</span> lineup, scored to your league's exact settings. Select any player for his full profile.</p></div>
+      <div><div class="kicker" id="team-kicker"></div><h1 id="team-title">Your Team</h1><p>Your best <span class="wk-now">this week's</span> lineup for your league's scoring. Select any player for his full profile.</p></div>
       <span class="example" id="team-example">Sample league. Import yours in League Hub.</span>
     </div>
     <div class="tiles" id="team-tiles"></div>
@@ -59,8 +59,8 @@
         <div class="card" id="opp-card" data-float></div>
       </div>
       <div class="stack">
-        <div class="card" id="fix-card"></div>
         <div class="card" id="startsit"></div>
+        <div class="card" id="fix-card"></div>
       </div>
     </div>
   </section>
@@ -88,7 +88,7 @@
 
   <!-- TRADES -->
   <section class="view" id="v-trade" hidden>
-    <div class="hero"><div><div class="kicker">Trade center</div><h1>Trades</h1><p>Three deals tailored to your roster. Each one fills a need for the other manager and gives you a modest rest-of-season edge.</p></div>
+    <div class="hero"><div><div class="kicker">Trade center</div><h1>Trades</h1><p>Deals built for your roster that the other manager has a reason to accept. <a class="how" href="#help-trades">How this works</a></p></div>
       <button class="btn" id="refresh-trades">New ideas</button></div>
     <div class="grid3" id="suggestions"></div>
     <div class="grid2 grid-trade">
@@ -110,7 +110,7 @@
 
   <!-- HUB -->
   <section class="view" id="v-hub" hidden>
-    <div class="hero"><div><div class="kicker" id="hub-kicker"></div><h1>League Hub</h1><p>Every roster in your league. Import your league or add rosters manually; TradeMetric uses them for power rankings, trade analysis and the Season Sim.</p></div>
+    <div class="hero"><div><div class="kicker" id="hub-kicker"></div><h1>League Hub</h1><p>Every roster in your league, power rankings and your trade log.</p></div>
       <div class="toolbar"><a class="btn primary" href="#league" id="lg-settings-btn">League settings</a><button class="btn" id="load-sample">Load sample league</button><button class="btn ghost" id="clear-league">Clear other rosters</button></div></div>
     <div class="card" id="import-card"></div>
     <div class="card lg-card" id="league-list"></div>
@@ -128,7 +128,7 @@
 
   <!-- SEASON -->
   <section class="view" id="v-season" hidden>
-    <div class="hero"><div><div class="kicker" id="season-kicker">Season simulator</div><h1>Season Sim</h1><p>TradeMetric simulates the rest of the season 2,000 times from every team's projected lineup to estimate playoff and championship odds.</p></div></div>
+    <div class="hero"><div><div class="kicker" id="season-kicker">Season simulator</div><h1>Season Sim</h1><p>Playoff and title odds from 2,000 simulated seasons. <a class="how" href="#help-sim">How this works</a></p></div></div>
     <div id="sim-hero"></div>
     <div class="card" id="sim-race"></div>
     <div class="grid2 grid-season">
@@ -176,9 +176,50 @@
     <div id="draft-body"></div>
   </section>
 
+  <!-- HELP -->
+  <section class="view" id="v-help" hidden>
+    <div class="hero"><div><div class="kicker">Help</div><h1>How this works</h1><p>What every number on TradeMetric means and where it comes from.</p></div></div>
+    <div class="faq">
+      <details class="faq-i" id="faq-team"><summary>My Team and your lineup</summary><div class="faq-b"><p>Your lineup is the highest-projected group of players that fits your league's roster slots. If you imported from Sleeper or ESPN, it shows the lineup you actually set there.</p>
+<p>Each projection starts from his points per game this season, blended with preseason expectations early in the year. It is then adjusted for this week's opponent, his team's expected points from the betting line, his injury status and the factors listed under Player values.</p>
+<p>Roster strength compares your starters at each position with the league average. Weakest spot is the position furthest below it.</p></div></details>
+      <details class="faq-i" id="faq-startsit"><summary>Start or sit</summary><div class="faq-b"><p>By default it compares the closest call in your lineup: the starter whose projection is nearest to a bench player who could replace him. You can pick any two or three of your players, or type in anyone.</p>
+<p><b>Floor and ceiling</b> come from how much his scoring has swung week to week. <b>Clear call</b> means a gap of 3 or more points, <b>Lean</b> 1 to 3, and <b>Coin flip</b> under 1.</p></div></details>
+      <details class="faq-i" id="faq-values"><summary>Player values, experts and risk</summary><div class="faq-b"><p>A player's value is the points he is projected to score from here on, compared with the best player you could get off waivers at his position. Current production counts most.</p>
+<p>The <b>Experts</b> rank is the FantasyPros consensus for the rest of the season. It makes up 40% of rest-of-season values, so a proven player off to a slow start is not written off after one bad month.</p>
+<p><b>Risk</b> (Low, Medium, High) adds up injury status, games missed, how much the experts disagree, big week-to-week swings and small samples. Risk lowers a player's value in trades a little; it never removes him.</p>
+<p><b>What moves his projection</b> lists small adjustments, each a few percent and capped at 8% in total:</p>
+<ul><li><b>Rest of season:</b> strength of defenses faced so far, targets and air yards compared with his scoring, running back age and heavy workloads, touchdown luck, a rising or falling snap share, and a rising or falling workload.</li>
+<li><b>This week:</b> game script from the betting line, indoor or cold games, a backup quarterback starting, a first game back from a soft-tissue injury, a short week, coming off a bye, West Coast teams in early road games, injured offensive linemen, and injured defensive backs on the other team.</li></ul></div></details>
+      <details class="faq-i" id="faq-rankings"><summary>Rankings and tags</summary><div class="faq-b"><p>Players are ranked by value over a waiver-level player for your league's scoring and roster. <b>Pts/G</b> is projected points per game from here on.</p>
+<p><span class="badge buy">BL</span> <b>Buy low:</b> a good player who scored less than expected lately but is still getting the ball, or whom experts rank well above how he has scored. <span class="badge sell">SH</span> <b>Sell high:</b> scoring above what his role or the experts support. <span class="badge risk">RISK</span>: scoring above his workload, or facing a hard schedule. Defenses and kickers never get buy or sell tags.</p>
+<p><b>Trend</b> is his last three games against his season average. <b>Opp/G</b> is carries plus targets per game.</p></div></details>
+      <details class="faq-i" id="faq-waivers"><summary>Waiver wire and bids</summary><div class="faq-b"><p><b>Your gain</b> is how many points a week your best lineup changes after adding him and dropping the player shown. <b>Pts/G ahead</b> blends TradeMetric's projection with the experts' rest-of-season ranks.</p>
+<p>The suggested bid is a share of your season budget. It rises with his value to you and to the league, rises when other teams need his position and when he is moving into a bigger role, and falls as fewer weeks are left. In leagues that use waiver order, it suggests whether he is worth a high claim instead.</p></div></details>
+      <details class="faq-i" id="faq-tradevalues"><summary>Trade values</summary><div class="faq-b"><p>Each player gets a 0 to 100 score: half from trade market values (FantasyCalc, KeepTradeCut and FantasyPros) and half from TradeMetric's rest-of-season projection for your scoring. Stars count for more than the sum of lesser players, so two 30s rarely get you a 60.</p>
+<p>Tiers group players with similar scores at each position. In keeper and dynasty leagues, long-term value is blended in.</p></div></details>
+      <details class="faq-i" id="faq-trades"><summary>Trade suggestions and grades</summary><div class="faq-b"><p>TradeMetric looks at every deal from one-for-one up to three-for-two with each team, then keeps the ones that help you and that the other manager has a reason to accept: fair market value, a better lineup for them, or filling a need.</p>
+<p>The shape fits each team's situation. A team with depth to spare gets offered a consolidation, two players for one better starter. A team with injured starters or holes in its lineup gets offered extra bodies. Trades that would force a team to cut a starter are left out.</p>
+<p>Your grade weighs points added each week, your playoff weeks (15 to 17 count extra), and the change in your playoff and title odds, minus injury and stacking risk. What counts most depends on where you stand: contenders care about the playoffs, teams on the bubble about winning now.</p></div></details>
+      <details class="faq-i" id="faq-sim"><summary>Season Sim</summary><div class="faq-b"><p>Weeks already played use real results. The rest of the season is simulated 2,000 times from every team's projected lineup, byes and matchups. Ties in the standings go to points scored.</p>
+<p><b>What needs to happen</b> groups the simulated seasons by your final record and shows how often each record makes the playoffs.</p></div></details>
+      <details class="faq-i" id="faq-matchups"><summary>Matchups and schedule</summary><div class="faq-b"><p>Defense ranks show how many fantasy points each defense gives up to a position this season. 1st gives up the fewest (hardest matchup) and 32nd the most (easiest). Green means easy, red means tough. Weeks 15 to 17 are the fantasy playoffs.</p>
+<p><b>Team total</b> is the points his team is expected to score, from the betting line.</p></div></details>
+      <details class="faq-i" id="faq-news"><summary>News and practice</summary><div class="faq-b"><p>Stories come from ESPN, CBS, Yahoo, ProFootballTalk, RotoBaller, Pro Football Network, The Athletic and Google News. The same story from different outlets is combined, and the four most useful recent ones are shown. Titles and summaries are written by AI from each story.</p>
+<p>Practice reports show his final practice of each week from the official NFL injury report.</p></div></details>
+      <details class="faq-i" id="faq-draft"><summary>Draft tools</summary><div class="faq-b"><p>Draft values use value over a replacement-level starter for your league's scoring and roster. During the season they are rest-of-season values; next summer they switch to full-season projections.</p>
+<p><b>Mock draft:</b> computer drafters pick by value and roster need, with some randomness. <b>Live draft:</b> keep it open during your real draft and tap each pick as it happens. Best picks favor open starting spots and warn when a player probably won't last until your next pick.</p></div></details>
+      <details class="faq-i" id="faq-league"><summary>League type, waivers and QB value</summary><div class="faq-b"><p><b>Keeper and dynasty</b> leagues blend in long-term value (age, draft year and DynastyProcess market values) for trades, trade values and the draft. Redraft leagues count this season only.</p>
+<p><b>Waiver budget</b> sets the dollar amounts for suggested bids.</p>
+<p><b>Quarterback value</b> depends on league size. In one-QB leagues quarterbacks are easy to replace, more so in small leagues, so their trade value is scaled down: about a third in 8-team leagues, half in 12-team leagues and nearly full value in very large ones. A standout still keeps a big edge because he beats the best waiver QB by a lot. Superflex and 2QB leagues use full value.</p></div></details>
+      <details class="faq-i" id="faq-alerts"><summary>Alerts</summary><div class="faq-b"><p>The bell flags starters who are out, doubtful, questionable or on bye, sell-high windows on your players, and big pickups when a starter gets hurt. Alerts show inside the site.</p></div></details>
+      <details class="faq-i" id="faq-data"><summary>Where the data comes from</summary><div class="faq-b"><p>Stats, schedules, betting lines, injury reports, depth charts and snap counts come from nflverse. Expert rankings (weekly and rest of season), roster rates and dynasty values come from FantasyPros via DynastyProcess. Market values come from FantasyCalc and KeepTradeCut. Everything refreshes every morning.</p></div></details>
+    </div>
+  </section>
+
   <!-- LEAGUE SETUP -->
   <section class="view" id="v-league" hidden>
-    <div class="hero"><div><div class="kicker"><a href="#hub" class="back-link">← League Hub</a></div><h1>League settings</h1><p>Your league's scoring and roster rules. Every ranking, lineup and trade updates instantly as you edit.</p></div></div>
+    <div class="hero"><div><div class="kicker"><a href="#hub" class="back-link">← League Hub</a></div><h1>League settings</h1><p>Scoring and roster rules. Everything updates as you edit.</p></div></div>
   <div class="card"><div class="card-h"><h3>Start from a preset</h3></div>
       <div class="presets" id="presets">
         <button class="btn" data-preset="std">Standard</button><button class="btn" data-preset="half">Half PPR</button><button class="btn" data-preset="ppr">Full PPR</button><button class="btn" data-preset="sf">Superflex + TE premium</button><button class="btn" data-preset="2qb">2QB, 6-pt pass TD</button>
@@ -202,7 +243,7 @@
             <div class="field"><label for="lg-waiver">Waivers</label><select id="lg-waiver"><option value="faab">Bidding budget (FAAB)</option><option value="priority">Waiver order</option></select></div>
             <div class="field" id="lg-budget-f"><label for="lg-budget">Season budget ($)</label><input type="number" id="lg-budget" min="0" step="1" inputmode="numeric"></div>
           </div>
-          <p class="note" style="margin:0 0 12px">Keeper and dynasty leagues also count long-term value (age, draft year and dynasty market values) in trades and the draft.</p>
+          <p class="note" style="margin:0 0 12px"><a class="how" href="#help-league">What these change</a></p>
           <div class="slots" id="slots-form"></div>
           <p class="note" style="margin:10px 0 0">Flex takes RB, WR or TE. Superflex also takes a QB.</p></div>
       </div>
@@ -210,7 +251,7 @@
     <div class="card"><div class="card-h"><h2>Scoring</h2></div><div id="scoring-form"></div></div>
   </section>
 </main>
-<footer><div class="wrap" id="site-foot">Stats, schedules, betting lines and injury reports from nflverse. Expert consensus (weekly and rest-of-season) and dynasty values from FantasyPros via DynastyProcess. Projections blend preseason expectations with 2026 production. Updated every morning.</div></footer>
+<footer><div class="wrap" id="site-foot"><a href="#help" class="foot-help">How TradeMetric works</a> · Stats, schedules, betting lines and injury reports from nflverse. Expert consensus (weekly and rest-of-season) and dynasty values from FantasyPros via DynastyProcess. Projections blend preseason expectations with 2026 production. Updated every morning.</div></footer>
 <datalist id="dl-players"></datalist>
 <div class="scrim" id="scrim" hidden><div class="modal" id="modal" role="dialog" aria-modal="true" aria-label="Player card"></div></div>
 <div class="toast" id="toast" hidden></div>

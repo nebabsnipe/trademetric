@@ -144,7 +144,10 @@ const ECR={};Object.entries(DATA.ecr||{}).forEach(([k,v])=>ECR[k.startsWith('dst
 const ROS=DATA.ros||{},DYN=DATA.dyn||{},ROST=DATA.rost||{},KICK=DATA.kick||{};
 /* expert order for the rest of the season: FantasyPros rest-of-season ranks when loaded, else this week's ranks */
 const XR=id=>ROS[id]?ROS[id][0]:ECR[id];
-const CONS_W={model:.6,cons:.4},STAR_POW=1.5,STAR_REF=6,QB_1QB=.6;
+const CONS_W={model:.6,cons:.4},STAR_POW=1.5,STAR_REF=6;
+/* one-QB leagues: quarterbacks are easy to replace, more so in small leagues. 8 teams .35, 12 teams .49, 16 teams .63, 32 teams .95.
+   Value is still measured over the best QB left on waivers, so a true standout (Josh Allen) keeps a big edge in any size league */
+const qbF=()=>Math.max(.35,Math.min(1,.35+.035*((S.league&&S.league.teams||12)-8)));
 function valuate(L){
   const pts={};POOL.forEach(p=>pts[p.id]=projPts(p,L.sc)*(BOOST[p.id]||1));
   const desc=(a,b)=>pts[b.id]-pts[a.id],byPos={};POS.forEach(x=>byPos[x]=POOL.filter(p=>p.pos===x).sort(desc));
@@ -173,8 +176,8 @@ function derive(){
     const ur=useBase?useL3/useBase:1;
     const ros=sosOf(p,WEEK+1,17),po=sosOf(p,15,17),last2=played.slice(-2),sd=Math.sqrt(avg(played.map(x=>(x-season)**2))),cv=season?sd/season:0;
     const mates=matesOut(p),role=last3>1.3*proj&&(ur>=1.15||mates.length)?(mates.length?`More work explains the jump: ${mates.map(q=>q.n).join(' and ')} ${mates.length>1?'are':'is'} out.`:`More work explains the jump: he's getting ${Math.round((ur-1)*100)}% more touches and targets lately.`):null;
-    let buy=null,risk=null;const noTags=p.pos==='K';
-    if(!noTags&&V.vor[p.id]>0&&proj>=8&&last2.length===2&&last2.every(x=>x<.7*proj)&&ur>=.9){
+    let buy=null,risk=null;const noTags=p.pos==='K',noBS=p.pos==='K'||p.pos==='DST';
+    if(!noBS&&V.vor[p.id]>0&&proj>=8&&last2.length===2&&last2.every(x=>x<.7*proj)&&ur>=.9){
       buy=[`Scored ${last2.map(f1).join(' and ')} the last two weeks, under his ${f1(proj)} average.`,`Still getting the ball (${Math.round(Math.min(ur,1.3)*100)}% of his usual work), so expect a bounce back.`];
       if(ros>=18)buy.push('Easy schedule coming up.');
       if(po>=20)buy.push('Good playoff matchups in Weeks 15 to 17.')}
@@ -184,7 +187,7 @@ function derive(){
       if(po<=6)r.push('Tough playoff matchups in Weeks 15 to 17.');
       if(r.length&&cv>.55&&played.length>=5)r.push(`Up-and-down weeks: from ${f1(Math.min(...played))} to ${f1(Math.max(...played))}.`);
       if(r.length)risk=r}
-    let tag=null;if(buy)tag='buy';else if(!noTags&&V.vor[p.id]>0&&proj>=9&&last3>1.5*proj&&ur<=1.12&&!mates.length)tag='sell';
+    let tag=null;if(buy)tag='buy';else if(!noBS&&V.vor[p.id]>0&&proj>=9&&last3>1.5*proj&&ur<=1.12&&!mates.length)tag='sell';
     const nx=OPP[p.t]&&OPP[p.t][WEEK];const projNext=nx?(p.pos==='DST'?(dstPts(p,S.league.sc,VEGAS[nx.opp]??p.pa)*(V.pts[p.id]/Math.max(.1,projPts(p,S.league.sc)))):proj*matchF(nx.opp,p.pos)*weekMult(p.id)*vegasF(p.t)):0;
     const tshare=p.pos==='QB'||p.pos==='DST'||p.pos==='K'?null:avg(games.map(x=>x.ts||0)),snaps=games.map(x=>x.snap).filter(x=>x>=0),snap=snaps.length?avg(snaps):null,rp=Math.max(1,V.repl[p.pos]);
     const oppg=p.pos==='QB'||p.pos==='DST'||p.pos==='K'||!games.length?null:avg(games.map(x=>x.ratt+x.tgt));
@@ -205,9 +208,13 @@ function outlookPass(){
     g.scoreRank=sr[id]||null;g.xr=r?Math.round(r[0]):null;g.xrange=r?[r[2],r[3]]:null;
     /* usage nudge */
     let nudge=0;if(g.gp>=4&&p.pos!=='K'&&p.pos!=='DST')nudge=(Math.max(.82,Math.min(1.25,g.ur))-1)*.16;
-    g.outF=1+nudge;V.ros[id]=V.tpts[id]*g.outF;
+    g.outF=1+nudge;const fx=factorsOf(p,g);g.fx=fx;if(nudge&&Math.abs(nudge)>=.005)fx.push({s:'ros',k:'use',v:nudge,t:nudge>0?'Workload rising over the last three games':'Workload shrinking over the last three games'});
+    const tot=sc=>Math.max(-.08,Math.min(.08,sum(fx.filter(f=>f.s===sc&&f.k!=='use'),f=>f.v)));const rf=tot('ros'),wf=tot('wk');
+    g.outF=(1+nudge)*(1+rf);V.ros[id]=V.tpts[id]*g.outF;if(g.next&&wf)g.projNext*=1+wf;g.fxWk=wf;g.fxRos=rf;
     /* what backs it up */
-    if(g.xr&&g.scoreRank){const d=g.scoreRank-g.xr;
+    const unit=p.pos==='DST'?'defense':p.pos==='K'?'kicker':null;
+    if(unit&&g.xr)look.push(`Experts rank this ${unit} ${ord(g.xr)} the rest of the way${g.scoreRank?`, and it has scored ${ord(g.scoreRank)} best so far`:''}.`);
+    else if(g.xr&&g.scoreRank){const d=g.scoreRank-g.xr;
       if(d>=5)look.push(`Experts rank him ${p.pos}${g.xr} the rest of the way, ahead of his ${p.pos}${g.scoreRank} scoring so far.`);
       else if(d<=-5)look.push(`Experts rank him ${p.pos}${g.xr} the rest of the way, behind his ${p.pos}${g.scoreRank} scoring so far.`);
       else look.push(`Experts rank him ${p.pos}${g.xr} the rest of the way, close to how he has scored (${p.pos}${g.scoreRank}).`)}
@@ -225,10 +232,62 @@ function outlookPass(){
     if(g.gp>0&&g.gp<4&&p.pos!=='K'&&p.pos!=='DST'){rs+=.12;rw.push(`Only ${g.gp} game${g.gp>1?'s':''} of data this year.`)}
     const lvl=rs>=.45?2:rs>=.2?1:0;g.risk2={lvl,score:rs,why:rw};g.look=look;
     /* expert-backed buy low / sell high */
-    if(!g.tag&&p.pos!=='K'&&V.vor[id]>0&&g.xr&&g.scoreRank&&g.gp>=4&&!LONG_OUT.includes(s)){
+    if(!g.tag&&p.pos!=='K'&&p.pos!=='DST'&&V.vor[id]>0&&g.xr&&g.scoreRank&&g.gp>=4&&!LONG_OUT.includes(s)){
       if(g.scoreRank-g.xr>=Math.max(6,g.xr*.6)&&g.ur>=.92){g.tag='buy';g.buy=[`Slow start: he has scored like a ${p.pos}${g.scoreRank}, but experts still rank him ${p.pos}${g.xr} the rest of the way.`,`Still getting the ball (${Math.round(Math.min(g.ur,1.3)*100)}% of his usual work).`].concat(lvl?['Some risk: '+rw[0].replace(/\.$/,'').toLowerCase()+'.']:[])}
       else if(g.xr-g.scoreRank>=Math.max(6,g.scoreRank*.6)&&g.ur<=1.05&&!g.mates.length&&g.scoreRank<=24){g.tag='sell';g.sellWhy=`He has scored like a ${p.pos}${g.scoreRank}, but experts rank him only ${p.pos}${g.xr} the rest of the way.`}}
   })}
+/* ===== Extra projection factors, each weighted lightly (a few percent), totals capped at 8% =====
+   Rest of season: opponent-adjusted scoring, efficiency (WOPR), age and workload, touchdown luck, snap trend.
+   This week: game script, dome or cold weather, backup QB, first game back from a soft-tissue injury,
+   short week, coming off a bye, West Coast team at a 1 PM ET road game, offensive line and secondary injuries. */
+const EFF=DATA.eff||{},LINES=DATA.lines||{};
+const COLD=['BUF','GB','CHI','CLE','NE','NYG','NYJ','PIT','DEN','KC','CIN','BAL','PHI','WAS','DET','MIN','IND','TEN','SEA','LV'];
+const WEST=['SEA','SF','LAR','LAC','LV','ARI'];
+let EFFR={v:-1};
+function effRanks(){if(EFFR.v===VER)return EFFR.m;const m={};['WR','TE','RB'].forEach(x=>POOL.filter(p=>p.pos===x&&EFF[p.id]&&G[p.id]&&G[p.id].gp>=4).sort((a,b)=>EFF[b.id][0]-EFF[a.id][0]).forEach((p,i)=>m[p.id]=i+1));EFFR={v:VER,m};return m}
+function factorsOf(p,g){const out=[],id=p.id,pos=p.pos,skill=['QB','RB','WR','TE'].includes(pos),add=(s,v,t)=>{if(Math.abs(v)>=.005)out.push({s,v,t})};
+  if(pos==='DST')return out;const games=g.log.filter(x=>!x.bye&&!x.dnp);
+  if(skill&&g.gp>=4){
+    /* 1 opponent-adjusted scoring (kept light) */
+    const pts=g.pts.map((x,i)=>x===null?null:[x,g.log[i].opp]).filter(Boolean),r=avg(pts.map(([x,o])=>x/matchF(o,pos)))/Math.max(.1,avg(pts.map(([x])=>x)));
+    add('ros',Math.max(-.03,Math.min(.03,(r-1)*.5)),r>1?'Has faced tough defenses so far':'Has faced easy defenses so far');
+    /* 2 efficiency: weighted opportunity rank vs scoring rank */
+    const er=effRanks()[id];if(er&&g.scoreRank&&pos!=='QB'){const d=g.scoreRank-er;if(d>=8)add('ros',.03,'Earns more targets and air yards than his scoring shows');else if(d<=-8)add('ros',-.03,'Scoring more than his targets and air yards support')}
+    /* 8 age and wear */
+    const dy=DYN[id];if(pos==='RB'&&dy&&dy[2]>=28)add('ros',dy[2]>=30?-.03:-.02,`Running back age ${Math.floor(dy[2])}: late-season decline is common`);
+    if(pos==='RB'&&WEEK>=10&&avg(games.map(x=>x.ratt))>=19)add('ros',-.015,'Heavy workload so far, which tends to wear down late');
+    /* 15 touchdown luck */
+    if(pos!=='QB'){const td=sum(games,x=>x.rtd+x.rectd),exp=sum(games,x=>x.tgt*.045+x.ratt*.03),dpg=(td-exp)*6/Math.max(1,games.length);
+      if(dpg>=1.5)add('ros',-.03,'Scoring touchdowns at a rate that usually cools off');else if(dpg<=-1.5)add('ros',.03,'Due for more touchdowns given his workload')}
+    /* 16 snap trend */
+    const sn=games.map(x=>x.snap).filter(x=>x>=0);if(sn.length>=5){const a=avg(sn.slice(-3)),b=avg(sn.slice(0,-3));if(a-b>=10)add('ros',.02,`Snap share climbing (${Math.round(b)}% to ${Math.round(a)}%)`);else if(b-a>=10)add('ros',-.02,`Snap share falling (${Math.round(b)}% to ${Math.round(a)}%)`)}
+  }
+  const nx=g.next;if(!nx)return out;const opp=nx.opp,k=KICK[p.t]||[];
+  /* 3 game script from the betting line */
+  if(skill&&VEGAS[p.t]&&VEGAS[opp]){const sp=VEGAS[p.t]-VEGAS[opp];
+    if(pos==='RB')add('wk',Math.max(-.03,Math.min(.03,sp*.004)),sp>0?'Team favored: more running to close out the game':'Team expected to trail: fewer carries');
+    else add('wk',Math.max(-.02,Math.min(.02,-sp*.0025)),sp<0?'Team expected to trail: more passing':'Team favored: less need to pass')}
+  /* 4 weather and venue */
+  const home=nx.home?p.t:opp,roof=(k[3]||'').toLowerCase();
+  if(roof==='dome'||roof==='closed'){if(pos!=='RB')add('wk',pos==='K'?.03:.015,'Indoor game: no wind or weather')}
+  else if(WEEK>=13&&COLD.includes(home)&&roof!=='retractable'){if(pos==='K')add('wk',-.04,'Cold outdoor game late in the season');else if(pos==='QB'||pos==='WR'||pos==='TE')add('wk',-.015,'Cold outdoor game late in the season')}
+  /* 6 teammate effects: backup quarterback */
+  if(pos==='WR'||pos==='TE'||pos==='RB'){const qb=POOL.filter(q=>q.pos==='QB'&&q.t===p.t).sort((a,b)=>V.pts[b.id]-V.pts[a.id])[0];if(qb&&isOut(qb.id))add('wk',pos==='RB'?-.03:-.06,`${qb.n} is out, so a backup starts at QB`)}
+  /* 7 first game back from a soft-tissue injury */
+  const last=g.log[g.log.length-1],pr=PRAC[id],inj=(pr&&pr.length?pr[pr.length-1][2]:'')||p.inj||'';
+  if(skill&&last&&last.dnp&&!isOut(id)&&/hamstring|ankle|calf|groin|knee|quad/i.test(inj))add('wk',-.04,`First game back from a ${inj.toLowerCase()} injury: snaps are often limited`);
+  /* 11 short week, 12 rest and travel */
+  if(k[0]==='Thursday'&&BYE[p.t]!==WEEK-1)add('wk',-.02,'Short week: Thursday game');
+  if(BYE[p.t]===WEEK-1)add('wk',.02,'Coming off a bye week');
+  if(!nx.home&&WEST.includes(p.t)&&k[2]&&k[2]<'14:00'&&!WEST.includes(opp))add('wk',-.015,'West Coast team in an early East Coast game');
+  /* 13 offensive line, 14 opposing secondary */
+  const ol=(LINES[p.t]||[0,0])[0],db=(LINES[opp]||[0,0])[1];
+  if(ol&&(pos==='RB'||pos==='QB'))add('wk',-Math.min(.045,ol*.015),`${ol} offensive ${ol>1?'linemen':'lineman'} out`);
+  if(db&&(pos==='WR'||pos==='TE'||pos==='QB'))add('wk',Math.min(.045,db*(pos==='QB'?.01:.015)),`${opp} has ${db} defensive back${db>1?'s':''} out`);
+  return out}
+function fxHtml(g){const f=(g.fx||[]).slice().sort((a,b)=>Math.abs(b.v)-Math.abs(a.v));if(!f.length)return '';
+  const row=x=>`<li><span class="fx-v ${x.v>0?'up':'down'}">${x.v>0?'+':'−'}${Math.round(Math.abs(x.v)*1000)/10}%</span><span>${esc(x.t)}</span><em>${x.s==='wk'?'This week':'Rest of season'}</em></li>`;
+  return `<div class="fx"><span class="lab2">What moves his projection</span><ul class="fx-list">${f.map(row).join('')}</ul></div>`}
 function riskHtml(id){const r=G[id]&&G[id].risk2;if(!r)return '';return `<span class="rk rk${r.lvl}" title="${esc(r.why.join(' '))}">${RISK_TXT[r.lvl]} risk</span>`}
 function recompute(){computeBoosts();V=valuate(S.league);B=valuate(BASELINE);derive();applyLive();rebuildOwn();VER++}
 /* ===== Live game-day data (/api/live) ===== */
@@ -354,7 +413,7 @@ function teamStats(){
 const tv=id=>Math.max(0,V.vor[id]+2);
 /* Trade Score building blocks */
 const sfLeague=()=>(S.league.slots.SFLEX||0)>0||(S.league.slots.QB||1)>1;
-function aboveRepl(id,src){const p=byId[id];let v=(src==='cons'?V.cons[id]:V.tpts[id])-V.repl[p.pos];if(p.pos==='QB'&&!sfLeague())v*=QB_1QB;if(LONG_OUT.includes(stOf(id)))v*=.25;return Math.max(0,v)}
+function aboveRepl(id,src){const p=byId[id];let v=(src==='cons'?V.cons[id]:V.tpts[id])-V.repl[p.pos];if(p.pos==='QB'&&!sfLeague())v*=qbF();if(LONG_OUT.includes(stOf(id)))v*=.25;return Math.max(0,v)}
 const starW=v=>Math.pow(v,STAR_POW)/Math.pow(STAR_REF,STAR_POW-1);
 const tval=id=>starW(aboveRepl(id)),cval=id=>starW(aboveRepl(id,'cons'));
 const tptsV=id=>V.tpts[id];
@@ -407,7 +466,7 @@ function marketTable(){if(MKT.v===VER)return MKT;const sf=sfLeague(),vor=POOL.fi
   MKT={v:VER,srcs};return MKT}
 function marketValue(id){if(MVC.v!==VER)MVC={v:VER,m:{}};if(MVC.m[id]!=null)return MVC.m[id];return MVC.m[id]=marketValue0(id)}
 function marketValue0(id){const m=marketTable().srcs,vals=Object.values(m).map(x=>x[id]).filter(x=>x!=null);
-  let v=vals.length?avg(vals):aboveRepl(id);if(byId[id].pos==='QB'&&!sfLeague())v*=QB_1QB;const r=starW(Math.max(0,v)),dw=DY_W[fmtOf()]||0;return dw&&DYN[id]?(1-dw)*r+dw*dynV(id):r}
+  let v=vals.length?avg(vals):aboveRepl(id);if(byId[id].pos==='QB'&&!sfLeague())v*=qbF();const r=starW(Math.max(0,v)),dw=DY_W[fmtOf()]||0;return dw&&DYN[id]?(1-dw)*r+dw*dynV(id):r}
 function marketLabel(){const s=(MARKET&&MARKET.sources)||{},d=x=>x?new Date(x+'T12:00:00').toLocaleDateString([], {month:'short',day:'numeric'}):'';const parts=[];
   if(marketTable().srcs.FantasyCalc)parts.push(`FantasyCalc ${d(s.fantasycalc&&s.fantasycalc.date)}`);if(marketTable().srcs.KeepTradeCut)parts.push(`KeepTradeCut ${d(s.keeptradecut&&s.keeptradecut.date)}`);
   if(marketTable().srcs.FantasyPros)parts.push(`FantasyPros ${d(DATA.ecrDate)}`);return parts.length?`Market values: saved snapshot from ${parts.join(', ')}`:'Market values: TradeMetric projections (no market snapshot loaded)'}
@@ -1002,7 +1061,7 @@ function renderSeason(){
       <div class="r2${t===me?' me':''}${P===6?'':' nobye'}"><span class="r2-rk">${i+1}</span>
         <span class="r2-team"><i class="tsq" style="background:${teamColor(t)}"></i><span class="r2-nm"><b>${esc(T.name)}</b><small>${recTxt(t)} · ${f1(rec[t].pf)} pts</small></span>${t===me?'<span class="tag mine">You</span>':''}</span>
         <span class="r2-odds ${cls}">${bar(x.playoff)}<b>${pct(x.playoff)}</b></span>${P===6?`<span class="r2-c r2-bye">${pct(x.bye)}</span>`:''}<span class="r2-c">${pct(x.title)}</span><span class="r2-c r2-pw">${Math.round(x.wins)}-${REG_WEEKS-Math.round(x.wins)}</span></div>`}).join('')}</div>
-    <p class="note" style="margin:12px 0 0">Weeks 1 to ${sim.P0||PLAYED} use real results. The rest of the season is simulated ${N_SIM.toLocaleString()} times from projected lineups, byes and matchups. Ties in the standings go to points scored.</p>`;
+    ${howLink('sim')}`;
   renderNeed(sim,rec);
   let road='';for(let w=WEEK;w<=REG_WEEKS;w++){const oid=oppOf(me,w);if(!oid)continue;const A=weekLine(myTeam().players,w,me),Bm=weekLine(teamById(oid).players,w,oid),p=Phi((A.m-Bm.m)/Math.sqrt(A.sd**2+Bm.sd**2));
     road+=`<div class="road-row"><span class="slot">Wk ${w}</span><span class="owner"><i style="background:${teamColor(oid)}"></i>${esc(teamById(oid).name)}</span><span class="note">${recTxt(oid)}</span><div class="road-bar"><i class="${p>=.6?'good':p<.4?'bad':''}" style="width:${p*100}%"></i></div><span class="wp ${p>=.6?'good':p<.4?'bad':''}">${pct(p)}</span></div>`}
@@ -1035,7 +1094,7 @@ function renderNeed(sim,rec){const el=$('sim-need');if(!el)return;const me=S.me,
   const tbl=`<div class="need-tbl"><div class="nt nt-h"><span>Finish</span><span>Rest of season</span><span>Playoff odds</span><span class="r">How likely</span></div>${rows.map(x=>`<div class="nt ${x.odds>=.9?'good':x.odds>=.5?'mid':x.odds>=.1?'low':'bad'}${safe&&x.k===safe.k?' key':''}"><b class="num">${rc(x.k)}</b><span class="num">${x.k}-${L-x.k}</span><span class="nt-odds"><span class="pr-bar"><i style="width:${Math.max(1.5,x.odds*100)}%"></i></span><b>${pct(x.odds)}</b></span><span class="r note">${x.reach<.01?'<1%':pct(x.reach)}</span></div>`).join('')}</div>`;
   const sw=(sim.swing||[]).map(g=>{const pa=g.n[0]?g.m[0]/g.n[0]:0,pb=g.n[1]?g.m[1]/g.n[1]:0;return {...g,d:Math.abs(pa-pb),root:pa>=pb?g.a:g.b,vs:pa>=pb?g.b:g.a,hi:Math.max(pa,pb),lo:Math.min(pa,pb)}}).filter(g=>g.d>=.015).sort((a,b)=>b.d-a.d).slice(0,3);
   const root=sw.length?`<div class="need-root"><h4>Root for this week${sim.W1?` (Week ${sim.W1})`:''}</h4>${sw.map(g=>`<div class="root-row"><span class="owner"><i style="background:${teamColor(g.root)}"></i><b>${esc(teamById(g.root).name)}</b></span><span class="note">over ${esc(teamById(g.vs).name)}</span><span class="gain">+${Math.round(g.d*100)} pts</span></div>`).join('')}</div>`:'';
-  el.innerHTML=head+hero+lock+tbl+root+`<p class="note" style="margin:14px 0 0">How this works: out of ${N_SIM.toLocaleString()} simulated seasons, we group the ones where you finish with each record and count how often you make the top ${sim.P}. "How likely" is how often you end up with that record.</p>`}
+  el.innerHTML=head+hero+lock+tbl+root+`${howLink('sim')}`}
 
 
 /* ===== Platform import ===== */
@@ -1216,9 +1275,9 @@ function openCard(id){if(openId!==id)delete SORTS['log-table'];openId=id;const p
     <div class="msec"><h4>Game log</h4><div class="logbox"><table id="log-table"><thead><tr><th data-sort data-first="asc">WK</th><th>OPP</th>${cols.map(c=>`<th class="r" data-sort>${c[0]}</th>`).join('')}<th class="r" data-sort>FPTS</th></tr></thead>
       <tbody>${g.log.map((x,i)=>x.bye?`<tr><td>${x.w}</td><td colspan="${cols.length+2}" class="muted">Bye week</td></tr>`:x.dnp?`<tr><td>${x.w}</td><td>${x.home?'vs':'@'} ${x.opp}</td><td colspan="${cols.length+1}" class="muted">Did not play</td></tr>`:`<tr><td>${x.w}</td><td>${x.home?'vs':'@'} ${x.opp}</td>${cols.map(c=>`<td class="r num">${x[c[1]]}</td>`).join('')}<td class="r num" style="font-weight:700">${f1(g.pts[i])}</td></tr>`).join('')}</tbody>
       <tfoot><tr><td colspan="2">Season</td>${cols.map(c=>`<td class="r num">${tot(c[1])}</td>`).join('')}<td class="r num">${f1(season)}</td></tr></tfoot></table></div>
-      <p class="note" style="margin:6px 0 0">Real 2026 stats through Week ${PLAYED}. Last updated ${new Date(DATA.asOf+'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric'})}; refreshed every morning.</p></div>
+      <p class="note" style="margin:6px 0 0">Through Week ${PLAYED} · updated ${new Date(DATA.asOf+'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric'})}</p></div>
     <div class="msec"><h4>Schedule ahead</h4><div class="schedbox"><div class="sched">${schedOf(p.t,WEEK,17).map(x=>x.g?`<div class="sw ${defRank(x.g.opp,p.pos)>=24?'easy':defRank(x.g.opp,p.pos)<=8?'hard':''}${x.w>=15?' po':''}"><span>Wk ${x.w}</span><b>${x.g.home?'vs':'at'} ${x.g.opp}</b><em>${ord(defRank(x.g.opp,p.pos))}</em></div>`:`<div class="sw${x.w>=15?' po':''}"><span>Wk ${x.w}</span><b>BYE</b><em>-</em></div>`).join('')}</div></div>
-      <p class="note" style="margin:6px 0 0">Defense rank against ${p.pos}s. Green is an easy matchup, red is tough. Weeks 15 to 17, underlined, are the fantasy playoffs.</p></div>
+      ${howLink('matchups')}</div>
     <div class="msec"><h4>${isMine?'Trade him for similar value':own?'What it would take from your roster':'Similar value on your roster'}</h4>${comps.length?comps.map(q=>`<div class="mini-row">${plCell(q,`${q.pos}${V.posRank[q.id]} · ${f1(V.pts[q.id])} pts/G · ${OWN[q.id]===S.me?'your team':esc(teamById(OWN[q.id]).name)}`)}${tagHtml(q.id)||'<span></span>'}<button class="btn small" data-load="${isMine?id:q.id}|${isMine?q.id:id}" ${(!isMine&&!own)?'hidden':''}>Trade</button></div>`).join(''):'<p class="empty">No close matches in your league right now.</p>'}</div>
     <div class="msec"><h4>News and practice</h4>${(()=>{const st=newsItems(p,g);return st.length?`<ul class="news">${st.map(x=>`<li><span>${x.t}</span></li>`).join('')}</ul>`:''})()}${pracHtml(id)}<div id="card-news">${newsHtml(id)}</div></div>
    </div>`;
@@ -1228,15 +1287,12 @@ const DAYS={Sunday:'Sun',Monday:'Mon',Tuesday:'Tue',Wednesday:'Wed',Thursday:'Th
 function kickTxt(t){const k=KICK[t];if(!k||!k[1])return '';const [wd,day,tm]=k,d=new Date(day+'T12:00:00');let s=(DAYS[wd]||wd)+' '+d.toLocaleDateString('en-US',{month:'short',day:'numeric'});
   if(tm){const [h,m]=tm.split(':').map(Number);s+=` · ${(h%12)||12}:${String(m).padStart(2,'0')} ${h>=12?'PM':'AM'} ET`}return s}
 function muBanner(p,g){const nx=g.next,own=ownerHtml(p.id);
-  if(!nx)return `<div class="mu-banner bye"><div class="mu-main"><span class="mu-wk">Week ${WEEK}</span><b class="mu-name">Bye week</b><span class="mu-sub">No game this week</span></div><div class="mu-own">${own}</div></div>`;
-  const r=nx.rank,cls=r>=24?'easy':r<=8?'hard':'mid',txt=r>=24?'Good matchup':r<=8?'Tough matchup':'Average matchup',vs=p.pos==='DST'?'offense':'defense';
-  return `<div class="mu-banner" style="${tcVars(nx.opp)}"><div class="mu-logo" aria-hidden="true">${nx.opp}</div>
-    <div class="mu-main"><span class="mu-wk">Week ${WEEK}${kickTxt(p.t)?' · '+kickTxt(p.t):''}</span><b class="mu-name">${nx.home?'vs':'at'} ${esc(NICK[nx.opp]||nx.opp)}</b><span class="mu-sub">${nx.home?'Home game':'Road game'}</span></div>
-    <div class="mu-stats">
-      <div class="mu-st"><span>Matchup</span><b class="mu-badge ${cls}">${ord(r)}</b><em title="${nx.opp} ${vs} ranks ${ord(r)} ${p.pos==='DST'?'in points given up to defenses':'against '+p.pos+'s'}; 1st gives up the fewest, 32nd the most">${txt}</em></div>
-      ${VEGAS[p.t]?`<div class="mu-st"><span>Team total</span><b>${VEGAS[p.t]}</b><em>From the betting line</em></div>`:''}
-      <div class="mu-st"><span>Projection</span><b>${f1(g.projNext)}</b><em>${riskHtml(p.id)}</em></div>
-    </div><div class="mu-own">${own}</div></div>`}
+  if(!nx)return `<div class="mu-line bye"><span class="mu-wk">Week ${WEEK}</span><b>Bye week</b><span class="mu-own">${own}</span></div>`;
+  const r=nx.rank,cls=r>=24?'easy':r<=8?'hard':'';
+  return `<div class="mu-line" style="${tcVars(nx.opp)}"><span class="mu-logo" aria-hidden="true">${nx.opp}</span>
+    <span class="mu-what"><b>${nx.home?'vs':'at'} ${esc(NICK[nx.opp]||nx.opp)}</b><span class="mu-wk">Week ${WEEK}${kickTxt(p.t)?' · '+kickTxt(p.t):''}</span></span>
+    <span class="mu-chips"><span class="drk ${cls}" title="${nx.opp} ranks ${ord(r)} against ${p.pos==='DST'?'D/STs':p.pos+'s'} (1st gives up the fewest points)">${ord(r)} vs ${p.pos==='DST'?'D/ST':p.pos}</span>${VEGAS[p.t]?`<span class="mu-tt" title="Points his team is expected to score, from the betting line">Team total <b>${VEGAS[p.t]}</b></span>`:''}</span>
+    <span class="mu-own">${own}</span></div>`}
 function outlookHtml(p,g){if(p.pos==='K')return '';const r=g.risk2||{lvl:0,why:[]},look=(g.look||[]).filter(x=>!/^Experts rank/.test(x)||!g.xr);
   const chips=[g.xr?`<div class="ol-chip"><span>Experts, rest of season</span><b>${p.pos}${g.xr}</b><em>${g.xrange&&g.xrange[0]?`Range ${p.pos}${g.xrange[0]} to ${p.pos}${g.xrange[1]}`:'FantasyPros consensus'}</em></div>`:'',
     g.scoreRank?`<div class="ol-chip"><span>Scoring so far</span><b>${p.pos}${g.scoreRank}</b><em>${f1(g.season)} pts a game</em></div>`:'',
@@ -1247,7 +1303,7 @@ function outlookHtml(p,g){if(p.pos==='K')return '';const r=g.risk2||{lvl:0,why:[
   const lead=gap>=5?'Experts expect him to score more from here than he has so far.':gap<=-5?'Experts expect him to cool off from his pace so far.':g.xr?'Experts see more of the same from here.':'';
   return `<div class="msec"><h4>Rest-of-season outlook</h4><div class="ol-chips">${chips}</div>
     ${lead||bullets.length?`<ul class="reasons ol-why">${lead?`<li>${lead}</li>`:''}${bullets.map(x=>`<li>${esc(x)}</li>`).join('')}</ul>`:''}
-    ${r.lvl&&r.why.length>1?`<p class="note" style="margin:6px 0 0">Risk factors: ${esc(r.why.join(' '))}</p>`:''}</div>`}
+    ${r.lvl&&r.why.length>1?`<p class="note" style="margin:6px 0 0">Risk factors: ${esc(r.why.join(' '))}</p>`:''}${fxHtml(g)}${howLink('values')}</div>`}
 function closeCard(){$('scrim').hidden=true;document.body.style.overflow='';openId=null}
 
 /* ===== League setup form ===== */
@@ -1280,11 +1336,12 @@ function applyTheme(){if(themePref)document.documentElement.setAttribute('data-t
 $('theme-btn').addEventListener('click',()=>{themePref=isDark()?'light':'dark';try{localStorage.setItem('hashmark-theme',themePref)}catch(e){}applyTheme()});
 
 /* ===== Routing & events ===== */
-const TABS=['team','feed','trade','rankings','hub','season','league','draft','welcome','signin','account'];let tab='team';
+const TABS=['team','feed','trade','rankings','hub','season','league','draft','help','welcome','signin','account'];let tab='team';
+function howLink(k){return `<a class="how how-wrap" href="#help-${k}">How this works</a>`}
 const TAB_ALIAS={players:['rankings','rank'],waivers:['rankings','waiv'],values:['rankings','vals']};
-function go(t){if(TAB_ALIAS[t]){plView=TAB_ALIAS[t][1];t=TAB_ALIAS[t][0]}if(t==='helper'){if(USER)openAI();t=TABS.includes(tab)?tab:'team';history.replaceState(null,'','#'+t)}if(!USER&&t!=='signin')t='signin';tab=TABS.includes(t)?t:'team';if(tab!=='welcome'&&S&&!S.onboarded){S.onboarded=true;save()}document.querySelectorAll('.nav button').forEach(b=>{if(b.dataset.tab===tab)b.setAttribute('aria-current','page');else b.removeAttribute('aria-current')});
-  TABS.forEach(x=>$('v-'+x).hidden=x!==tab);render();window.scrollTo(0,0)}
-function render(){({team:renderTeam,rankings:renderPlayers,draft:renderDraft,trade:renderTrade,hub:renderHub,season:renderSeason,welcome:renderWelcome,league:fillLeagueForm,signin:renderSignin,feed:renderFeed,account:renderAccount})[tab]();renderAlerts();if(openId&&!$('scrim').hidden)openCard(openId);queueBalance()}
+function go(t){let helpSec=null;if(t&&t.startsWith('help-')){helpSec=t.slice(5);t='help'}if(TAB_ALIAS[t]){plView=TAB_ALIAS[t][1];t=TAB_ALIAS[t][0]}if(t==='helper'){if(USER)openAI();t=TABS.includes(tab)?tab:'team';history.replaceState(null,'','#'+t)}if(!USER&&t!=='signin')t='signin';tab=TABS.includes(t)?t:'team';if(tab!=='welcome'&&S&&!S.onboarded){S.onboarded=true;save()}document.querySelectorAll('.nav button').forEach(b=>{if(b.dataset.tab===tab)b.setAttribute('aria-current','page');else b.removeAttribute('aria-current')});
+  TABS.forEach(x=>$('v-'+x).hidden=x!==tab);render();window.scrollTo(0,0);if(tab==='help')openHelp(helpSec)}
+function render(){({team:renderTeam,rankings:renderPlayers,draft:renderDraft,help:()=>{},trade:renderTrade,hub:renderHub,season:renderSeason,welcome:renderWelcome,league:fillLeagueForm,signin:renderSignin,feed:renderFeed,account:renderAccount})[tab]();renderAlerts();if(openId&&!$('scrim').hidden)openCard(openId);queueBalance()}
 document.querySelectorAll('.nav button').forEach(b=>b.addEventListener('click',()=>{location.hash=b.dataset.hash||b.dataset.tab}));
 window.addEventListener('hashchange',()=>{closeCard();go(location.hash.slice(1))});
 function loadTrade(str){const [g,r]=str.split('|');TD.give=g?g.split(','):[];TD.get=r?r.split(','):[];closeCard();if(tab==='trade')renderTrade();else location.hash='trade';setTimeout(()=>$('rating').scrollIntoView({behavior:'smooth',block:'center'}),60)}
@@ -1772,15 +1829,14 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape'&&document.body.class
 const NEWS={};
 const PRAC_TXT={DNP:'Did not practice',LP:'Limited',FP:'Full practice'};
 function pracHtml(id){const L=PRAC[id];if(!L||!L.length)return '';
-  return `<div class="prac"><span class="lab2">Practice reports</span>${L.slice().reverse().map(([w,c,inj,gs])=>`<div class="prac-row"><span class="prac-wk">Wk ${w}</span><span class="pchip ${(c||'na').toLowerCase()}">${PRAC_TXT[c]||'No report'}</span><span class="prac-inj">${esc(inj&&!/not injury related/i.test(inj)?inj:inj?'Rest day':'')}</span>${gs?`<span class="prac-gs ${gs==='Out'?'bad':gs==='Questionable'?'warn':''}">${esc(gs)}</span>`:''}</div>`).join('')}
-    <span class="note">Final practice of each week from the official NFL injury report.</span></div>`}
+  return `<div class="prac"><span class="lab2">Practice reports</span>${L.slice().reverse().map(([w,c,inj,gs])=>`<div class="prac-row"><span class="prac-wk">Wk ${w}</span><span class="pchip ${(c||'na').toLowerCase()}">${PRAC_TXT[c]||'No report'}</span><span class="prac-inj">${esc(inj&&!/not injury related/i.test(inj)?inj:inj?'Rest day':'')}</span>${gs?`<span class="prac-gs ${gs==='Out'?'bad':gs==='Questionable'?'warn':''}">${esc(gs)}</span>`:''}</div>`).join('')}</div>`}
 function newsHtml(id){const n=NEWS[id];
   if(!n||n.loading)return `<div class="nws-load"><span class="spin"></span> Loading news from ESPN, CBS, Yahoo, RotoBaller and more...</div>`;
   if(n.error)return `<p class="note">News couldn't load right now. <button class="linkish" data-news-retry="${id}">Try again</button></p>`;
   if(!n.items.length)return `<p class="note">No recent news stories about ${esc(byId[id].n)} in the last three weeks.</p>`;
   return `<div class="nws">${n.items.slice(0,4).map(x=>`<article class="nw"><h5>${esc(x.title)}</h5>${x.summary?`<p>${esc(x.summary)}</p>`:''}
     <div class="nw-meta"><span>${esc(x.outlet)}${x.also&&x.also.length?` <span class="note">+ ${x.also.length} more</span>`:''}</span>${x.at?`<span>${ago(x.at)}</span>`:''}${x.url?`<a href="${esc(x.url)}" target="_blank" rel="noopener">Read story ↗</a>`:''}</div></article>`).join('')}</div>
-    <p class="note" style="margin:8px 0 0">${n.ai?'Titles and summaries written by AI from each story. ':''}Duplicate stories from different outlets are combined.</p>`}
+    ${howLink('news')}`}
 async function loadNews(id){const p=byId[id];if(!p||p.pos==='DST')return;const c=NEWS[id];if(c&&!c.error&&(c.loading||Date.now()-c.at<20*60e3))return;
   NEWS[id]={loading:true};const paint=()=>{if(openId===id){const el=$('card-news');if(el)el.innerHTML=newsHtml(id)}};paint();
   try{const r=await fetch(`/api/news?name=${encodeURIComponent(p.n)}&team=${encodeURIComponent(p.t||'')}&pos=${encodeURIComponent(p.pos)}`);if(!r.ok)throw new Error(r.status);const j=await r.json();NEWS[id]={items:j.items||[],ai:j.ai,at:Date.now()}}
@@ -1789,9 +1845,9 @@ document.addEventListener('click',e=>{const b=e.target.closest&&e.target.closest
 
 /* ===== Players tab: rankings, waiver wire with bid advice, trade value chart ===== */
 var plView='rank',waivPos='ALL',valPos='ALL',VAL_ALL=false;
-const PL_INTRO={rank:`Every player valued for your league's scoring. <span class="badge buy">BL</span> buy low, <span class="badge sell">SH</span> sell high, <span class="badge risk">RISK</span> due for regression. Experts is the FantasyPros rest-of-season rank at his position. Select any column to sort.`,
-  waiv:`Available players ranked for your team, with a suggested bid and who to drop. Bids scale with your league's budget, the weeks left and how many teams will want him.`,
-  vals:`What every player is worth in a trade on a 0 to 100 scale, from expert market values and TradeMetric's rest-of-season projections. Stars are worth more than the sum of lesser players: two 30s rarely get you a 60.`};
+const PL_INTRO={rank:`Every player valued for your league's scoring. <a class="how" href="#help-rankings">How this works</a>`,
+  waiv:`The best pickups for your team, with a bid and who to drop. <a class="how" href="#help-waivers">How this works</a>`,
+  vals:`What every player is worth in a trade, from 0 to 100. <a class="how" href="#help-tradevalues">How this works</a>`};
 function renderPlayers(){document.querySelectorAll('#pl-seg button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.pl===plView));
   ['rank','waiv','vals'].forEach(k=>$('pl-'+k).hidden=k!==plView);$('pl-intro').innerHTML=PL_INTRO[plView];
   if(plView==='rank')renderRankings();else{$('rank-kicker').textContent=`${S.league.name||'My League'} · ${leagueTagline(S.league)}`;if(plView==='waiv')renderWaivers();else renderValues()}}
@@ -1822,7 +1878,7 @@ function renderWaivers(){const faab=(S.league.waiver||'faab')==='faab',B=S.leagu
       <td class="r">${faab?(b.hi?`<b class="bid num">$${b.lo===b.hi?b.lo:b.lo+'–'+b.hi}</b><span class="bid-p">${Math.round(b.pc)}% of budget</span>`:'<span class="note">$0–1</span>'):`<b class="bid">${claimTxt(r)}</b>`}</td>
       <td>${r.drop?`<button class="pname" data-open="${r.drop}">${esc(byId[r.drop].n)}</button><span class="psub" style="display:block">${byId[r.drop].pos}${V.posRank[r.drop]} · ${f1(V.pts[r.drop])}/G</span>`:'<span class="note">Open spot</span>'}</td>
       <td class="r"><button class="btn small" data-swap="${p.id}|${r.drop||''}">Add</button></td></tr>`}).join('')||'<tr><td colspan="8" class="empty">No available players at this position.</td></tr>'}</tbody></table></div>
-    <p class="note" style="margin:0">Your gain is the change to your best lineup after the drop. Pts/G ahead blends TradeMetric's projection with the experts' rest-of-season ranks. Players moving into a bigger role draw higher bids because every team will want them.</p>`}
+    ${howLink('waivers')}`}
 let TVC={v:-1};
 function tradeVal(id){if(TVC.v!==VER)TVC={v:VER,m:{}};if(TVC.m[id]!=null)return TVC.m[id];const g=G[id];return TVC.m[id]=.5*marketValue(id)+.5*starW(aboveRepl(id)*(g&&g.outF||1))}
 function renderValues(){const L=POOL.filter(p=>p.pos!=='K'&&p.pos!=='DST').map(p=>({p,v:tradeVal(p.id)})).filter(x=>x.v>.05).sort((a,b)=>b.v-a.v);
@@ -1835,7 +1891,7 @@ function renderValues(){const L=POOL.filter(p=>p.pos!=='K'&&p.pos!=='DST').map(p
   $('pl-vals').innerHTML=`<div class="toolbar">${posSeg('vpos',valPos,['ALL','QB','RB','WR','TE'])}<input type="search" id="val-search" placeholder="Search players or NFL teams" value="${esc(q)}"></div>
     <div class="tablebox"><table class="val-t" style="min-width:780px"><thead><tr><th class="r">#</th><th>Player</th><th>Pos</th><th style="width:30%">Trade value</th><th class="r">Tier</th><th class="r">Trend</th><th>Risk</th><th class="r">Experts</th></tr></thead><tbody>${html||'<tr><td colspan="8" class="empty">No players match.</td></tr>'}</tbody></table></div>
     ${!VAL_ALL&&!q&&total>150?`<div class="rank-more"><button class="btn" id="val-all">Show all ${total} players</button></div>`:''}
-    <p class="note" style="margin:0">${fmtOf()==='redraft'?'Values are for this season only.':`Your league is set to ${fmtOf()}, so long-term value (age and dynasty market values) is blended in.`} ${esc(marketLabel())}.</p>`;
+    ${howLink('tradevalues')}`;
   const si=$('val-search');if(si&&q){si.focus();si.setSelectionRange(q.length,q.length)}}
 
 /* ===== Start or sit ===== */
@@ -1922,7 +1978,7 @@ function drRun(){clearTimeout(DR_TIMER);renderDraft();if(!DR||DR.mode!=='mock'||
   DR_TIMER=setTimeout(()=>{if(!DR||tab!=='draft')return;const id=drBot(k);if(!id)return;DR.picks.push({id,t:drTeamAt(k),k});drRun()},DR.fast?0:140)}
 function renderDraft(){document.querySelectorAll('#dr-seg button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.dr===drView));
   $('draft-kicker').textContent=`${S.league.name||'My League'} · ${leagueTagline(S.league)}${fmtOf()!=='redraft'?' · '+fmtOf():''}`;
-  $('draft-intro').textContent=WEEK>1&&WEEK<=18?`It's the regular season, so these values are rest-of-season. Use the mock draft to practice and the cheat sheet for redrafts or late-season leagues. Next summer they switch to full-season projections.`:'Cheat sheets, mock drafts and a live draft assistant, all valued for your league\'s scoring and roster.';
+  $('draft-intro').innerHTML=`${WEEK>1&&WEEK<=18?'During the season, values are rest-of-season.':'Cheat sheets, mock drafts and a live draft assistant for your league.'} <a class="how" href="#help-draft">How this works</a>`;
   if(drView==='sheet')return renderSheet();
   if(drView==='live'&&(!DR||DR.mode!=='live'))DR=S.draftLive&&S.draftLive.picks?S.draftLive:null;
   if(!DR||DR.mode!==drView)drNew(drView);
@@ -1931,13 +1987,13 @@ function renderSheet(){const B=draftBoard(),cols=[['QB',24],['RB',48],['WR',60],
   const col=([pos,n])=>{const L=B.list.filter(x=>byId[x.id].pos===pos).slice(0,n);let pt=0;
     return `<div class="card sh-col"><div class="card-h"><h3>${pos}</h3><span class="note">Top ${L.length}</span></div><ol class="sh-list">${L.map((x,i)=>{const p=byId[x.id],t=B.tier[x.id],brk=t!==pt;pt=t;return `${brk?`<li class="sh-tier">Tier ${t}</li>`:''}<li class="sh-row"><span class="num sh-n">${i+1}</span><button class="pname" data-open="${p.id}">${esc(p.n)}</button><span class="sh-m">${p.t} · ${BYE[p.t]||'-'}</span><span class="num sh-v">${f1(V.ros[p.id])}</span></li>`}).join('')}</ol></div>`};
   const top=B.list.slice(0,200);
-  $('draft-body').innerHTML=`<div class="toolbar"><span class="note">Tiers group players with similar value. Numbers are projected points a game for your scoring; byes next to each team.</span><button class="btn" id="sh-print">Print cheat sheet</button></div>
+  $('draft-body').innerHTML=`<div class="toolbar">${howLink('draft')}<button class="btn" id="sh-print">Print cheat sheet</button></div>
     <div class="sh-grid">${cols.map(col).join('')}</div>
     <div class="card"><div class="card-h"><h2>Top 200 overall</h2><span class="note">Value over a replacement-level starter${fmtOf()!=='redraft'?', with long-term value blended in':''}</span></div>
       <ol class="sh-all">${top.map(x=>{const p=byId[x.id];return `<li><span class="num sh-n">${x.rk}</span><span class="pos ${p.pos}">${p.pos}${V.posRank[p.id]}</span><button class="pname" data-open="${p.id}">${esc(p.n)}</button><span class="sh-m">${p.t} · ${BYE[p.t]||'-'}</span></li>`}).join('')}</ol></div>`}
 function renderBoard(){const B=draftBoard(),N=DR.n*DR.R,k=DR.picks.length,done=k>=N,onT=done?null:drTeamAt(k),mine=drMine(),myTurn=!done&&onT===DR.slot-1,live=DR.mode==='live';
   const setup=!DR.started&&!live;
-  if(setup){$('draft-body').innerHTML=`<div class="card dr-setup"><h2>Mock draft</h2><p class="note">Practice against ${DR.n-1} computer drafters who pick by value and roster need, with some randomness. ${DR.R} rounds, snake order, using your league's roster and scoring.</p>
+  if(setup){$('draft-body').innerHTML=`<div class="card dr-setup"><h2>Mock draft</h2><p class="note">Snake draft against ${DR.n-1} computer drafters, using your league's roster and scoring.</p>
       <div class="field-row"><div class="field"><label for="dr-slot">Your draft slot</label><select id="dr-slot">${Array.from({length:DR.n},(_,i)=>`<option value="${i+1}" ${DR.slot===i+1?'selected':''}>Pick ${i+1}</option>`).join('')}</select></div>
       <div class="field"><label for="dr-teams">Teams</label><select id="dr-teams">${[8,10,12,14,16].map(n=>`<option ${DR.n===n?'selected':''}>${n}</option>`).join('')}</select></div>
       <div class="field"><label for="dr-rounds">Rounds</label><select id="dr-rounds">${[8,10,12,14,15,16,18,20].map(n=>`<option ${DR.R===n?'selected':''}>${n}</option>`).join('')}</select></div></div>
@@ -1951,7 +2007,7 @@ function renderBoard(){const B=draftBoard(),N=DR.n*DR.R,k=DR.picks.length,done=k
   const recentPicks=DR.picks.slice(-10).reverse();
   $('draft-body').innerHTML=`<div class="dr-top card"><div class="dr-clock">${done?'<b>Draft complete</b>':`<span class="note">Round ${Math.floor(k/DR.n)+1}, pick ${k%DR.n+1} · overall ${k+1}</span><b>${myTurn?'You are on the clock':esc(drTeamName(onT))+' is on the clock'}</b>${!myTurn&&until!=null?`<span class="note">Your next pick is in ${until} pick${until>1?'s':''}</span>`:''}`}</div>
       <div class="dr-act">${live?'':`<button class="btn small" id="dr-sim" ${done||myTurn?'disabled':''}>Skip to my pick</button>`}<button class="btn small" id="dr-undo" ${k?'':'disabled'}>Undo</button><button class="btn small ghost" id="dr-reset">${live?'Clear draft':'New mock draft'}</button></div></div>
-    ${live&&!k?`<p class="note dr-help">Keep this open during your real draft. Tap <b>Picked</b> each time any team takes a player (it goes to the team on the clock) and TradeMetric updates its advice for your next pick. Your slot: <select id="dr-slot-live">${Array.from({length:DR.n},(_,i)=>`<option value="${i+1}" ${DR.slot===i+1?'selected':''}>Pick ${i+1}</option>`).join('')}</select> of <select id="dr-teams-live">${[8,10,12,14,16].map(n=>`<option ${DR.n===n?'selected':''}>${n}</option>`).join('')}</select> teams.</p>`:''}
+    ${live&&!k?`<p class="note dr-help">Tap <b>Picked</b> each time any team takes a player. Your slot: <select id="dr-slot-live">${Array.from({length:DR.n},(_,i)=>`<option value="${i+1}" ${DR.slot===i+1?'selected':''}>Pick ${i+1}</option>`).join('')}</select> of <select id="dr-teams-live">${[8,10,12,14,16].map(n=>`<option ${DR.n===n?'selected':''}>${n}</option>`).join('')}</select> teams.</p>`:''}
     <div class="grid2 dr-grid"><div class="stack">
       ${done?drSummary():`<div class="card dr-rec"><div class="card-h"><h2>${myTurn?'Best picks now':'Best picks for your next turn'}</h2></div>${top3.map((x,i)=>{const p=byId[x.id];return `<div class="dr-r${i?'':' first'}">${plCell(p,`${p.pos}${V.posRank[p.id]} · ${p.t} · Tier ${B.tier[x.id]} · ${f1(V.ros[p.id])} pts/G`)}<span class="dr-why">${esc(recWhy(x))}</span>${myTurn?`<button class="btn small ${i?'':'primary'}" data-drpick="${p.id}">Draft</button>`:''}</div>`}).join('')}</div>`}
       <div class="card"><div class="card-h"><h2>Available</h2><span class="note">${avail.length} players</span></div>
@@ -1994,3 +2050,6 @@ document.addEventListener('change',e=>{const t=e.target;
   else if(t.id==='dr-rounds'){DR.R=+t.value;renderDraft()}});
 document.addEventListener('input',e=>{if(e.target.id==='val-search')renderValues();else if(e.target.id==='dr-q')renderDraft()});
 document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!$('alert-pop').hidden)toggleAlerts(false);if(e.key==='Enter'&&e.target.id==='ss-add')$('ss-add-btn').click()});
+
+/* ===== How this works (help page) ===== */
+function openHelp(sec){document.querySelectorAll('#v-help details').forEach(d=>{if(sec)d.open=d.id==='faq-'+sec});if(sec){const el=$('faq-'+sec);if(el)setTimeout(()=>el.scrollIntoView({block:'start'}),30)}}

@@ -107,7 +107,7 @@ bye={t:next(i+1 for i,x in enumerate(sched[t]) if x==0) for t in teams}
 vegas={};kick={}
 for r in g[g.week==WEEK].itertuples():
     for tm,home in ((r.home_team,1),(r.away_team,0)):
-        kick[tm]=[str(r.weekday) if pd.notna(r.weekday) else '',str(r.gameday) if pd.notna(r.gameday) else '',str(r.gametime) if pd.notna(r.gametime) else '']
+        kick[tm]=[str(r.weekday) if pd.notna(r.weekday) else '',str(r.gameday) if pd.notna(r.gameday) else '',str(r.gametime) if pd.notna(r.gametime) else '',str(getattr(r,'roof','')) if pd.notna(getattr(r,'roof','')) else '']
     if pd.notna(r.total_line):
         s=r.spread_line if pd.notna(r.spread_line) else 0
         vegas[r.home_team]=round(r.total_line/2+s/2,1);vegas[r.away_team]=round(r.total_line/2-s/2,1)
@@ -193,6 +193,31 @@ for p in out:
 data={'week':WEEK,'played':PLAYED,'injWeek':IW,'asOf':datetime.date.today().isoformat(),'fields':F,'players':final,'sched':sched,'bye':bye,'vegas':vegas,'kick':kick,'def':DEF}
 data['depth']={p[0]:depth[GID[p[0]]] for p in final if GID.get(p[0]) in depth}
 data['practice']={p[0]:prac[GID[p[0]]] for p in final if GID.get(p[0]) in prac}
+# efficiency: weighted opportunity (WOPR) and air yards per game, which predict future scoring better than raw points
+try:
+    eff={}
+    cols=[c for c in ('wopr','receiving_air_yards') if c in w.columns]
+    if cols:
+        e=w.groupby('player_id').agg(**{c:(c,'mean') for c in cols}).reset_index()
+        em={r.player_id:r for r in e.itertuples()}
+        for p in final:
+            r=em.get(GID.get(p[0]))
+            if r is None or p[2] not in('WR','TE','RB'):continue
+            wo=getattr(r,'wopr',None);ay=getattr(r,'receiving_air_yards',None)
+            eff[p[0]]=[round(float(wo),3) if wo is not None and pd.notna(wo) else 0,round(float(ay),1) if ay is not None and pd.notna(ay) else 0]
+    data['eff']=eff;print(len(eff),'efficiency rows',file=sys.stderr)
+except Exception as ex:print('efficiency skipped',ex,file=sys.stderr)
+# line health: offensive linemen and defensive backs out or doubtful on the latest injury report
+try:
+    lines={}
+    for r in inj.itertuples():
+        st=r.report_status if isinstance(r.report_status,str) else ''
+        if st not in('Out','Doubtful'):continue
+        t=fix(r.team);pos=str(r.position)
+        if pos in('T','G','C','OT','OG','OL'):lines.setdefault(t,[0,0])[0]+=1
+        elif pos in('CB','S','FS','SS','DB'):lines.setdefault(t,[0,0])[1]+=1
+    data['lines']=lines;print(len(lines),'teams with line injuries',file=sys.stderr)
+except Exception as ex:print('line injuries skipped',ex,file=sys.stderr)
 js=json.dumps(data,separators=(',',':'))
 print(len(final),'players',len(js)//1024,'KB','week',WEEK,file=sys.stderr)
 print(sum(1 for p in final if p[4]),'with status',file=sys.stderr)
