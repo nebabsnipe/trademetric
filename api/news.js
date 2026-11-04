@@ -107,7 +107,7 @@ async function collect(name, team, probe) {
     out.push({ ...i, also: [], alts: [] });
   }
   out.sort((a, b) => score(b) - score(a));
-  return { items: out.slice(0, 9), report };
+  return { items: out.slice(0, 7), report };
 }
 
 function parseJSON(text) {
@@ -164,7 +164,7 @@ export default async function handler(req, res) {
     const a = ai && ai.find(z => z && z.i === i);
     return { title: (a && a.title) || x.title, summary: (a && a.summary) || clip(x.desc, 260), headline: x.title, outlet: x.outlet, also: x.also.slice(0, 3), url: x.url, at: x.at, relevant: a ? a.relevant !== false : true, ai: !!a };
   }).filter(x => x.relevant);
-  const v = { name, updated: new Date().toISOString(), ai: !!ai, items: out.slice(0, 6) };
+  const v = { name, updated: new Date().toISOString(), ai: !!ai, items: out.slice(0, 4) };
   if (!ai && items.length) { v.aiError = LAST_ERR; }
   cache.set(key, { at: Date.now(), v });
   res.setHeader('Cache-Control', 's-maxage=1800, stale-while-revalidate=3600');

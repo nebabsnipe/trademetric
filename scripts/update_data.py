@@ -23,14 +23,17 @@ SOURCES={
   f'snap_counts_{SEASON}.csv':        NV+f'snap_counts/snap_counts_{SEASON}.csv',
   f'depth_charts_{SEASON}.csv':       NV+f'depth_charts/depth_charts_{SEASON}.csv',
   'fp_latest_weekly.csv':             'https://raw.githubusercontent.com/dynastyprocess/data/master/files/fp_latest_weekly.csv',
+  'db_fpecr_latest.csv':              'https://raw.githubusercontent.com/dynastyprocess/data/master/files/db_fpecr_latest.csv',
+  'values-players.csv':               'https://raw.githubusercontent.com/dynastyprocess/data/master/files/values-players.csv',
 }
+OPTIONAL=('fp_latest_weekly.csv',f'depth_charts_{SEASON}.csv','db_fpecr_latest.csv','values-players.csv')
 os.makedirs(RAW,exist_ok=True)
 for name,url in SOURCES.items():
     try:
         urllib.request.urlretrieve(url,RAW+name);print('downloaded',name,file=sys.stderr)
     except Exception as e:
         print('could not download',name,e,file=sys.stderr)
-        if not os.path.exists(RAW+name) and name not in ('fp_latest_weekly.csv',f'depth_charts_{SEASON}.csv'):sys.exit(1)
+        if not os.path.exists(RAW+name) and name not in OPTIONAL:sys.exit(1)
 ECR_FILE=RAW+'fp_latest_weekly.csv' if os.path.exists(RAW+'fp_latest_weekly.csv') else None
 PREV=json.load(open(OUT)) if os.path.exists(OUT) else {}
 
@@ -101,8 +104,10 @@ sched={t:[0]*18 for t in teams}
 for r in g.itertuples():
     sched[r.home_team][r.week-1]=[r.away_team,1];sched[r.away_team][r.week-1]=[r.home_team,0]
 bye={t:next(i+1 for i,x in enumerate(sched[t]) if x==0) for t in teams}
-vegas={}
+vegas={};kick={}
 for r in g[g.week==WEEK].itertuples():
+    for tm,home in ((r.home_team,1),(r.away_team,0)):
+        kick[tm]=[str(r.weekday) if pd.notna(r.weekday) else '',str(r.gameday) if pd.notna(r.gameday) else '',str(r.gametime) if pd.notna(r.gametime) else '']
     if pd.notna(r.total_line):
         s=r.spread_line if pd.notna(r.spread_line) else 0
         vegas[r.home_team]=round(r.total_line/2+s/2,1);vegas[r.away_team]=round(r.total_line/2-s/2,1)
@@ -185,7 +190,7 @@ seen=set();final=[]
 for p in out:
     if p[0] in seen: continue
     seen.add(p[0]);final.append(p)
-data={'week':WEEK,'played':PLAYED,'injWeek':IW,'asOf':datetime.date.today().isoformat(),'fields':F,'players':final,'sched':sched,'bye':bye,'vegas':vegas,'def':DEF}
+data={'week':WEEK,'played':PLAYED,'injWeek':IW,'asOf':datetime.date.today().isoformat(),'fields':F,'players':final,'sched':sched,'bye':bye,'vegas':vegas,'kick':kick,'def':DEF}
 data['depth']={p[0]:depth[GID[p[0]]] for p in final if GID.get(p[0]) in depth}
 data['practice']={p[0]:prac[GID[p[0]]] for p in final if GID.get(p[0]) in prac}
 js=json.dumps(data,separators=(',',':'))
@@ -280,7 +285,7 @@ for r in rows:
     pos=r['pos'];
     if pos not in('QB','RB','WR','TE','DST'):continue
     if pos=='DST':
-        t=TM.get(r['team'],r['team']);ecr['dst-'+t]=float(r['ecr']);continue
+        t=TM.get(r['team'],r['team']);ecr['dst-'+t.lower()]=float(r['ecr']);continue
     c=idx.get((norm(r['player_name']),pos),[])
     t=TM.get(r['team'],r['team'])
     if len(c)>1:c=[p for p in c if p[3]==t] or c
@@ -291,6 +296,42 @@ if ecr:
 elif PREV.get('ecr'):
     d['ecr']=PREV['ecr'];d['ecrDate']=PREV.get('ecrDate')
 print(len(ecr),'matched; notable misses:',miss[:20])
+
+for k in d.get('k',[]):idx.setdefault((norm(k[1]),'K'),[]).append([k[0],k[1],'K',k[2]])
+def match(name,pos,team):
+    if pos in('DST','DEF'):return 'dst-'+TM.get(team,team).lower()
+    c=idx.get((norm(name),pos),[]);t=TM.get(team,team)
+    if len(c)>1:c=[p for p in c if p[3]==t] or c
+    return c[0][0] if c else None
+num=lambda x:float(x) if x not in ('','NA',None) else None
+# rest-of-season expert consensus (position ranks, with expert disagreement) and roster rates
+ROS_PAGES={'/nfl/rankings/ros-qb.php','/nfl/rankings/ros-ppr-rb.php','/nfl/rankings/ros-ppr-wr.php','/nfl/rankings/ros-ppr-te.php','/nfl/rankings/ros-k.php','/nfl/rankings/ros-dst.php'}
+ros={};rost={}
+try:
+    for r in csv.DictReader(open(RAW+'db_fpecr_latest.csv')):
+        if r['fp_page'] not in ROS_PAGES:continue
+        pos='DST' if r['pos'] in('DST','DEF') else r['pos']
+        pid=match(r['player'],pos,r['team'])
+        if not pid or num(r['ecr']) is None:continue
+        ros[pid]=[round(num(r['ecr']),1),round(num(r['sd']) or 0,1),int(num(r['best']) or 0),int(num(r['worst']) or 0)]
+        o=num(r['player_owned_avg'])
+        if o is not None:rost[pid]=round(o)
+        d['rosDate']=r['scrape_date']
+except Exception as e:print('ros ecr skipped',e,file=sys.stderr)
+if ros:d['ros']=ros;d['rost']=rost
+elif PREV.get('ros'):d['ros']=PREV['ros'];d['rost']=PREV.get('rost',{});d['rosDate']=PREV.get('rosDate')
+print(len(ros),'rest-of-season ranks',file=sys.stderr)
+# dynasty / keeper values (DynastyProcess): [1QB value, superflex value, age, draft year]
+dyn={}
+try:
+    for r in csv.DictReader(open(RAW+'values-players.csv')):
+        if r['pos'] not in('QB','RB','WR','TE'):continue
+        pid=match(r['player'],r['pos'],r['team'])
+        if pid:dyn[pid]=[int(num(r['value_1qb']) or 0),int(num(r['value_2qb']) or 0),num(r['age']),int(num(r['draft_year']) or 0)]
+except Exception as e:print('dynasty values skipped',e,file=sys.stderr)
+if dyn:d['dyn']=dyn
+elif PREV.get('dyn'):d['dyn']=PREV['dyn']
+print(len(dyn),'dynasty values',file=sys.stderr)
 
 json.dump(d,open(OUT,'w'),separators=(',',':'))
 print('wrote',OUT,file=sys.stderr)

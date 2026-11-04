@@ -20,14 +20,17 @@
     <nav class="nav" aria-label="Sections">
       <button data-tab="team">My Team</button>
       <button data-tab="feed" class="nav-hot"><span class="play" aria-hidden="true"></span>Highlights</button>
+      <button data-tab="rankings" data-hash="players">Players</button>
       <button data-tab="trade">Trades</button>
-      <button data-tab="rankings">Rankings</button>
-      <button data-tab="hub"><span class="lbl-l">League Hub</span><span class="lbl-s">Hub</span></button>
       <button data-tab="season"><span class="lbl-l">Season Sim</span><span class="lbl-s">Sim</span></button>
+      <button data-tab="hub" data-hash="league-hub">League</button>
+      <button data-tab="draft" class="nav-draft">Draft</button>
     </nav>
     <div class="topbar-right">
       <span class="demo-pill" id="week-pill"></span>
       <select id="league-switch" class="league-switch" aria-label="Switch league" hidden></select>
+      <div class="alerts-wrap"><button class="alert-btn" id="alert-btn" type="button" aria-label="Alerts" aria-expanded="false"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg><span class="alert-n" id="alert-n" hidden></span></button>
+        <div class="alert-pop" id="alert-pop" hidden></div></div>
       <button class="acct-btn" id="acct-btn" type="button">Sign in</button>
       <button class="theme-btn" id="theme-btn" aria-label="Switch light or dark mode"></button>
     </div>
@@ -57,13 +60,16 @@
       </div>
       <div class="stack">
         <div class="card" id="fix-card"></div>
+        <div class="card" id="startsit"></div>
       </div>
     </div>
   </section>
 
   <!-- RANKINGS -->
   <section class="view" id="v-rankings" hidden>
-    <div class="hero"><div><div class="kicker" id="rank-kicker"></div><h1>Rankings</h1><p>Every player valued for your league's scoring. <span class="badge buy">BL</span> buy-low candidate, <span class="badge sell">SH</span> sell-high candidate, <span class="badge risk">RISK</span> due for regression. Snap % and Opp/G (carries plus targets per game) show how secure a role is. Select any column to sort.</p></div></div>
+    <div class="hero"><div><div class="kicker" id="rank-kicker"></div><h1>Players</h1><p id="pl-intro"></p></div>
+      <div class="seg pl-seg" id="pl-seg" aria-label="Player views"><button data-pl="rank" aria-pressed="true">Rankings</button><button data-pl="waiv" aria-pressed="false">Waiver wire</button><button data-pl="vals" aria-pressed="false">Trade values</button></div></div>
+    <div id="pl-rank" class="pl-pane">
     <div class="toolbar">
       <div class="seg" id="pos-filter"><button data-pos="ALL" aria-pressed="true">All</button><button data-pos="QB">QB</button><button data-pos="RB">RB</button><button data-pos="WR">WR</button><button data-pos="TE">TE</button><button data-pos="K">K</button><button data-pos="DST">D/ST</button></div>
       <div class="seg" id="own-filter"><button data-own="all" aria-pressed="true">Everyone</button><button data-own="free">Available</button><button data-own="buy">Buy low</button><button data-own="risk">Risks</button><button data-own="opp">Opportunities</button></div>
@@ -71,10 +77,13 @@
       
     </div>
     <p class="note" id="rank-note" hidden style="margin:0;max-width:85ch"></p>
-    <div class="tablebox"><table id="rank-table" style="min-width:1040px">
-      <thead><tr><th class="r" data-sort data-first="asc">#</th><th data-sort data-first="asc">Player</th><th data-sort data-first="asc">Pos</th><th class="r" data-sort>Wk <span class="wk-num">9</span></th><th class="r" data-sort title="Projected points per game for the rest of the season">Pts/G</th><th class="r" data-sort title="Last 3 games compared with his season average">Trend</th><th class="r" data-sort title="Share of his team's targets">Tgt share</th><th class="r" data-sort title="Share of his team's offensive snaps">Snap %</th><th class="r" data-sort title="Carries plus targets per game">Opp/G</th><th data-sort data-first="asc">League team</th></tr></thead>
+    <div class="tablebox"><table id="rank-table" style="min-width:1110px">
+      <thead><tr><th class="r" data-sort data-first="asc">#</th><th data-sort data-first="asc">Player</th><th data-sort data-first="asc">Pos</th><th class="r" data-sort>Wk <span class="wk-num">9</span></th><th class="r" data-sort title="Projected points per game for the rest of the season">Pts/G</th><th class="r" data-sort data-first="asc" title="FantasyPros expert consensus rank at his position for the rest of the season">Experts</th><th class="r" data-sort title="Last 3 games compared with his season average">Trend</th><th class="r" data-sort title="Share of his team's targets">Tgt share</th><th class="r" data-sort title="Share of his team's offensive snaps">Snap %</th><th class="r" data-sort title="Carries plus targets per game">Opp/G</th><th data-sort data-first="asc">League team</th></tr></thead>
       <tbody id="rank-body"></tbody></table></div>
       <div id="rank-more" class="rank-more"></div>
+    </div>
+    <div id="pl-waiv" class="pl-pane" hidden></div>
+    <div id="pl-vals" class="pl-pane" hidden></div>
   </section>
 
   <!-- TRADES -->
@@ -160,6 +169,13 @@
     </div>
   </section>
 
+  <!-- DRAFT -->
+  <section class="view" id="v-draft" hidden>
+    <div class="hero"><div><div class="kicker" id="draft-kicker">Draft tools</div><h1>Draft</h1><p id="draft-intro">Cheat sheets, mock drafts and a live draft assistant, all valued for your league's scoring and roster.</p></div>
+      <div class="seg" id="dr-seg" aria-label="Draft tools"><button data-dr="sheet" aria-pressed="true">Cheat sheet</button><button data-dr="mock" aria-pressed="false">Mock draft</button><button data-dr="live" aria-pressed="false">Live draft</button></div></div>
+    <div id="draft-body"></div>
+  </section>
+
   <!-- LEAGUE SETUP -->
   <section class="view" id="v-league" hidden>
     <div class="hero"><div><div class="kicker"><a href="#hub" class="back-link">← League Hub</a></div><h1>League settings</h1><p>Your league's scoring and roster rules. Every ranking, lineup and trade updates instantly as you edit.</p></div></div>
@@ -181,6 +197,12 @@
       <div class="stack">
         <div class="card"><div class="card-h"><h2>Roster</h2></div>
           <div class="field" style="margin-bottom:12px"><label for="lg-name">League name</label><input type="text" id="lg-name"></div>
+          <div class="field-row">
+            <div class="field"><label for="lg-format">League type</label><select id="lg-format"><option value="redraft">Redraft (this season only)</option><option value="keeper">Keeper</option><option value="dynasty">Dynasty</option></select></div>
+            <div class="field"><label for="lg-waiver">Waivers</label><select id="lg-waiver"><option value="faab">Bidding budget (FAAB)</option><option value="priority">Waiver order</option></select></div>
+            <div class="field" id="lg-budget-f"><label for="lg-budget">Season budget ($)</label><input type="number" id="lg-budget" min="0" step="1" inputmode="numeric"></div>
+          </div>
+          <p class="note" style="margin:0 0 12px">Keeper and dynasty leagues also count long-term value (age, draft year and dynasty market values) in trades and the draft.</p>
           <div class="slots" id="slots-form"></div>
           <p class="note" style="margin:10px 0 0">Flex takes RB, WR or TE. Superflex also takes a QB.</p></div>
       </div>
@@ -188,7 +210,7 @@
     <div class="card"><div class="card-h"><h2>Scoring</h2></div><div id="scoring-form"></div></div>
   </section>
 </main>
-<footer><div class="wrap" id="site-foot">Stats, schedules, betting lines and injury reports from nflverse. Expert consensus from FantasyPros via DynastyProcess. Projections blend preseason expectations with 2026 production. Updated every morning.</div></footer>
+<footer><div class="wrap" id="site-foot">Stats, schedules, betting lines and injury reports from nflverse. Expert consensus (weekly and rest-of-season) and dynasty values from FantasyPros via DynastyProcess. Projections blend preseason expectations with 2026 production. Updated every morning.</div></footer>
 <datalist id="dl-players"></datalist>
 <div class="scrim" id="scrim" hidden><div class="modal" id="modal" role="dialog" aria-modal="true" aria-label="Player card"></div></div>
 <div class="toast" id="toast" hidden></div>
