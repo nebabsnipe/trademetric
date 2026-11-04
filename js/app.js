@@ -1854,17 +1854,31 @@ function renderPlayers(){document.querySelectorAll('#pl-seg button').forEach(b=>
 const posSeg=(attr,cur,list)=>`<div class="seg">${list.map(x=>`<button data-${attr}="${x}" aria-pressed="${x===cur}">${x==='ALL'?'All':x==='DST'?'D/ST':x}</button>`).join('')}</div>`;
 const weeksLeft=()=>Math.max(1,Math.max(...poWeeks())-WEEK+1);
 let WV={v:-1};
-function waiverList(){if(WV.v===VER)return WV.rows;const me=myTeam(),before=lineup(me.players,projV).total;
-  const fa=POOL.filter(p=>!OWN[p.id]&&!LONG_OUT.includes(stOf(p.id))),rep={};
-  POS.forEach(x=>{const a=fa.filter(p=>p.pos===x).map(p=>V.ros[p.id]).sort((a,b)=>b-a);rep[x]=a[Math.min(a.length-1,7)]||0});
+/* how many healthy players a team wants at a position before an extra one is only surplus:
+   starters (with a share of flex spots) plus one for byes and injuries */
+function posNeed(x){const s=S.league.slots;if(x==='K'||x==='DST')return s[x]||0;
+  const fl=s.FLEX||0,sf=s.SFLEX||0,st=(s[x]||0)+(x==='QB'?sf:x==='TE'?fl*.15:fl*.45+sf*.1);return Math.round(st)+(x==='RB'?2:1)}
+function waiverList(){if(WV.v===VER)return WV.rows;const me=myTeam(),rosV=id=>LONG_OUT.includes(stOf(id))?0:V.ros[id]||0;
+  const beforeR=lineup(me.players,rosV).total,beforeW=lineup(me.players,nextV).total;
+  const fa=POOL.filter(p=>!OWN[p.id]&&!LONG_OUT.includes(stOf(p.id))),rep={},have={};
+  POS.forEach(x=>{const a=fa.filter(p=>p.pos===x).map(p=>V.ros[p.id]).sort((a,b)=>b-a);rep[x]=a[Math.min(a.length-1,7)]||0;
+    have[x]=me.players.filter(id=>byId[id]&&byId[id].pos===x&&!LONG_OUT.includes(stOf(id))).length});
   const want={};POS.forEach(x=>want[x]=teamStats().rows.filter(r=>r.T.id!==S.me&&r.needs.includes(x)).length);
-  const rows=fa.filter(p=>V.ros[p.id]>2||G[p.id].opp.length).map(p=>{const drop=dropFor(p.id),g=drop?lineup(me.players.filter(x=>x!==drop).concat(p.id),projV).total-before:0;
-    const over=Math.max(0,V.ros[p.id]-rep[p.pos]),hot=G[p.id].opp.some(o=>o.long)?1.35:G[p.id].opp.length?1.15:1;
-    return {p,drop,g,over,want:want[p.pos]||0,score:(Math.max(0,g)+over*.45)*hot}}).sort((a,b)=>b.score-a.score);
+  const rows=fa.filter(p=>V.ros[p.id]>2||G[p.id].opp.length).map(p=>{const drop=dropFor(p.id),after=me.players.filter(x=>x!==drop).concat(p.id);
+    const gR=drop?lineup(after,rosV).total-beforeR:0,gW=drop?lineup(after,nextV).total-beforeW:0;
+    /* need: 1 when short at the position, .3 when you already have enough, .1 once he'd be well past that */
+    const gap=posNeed(p.pos)-have[p.pos]+(drop&&byId[drop].pos===p.pos?1:0),need=gap>0?1:gap===0?.3:.1;
+    /* depth is judged above what's freely available at each position, so high-scoring QBs don't win on raw points */
+    const over=Math.max(0,V.ros[p.id]-rep[p.pos]),dOver=drop?Math.max(0,(V.ros[drop]||0)-(rep[byId[drop].pos]||0)):0,depth=Math.max(0,over-dOver)*need*.6;
+    const hot=G[p.id].opp.some(o=>o.long)?1.35:G[p.id].opp.length?1.15:1;
+    const score=(Math.max(0,gR)+Math.max(0,gW)*.35+depth)*hot;
+    return {p,drop,g:gR,gW,need,over,want:want[p.pos]||0,score}}).sort((a,b)=>b.score-a.score);
+  /* kickers and defenses are streamers: keep only the best two of each near the top, the rest sink */
+  const kd={K:0,DST:0};rows.forEach(r=>{if(r.p.pos in kd&&++kd[r.p.pos]>2)r.score*=.2});rows.sort((a,b)=>b.score-a.score);
   WV={v:VER,rows};return rows}
 /* bid: a share of the season budget that grows with value to you and to the league, shrinks as the season runs out, and rises when teams need the position */
 function bidFor(r){const B=S.league.budget??100,wf=Math.min(1,weeksLeft()/9),comp=1+Math.min(.3,r.want*.06);
-  let pc=r.score<.3?0:Math.min(45,1.6*Math.pow(r.score,1.35))*(.45+.55*wf)*comp;pc=Math.min(pc,45);
+  let pc=r.score<.3?0:Math.min(45,1.6*Math.pow(r.score,1.35))*(.45+.55*wf)*comp;pc=Math.min(pc,r.p.pos==='K'||r.p.pos==='DST'?2:45);
   const lo=Math.round(B*pc*.8/100),hi=Math.round(B*pc*1.2/100);return {pc,lo:pc>0?Math.max(1,lo):0,hi:pc>0?Math.max(1,hi):0}}
 function claimTxt(r){return r.score>=3?'Use a top claim':r.score>=1.2?'Worth a claim':'Free agent add'}
 function renderWaivers(){const faab=(S.league.waiver||'faab')==='faab',B=S.league.budget??100;
@@ -1874,7 +1888,7 @@ function renderWaivers(){const faab=(S.league.waiver||'faab')==='faab',B=S.leagu
     <div class="tablebox"><table class="waiv-t" style="min-width:880px"><thead><tr><th>Player</th><th class="r">Pts/G ahead</th><th class="r">Wk ${WEEK}</th><th class="r" title="Share of leagues where he is rostered (FantasyPros)">Rostered</th><th class="r">Your gain</th><th class="r">${faab?'Suggested bid':'Claim'}</th><th>Drop</th><th></th></tr></thead><tbody>
     ${rows.map(r=>{const p=r.p,g=G[p.id],b=bidFor(r);return `<tr><td>${plCell(p,`${p.pos}${V.posRank[p.id]} · ${p.t} · ${oppHtml(p.id)}${roleTag(p.id)?' '+roleTag(p.id):''}`)}${g.opp.length?`<span class="why-line">${esc(oppTxtLine(g.opp[0]))}</span>`:g.look&&g.look[0]?`<span class="why-line">${esc(g.look[0])}</span>`:''}</td>
       <td class="r num">${f1(V.ros[p.id])}</td><td class="r num">${g.next?f1(g.projNext):'<span class="tag bye">Bye</span>'}</td><td class="r num">${ROST[p.id]!=null?ROST[p.id]+'%':'<span class="muted">-</span>'}</td>
-      <td class="r">${r.g>.05?`<span class="gain">+${f1(r.g)}/wk</span>`:'<span class="note">Depth</span>'}</td>
+      <td class="r">${r.g>.05?`<span class="gain">+${f1(r.g)}/wk</span>`:r.gW>.05?`<span class="gain">+${f1(r.gW)} Wk ${WEEK}</span>`:r.need>=1?`<span class="note">Need at ${p.pos==='DST'?'D/ST':p.pos}</span>`:r.need>=.3?'<span class="note">Depth</span>':`<span class="note">Already deep at ${p.pos==='DST'?'D/ST':p.pos}</span>`}</td>
       <td class="r">${faab?(b.hi?`<b class="bid num">$${b.lo===b.hi?b.lo:b.lo+'–'+b.hi}</b><span class="bid-p">${Math.round(b.pc)}% of budget</span>`:'<span class="note">$0–1</span>'):`<b class="bid">${claimTxt(r)}</b>`}</td>
       <td>${r.drop?`<button class="pname" data-open="${r.drop}">${esc(byId[r.drop].n)}</button><span class="psub" style="display:block">${byId[r.drop].pos}${V.posRank[r.drop]} · ${f1(V.pts[r.drop])}/G</span>`:'<span class="note">Open spot</span>'}</td>
       <td class="r"><button class="btn small" data-swap="${p.id}|${r.drop||''}">Add</button></td></tr>`}).join('')||'<tr><td colspan="8" class="empty">No available players at this position.</td></tr>'}</tbody></table></div>
