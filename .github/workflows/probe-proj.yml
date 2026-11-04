@@ -21,5 +21,4 @@ jobs:
             console.log('  DST',JSON.stringify(a.filter(x=>x.pos==='DST').slice(0,2)),'K',JSON.stringify(a.filter(x=>x.pos==='K').slice(0,2)))}
           JS
           node /tmp/run.mjs
-      - uses: actions/upload-artifact@v4
-        with: { name: proj, path: /tmp/out.json }
+      - run: gzip -c /tmp/out.json | base64 -w0 | sed 's/^/PROJB64:/'; echo
