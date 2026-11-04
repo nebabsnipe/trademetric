@@ -148,8 +148,14 @@ const CONS_W={model:.6,cons:.4},STAR_POW=1.5,STAR_REF=6;
 /* one-QB leagues: quarterbacks are easy to replace, more so in small leagues. 8 teams .35, 12 teams .49, 16 teams .63, 32 teams .95.
    Value is still measured over the best QB left on waivers, so a true standout (Josh Allen) keeps a big edge in any size league */
 const qbF=()=>Math.max(.35,Math.min(1,.35+.035*((S.league&&S.league.teams||12)-8)));
+/* touchdowns are the noisiest stat: pull each player's TD rate partway toward what his targets and carries usually produce.
+   The pull weakens as the season's sample grows (about half-way by midseason). Used for projections, not for "points so far". */
+const TD_EXP={rec:{RB:.03,WR:.045,TE:.055},rush:{QB:.05,RB:.032,WR:.04,TE:.04}};
+function tdReg(p){if(p.pos==='K'||p.pos==='DST')return p;const n=Math.max(1,WEEK-1),w=Math.min(.65,n/(n+9));
+  const er=(p.tgt||0)*(TD_EXP.rec[p.pos]||0),eu=(p.ratt||0)*(TD_EXP.rush[p.pos]||0);
+  return {...p,rectd:p.pos==='QB'?p.rectd:w*p.rectd+(1-w)*er,rtd:w*p.rtd+(1-w)*eu}}
 function valuate(L){
-  const pts={};POOL.forEach(p=>pts[p.id]=projPts(p,L.sc)*(BOOST[p.id]||1));
+  const pts={},ptsR={};POOL.forEach(p=>{pts[p.id]=projPts(p,L.sc)*(BOOST[p.id]||1);ptsR[p.id]=projPts(tdReg(p),L.sc)*(BOOST[p.id]||1)});
   const desc=(a,b)=>pts[b.id]-pts[a.id],byPos={};POS.forEach(x=>byPos[x]=POOL.filter(p=>p.pos===x).sort(desc));
   const used=new Set();POS.forEach(x=>byPos[x].slice(0,L.teams*(L.slots[x]||0)).forEach(p=>used.add(p.id)));
   const take=(elig,n)=>POOL.filter(p=>elig.includes(p.pos)&&!used.has(p.id)).sort(desc).slice(0,n).forEach(p=>used.add(p.id));
@@ -163,7 +169,7 @@ function valuate(L){
     const listed=all.filter(p=>XR(p.id)!=null).sort((a,b)=>XR(a.id)-XR(b.id)),miss=all.filter(p=>XR(p.id)==null&&!gone(p)),tail=all.filter(p=>XR(p.id)==null&&gone(p)),order=[];let i=0,j=0;
     while(i<listed.length||j<miss.length){if(j<miss.length&&(i>=listed.length||pts[miss[j].id]>pts[listed[i].id]))order.push(miss[j++]);else order.push(listed[i++])}
     order.concat(tail).forEach((p,k)=>{cons[p.id]=pts[all[k].id];crank[p.id]=k+1})});
-  POOL.forEach(p=>tpts[p.id]=CONS_W.model*pts[p.id]+CONS_W.cons*cons[p.id]);
+  POOL.forEach(p=>tpts[p.id]=CONS_W.model*ptsR[p.id]+CONS_W.cons*cons[p.id]);
   return {pts,vor,rank,posRank,repl,list,cons,crank,tpts};
 }
 let V,B,G={},OWN={},VER=0;
@@ -188,7 +194,7 @@ function derive(){
       if(r.length&&cv>.55&&played.length>=5)r.push(`Up-and-down weeks: from ${f1(Math.min(...played))} to ${f1(Math.max(...played))}.`);
       if(r.length)risk=r}
     let tag=null;if(buy)tag='buy';else if(!noBS&&V.vor[p.id]>0&&proj>=9&&last3>1.5*proj&&ur<=1.12&&!mates.length)tag='sell';
-    const nx=OPP[p.t]&&OPP[p.t][WEEK];const projNext=nx?(p.pos==='DST'?(dstPts(p,S.league.sc,VEGAS[nx.opp]??p.pa)*(V.pts[p.id]/Math.max(.1,projPts(p,S.league.sc)))):proj*matchF(nx.opp,p.pos)*weekMult(p.id)*vegasF(p.t)):0;
+    const nx=OPP[p.t]&&OPP[p.t][WEEK];const projNext=nx?(p.pos==='DST'?(dstPts(p,S.league.sc,VEGAS[nx.opp]??p.pa)*(V.pts[p.id]/Math.max(.1,projPts(p,S.league.sc)))):V.tpts[p.id]*matchF(nx.opp,p.pos)*weekMult(p.id)*vegasF(p.t)):0;
     const tshare=p.pos==='QB'||p.pos==='DST'||p.pos==='K'?null:avg(games.map(x=>x.ts||0)),snaps=games.map(x=>x.snap).filter(x=>x>=0),snap=snaps.length?avg(snaps):null,rp=Math.max(1,V.repl[p.pos]);
     const oppg=p.pos==='QB'||p.pos==='DST'||p.pos==='K'||!games.length?null:avg(games.map(x=>x.ratt+x.tgt));
     const trendPct=played.length>=4&&season>0?last3/season-1:null,cons=played.length?played.filter(x=>x>=rp).length/played.length:null,boom=played.length?played.filter(x=>x>=rp*1.75).length/played.length:null;
@@ -210,7 +216,7 @@ function outlookPass(){
     let nudge=0;if(g.gp>=4&&p.pos!=='K'&&p.pos!=='DST')nudge=(Math.max(.82,Math.min(1.25,g.ur))-1)*.16;
     g.outF=1+nudge;const fx=factorsOf(p,g);g.fx=fx;if(nudge&&Math.abs(nudge)>=.005)fx.push({s:'ros',k:'use',v:nudge,t:nudge>0?'Workload rising over the last three games':'Workload shrinking over the last three games'});
     const tot=sc=>Math.max(-.08,Math.min(.08,sum(fx.filter(f=>f.s===sc&&f.k!=='use'),f=>f.v)));const rf=tot('ros'),wf=tot('wk');
-    g.outF=(1+nudge)*(1+rf);V.ros[id]=V.tpts[id]*g.outF;if(g.next&&wf)g.projNext*=1+wf;g.fxWk=wf;g.fxRos=rf;
+    g.outF=(1+nudge)*(1+rf);V.ros[id]=V.tpts[id]*g.outF;if(g.next)g.projNext*=(p.pos==='DST'?1:g.outF)*(1+wf);g.fxWk=wf;g.fxRos=rf;
     /* what backs it up */
     const unit=p.pos==='DST'?'defense':p.pos==='K'?'kicker':null;
     if(unit&&g.xr)look.push(`Experts rank this ${unit} ${ord(g.xr)} the rest of the way${g.scoreRank?`, and it has scored ${ord(g.scoreRank)} best so far`:''}.`);
@@ -258,7 +264,7 @@ function factorsOf(p,g){const out=[],id=p.id,pos=p.pos,skill=['QB','RB','WR','TE
     if(pos==='RB'&&WEEK>=10&&avg(games.map(x=>x.ratt))>=19)add('ros',-.015,'Heavy workload so far, which tends to wear down late');
     /* 15 touchdown luck */
     if(pos!=='QB'){const td=sum(games,x=>x.rtd+x.rectd),exp=sum(games,x=>x.tgt*.045+x.ratt*.03),dpg=(td-exp)*6/Math.max(1,games.length);
-      if(dpg>=1.5)add('ros',-.03,'Scoring touchdowns at a rate that usually cools off');else if(dpg<=-1.5)add('ros',.03,'Due for more touchdowns given his workload')}
+      if(dpg>=1.5)add('ros',-.01,'Scoring touchdowns at a rate that usually cools off');else if(dpg<=-1.5)add('ros',.01,'Due for more touchdowns given his workload')}
     /* 16 snap trend */
     const sn=games.map(x=>x.snap).filter(x=>x>=0);if(sn.length>=5){const a=avg(sn.slice(-3)),b=avg(sn.slice(0,-3));if(a-b>=10)add('ros',.02,`Snap share climbing (${Math.round(b)}% to ${Math.round(a)}%)`);else if(b-a>=10)add('ros',-.02,`Snap share falling (${Math.round(b)}% to ${Math.round(a)}%)`)}
   }
