@@ -86,8 +86,8 @@ const FANTASY = /\b(injur|ruled out|out for|questionable|doubtful|practice|limit
 const FLUFF = /\b(costume|halloween|podcast|mailbag|power rankings|odds|betting|picks against|mock draft)/i;
 const score = i => (Date.parse(i.at || 0) / 864e5) + (i.desc ? 1.2 : 0) + (FANTASY.test(i.title + ' ' + i.desc) ? 1.5 : 0) - (FLUFF.test(i.title) ? 4 : 0) - (RANK[i.src] ?? 4) * .15;
 
-async function collect(name, team, probe) {
-  const list = [...SHARED.map(s => ({ ...s, ttl: 5 * 60e3 })), ...perPlayer(name, team).map(s => ({ ...s, ttl: 20 * 60e3 }))];
+async function collect(name, team, probe, noGoogle) {
+  const list = [...SHARED.map(s => ({ ...s, ttl: 5 * 60e3 })), ...perPlayer(name, team).filter(s => !noGoogle || s.src !== 'Google News').map(s => ({ ...s, ttl: 20 * 60e3 }))];
   const report = [];
   const got = await Promise.all(list.map(async s => {
     try {
@@ -150,6 +150,17 @@ const cache = new Map();
 export default async function handler(req, res) {
   const q = req.query || {};
   const name = String(q.name || '').slice(0, 60), team = String(q.team || '').toUpperCase().slice(0, 4), pos = String(q.pos || '').slice(0, 4);
+  /* batch mode for the AI Helper: raw headlines for many players at once, no AI summaries (so no cost).
+     GET /api/news?batch=Name|TEAM;Name|TEAM  (first 6 also search Google News) */
+  if (q.batch) {
+    const list = String(q.batch).split(';').map(x => x.split('|')).filter(x => x[0]).slice(0, 30).map(([n, t]) => [String(n).slice(0, 60), String(t || '').toUpperCase().slice(0, 4)]);
+    const out = {};
+    await Promise.all(list.map(async ([n, t], i) => {
+      try { const { items } = await collect(n, t, false, i >= 6); out[n] = items.slice(0, 3).map(x => ({ title: x.title, desc: clip(x.desc, 300), outlet: x.outlet, at: x.at })); } catch { out[n] = []; }
+    }));
+    res.setHeader('Cache-Control', 'public, max-age=0, s-maxage=600');
+    return res.status(200).json({ updated: new Date().toISOString(), items: out });
+  }
   if (!name) return res.status(400).json({ error: 'Missing name' });
   if (q.probe) {
     const { items, report } = await collect(name, team, true);

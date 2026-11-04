@@ -6,7 +6,15 @@ jobs:
   probe:
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
       - run: |
-          curl -s "https://www.trademetric.app/api/feed?week=9&debug=1&b=$RANDOM" | python3 -c "import json,sys;d=json.load(sys.stdin);print('DBG',json.dumps(d.get('debug'))[:1500])"
-          curl -s -w "\nCODE %{http_code}\n" "https://site.api.espn.com/apis/fantasy/v2/games/ffl/news/players?limit=5" | head -c 1500; echo
-          curl -s -w "\nCODE %{http_code}\n" "https://site.api.espn.com/apis/fantasy/v2/games/ffl/news/players?limit=200&playerId=3916387" | head -c 800; echo
+          cp api/news.js /tmp/news.mjs
+          cat > /tmp/run.mjs <<'JS'
+          import h from '/tmp/news.mjs';
+          const res={setHeader(){},status(c){this.c=c;return this},json(o){this.o=o;return this}};
+          const t=Date.now();
+          await h({query:{batch:'Lamar Jackson|BAL;Sam Darnold|SEA;Mike Gesicki|CIN;Jaxson Dart|NYG;Kirk Cousins|LV;Tee Higgins|CIN;Dak Prescott|DAL;Chase Brown|CIN'}},res);
+          console.log('STATUS',res.c,'ms',Date.now()-t);
+          for(const [k,v] of Object.entries(res.o.items))for(const a of v)console.log('ITEM',k,'|',a.at,'|',a.outlet,'|',a.title,'|',(a.desc||'').slice(0,150));
+          JS
+          node /tmp/run.mjs 2>&1 | grep -E "STATUS|ITEM"
