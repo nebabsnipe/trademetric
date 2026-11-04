@@ -293,9 +293,37 @@ function factorsOf(p,g){const out=[],id=p.id,pos=p.pos,skill=['QB','RB','WR','TE
   return out}
 function fxHtml(g){const f=(g.fx||[]).slice().sort((a,b)=>Math.abs(b.v)-Math.abs(a.v));if(!f.length)return '';
   const row=x=>`<li><span class="fx-v ${x.v>0?'up':'down'}">${x.v>0?'+':'−'}${Math.round(Math.abs(x.v)*1000)/10}%</span><span>${esc(x.t)}</span><em>${x.s==='wk'?'This week':'Rest of season'}</em></li>`;
-  return `<div class="fx"><span class="lab2">What moves his projection</span><ul class="fx-list">${f.map(row).join('')}</ul></div>`}
+  return `<div class="fx"><span class="lab2">What moves TradeMetric's number</span><ul class="fx-list">${f.map(row).join('')}</ul></div>`}
 function riskHtml(id){const r=G[id]&&G[id].risk2;if(!r)return '';return `<span class="rk rk${r.lvl}" title="${esc(r.why.join(' '))}">${RISK_TXT[r.lvl]} risk</span>`}
-function recompute(){computeBoosts();V=valuate(S.league);B=valuate(BASELINE);derive();applyLive();rebuildOwn();VER++}
+function recompute(){computeBoosts();V=valuate(S.league);B=valuate(BASELINE);derive();blendPlat();applyLive();rebuildOwn();VER++}
+/* ===== Platform projections (/api/proj): ESPN's and Sleeper's own weekly projections, scored with your league's settings.
+   They update through the week with injuries and depth charts, so they make up 90% of each weekly projection; TradeMetric's model is the other 10%. ===== */
+const PLAT_W=.9;let PROJ=null,PROJ_TIMER=null;
+function platPts(e,pos){if(!e)return null;const sc=S.league.sc;if(!e.s)return e.ppr;
+  if(pos==='K')return kPts(e.s,sc);if(pos==='DST')return linePts(e.s,'DST',sc);
+  /* projections are averages, so score yardage bonuses by chance instead of an all-or-nothing line */
+  const L=e.s;return linePts({...L,pyd:L.pyd,ryd:L.ryd,recyd:L.recyd},pos,sc)-(L.pyd>=300?sc.p300||0:0)-(L.ryd>=100?sc.r100||0:0)-(L.recyd>=100?sc.rec100||0:0)
+    +(sc.p300?pOver(L.pyd,.28,300)*sc.p300:0)+(sc.r100?pOver(L.ryd,.5,100)*sc.r100:0)+(sc.rec100?pOver(L.recyd,.55,100)*sc.rec100:0)}
+function blendPlat(){if(!PROJ||PROJ.week!==WEEK)return;
+  POOL.forEach(p=>{const g=G[p.id];if(!g||!g.next)return;let m=PROJ.map[p.id];
+    /* both platforms list only players they project to score. If both cover his team and neither lists him (and no similar name
+       on his team suggests a spelling mismatch), they project him for zero, usually because he's out */
+    if(!m){if(p.pos==='K'||p.pos==='DST'||PROJ.srcs<2||!PROJ.teams.has(p.t)||PROJ.near.has(lastKey(p.n,p.t)))return;m={espn:{ppr:0},sleeper:{ppr:0}}}
+    const es=platPts(m.espn,p.pos),sl=platPts(m.sleeper,p.pos),vals=[es,sl].filter(x=>x!=null);if(!vals.length)return;
+    const plat=avg(vals),ours=g.projNext;g.plat={espn:es,sleeper:sl,plat,ours};g.projNext=PLAT_W*plat+(1-PLAT_W)*ours})}
+const lastKey=(n,t)=>{const w=norm(n||'').split(' ').filter(x=>!/^(jr|sr|ii|iii|iv|v)$/.test(x));return (w[w.length-1]||'')+'|'+t};
+function readProj(j){const map={},src=Object.entries(j.sources||{}),teams=src.map(([,rows])=>new Set(rows.map(x=>x.t))),near=new Set();
+  src.forEach(([k,rows])=>rows.forEach(x=>{if(x.n)near.add(lastKey(x.n,x.t));
+    const p=x.pos==='DST'?byId['dst-'+String(x.t).toLowerCase()]:findExact(x.n,x.pos,x.t);if(!p||p.pos!==x.pos)return;(map[p.id]=map[p.id]||{})[k]=x}));
+  /* a team counts as covered only when every source has it */
+  const both=new Set([...(teams[0]||[])].filter(t=>teams.every(s=>s.has(t))));
+  PROJ={week:j.week,at:j.updated,map,srcs:src.length,teams:both,near}}
+async function loadProj(){clearTimeout(PROJ_TIMER);
+  try{const r=await fetch('/api/proj?week='+WEEK+'&b='+Math.floor(Date.now()/1200000));if(r.ok){const j=await r.json();
+    if(j&&j.sources&&j.week===WEEK){readProj(j);recompute();const a=document.activeElement;if(!(a&&/INPUT|TEXTAREA|SELECT/.test(a.tagName)))render()}}}catch(e){}
+  PROJ_TIMER=setTimeout(()=>{if(document.hidden)document.addEventListener('visibilitychange',loadProj,{once:true});else loadProj()},20*60e3)}
+function platHtml(g){const x=g.plat;if(!x||!g.next)return '';const it=[x.espn!=null?`ESPN <b>${f1(x.espn)}</b>`:'',x.sleeper!=null?`Sleeper <b>${f1(x.sleeper)}</b>`:'',`TradeMetric <b>${f1(x.ours)}</b>`].filter(Boolean).join(' · ');
+  return `<p class="plat-line"><span class="lab2">Week ${WEEK} projection ${f1(g.projNext)}</span>${it}<em>90% ESPN and Sleeper, 10% TradeMetric, in your league's scoring</em></p>`}
 /* ===== Live game-day data (/api/live) ===== */
 let LIVE=null,LIVEST={},LIVE_TIMER=null;
 function applyLive(){
@@ -311,7 +339,7 @@ function liveStatus(){if(!LIVE||!LIVE.injuries)return;const keep=['IR','PUP','SU
 var ROLLED=false;
 function checkRollover(){if(!LIVE||LIVE.week!==WEEK||WEEK>=18)return false;const gs=Object.values(LIVE.games||{});
   const playing=Object.keys(OPP).filter(t=>OPP[t][WEEK]);if(!gs.length||gs.length<playing.length*.9||!gs.every(g=>g.state==='post'))return false;
-  WEEK++;ROLLED=true;LIVE=null;LIVEST={};LIVE_LU=null;PLAT=null;SCHED=null;weekLabels();return true}
+  WEEK++;ROLLED=true;LIVE=null;PROJ=null;setTimeout(loadProj,800);LIVEST={};LIVE_LU=null;PLAT=null;SCHED=null;weekLabels();return true}
 async function loadLive(){
   clearTimeout(LIVE_TIMER);let next=10*60e3;
   try{const r=await fetch('/api/live?week='+WEEK+'&b='+Math.floor(Date.now()/120000));if(r.ok){const j=await r.json();
@@ -1309,7 +1337,7 @@ function outlookHtml(p,g){if(p.pos==='K')return '';const r=g.risk2||{lvl:0,why:[
   const lead=gap>=5?'Experts expect him to score more from here than he has so far.':gap<=-5?'Experts expect him to cool off from his pace so far.':g.xr?'Experts see more of the same from here.':'';
   return `<div class="msec"><h4>Rest-of-season outlook</h4><div class="ol-chips">${chips}</div>
     ${lead||bullets.length?`<ul class="reasons ol-why">${lead?`<li>${lead}</li>`:''}${bullets.map(x=>`<li>${esc(x)}</li>`).join('')}</ul>`:''}
-    ${r.lvl&&r.why.length>1?`<p class="note" style="margin:6px 0 0">Risk factors: ${esc(r.why.join(' '))}</p>`:''}${fxHtml(g)}${howLink('values')}</div>`}
+    ${r.lvl&&r.why.length>1?`<p class="note" style="margin:6px 0 0">Risk factors: ${esc(r.why.join(' '))}</p>`:''}${platHtml(g)}${fxHtml(g)}${howLink('values')}</div>`}
 function closeCard(){$('scrim').hidden=true;document.body.style.overflow='';openId=null}
 
 /* ===== League setup form ===== */
@@ -1439,7 +1467,7 @@ else{S.league.sc={...BASE_SC,...S.league.sc};if(S.league.slots.DST===undefined)S
 buildLeagueForm();
 S.chat=(S.chat||[]).filter(x=>x.status==='done'||x.status==='error');
 var INTENDED=location.hash.slice(1);go('signin');
-loadLive();
+loadLive();loadProj();
 
 /* ===== Accounts (Supabase): username or email + password, own sign-in page, league saved to the cloud ===== */
 var SUPA_URL='https://rltmfnmgbfgecbaevfvc.supabase.co',SUPA_KEY='sb_publishable_AFX79aKgqorAx3zgOyKatw_o_3_ERWG';
