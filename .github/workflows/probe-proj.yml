@@ -6,20 +6,9 @@ jobs:
   probe:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
       - run: |
-          cp api/live.js /tmp/live.mjs; cp api/market.js /tmp/market.mjs
-          cat > /tmp/run.mjs <<'JS'
-          import live from '/tmp/live.mjs'; import market from '/tmp/market.mjs'; import fs from 'fs';
-          const mk=()=>({h:{},setHeader(k,v){this.h[k]=v},status(c){this.c=c;return this},json(o){this.o=o;return this}});
-          const a=mk();await live({query:{}},a);const L=a.o;
-          console.log('LIVE',a.c,'week',L.week,'games',Object.keys(L.games||{}).length,'inj',(L.injuries||[]).length,'notes',(L.notes||[]).length,a.h['Cache-Control']);
-          for(const t of ['BAL','JAX','CIN','ATL','DAL','IND'])console.log('GAME',t,JSON.stringify(L.games[t]));
-          console.log('INJ',JSON.stringify((L.injuries||[]).filter(x=>x[2]).slice(0,4)));
-          for(const n of (L.notes||[]).slice(0,8))console.log('NOTE',JSON.stringify(n));
-          const b=mk();await market({query:{}},b);console.log('MARKET',b.c,(b.o.fc1||[]).length,(b.o.fc2||[]).length,JSON.stringify((b.o.fc1||[]).slice(0,3)));
-          fs.writeFileSync('/tmp/live.json',JSON.stringify(L));fs.writeFileSync('/tmp/market.json',JSON.stringify(b.o));
-          JS
-          node /tmp/run.mjs 2>&1 | grep -E "^(LIVE|GAME|INJ|NOTE|MARKET)"
-          echo "LIVEB64:$(gzip -c /tmp/live.json | base64 -w0)"
-          echo "MKTB64:$(gzip -c /tmp/market.json | base64 -w0)"
+          B=$RANDOM
+          for u in "api/live?week=9&b=$B" "api/market?b=$B" "api/proj?week=9&b=$B" "api/news?batch=Hunter%20Henry%7CNE&b=$B"; do
+            curl -s -o /tmp/o.json -w "URL $u HTTP %{http_code} %{time_total}s\n" "https://www.trademetric.app/$u"
+            python3 -c "import json;d=json.load(open('/tmp/o.json'));print('KEYS',list(d.keys()), {k:len(v) for k,v in d.items() if isinstance(v,(list,dict))}, d.get('games',{}).get('BAL'))"
+          done
