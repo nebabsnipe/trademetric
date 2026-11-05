@@ -6,15 +6,22 @@ jobs:
   probe:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
       - run: |
-          cp api/news.js /tmp/news.mjs
-          cat > /tmp/run.mjs <<'JS'
-          import h from '/tmp/news.mjs';
-          const res={setHeader(){},status(c){this.c=c;return this},json(o){this.o=o;return this}};
-          const t=Date.now();
-          await h({query:{batch:'Lamar Jackson|BAL;Sam Darnold|SEA;Mike Gesicki|CIN;Jaxson Dart|NYG;Kirk Cousins|LV;Tee Higgins|CIN;Dak Prescott|DAL;Chase Brown|CIN'}},res);
-          console.log('STATUS',res.c,'ms',Date.now()-t);
-          for(const [k,v] of Object.entries(res.o.items))for(const a of v)console.log('ITEM',k,'|',a.at,'|',a.outlet,'|',a.title,'|',(a.desc||'').slice(0,150));
-          JS
-          node /tmp/run.mjs 2>&1 | grep -E "STATUS|ITEM"
+          curl -s "https://api.sleeper.app/v1/players/nfl" -o /tmp/p.json
+          python3 - <<'PY'
+          import json;d=json.load(open('/tmp/p.json'))
+          keys=set()
+          for p in d.values(): keys|=set(p.keys())
+          print('SLKEYS',sorted(keys))
+          for n in ['Sam Darnold','Lamar Jackson','Tee Higgins','Mike Gesicki']:
+            for p in d.values():
+              if p.get('full_name')==n: print('SL',n,{k:p.get(k) for k in p if 'injur' in k or 'practice' in k or k in('status','team','news_updated')})
+          PY
+          curl -s "https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?seasontype=2&week=9&dates=2026" -o /tmp/s.json
+          python3 - <<'PY'
+          import json;d=json.load(open('/tmp/s.json'))
+          for ev in d.get('events',[])[:3]:
+            c=ev['competitions'][0];print('ODDS',ev.get('shortName'),json.dumps(c.get('odds'))[:700])
+          PY
+          curl -s "https://api.fantasycalc.com/values/current?isDynasty=false&numQbs=1&numTeams=12&ppr=1" | head -c 600; echo
+          curl -s "https://site.api.espn.com/apis/site/v2/sports/football/nfl/injuries" | head -c 1500; echo
