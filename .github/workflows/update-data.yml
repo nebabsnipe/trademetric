@@ -4,6 +4,7 @@ on:
   schedule:
     - cron: "17 13 * * *"   # every day, about 6am Arizona time
     - cron: "17 7,10,16,19 * * 2"   # Tuesdays after Monday night: midnight, 3am, 9am and noon Arizona time
+    - cron: "17 7,10 * * 1,5"   # after Sunday night and Thursday night games: midnight and 3am Arizona time, Monday and Friday
   workflow_dispatch:         # lets you run it by hand from the Actions tab
 
 permissions:

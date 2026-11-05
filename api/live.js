@@ -1,6 +1,8 @@
 // Live game-day data: scores and game clocks (ESPN), player stats so far (Sleeper)
 // and the latest injury designations (Sleeper). Cached at Vercel's edge so every
-// visitor shares one fetch per 2-minute window.
+// visitor shares one fetch per 2-minute window (5 minutes when no game is on).
+// Also carries the current betting lines (DraftKings via ESPN) and ESPN's injury notes,
+// which include practice participation through the week.
 
 const TEAM = { WSH: 'WAS', LA: 'LAR', JAC: 'JAX' };
 const fix = t => TEAM[t] || t;
@@ -14,7 +16,7 @@ async function j(url) {
 
 let injCache = { at: 0, data: null };
 async function injuries() {
-  if (injCache.data && Date.now() - injCache.at < 10 * 60e3) return injCache.data;
+  if (injCache.data && Date.now() - injCache.at < 5 * 60e3) return injCache.data;
   const all = await j('https://api.sleeper.app/v1/players/nfl');
   const out = [];
   for (const p of Object.values(all)) {
@@ -22,10 +24,39 @@ async function injuries() {
     if (!(p.search_rank > 0 && p.search_rank <= 600)) continue;
     let st = p.injury_status ? (INJ[p.injury_status] ?? '') : '';
     if (!st && p.status === 'Injured Reserve') st = 'IR';
-    out.push([p.full_name || `${p.first_name} ${p.last_name}`, fix(p.team), st]);
+    out.push([p.full_name || `${p.first_name} ${p.last_name}`, fix(p.team), st, st ? (p.injury_body_part || '') : '']);
   }
   injCache = { at: Date.now(), data: out };
   return out;
+}
+
+/* ESPN injury notes (Rotowire-style), with practice participation through the week */
+let noteCache = { at: 0, data: null };
+async function notes() {
+  if (noteCache.data && Date.now() - noteCache.at < 5 * 60e3) return noteCache.data;
+  const d = await j('https://site.api.espn.com/apis/site/v2/sports/football/nfl/injuries');
+  const out = [];
+  for (const t of d.injuries || []) for (const x of t.injuries || []) {
+    const a = x.athlete || {}, pos = a.position && a.position.abbreviation;
+    if (pos && !['QB', 'RB', 'WR', 'TE', 'K', 'FB'].includes(pos)) continue;
+    const team = fix((a.team && a.team.abbreviation) || '');
+    out.push({ n: a.displayName, t: team, st: x.status || '', at: x.date || null, note: String(x.shortComment || '').slice(0, 300), type: (x.details && (x.details.type || x.details.location)) || '' });
+  }
+  noteCache = { at: Date.now(), data: out };
+  return out;
+}
+
+function oddsOf(c) {
+  const o = (c.odds || []).find(x => x && x.overUnder != null) || (c.odds || [])[0];
+  if (!o || o.overUnder == null) return null;
+  const home = (c.competitors || []).find(x => x.homeAway === 'home'), away = (c.competitors || []).find(x => x.homeAway === 'away');
+  if (!home || !away) return null;
+  const sp = Math.abs(+o.spread || 0), favAbbr = fix(String(o.details || '').split(' ')[0]);
+  const homeFav = o.homeTeamOdds && o.homeTeamOdds.favorite != null ? !!o.homeTeamOdds.favorite : favAbbr === fix(home.team && home.team.abbreviation);
+  const total = +o.overUnder;
+  // implied points: half the total, plus or minus half the spread
+  const h = total / 2 + (homeFav ? sp : -sp) / 2;
+  return { [fix(home.team.abbreviation)]: +h.toFixed(1), [fix(away.team.abbreviation)]: +(total - h).toFixed(1), total, line: o.details || '' };
 }
 
 function gameInfo(board) {
@@ -41,10 +72,11 @@ function gameInfo(board) {
     const [m, s] = clock.split(':').map(Number);
     const elapsed = state === 'post' ? 60 : state === 'pre' ? 0 : Math.min(60, (period - 1) * 15 + (15 - ((m || 0) + (s || 0) / 60)));
     const rem = state === 'post' ? 0 : state === 'pre' ? 1 : Math.max(0, 1 - elapsed / 60);
+    let odds = null; try { odds = oddsOf(c); } catch {}
     const teams = (c.competitors || []).map(x => ({ t: fix(x.team && x.team.abbreviation), score: +x.score || 0, home: x.homeAway === 'home' }));
     for (const a of teams) {
       const b = teams.find(x => x !== a) || {};
-      games[a.t] = { state, rem: +rem.toFixed(3), detail: st.shortDetail || st.detail || '', start: ev.date, score: a.score, opp: b.t, oppScore: b.score || 0, home: a.home };
+      games[a.t] = { state, rem: +rem.toFixed(3), detail: st.shortDetail || st.detail || '', start: ev.date, score: a.score, opp: b.t, oppScore: b.score || 0, home: a.home, implied: odds ? odds[a.t] ?? null : null, total: odds ? odds.total : null, line: odds ? odds.line : '' };
     }
   }
   return games;
@@ -74,10 +106,11 @@ export default async function handler(req, res) {
     let week = parseInt((req.query && req.query.week) || state.week, 10);
     if (!(week >= 1 && week <= 18)) week = state.week;
     const pos = ['QB', 'RB', 'WR', 'TE', 'K', 'DEF'].map(p => 'position[]=' + p).join('&');
-    const [stats, board, inj] = await Promise.all([
+    const [stats, board, inj, note] = await Promise.all([
       j(`https://api.sleeper.com/stats/nfl/${season}/${week}?season_type=regular&${pos}`).catch(() => []),
       j(`https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?seasontype=2&week=${week}&dates=${season}`).catch(() => null),
       injuries().catch(() => null),
+      notes().catch(() => null),
     ]);
     const games = gameInfo(board);
     const players = [];
@@ -90,8 +123,8 @@ export default async function handler(req, res) {
     }
     const live = Object.values(games).some(g => g.state === 'in');
     // The page adds a 2-minute time bucket to the URL (&b=...), so a cached copy is never older than that.
-    res.setHeader('Cache-Control', `public, max-age=0, s-maxage=${live ? 120 : 300}`);
-    return res.status(200).json({ season, week, nflWeek: state.week, updated: new Date().toISOString(), live, games, players, injuries: inj });
+    res.setHeader('Cache-Control', `public, max-age=0, s-maxage=${live ? 120 : 240}`);
+    return res.status(200).json({ season, week, nflWeek: state.week, updated: new Date().toISOString(), live, games, players, injuries: inj, notes: note });
   } catch (e) {
     res.setHeader('Cache-Control', 'public, s-maxage=60');
     return res.status(502).json({ error: 'Live data unavailable' });

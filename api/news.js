@@ -158,7 +158,7 @@ export default async function handler(req, res) {
     await Promise.all(list.map(async ([n, t], i) => {
       try { const { items } = await collect(n, t, false, i >= 6); out[n] = items.slice(0, 3).map(x => ({ title: x.title, desc: clip(x.desc, 300), outlet: x.outlet, at: x.at })); } catch { out[n] = []; }
     }));
-    res.setHeader('Cache-Control', 'public, max-age=0, s-maxage=600');
+    res.setHeader('Cache-Control', 'public, max-age=0, s-maxage=300');
     return res.status(200).json({ updated: new Date().toISOString(), items: out });
   }
   if (!name) return res.status(400).json({ error: 'Missing name' });

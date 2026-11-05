@@ -1,7 +1,7 @@
 // Weekly fantasy projections from ESPN and Sleeper, as raw stat lines so the page
 // can score them with each league's exact settings. Both platforms update these
 // through the week as injury news and depth charts change. Cached at Vercel's
-// edge for 20 minutes so every visitor shares one fetch.
+// edge for 5 minutes so every visitor shares one fetch.
 
 const TEAM = { WSH: 'WAS', LA: 'LAR', JAC: 'JAX' };
 const fix = t => TEAM[t] || t;
@@ -87,7 +87,7 @@ export default async function handler(req, res) {
     if (Array.isArray(s) && s.length) sources.sleeper = s;
     if (Array.isArray(e) && e.length) sources.espn = e;
     if (!Object.keys(sources).length) throw new Error('no projections: ' + JSON.stringify({ s: s.err, e: e.err }));
-    res.setHeader('Cache-Control', 'public, max-age=0, s-maxage=1200');
+    res.setHeader('Cache-Control', 'public, max-age=0, s-maxage=300');
     return res.status(200).json({ season, week, updated: new Date().toISOString(), sources, errors: { sleeper: s.err || null, espn: e.err || null } });
   } catch (err) {
     res.setHeader('Cache-Control', 'public, s-maxage=60');

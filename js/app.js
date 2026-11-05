@@ -27,7 +27,7 @@ weekLabels();
 Object.entries(DATA.sched).forEach(([t,arr])=>{OPP[t]={};arr.forEach((x,k)=>{if(x)OPP[t][k+1]={opp:x[0],home:!!x[1]}})});
 const defRank=(t,pos)=>(DEF[t]&&DEF[t][pos])||16;
 const matchF=(t,pos)=>1+((defRank(t,pos)-16.5)/16.5)*.15;
-const vegasF=t=>WEEK===DATA.week&&VEGAS[t]?1+(VEGAS[t]-22.5)/22.5*.5:1;
+var VEGAS_WK=DATA.week;const vegasF=t=>WEEK===VEGAS_WK&&VEGAS[t]?1+(VEGAS[t]-22.5)/22.5*.5:1;
 function sosOf(p,from,to){const r=schedOf(p.t,from,to).filter(x=>x.g).map(x=>defRank(x.g.opp,p.pos));return r.length?r.reduce((a,b)=>a+b,0)/r.length:16.5}
 const LOGS={};
 function genLog(p){
@@ -319,9 +319,9 @@ function readProj(j){const map={},src=Object.entries(j.sources||{}),teams=src.ma
   const both=new Set([...(teams[0]||[])].filter(t=>teams.every(s=>s.has(t))));
   PROJ={week:j.week,at:j.updated,map,srcs:src.length,teams:both,near}}
 async function loadProj(){clearTimeout(PROJ_TIMER);
-  try{const r=await fetch('/api/proj?week='+WEEK+'&b='+Math.floor(Date.now()/1200000));if(r.ok){const j=await r.json();
+  try{const r=await fetch('/api/proj?week='+WEEK+'&b='+Math.floor(Date.now()/300000));if(r.ok){const j=await r.json();
     if(j&&j.sources&&j.week===WEEK){readProj(j);recompute();const a=document.activeElement;if(!(a&&/INPUT|TEXTAREA|SELECT/.test(a.tagName)))render()}}}catch(e){}
-  PROJ_TIMER=setTimeout(()=>{if(document.hidden)document.addEventListener('visibilitychange',loadProj,{once:true});else loadProj()},20*60e3)}
+  PROJ_TIMER=setTimeout(()=>{if(document.hidden)document.addEventListener('visibilitychange',loadProj,{once:true});else loadProj()},5*60e3)}
 function platHtml(g){const x=g.plat;if(!x||!g.next)return '';const it=[x.espn!=null?`ESPN <b>${f1(x.espn)}</b>`:'',x.sleeper!=null?`Sleeper <b>${f1(x.sleeper)}</b>`:'',`TradeMetric <b>${f1(x.ours)}</b>`].filter(Boolean).join(' · ');
   return `<p class="plat-line"><span class="lab2">Week ${WEEK} projection ${f1(g.projNext)}</span>${it}<em>${x.plat===0?'ESPN and Sleeper both project zero, which usually means he is ruled out or not expected to play. Check his news below.':'90% ESPN and Sleeper, 10% TradeMetric, in your league\'s scoring'}</em></p>`}
 /* ===== Live game-day data (/api/live) ===== */
@@ -334,14 +334,28 @@ function applyLive(){
       const pp=PLAT&&PLAT.pts[p.id];g.live={pts:pp!=null?pp:gm.state==='post'?stat+paTier(pa,sc):stat,state:gm.state,detail:gm.detail,rem:gm.rem,src:pp!=null?PLAT.src:null};g.projNext=pp!=null&&gm.state==='post'?pp:stat+projStat*gm.rem+paTier(Math.round(estPA),sc);return}
     const pp=PLAT&&PLAT.pts[p.id],pts=pp!=null?pp:st?linePts(st,p.pos,sc):0;g.live={pts,state:gm.state,detail:gm.detail,rem:gm.rem,src:pp!=null?PLAT.src:null};g.projNext=gm.state==='post'?pts:pts+g.projNext*gm.rem})}
 function liveStatus(){if(!LIVE||!LIVE.injuries)return;const keep=['IR','PUP','SUS'];
-  LIVE.injuries.forEach(([n,t,st])=>{const p=findExact(n);if(!p||p.pos==='DST'||(p.t!==t&&norm(p.n)!==norm(n)))return;
-    if(st)p.status=st;else if(!keep.includes(String(p.status||'').toUpperCase()))p.status=''})}
+  LIVE.injuries.forEach(([n,t,st,body])=>{const p=findExact(n);if(!p||p.pos==='DST'||(p.t!==t&&norm(p.n)!==norm(n)))return;
+    if(st){p.status=st;if(body)p.inj=body}else if(!keep.includes(String(p.status||'').toUpperCase()))p.status=''});
+  liveOdds();liveNotes()}
+/* current betting lines (DraftKings via ESPN) replace the morning's lines until each game kicks off */
+function liveOdds(){if(!LIVE||LIVE.week!==WEEK)return;const gs=Object.entries(LIVE.games||{}).filter(([,g])=>g.implied!=null);if(!gs.length)return;
+  if(VEGAS_WK!==WEEK){Object.keys(VEGAS).forEach(k=>delete VEGAS[k]);VEGAS_WK=WEEK}
+  gs.forEach(([t,g])=>{if(g.state==='pre')VEGAS[t]=g.implied})}
+/* ESPN injury notes, with practice participation pulled out for the practice report */
+let NOTES={};
+function pracCode(s){if(!/practi|participa|session|walkthrough/i.test(s))return '';
+  if(/did not practice|didn'?t practice|\bDNP\b|sat out|not practicing|no practice|held out|(wasn'?t|was not|not) (on the field|spotted|seen) (at|for|during)?|missed (wednesday|thursday|friday|practice)|absent/i.test(s))return 'DNP';
+  if(/limited|non-contact|red jersey|yellow jersey/i.test(s))return 'LP';if(/full(y)? (participa|practice|go)|practiced fully|full session|without limitation|was a full/i.test(s))return 'FP';return ''}
+function liveNotes(){if(!LIVE||!LIVE.notes)return;NOTES={};
+  LIVE.notes.forEach(x=>{const p=findExact(x.n,null,x.t);if(!p||p.pos==='DST'||(p.t!==x.t&&norm(p.n)!==norm(x.n)))return;NOTES[p.id]=x;
+    const code=pracCode(x.note),fresh=x.at&&Date.now()-Date.parse(x.at)<6*864e5;if(!code||!fresh||LIVE.week!==WEEK)return;
+    const L=PRAC[p.id]=(PRAC[p.id]||[]).filter(r=>r[0]!==WEEK);L.push([WEEK,code,x.type||p.inj||'',['Out','Doubtful','Questionable'].includes(x.st)?x.st:'']);if(L.length>3)L.shift()})}
 var ROLLED=false;
 function checkRollover(){if(!LIVE||LIVE.week!==WEEK||WEEK>=18)return false;const gs=Object.values(LIVE.games||{});
   const playing=Object.keys(OPP).filter(t=>OPP[t][WEEK]);if(!gs.length||gs.length<playing.length*.9||!gs.every(g=>g.state==='post'))return false;
   WEEK++;ROLLED=true;LIVE=null;PROJ=null;setTimeout(loadProj,800);LIVEST={};LIVE_LU=null;PLAT=null;SCHED=null;weekLabels();return true}
 async function loadLive(){
-  clearTimeout(LIVE_TIMER);let next=10*60e3;
+  clearTimeout(LIVE_TIMER);let next=5*60e3;
   try{const r=await fetch('/api/live?week='+WEEK+'&b='+Math.floor(Date.now()/120000));if(r.ok){const j=await r.json();
     if(j&&j.games){await loadPlatform();LIVE=j;LIVEST={};(j.players||[]).forEach(x=>{const p=x.pos==='DST'?byId['dst-'+String(x.t).toLowerCase()]:findExact(x.n);if(p&&p.pos===x.pos)LIVEST[p.id]=x.s});
       liveStatus();if(checkRollover()){setTimeout(loadLive,500);await loadPlatform()}recompute();const a=document.activeElement;if(!(a&&/INPUT|TEXTAREA|SELECT/.test(a.tagName)))render();if(j.live||Object.values(j.games).some(g=>g.state==='pre'&&Date.parse(g.start)-Date.now()<30*60e3))next=2*60e3}}}catch(e){}
@@ -492,18 +506,24 @@ function teamImpact(before,after){const W=tmWeeks(),PO=poWeeks(),RW=(S.real&&S.r
     if(PO.includes(w)){po+=a.pts-b.pts;poB+=b.pts;poA+=a.pts;weeks.push({w,b:b.pts,a:a.pts})}});
   const wsum=sum(W,wkWt)||1;return {perWeek:tot/wsum,po:po/Math.max(1,PO.length),reg:nReg?reg/nReg:0,poB,poA,weeks}}
 /* market value: each source's ranking mapped onto this league's points-above-replacement scale, then averaged */
-let MKT={v:-1};
+let MKT={v:-1},LIVE_FC=null,MKT_TIMER=null;
+/* FantasyCalc values straight from /api/market every 5 minutes (the daily snapshot stays as the fallback) */
+async function loadMarket(){clearTimeout(MKT_TIMER);
+  try{const r=await fetch('/api/market?b='+Math.floor(Date.now()/300000));if(r.ok){const d=await r.json(),o={at:Date.parse(d.updated)||Date.now()};
+    ['fc1','fc2'].forEach(k=>{const m={};(d[k]||[]).forEach(([n,pos,v,t])=>{const p=findExact(n,pos,t);if(p&&p.pos===pos)m[p.id]=v});if(Object.keys(m).length>50)o[k]=m});
+    if(o.fc1||o.fc2){LIVE_FC=o;VER++;if(typeof render==='function'&&(tab==='trade'||tab==='rankings'))render()}}}catch(e){}
+  MKT_TIMER=setTimeout(()=>{if(document.hidden)document.addEventListener('visibilitychange',loadMarket,{once:true});else loadMarket()},5*60e3)}
 function marketTable(){if(MKT.v===VER)return MKT;const sf=sfLeague(),vor=POOL.filter(p=>p.pos!=='K'&&p.pos!=='DST').map(p=>Math.max(0,V.vor[p.id])).sort((a,b)=>b-a);
   const srcs={};const add=(name,vals)=>{if(!vals)return;const ids=Object.keys(vals).filter(id=>byId[id]).sort((a,b)=>vals[b]-vals[a]);if(ids.length<50)return;const m={};ids.forEach((id,i)=>m[id]=vor[i]||0);srcs[name]=m};
-  if(MARKET){add('FantasyCalc',MARKET[sf?'fc2':'fc1']);add('KeepTradeCut',MARKET[sf?'ktc2':'ktc1'])}
+  if(MARKET||LIVE_FC){add('FantasyCalc',(LIVE_FC&&LIVE_FC[sf?'fc2':'fc1'])||(MARKET&&MARKET[sf?'fc2':'fc1']));if(MARKET)add('KeepTradeCut',MARKET[sf?'ktc2':'ktc1'])}
   const fp={};POOL.forEach(p=>{if(XR(p.id)!=null)fp[p.id]=Math.max(0,V.cons[p.id]-V.repl[p.pos])});if(Object.keys(fp).length>50)srcs.FantasyPros=fp;
   MKT={v:VER,srcs};return MKT}
 function marketValue(id){if(MVC.v!==VER)MVC={v:VER,m:{}};if(MVC.m[id]!=null)return MVC.m[id];return MVC.m[id]=marketValue0(id)}
 function marketValue0(id){const m=marketTable().srcs,vals=Object.values(m).map(x=>x[id]).filter(x=>x!=null);
   let v=vals.length?avg(vals):aboveRepl(id);if(byId[id].pos==='QB'&&!sfLeague())v*=qbF();const r=starW(Math.max(0,v)),dw=DY_W[fmtOf()]||0;return dw&&DYN[id]?(1-dw)*r+dw*dynV(id):r}
 function marketLabel(){const s=(MARKET&&MARKET.sources)||{},d=x=>x?new Date(x+'T12:00:00').toLocaleDateString([], {month:'short',day:'numeric'}):'';const parts=[];
-  if(marketTable().srcs.FantasyCalc)parts.push(`FantasyCalc ${d(s.fantasycalc&&s.fantasycalc.date)}`);if(marketTable().srcs.KeepTradeCut)parts.push(`KeepTradeCut ${d(s.keeptradecut&&s.keeptradecut.date)}`);
-  if(marketTable().srcs.FantasyPros)parts.push(`FantasyPros ${d(DATA.ecrDate)}`);return parts.length?`Market values: saved snapshot from ${parts.join(', ')}`:'Market values: TradeMetric projections (no market snapshot loaded)'}
+  if(marketTable().srcs.FantasyCalc)parts.push(LIVE_FC?`FantasyCalc (live, ${new Date(LIVE_FC.at).toLocaleTimeString([],{hour:'numeric',minute:'2-digit'})})`:`FantasyCalc ${d(s.fantasycalc&&s.fantasycalc.date)}`);if(marketTable().srcs.KeepTradeCut)parts.push(`KeepTradeCut ${d(s.keeptradecut&&s.keeptradecut.date)}`);
+  if(marketTable().srcs.FantasyPros)parts.push(`FantasyPros ${d(DATA.ecrDate)}`);return parts.length?`Market values: ${LIVE_FC?'':'saved snapshot from '}${parts.join(', ')}`:'Market values: TradeMetric projections (no market snapshot loaded)'}
 /* risk: injury-prone players coming in, and too many starters from one NFL team */
 function injRisk(id){const g=G[id],s=stOf(id),p=byId[id];let r={Q:.35,D:.7,O:.5,IR:.6,PUP:.6,SUS:.3}[s]||0;
   const teamG=g.log.filter(x=>!x.bye).length;if(teamG)r+=Math.max(0,(teamG-g.gp)/teamG)*1.2;return r*Math.max(.5,V.pts[id]/10)}
@@ -937,12 +957,13 @@ async function newsContext(q){const items=(FEED&&FEED.news)||[];
   const names=[...ids].map(id=>byId[id]).filter(Boolean),cut=Date.now()-10*864e5,out=[],dt=at=>at?new Date(at).toLocaleDateString('en-US',{month:'short',day:'numeric'}):'';
   /* player news from ESPN, RotoBaller, CBS, Yahoo, PFT and more (raw headlines, cached 10 minutes on the server) */
   try{const qs=names.filter(p=>p.pos!=='DST').slice(0,30).map(p=>encodeURIComponent(p.n+'|'+p.t)).join(';');
-    const r=await Promise.race([fetch('/api/news?batch='+qs+'&b='+Math.floor(Date.now()/600000)),new Promise((_,j)=>setTimeout(()=>j(0),9000))]);
+    const r=await Promise.race([fetch('/api/news?batch='+qs+'&b='+Math.floor(Date.now()/300000)),new Promise((_,j)=>setTimeout(()=>j(0),9000))]);
     if(r.ok){const d=await r.json();names.forEach(p=>((d.items||{})[p.n]||[]).forEach(a=>{if(a.at&&Date.parse(a.at)<cut)return;
       out.push({at:a.at,line:`- ${dt(a.at)} [${p.n}] ${a.title}${a.desc&&a.desc!==a.title?': '+a.desc:''} (${a.outlet})`,k:norm(a.title)})}))}}catch(e){}
   items.forEach(a=>{if(a.at&&Date.parse(a.at)<cut)return;const txt=norm((a.title||'')+' '+(a.desc||'')+' '+(a.athletes||[]).join(' '));
     const who=names.filter(p=>txt.includes(norm(p.n)));if(!who.length||out.some(o=>o.k===norm(a.title)))return;
     out.push({at:a.at,line:`- ${dt(a.at)} [${who.map(p=>p.n).join(', ')}] ${a.title}${a.desc&&a.desc!==a.title?': '+String(a.desc).slice(0,280):''}`,k:norm(a.title)})});
+  names.forEach(p=>{const x=NOTES[p.id];if(x&&x.note&&(!x.at||Date.parse(x.at)>cut))out.push({at:x.at,line:`- ${dt(x.at)} [${p.n}] ESPN note${x.st&&x.st!=='Active'?' ('+x.st+')':''}: ${x.note}`,k:'note'+p.id})});
   out.sort((a,b)=>Date.parse(b.at||0)-Date.parse(a.at||0));
   return `Recent news for my players and players in the question (newest first):\n${out.slice(0,45).map(o=>o.line).join('\n')||'- No recent stories about these players.'}`}
 async function askHelper(q){
@@ -1316,7 +1337,7 @@ function openCard(id){if(openId!==id)delete SORTS['log-table'];openId=id;const p
     ${g.role?`<div class="callout buy"><b>Hot streak with a reason.</b> ${esc(g.role)}</div>`:''}
     <div class="msec" id="card-hl">${cardHighlights(id)}</div>
     <div class="msec"><h4>Scouting report</h4><div class="scout-grid">
-      <div><span class="lab2">Status</span>${stOf(id)?`<b>${ST_LABEL[stOf(id)]}</b>${p.inj?`<span class="note">${esc(p.inj)}</span>`:''}`:'<b>No injury designation</b>'}<span class="note">${S.custom?'From your imported data':`From the Week ${DATA.injWeek} injury report`}</span></div>
+      <div><span class="lab2">Status</span>${stOf(id)?`<b>${ST_LABEL[stOf(id)]}</b>${p.inj?`<span class="note">${esc(p.inj)}</span>`:''}`:'<b>No injury designation</b>'}<span class="note">${S.custom?'From your imported data':`From the Week ${DATA.injWeek} injury report`}</span>${NOTES[id]&&NOTES[id].note&&NOTES[id].st!=='Active'?`<span class="note">${esc(NOTES[id].note)} <em>(${new Date(NOTES[id].at).toLocaleDateString([],{month:'short',day:'numeric'})})</em></span>`:''}</div>
       <div><span class="lab2">Injury history</span><b>Played ${games.length} of ${teamGames} team games</b><span class="note">${games.length<teamGames?`Missed ${teamGames-games.length} this season`:'Has not missed a game this season'}</span></div>
       <div><span class="lab2">Next 4 games</span><div class="chips">${schedOf(p.t,WEEK,WEEK+3).map(x=>x.g?`<span class="drk ${defRank(x.g.opp,p.pos)>=24?'easy':defRank(x.g.opp,p.pos)<=8?'hard':''}">${x.g.home?'vs':'at'} ${x.g.opp} · ${ord(defRank(x.g.opp,p.pos))}</span>`:'<span class="drk">Bye</span>').join('')}</div><span class="note">Defense rank against ${p.pos}s</span></div>
       <div><span class="lab2">Role trend</span><b>${roleTxt(p,g)}</b><span class="note">${p.pos==='K'?'Field goal chances':p.pos==='DST'?'Lower is better':g.ur>=1.12?'Usage is rising':g.ur<=.88?'Usage is falling':'Usage is steady'}</span></div>
@@ -1484,7 +1505,7 @@ else{S.league.sc={...BASE_SC,...S.league.sc};if(S.league.slots.DST===undefined)S
 buildLeagueForm();
 S.chat=(S.chat||[]).filter(x=>x.status==='done'||x.status==='error');
 var INTENDED=location.hash.slice(1);go('signin');
-loadLive();loadProj();
+loadLive();loadProj();loadMarket();
 
 /* ===== Accounts (Supabase): username or email + password, own sign-in page, league saved to the cloud ===== */
 var SUPA_URL='https://rltmfnmgbfgecbaevfvc.supabase.co',SUPA_KEY='sb_publishable_AFX79aKgqorAx3zgOyKatw_o_3_ERWG';
