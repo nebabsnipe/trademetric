@@ -334,7 +334,7 @@ function applyLive(){
       const pp=PLAT&&PLAT.pts[p.id];g.live={pts:pp!=null?pp:gm.state==='post'?stat+paTier(pa,sc):stat,state:gm.state,detail:gm.detail,rem:gm.rem,src:pp!=null?PLAT.src:null};g.projNext=pp!=null&&gm.state==='post'?pp:stat+projStat*gm.rem+paTier(Math.round(estPA),sc);return}
     const pp=PLAT&&PLAT.pts[p.id],pts=pp!=null?pp:st?linePts(st,p.pos,sc):0;g.live={pts,state:gm.state,detail:gm.detail,rem:gm.rem,src:pp!=null?PLAT.src:null};g.projNext=gm.state==='post'?pts:pts+g.projNext*gm.rem})}
 function liveStatus(){if(!LIVE||!LIVE.injuries)return;const keep=['IR','PUP','SUS'];
-  LIVE.injuries.forEach(([n,t,st,body])=>{const p=findExact(n);if(!p||p.pos==='DST'||(p.t!==t&&norm(p.n)!==norm(n)))return;
+  LIVE.injuries.forEach(([n,t,st,body,num])=>{const p=findExact(n);if(!p||p.pos==='DST'||(p.t!==t&&norm(p.n)!==norm(n)))return;if(num!=null&&p.t===t)NUM[p.id]=num;
     if(st){p.status=st;if(body)p.inj=body}else if(!keep.includes(String(p.status||'').toUpperCase()))p.status=''});
   liveOdds();liveNotes()}
 /* current betting lines (DraftKings via ESPN) replace the morning's lines until each game kicks off */
@@ -661,7 +661,24 @@ const f1=x=>(Math.round(x*10)/10).toFixed(1);
 const sgn=x=>(x>0?'+':x<0?'−':'')+f1(Math.abs(x));
 const $=id=>document.getElementById(id);
 const initials=n=>n.replace(/\b(Jr|Sr|II|III|IV)\.?$/,'').split(/\s+/).filter(Boolean).map(w=>w[0]).slice(0,2).join('').toUpperCase();
-const av=(p,cls='')=>`<span class="av ${cls}" style="${tcVars(p.t)}">${esc(initials(p.n))}</span>`;
+/* player badge: a mini jersey in the team's colors (our own drawing, no photos or logos). V-neck collar and two-stripe
+   sleeves in the team trim, outlined jersey number. Defenses show the team; no known number falls back to initials. */
+const NUM=DATA.num||{};let JY_ID=0;
+const jyShade=(hex,f)=>{const n=parseInt(hex.slice(1),16);let r=n>>16,g=n>>8&255,b=n&255;const t=f<0?0:255,q=Math.abs(f);r=Math.round((t-r)*q+r);g=Math.round((t-g)*q+g);b=Math.round((t-b)*q+b);return '#'+((1<<24)+(r<<16)+(g<<8)+b).toString(16).slice(1)};
+const jyLum=hex=>{const n=parseInt(hex.slice(1),16);return (.299*(n>>16)+.587*(n>>8&255)+.114*(n&255))/255};
+/* trim that stands out on the base: the team's second color unless it's too close, then white or near-black */
+const jyTrim=(c1,c2)=>Math.abs(jyLum(c1)-jyLum(c2))>.18?c2:(jyLum(c1)>.5?'#101820':'#ffffff');
+const JY_PATH='M21 7l7-3q4 4 8 0l7 3 15 9-6 12-6-3v32H18V25l-6 3-6-12z';
+function jersey(p,lg){const [c1,c2,ct]=TC[p.t]||['#3a3f47','#8a919c','#fff'],tr=jyTrim(c1,c2),id='jy'+(JY_ID++),n=NUM[p.id];
+  const L=p.pos==='DST'?p.t:n!=null&&n>=0&&n<100?String(n):initials(p.n),fs=L.length>2?17:L.length>1?24:26;
+  return `<svg viewBox="0 0 64 64" aria-hidden="true" focusable="false"><defs><clipPath id="${id}"><path d="${JY_PATH}"/></clipPath>
+<linearGradient id="${id}g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${jyShade(c1,.12)}"/><stop offset=".55" stop-color="${c1}"/><stop offset="1" stop-color="${jyShade(c1,-.32)}"/></linearGradient></defs>
+<g clip-path="url(#${id})"><rect width="64" height="64" fill="url(#${id}g)"/><path d="M6 16l15-9 3 18-12 3z" fill="${jyShade(c1,-.12)}"/><path d="M58 16L43 7l-3 18 12 3z" fill="${jyShade(c1,-.12)}"/>
+<path d="M4 20l14-8M3 23.5l14-8M60 20l-14-8M61 23.5l-14-8" stroke="${tr}" stroke-width="2.2"/><path d="M18 54h28" stroke="${jyShade(c1,-.25)}" stroke-width="3"/></g>
+<path d="M28 4q4 7 8 0l-1.5-.6q-2.5 4-5 0z" fill="${tr}"/><path d="M27 4.4L32 12l5-7.6" fill="none" stroke="${tr}" stroke-width="2.4" stroke-linejoin="round"/>
+<path d="${JY_PATH}" fill="none" stroke="${jyShade(c1,-.4)}" stroke-width="1.2" stroke-linejoin="round"/>
+<text x="32" y="${L.length>2?42:44}" text-anchor="middle" font-family="Barlow Condensed,Arial Narrow,sans-serif" font-weight="900" font-size="${fs}" fill="${ct}" stroke="${tr}" stroke-width="${lg?2.2:1.6}" paint-order="stroke" letter-spacing=".5">${esc(L)}</text></svg>`}
+const av=(p,cls='')=>`<span class="av jy ${cls}" title="${p.pos==='DST'?esc(p.t)+' defense':NUM[p.id]!=null?'#'+NUM[p.id]:''}">${jersey(p,/\blg\b/.test(cls))}</span>`;
 const posTag=p=>`<span class="pos ${p.pos}">${p.pos}${V.posRank[p.id]}</span>`;
 const tagFull=id=>{const t=G[id]&&G[id].tag;return t?`<span class="tag ${t}">${t==='buy'?'Buy low':'Sell high'}</span>`:''};
 const tagHtml=(id,noBuy)=>{let t=G[id]&&G[id].tag;if(noBuy&&t==='buy')t=null;return stHtml(id)+(t?`<span class="badge ${t}" title="${t==='buy'?'Buy low':'Sell high'}">${t==='buy'?'BL':'SH'}</span>`:'')};

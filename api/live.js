@@ -24,7 +24,7 @@ async function injuries() {
     if (!(p.search_rank > 0 && p.search_rank <= 600)) continue;
     let st = p.injury_status ? (INJ[p.injury_status] ?? '') : '';
     if (!st && p.status === 'Injured Reserve') st = 'IR';
-    out.push([p.full_name || `${p.first_name} ${p.last_name}`, fix(p.team), st, st ? (p.injury_body_part || '') : '']);
+    out.push([p.full_name || `${p.first_name} ${p.last_name}`, fix(p.team), st, st ? (p.injury_body_part || '') : '', p.number != null && p.number !== '' ? +p.number : null]);
   }
   injCache = { at: Date.now(), data: out };
   return out;

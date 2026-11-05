@@ -295,6 +295,15 @@ kw['kp']=3*kw.k39+4*kw.k49+5*kw.k50-kw.kmiss+kw.xpm-kw.xpmiss
 ka=kw.groupby(['opponent_team','week']).kp.sum().reset_index().groupby('opponent_team').kp.mean()
 for i,(t,_) in enumerate(ka.sort_values().items()):d['def'].setdefault(t,{})['K']=i+1
 d['k']=kickers;d['kfields']=KF
+# jersey numbers (for the player badges): current roster, matched by TradeMetric id
+try:
+    ids={p[0] for p in d['players']}|{k[0] for k in kickers};num={}
+    for r in ros[ros.position.isin(['QB','RB','WR','TE','K','FB'])].itertuples():
+        i=slug(r.full_name)
+        if i in ids and pd.notna(r.jersey_number):num.setdefault(i,int(r.jersey_number))
+    d['num']=num;print(len(num),'jersey numbers',file=sys.stderr)
+except Exception as e:
+    print('no jersey numbers',e,file=sys.stderr)
 print(len(kickers),'kickers',file=sys.stderr)
 
 d=data
