@@ -102,9 +102,9 @@ textarea{width:100%;resize:vertical}
 .av{--c1:#333;--c2:#555;--ct:#fff;flex:none;width:34px;height:34px;border-radius:50%;display:grid;place-items:center;background:linear-gradient(135deg,var(--c1) 55%,var(--c2));color:var(--ct);font-family:var(--f-display);font-weight:800;font-size:14px;letter-spacing:.02em}
 .av.sm{width:28px;height:28px;font-size:12px}
 .av.lg{width:72px;height:72px;font-size:28px;box-shadow:0 0 0 3px rgba(255,255,255,.35)}
-/* mini jersey badge (SVG): no circle, no background, just the jersey */
+/* jersey-back badge (SVG): rounded square drawn inside the SVG, so no circle or background here */
 .av.jy{background:none;border-radius:0;box-shadow:none;display:block;padding:0}
-.av.jy svg{display:block;width:100%;height:100%;overflow:visible;filter:drop-shadow(0 1px 1px rgba(0,0,0,.18))}
+.av.jy svg{display:block;width:100%;height:100%;filter:drop-shadow(0 1px 1px rgba(0,0,0,.18))}
 .av.lg.jy svg{filter:drop-shadow(0 3px 6px rgba(0,0,0,.28))}
 .pl{display:flex;align-items:center;gap:10px;min-width:0}
 .pl .meta{display:flex;flex-direction:column;min-width:0}
