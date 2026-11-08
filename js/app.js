@@ -752,8 +752,8 @@ function jersey(p,lg){const [c1,c2,ct]=TC[p.t]||['#3a3f47','#8a919c','#fff'],tr=
 <linearGradient id="${id}g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${jyShade(c1,.1)}"/><stop offset="1" stop-color="${jyShade(c1,-.3)}"/></linearGradient></defs>
 <g clip-path="url(#${id})"><rect width="64" height="64" fill="url(#${id}g)"/><path d="M0 0h64v9Q32 3 0 9z" fill="${jyShade(c1,-.3)}"/><path d="M24 0Q32 5 40 0" fill="none" stroke="${tr}" stroke-width="2.6"/>
 <path d="M0 12L10 6M0 17L11 11M64 12L54 6M64 17L53 11" stroke="${tr}" stroke-width="2.6"/>
-${lg?`<text x="32" y="${L.length>2?19.5:18.5}" text-anchor="middle" font-family="Barlow,sans-serif" font-weight="700" font-size="${nm.length>11?4.6:nm.length>9?5.4:6.6}" letter-spacing="1.2" fill="${ct}">${esc(nm)}</text>`:''}
-<text x="32" y="${y}" text-anchor="middle" font-family="Barlow Condensed,Arial Narrow,sans-serif" font-weight="900" font-size="${fs}" fill="${ct}" stroke="${tr}" stroke-width="${lg?2.2:2}" paint-order="stroke">${esc(L)}</text></g>
+${lg?`<text x="32" y="${L.length>2?19.5:18.5}" text-anchor="middle" font-family="Inter,sans-serif" font-weight="700" font-size="${nm.length>11?4.6:nm.length>9?5.4:6.6}" letter-spacing="1.2" fill="${ct}">${esc(nm)}</text>`:''}
+<text x="32" y="${y}" text-anchor="middle" font-family="Kanit,Arial,sans-serif" font-weight="800" font-size="${fs}" fill="${ct}" stroke="${tr}" stroke-width="${lg?2.2:2}" paint-order="stroke">${esc(L)}</text></g>
 <rect x=".6" y=".6" width="62.8" height="62.8" rx="14.5" fill="none" stroke="#000" stroke-opacity=".22" stroke-width="1.2"/></svg>`}
 const av=(p,cls='')=>`<span class="av jy ${cls}" title="${p.pos==='DST'?esc(p.t)+' defense':NUM[p.id]!=null?'#'+NUM[p.id]:''}">${jersey(p,/\blg\b/.test(cls))}</span>`;
 const posTag=p=>`<span class="pos ${p.pos}">${p.pos}${V.posRank[p.id]}</span>`;
