@@ -26,8 +26,9 @@ SOURCES={
   'db_fpecr_latest.csv':              'https://raw.githubusercontent.com/dynastyprocess/data/master/files/db_fpecr_latest.csv',
   'values-players.csv':               'https://raw.githubusercontent.com/dynastyprocess/data/master/files/values-players.csv',
   f'ep_weekly_{SEASON}.csv':            f'https://github.com/ffverse/ffopportunity/releases/download/latest-data/ep_weekly_{SEASON}.csv',
+  f'play_by_play_{SEASON}.csv':         NV+f'pbp/play_by_play_{SEASON}.csv',
 }
-OPTIONAL=('fp_latest_weekly.csv',f'depth_charts_{SEASON}.csv','db_fpecr_latest.csv','values-players.csv',f'ep_weekly_{SEASON}.csv')
+OPTIONAL=('fp_latest_weekly.csv',f'depth_charts_{SEASON}.csv','db_fpecr_latest.csv','values-players.csv',f'ep_weekly_{SEASON}.csv',f'play_by_play_{SEASON}.csv')
 os.makedirs(RAW,exist_ok=True)
 for name,url in SOURCES.items():
     try:
@@ -218,6 +219,23 @@ try:
     print(len(data['exp']),'players with expected points',file=sys.stderr)
 except Exception as _e:
     print('expected points skipped',_e,file=sys.stderr)
+# Red zone opportunities: carries plus targets inside the 20 and inside the 10.
+# Only the columns we need are read -- the full play-by-play file is 43 MB.
+data['rz']={}
+try:
+    _pc=['season_type','week','yardline_100','play_type','rush_attempt','pass_attempt','rusher_player_id','receiver_player_id','two_point_attempt']
+    _pbp=pd.read_csv(D+f'play_by_play_{SEASON}.csv',low_memory=False,usecols=_pc)
+    _pbp=_pbp[(_pbp.season_type=='REG')&(_pbp.week<=PLAYED)&(_pbp.play_type.isin(['run','pass']))&(_pbp.two_point_attempt!=1)]
+    def _rzcount(limit):
+        z=_pbp[_pbp.yardline_100<=limit]
+        return z[z.rush_attempt==1].groupby('rusher_player_id').size().add(
+               z[z.pass_attempt==1].dropna(subset=['receiver_player_id']).groupby('receiver_player_id').size(),fill_value=0)
+    _r20,_r10=_rzcount(20),_rzcount(10)
+    data['rz']={p[0]:[int(_r20.get(GID[p[0]],0)),int(_r10.get(GID[p[0]],0))]
+                for p in final if GID.get(p[0]) in _r20.index}
+    print(len(data['rz']),'players with red zone work',file=sys.stderr)
+except Exception as _e:
+    print('red zone skipped',_e,file=sys.stderr)
 # efficiency: weighted opportunity (WOPR) and air yards per game, which predict future scoring better than raw points
 try:
     eff={}
