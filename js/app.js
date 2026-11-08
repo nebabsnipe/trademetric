@@ -2085,9 +2085,20 @@ function ssDefault(){const me=myTeam(),lu=lineup(me.players,nextV);let best=null
     lu.bench.filter(id=>el.includes(byId[id].pos)&&G[id].next&&!isOut(id)).forEach(b=>{const d=nextV(x.p.id)-nextV(b);if(!best||d<best.d)best={d,ids:[x.p.id,b]}})});
   return best?best.ids:me.players.filter(id=>byId[id].pos!=='K'&&byId[id].pos!=='DST').slice(0,2)}
 function ssStats(id){const g=G[id],proj=g.next?g.projNext:0,cv=Math.max(.25,Math.min(.9,g.cv||.45));return {proj,floor:Math.max(0,proj*(1-.75*cv)),ceil:proj*(1+.8*cv)}}
-function ssPick(){return `<div class="ss-pick">${SS.map(id=>`<span class="ss-chip">${av(byId[id],'sm')}<span>${esc(byId[id].n)}</span><button class="ss-x" data-ssrm="${id}" aria-label="Remove ${esc(byId[id].n)}">&times;</button></span>`).join('')}${SS.length<3?`<input type="text" id="ss-add" list="dl-players" placeholder="Add a player" autocomplete="off">`:''}</div>`}
-function ssAdd(){const el=$('ss-add');if(!el||!el.value.trim())return;const p=findByName(el.value);
-  if(!p){toast('No player found with that name');return}
+var SS_FA=false;
+/* the add box searches your roster by default; the link switches it to free agents */
+function ssPool(){if(SS_FA)return V.list.filter(q=>!OWN[q.id]&&G[q.id]).slice(0,300).map(q=>byId[q.id]).filter(Boolean);
+  const me=myTeam();return me?me.players.map(id=>byId[id]).filter(Boolean):[]}
+function ssFind(v){const q=norm(v||'');if(!q)return null;const L=ssPool();
+  return L.find(x=>norm(x.n)===q)||L.find(x=>norm(x.n).startsWith(q))||L.find(x=>norm(x.n).includes(q))||null}
+function ssPick(){const L=ssPool();
+  const chips=SS.map(id=>{const p=byId[id];return `<span class="ss-chip">${av(p,'sm')}<span>${esc(p.n)}</span>${OWN[id]?'':'<em class="ss-fa">FA</em>'}<button class="ss-x" data-ssrm="${id}" aria-label="Remove ${esc(p.n)}">&times;</button></span>`}).join('');
+  if(SS.length>=3)return `<div class="ss-pick">${chips}</div>`;
+  return `<div class="ss-pick">${chips}<input type="text" id="ss-add" list="dl-ss" placeholder="${SS_FA?'Add a free agent':'Add from your team'}" autocomplete="off">
+    <datalist id="dl-ss">${L.map(x=>`<option value="${esc(x.n)}">${x.pos} · ${x.t}</option>`).join('')}</datalist>
+    <button class="linkish ss-scope" data-ssfa="${SS_FA?0:1}">${SS_FA?'Back to my team':'Compare a free agent'}</button></div>`}
+function ssAdd(){const el=$('ss-add');if(!el||!el.value.trim())return;const p=ssFind(el.value);
+  if(!p){toast(SS_FA?'No free agent found with that name':'He is not on your team. Use "Compare a free agent" to look wider.');return}
   SS=(SS||[]).filter(x=>x!==p.id);SS=SS.length>=3?SS.slice(0,2).concat(p.id):SS.concat(p.id);renderStartSit()}
 function renderStartSit(){const el=$('startsit');if(!el)return;const me=myTeam();if(!me||me.players.length<2){el.innerHTML='';return}
   if(!SS)SS=ssDefault();SS=SS.filter(id=>byId[id]);if(!SS.length)SS=ssDefault();
@@ -2104,7 +2115,7 @@ function renderStartSit(){const el=$('startsit');if(!el)return;const me=myTeam()
    ${ssPick()}
    <div class="ss-verdict"><span class="ss-conf ${diff>=3?'clear':diff>=1?'lean':'flip'}">${conf}</span><b>Start ${esc(byId[win.id].n)}</b><span>${f1(win.proj)} vs ${f1(run.proj)} projected${why.length?'. '+esc(why[0]):''}</span></div>
    <div class="ss-grid n${st.length}">${st.map(x=>{const p=byId[x.id],g=G[x.id],w=x.id===win.id;return `<div class="ss-col${w?' win':''}">${w?'<span class="ss-start">Start</span>':''}
-     <div class="ss-pl">${av(p,'sm')}<div class="meta"><button class="pname" data-open="${p.id}">${esc(p.n)}</button><span class="psub">${p.pos}${V.posRank[p.id]} · ${p.t}${stOf(p.id)?' · '+stHtml(p.id):''}</span></div></div>
+     <div class="ss-pl">${av(p,'sm')}<div class="meta"><button class="pname" data-open="${p.id}">${esc(p.n)}</button><span class="psub">${p.pos}${V.posRank[p.id]} · ${p.t}${OWN[p.id]?'':' · free agent'}${stOf(p.id)?' · '+stHtml(p.id):''}</span></div></div>
      <div class="ss-proj"><b class="num">${f1(x.proj)}</b><span>projected</span></div>
      <dl class="ss-dl"><dt>Matchup</dt><dd>${g.next?`${g.next.home?'vs':'at'} ${g.next.opp} <span class="drk ${g.next.rank>=24?'easy':g.next.rank<=8?'hard':''}">${ord(g.next.rank)}</span>`:'Bye'}</dd><dt>Range</dt><dd>${f1(x.floor)}&ndash;${f1(x.ceil)}</dd><dt>Last 3</dt><dd>${f1(g.last3)}</dd><dt>Risk</dt><dd>${riskHtml(p.id)}</dd></dl>
      </div>`}).join('')}</div>`}
@@ -2217,7 +2228,7 @@ document.addEventListener('click',e=>{const t=e.target.closest&&e.target.closest
   if(d.vpos){valPos=d.vpos;renderValues();return}
   if(t.id==='val-all'){VAL_ALL=true;renderValues();return}
   if(d.ssrm){SS=SS.filter(x=>x!==d.ssrm);renderStartSit();return}
-  if(t.id==='ss-add-btn'){ssAdd();return}
+  if(d.ssfa!==undefined){SS_FA=d.ssfa==='1';renderStartSit();const b=$('ss-add');if(b)b.focus();return}
   if(d.dr){drView=d.dr;clearTimeout(DR_TIMER);renderDraft();return}
   if(d.dpos){drPos=d.dpos;renderDraft();return}
   if(d.drpick){drPick(d.drpick);return}

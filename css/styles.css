@@ -967,6 +967,8 @@ a.btn{text-decoration:none;display:inline-flex;align-items:center}
 .ss-chip>span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .ss-x{border:0;background:none;color:var(--muted);font-size:17px;line-height:1;padding:0 3px;cursor:pointer;border-radius:50%}
 .ss-x:hover{color:var(--bad)}
+.ss-fa{font-style:normal;font-size:10px;font-weight:800;letter-spacing:.04em;padding:1px 5px;border-radius:4px;background:var(--accent-soft);color:var(--accent)}
+.ss-scope{font-size:12.5px;white-space:nowrap}
 .live-now{display:flex;align-items:baseline;flex-wrap:wrap;gap:8px}
 .live-now b{font-family:var(--f-display);font-style:italic;font-weight:700;font-size:34px;line-height:1}
 .live-now>span{font-size:13px;color:var(--muted)}
