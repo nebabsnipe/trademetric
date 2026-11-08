@@ -1195,8 +1195,6 @@ function renderMatchup(){const el=$('matchup');const oid=oppOf(S.me,WEEK);
   if(!oid){el.innerHTML=`<div class="card-h"><h2>Week ${WEEK} matchup</h2></div><p class="empty">No opponent this week.</p>`;return}
   const me=myTeam(),O=teamById(oid),A=weekLine(me.players,WEEK,S.me),Bm=weekLine(O.players,WEEK,oid),pw=Phi((A.m-Bm.m)/Math.sqrt(A.sd**2+Bm.sd**2)),f=pickVal(WEEK);
   const act=lu=>sum(lu.slots.filter(x=>x.p&&liveOf(x.p.id)),x=>liveOf(x.p.id).pts),anyLive=[...A.lu.slots,...Bm.lu.slots].some(x=>x.p&&liveOf(x.p.id)),aA=act(A.lu),aB=act(Bm.lu);
-  const keyP=(lu,ot)=>{let best=null;lu.slots.forEach((x,i)=>{if(!x.p)return;const mu=f(x.p.id);if(mu<=0)return;const o=ot.slots[i],edge=mu-(o&&o.p?f(o.p.id):0);if(!best||edge>best.edge)best={p:x.p,mu,edge,slot:x.label}});return best};
-  const kp=(x,lab)=>{if(!x)return '';const n=G[x.p.id].next,lv=liveOf(x.p.id);if(lv)return `<div><span class="lab2">${lab}</span>${plCell(x.p,lv.state==='post'?`Scored ${f1(lv.pts)}. Game is final.`:`${f1(lv.pts)} so far, on pace for ${f1(x.mu)}.`)}</div>`;return `<div><span class="lab2">${lab}</span>${plCell(x.p,`${f1(x.mu)} projected${x.edge>0?`, ${f1(x.edge)} more than the other ${x.slot}`:''}${n?`. Faces ${n.opp}, ${ord(n.rank)} against ${x.p.pos}s`:''}.`)}</div>`};
   const cell=(id,v,win,al)=>{const l=id&&liveOf(id);return `<td class="${al} num ${win?'win':''}">${l?`<b>${f1(l.pts)}</b><small>${l.state==='post'?'final':'proj '+f1(v)}</small>`:f1(v)}</td>`};
   const rows=A.lu.slots.map((x,i)=>{const o=Bm.lu.slots[i],a=x.p?f(x.p.id):0,b=o&&o.p?f(o.p.id):0;
     const sub=id=>liveOf(id)?`${byId[id].pos} · ${liveTxt(id)} ${f1(liveOf(id).pts)} pts`:`${byId[id].pos} · ${oppHtml(id)}`;
@@ -1206,7 +1204,6 @@ function renderMatchup(){const el=$('matchup');const oid=oppOf(S.me,WEEK);
     <div class="mu-mid"><div class="mu-pct">${pct(pw)}</div><div class="note">chance you win</div></div>
     <div class="mu-team r"><span class="mu-name"><i class="tsq" style="background:${teamColor(oid)}"></i>${esc(O.name)}</span><span class="note">${recTxt(oid)}</span><b class="num">${f1(anyLive?aB:Bm.m)}</b>${anyLive?`<span class="mu-proj">proj ${f1(Bm.m)}</span>`:''}</div></div>
    <div class="mu-bar"><i style="width:${pw*100}%;background:${teamColor(S.me)}"></i><i style="width:${(1-pw)*100}%;background:${versusColor(teamColor(S.me),teamColor(oid))}"></i></div>
-   <div class="mu-swing">${kp(keyP(A.lu,Bm.lu),'Your key player')}${kp(keyP(Bm.lu,A.lu),'Their key player')}</div>
    <details class="mu-details"><summary>Position-by-position comparison</summary><div class="mu-table"><table><thead><tr><th>You</th><th class="r">${anyLive?'Pts':'Proj'}</th><th style="text-align:center">Slot</th><th>${anyLive?'Pts':'Proj'}</th><th>${esc(O.name)}</th></tr></thead><tbody>${rows}</tbody></table></div></details>`}
 function dialSvg(x){const r=86,c=Math.PI*r,len=c*Math.max(0,Math.min(1,x));
   return `<svg viewBox="0 0 200 116" class="dial" aria-hidden="true"><path d="M14 104 A86 86 0 0 1 186 104" class="dial-bg"/><path d="M14 104 A86 86 0 0 1 186 104" class="dial-fg" style="stroke-dasharray:${len} ${c}"/></svg>`}
@@ -2093,15 +2090,13 @@ function renderStartSit(){const el=$('startsit');if(!el)return;const me=myTeam()
   if(run.ceil>win.ceil+1)why.push(`${byId[run.id].n} has the higher ceiling if you need a big week.`);
   const opts=me.players.filter(id=>G[id]).sort((a,b)=>nextV(b)-nextV(a));
   const sel=(i)=>`<select data-ss="${i}" aria-label="Player ${i+1}">${i>1?'<option value="">Add a third player</option>':''}${opts.concat(SS.filter(id=>!opts.includes(id))).map(id=>`<option value="${id}" ${SS[i]===id?'selected':''}>${esc(byId[id].n)} (${byId[id].pos})</option>`).join('')}</select>`;
-  const mx=Math.max(...st.map(x=>x.ceil),1);
   el.innerHTML=`<div class="card-h"><h2>Start or sit</h2><span class="note">Week ${WEEK} · pick two or three players</span></div>
    <div class="ss-pick">${sel(0)}${sel(1)}${sel(2)}<div class="addrow ss-any"><input type="text" id="ss-add" list="dl-players" placeholder="Or compare anyone: type a name" autocomplete="off"><button class="btn small" id="ss-add-btn">Compare</button></div></div>
    <div class="ss-verdict"><span class="ss-conf ${diff>=3?'clear':diff>=1?'lean':'flip'}">${conf}</span><b>Start ${esc(byId[win.id].n)}</b><span>${f1(win.proj)} vs ${f1(run.proj)} projected${why.length?'. '+esc(why[0]):''}</span></div>
    <div class="ss-grid n${st.length}">${st.map(x=>{const p=byId[x.id],g=G[x.id],w=x.id===win.id;return `<div class="ss-col${w?' win':''}">${w?'<span class="ss-start">Start</span>':''}
-     <div class="ss-pl">${av(p)}<div class="meta"><button class="pname" data-open="${p.id}">${esc(p.n)}</button><span class="psub">${p.pos}${V.posRank[p.id]} · ${p.t}${stOf(p.id)?' · '+stHtml(p.id):''}</span></div></div>
+     <div class="ss-pl">${av(p,'sm')}<div class="meta"><button class="pname" data-open="${p.id}">${esc(p.n)}</button><span class="psub">${p.pos}${V.posRank[p.id]} · ${p.t}${stOf(p.id)?' · '+stHtml(p.id):''}</span></div></div>
      <div class="ss-proj"><b class="num">${f1(x.proj)}</b><span>projected</span></div>
-     <div class="ss-range" title="Likely range"><i style="left:${x.floor/mx*100}%;width:${Math.max(2,(x.ceil-x.floor)/mx*100)}%"></i><em style="left:${x.proj/mx*100}%"></em></div><div class="ss-rl"><span>${f1(x.floor)} floor</span><span>${f1(x.ceil)} ceiling</span></div>
-     <dl class="ss-dl"><dt>Matchup</dt><dd>${g.next?`${g.next.home?'vs':'at'} ${g.next.opp} <span class="drk ${g.next.rank>=24?'easy':g.next.rank<=8?'hard':''}">${ord(g.next.rank)}</span>`:'Bye'}</dd><dt>Team total</dt><dd>${VEGAS[p.t]||'-'}</dd><dt>Last 3</dt><dd>${f1(g.last3)}</dd><dt>Risk</dt><dd>${riskHtml(p.id)}</dd></dl>
+     <dl class="ss-dl"><dt>Matchup</dt><dd>${g.next?`${g.next.home?'vs':'at'} ${g.next.opp} <span class="drk ${g.next.rank>=24?'easy':g.next.rank<=8?'hard':''}">${ord(g.next.rank)}</span>`:'Bye'}</dd><dt>Range</dt><dd>${f1(x.floor)}&ndash;${f1(x.ceil)}</dd><dt>Last 3</dt><dd>${f1(g.last3)}</dd><dt>Risk</dt><dd>${riskHtml(p.id)}</dd></dl>
      ${SS.length>2?`<button class="linkish ss-rm" data-ssrm="${p.id}">Remove</button>`:''}</div>`}).join('')}</div>`}
 
 /* ===== Alerts (bell in the top bar) ===== */
