@@ -1428,6 +1428,11 @@ function openCard(id){if(openId!==id)delete SORTS['log-table'];openId=id;const p
     ${g.tag==='sell'?`<div class="callout sell"><b>Sell high.</b> ${g.sellWhy?esc(g.sellWhy)+' Good time to trade him.':`He's scoring ${f1(g.last3)} a game lately, well above his ${f1(V.pts[id])} projection, without getting more work. Good time to trade him.`}</div>`:''}
     ${g.risk?`<div class="callout risk"><b>Why he is a risk</b><ul class="reasons">${g.risk.map(x=>`<li>${esc(x)}</li>`).join('')}</ul></div>`:''}
     ${g.role?`<div class="callout buy"><b>Hot streak with a reason.</b> ${esc(g.role)}</div>`:''}
+    ${liveStatsHtml(p,g,cols)}
+    <div class="msec"><h4>Game log</h4><div class="logbox"><table id="log-table"><thead><tr><th data-sort data-first="asc">WK</th><th>OPP</th>${cols.map(c=>`<th class="r" data-sort>${c[0]}</th>`).join('')}<th class="r" data-sort>FPTS</th></tr></thead>
+      <tbody>${g.log.map((x,i)=>x.bye?`<tr><td>${x.w}</td><td colspan="${cols.length+2}" class="muted">Bye week</td></tr>`:x.dnp?`<tr><td>${x.w}</td><td>${x.home?'vs':'@'} ${x.opp}</td><td colspan="${cols.length+1}" class="muted">Did not play</td></tr>`:`<tr><td>${x.w}</td><td>${x.home?'vs':'@'} ${x.opp}</td>${cols.map(c=>`<td class="r num">${x[c[1]]}</td>`).join('')}<td class="r num" style="font-weight:700">${f1(g.pts[i])}</td></tr>`).join('')}</tbody>
+      <tfoot><tr><td colspan="2">Season</td>${cols.map(c=>`<td class="r num">${tot(c[1])}</td>`).join('')}<td class="r num">${f1(season)}</td></tr></tfoot></table></div>
+      <p class="note" style="margin:6px 0 0">Through Week ${PLAYED} · updated ${new Date(DATA.asOf+'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric'})}</p></div>
     <div class="msec" id="card-hl">${cardHighlights(id)}</div>
     <div class="msec"><h4>Scouting report</h4><div class="scout-grid">
       <div><span class="lab2">Status</span>${stOf(id)?`<b>${ST_LABEL[stOf(id)]}</b>${p.inj?`<span class="note">${esc(p.inj)}</span>`:''}`:'<b>No injury designation</b>'}<span class="note">${S.custom?'From your imported data':`From the Week ${DATA.injWeek} injury report`}</span>${NOTES[id]&&NOTES[id].note&&NOTES[id].st!=='Active'?`<span class="note">${esc(NOTES[id].note)} <em>(${new Date(NOTES[id].at).toLocaleDateString([],{month:'short',day:'numeric'})})</em></span>`:''}</div>
@@ -1437,10 +1442,6 @@ function openCard(id){if(openId!==id)delete SORTS['log-table'];openId=id;const p
     </div>
     <div id="scout" style="margin-top:10px"><button class="btn small" data-scout="${id}">Generate AI scouting report</button></div></div>
     <div class="msec"><h4>Usage this season</h4><div class="usage">${usage.map(([l,v,u])=>`<div><b>${u?Math.round(v)+u:(Number.isInteger(v)?v:f1(v))}</b><span>${l}</span></div>`).join('')}</div></div>
-    <div class="msec"><h4>Game log</h4><div class="logbox"><table id="log-table"><thead><tr><th data-sort data-first="asc">WK</th><th>OPP</th>${cols.map(c=>`<th class="r" data-sort>${c[0]}</th>`).join('')}<th class="r" data-sort>FPTS</th></tr></thead>
-      <tbody>${g.log.map((x,i)=>x.bye?`<tr><td>${x.w}</td><td colspan="${cols.length+2}" class="muted">Bye week</td></tr>`:x.dnp?`<tr><td>${x.w}</td><td>${x.home?'vs':'@'} ${x.opp}</td><td colspan="${cols.length+1}" class="muted">Did not play</td></tr>`:`<tr><td>${x.w}</td><td>${x.home?'vs':'@'} ${x.opp}</td>${cols.map(c=>`<td class="r num">${x[c[1]]}</td>`).join('')}<td class="r num" style="font-weight:700">${f1(g.pts[i])}</td></tr>`).join('')}</tbody>
-      <tfoot><tr><td colspan="2">Season</td>${cols.map(c=>`<td class="r num">${tot(c[1])}</td>`).join('')}<td class="r num">${f1(season)}</td></tr></tfoot></table></div>
-      <p class="note" style="margin:6px 0 0">Through Week ${PLAYED} · updated ${new Date(DATA.asOf+'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric'})}</p></div>
     <div class="msec"><h4>Schedule ahead</h4><div class="schedbox"><div class="sched">${schedOf(p.t,WEEK,17).map(x=>x.g?`<div class="sw ${defRank(x.g.opp,p.pos)>=24?'easy':defRank(x.g.opp,p.pos)<=8?'hard':''}${x.w>=15?' po':''}"><span>Wk ${x.w}</span><b>${x.g.home?'vs':'at'} ${x.g.opp}</b><em>${ord(defRank(x.g.opp,p.pos))}</em></div>`:`<div class="sw${x.w>=15?' po':''}"><span>Wk ${x.w}</span><b>BYE</b><em>-</em></div>`).join('')}</div></div>
       ${howLink('matchups')}</div>
     <div class="msec"><h4>${isMine?'Trade him for similar value':own?'What it would take from your roster':'Similar value on your roster'}</h4>${comps.length?comps.map(q=>`<div class="mini-row">${plCell(q,`${q.pos}${V.posRank[q.id]} · ${f1(V.pts[q.id])} pts/G · ${OWN[q.id]===S.me?'your team':esc(teamById(OWN[q.id]).name)}`)}${tagHtml(q.id)||'<span></span>'}<button class="btn small" data-load="${isMine?id:q.id}|${isMine?q.id:id}" ${(!isMine&&!own)?'hidden':''}>Trade</button></div>`).join(''):'<p class="empty">No close matches in your league right now.</p>'}</div>
@@ -1468,7 +1469,13 @@ function outlookHtml(p,g){if(p.pos==='K')return '';const r=g.risk2||{lvl:0,why:[
   const lead=gap>=5?'Experts expect him to score more from here than he has so far.':gap<=-5?'Experts expect him to cool off from his pace so far.':g.xr?'Experts see more of the same from here.':'';
   return `<div class="msec"><h4>Rest-of-season outlook</h4><div class="ol-chips">${chips}</div>
     ${lead||bullets.length?`<ul class="reasons ol-why">${lead?`<li>${lead}</li>`:''}${bullets.map(x=>`<li>${esc(x)}</li>`).join('')}</ul>`:''}
-    ${r.lvl&&r.why.length>1?`<p class="note" style="margin:6px 0 0">Risk factors: ${esc(r.why.join(' '))}</p>`:''}${platHtml(g)}${fxHtml(g)}${howLink('values')}</div>`}
+    ${r.lvl&&r.why.length>1?`<p class="note" style="margin:6px 0 0">Risk factors: ${esc(r.why.join(' '))}</p>`:''}${howLink('values')}</div>`}
+function liveStatsHtml(p,g,cols){const l=liveOf(p.id);if(!l)return '';
+  const st=LIVEST[p.id],cells=(st?cols:[]).filter(c=>st[c[1]]).map(c=>`<div><b>${st[c[1]]}</b><span>${esc(c[0])}</span></div>`).join('');
+  return `<div class="msec"><h4>${l.state==='post'?'How he did today':'Live right now'}</h4>
+    <div class="live-now"><b class="num">${f1(l.pts)}</b><span>points ${l.state==='post'?'scored':'so far'}</span>${liveTxt(p.id)}</div>
+    ${cells?`<div class="usage" style="margin-top:10px">${cells}</div>`:'<p class="note" style="margin:8px 0 0">No stats yet.</p>'}
+    ${l.state==='post'?'':`<p class="note" style="margin:8px 0 0">On pace for ${f1(g.projNext)}.</p>`}</div>`}
 function closeCard(){$('scrim').hidden=true;document.body.style.overflow='';openId=null}
 
 /* ===== League setup form ===== */
@@ -2078,8 +2085,13 @@ function ssDefault(){const me=myTeam(),lu=lineup(me.players,nextV);let best=null
     lu.bench.filter(id=>el.includes(byId[id].pos)&&G[id].next&&!isOut(id)).forEach(b=>{const d=nextV(x.p.id)-nextV(b);if(!best||d<best.d)best={d,ids:[x.p.id,b]}})});
   return best?best.ids:me.players.filter(id=>byId[id].pos!=='K'&&byId[id].pos!=='DST').slice(0,2)}
 function ssStats(id){const g=G[id],proj=g.next?g.projNext:0,cv=Math.max(.25,Math.min(.9,g.cv||.45));return {proj,floor:Math.max(0,proj*(1-.75*cv)),ceil:proj*(1+.8*cv)}}
+function ssPick(){return `<div class="ss-pick">${SS.map(id=>`<span class="ss-chip">${av(byId[id],'sm')}<span>${esc(byId[id].n)}</span><button class="ss-x" data-ssrm="${id}" aria-label="Remove ${esc(byId[id].n)}">&times;</button></span>`).join('')}${SS.length<3?`<input type="text" id="ss-add" list="dl-players" placeholder="Add a player" autocomplete="off">`:''}</div>`}
+function ssAdd(){const el=$('ss-add');if(!el||!el.value.trim())return;const p=findByName(el.value);
+  if(!p){toast('No player found with that name');return}
+  SS=(SS||[]).filter(x=>x!==p.id);SS=SS.length>=3?SS.slice(0,2).concat(p.id):SS.concat(p.id);renderStartSit()}
 function renderStartSit(){const el=$('startsit');if(!el)return;const me=myTeam();if(!me||me.players.length<2){el.innerHTML='';return}
-  if(!SS||SS.filter(id=>byId[id]).length<2)SS=ssDefault();SS=SS.filter(id=>byId[id]);
+  if(!SS)SS=ssDefault();SS=SS.filter(id=>byId[id]);if(!SS.length)SS=ssDefault();
+  if(SS.length<2){el.innerHTML=`<div class="card-h"><h2>Start or sit</h2><span class="note">Week ${WEEK}</span></div>${ssPick()}<p class="note">Add another player to compare.</p>`;return}
   const st=SS.map(id=>({id,...ssStats(id)})),ord2=[...st].sort((a,b)=>b.proj-a.proj),win=ord2[0],run=ord2[1],diff=win.proj-run.proj;
   const conf=diff>=3?'Clear call':diff>=1?'Lean':'Coin flip',why=[];
   const wg=G[win.id],rg=G[run.id];
@@ -2088,16 +2100,14 @@ function renderStartSit(){const el=$('startsit');if(!el)return;const me=myTeam()
     if(VEGAS[byId[win.id].t]&&VEGAS[byId[run.id].t]&&VEGAS[byId[win.id].t]-VEGAS[byId[run.id].t]>=3)why.push(`His team is expected to score more (${VEGAS[byId[win.id].t]} vs ${VEGAS[byId[run.id].t]}).`)}
   if(stOf(run.id))why.push(`${byId[run.id].n} is ${ST_LABEL[stOf(run.id)].toLowerCase()}.`);
   if(run.ceil>win.ceil+1)why.push(`${byId[run.id].n} has the higher ceiling if you need a big week.`);
-  const opts=me.players.filter(id=>G[id]).sort((a,b)=>nextV(b)-nextV(a));
-  const sel=(i)=>`<select data-ss="${i}" aria-label="Player ${i+1}">${i>1?'<option value="">Add a third player</option>':''}${opts.concat(SS.filter(id=>!opts.includes(id))).map(id=>`<option value="${id}" ${SS[i]===id?'selected':''}>${esc(byId[id].n)} (${byId[id].pos})</option>`).join('')}</select>`;
-  el.innerHTML=`<div class="card-h"><h2>Start or sit</h2><span class="note">Week ${WEEK} · pick two or three players</span></div>
-   <div class="ss-pick">${sel(0)}${sel(1)}${sel(2)}<div class="addrow ss-any"><input type="text" id="ss-add" list="dl-players" placeholder="Or compare anyone: type a name" autocomplete="off"><button class="btn small" id="ss-add-btn">Compare</button></div></div>
+  el.innerHTML=`<div class="card-h"><h2>Start or sit</h2><span class="note">Week ${WEEK} · compare up to three</span></div>
+   ${ssPick()}
    <div class="ss-verdict"><span class="ss-conf ${diff>=3?'clear':diff>=1?'lean':'flip'}">${conf}</span><b>Start ${esc(byId[win.id].n)}</b><span>${f1(win.proj)} vs ${f1(run.proj)} projected${why.length?'. '+esc(why[0]):''}</span></div>
    <div class="ss-grid n${st.length}">${st.map(x=>{const p=byId[x.id],g=G[x.id],w=x.id===win.id;return `<div class="ss-col${w?' win':''}">${w?'<span class="ss-start">Start</span>':''}
      <div class="ss-pl">${av(p,'sm')}<div class="meta"><button class="pname" data-open="${p.id}">${esc(p.n)}</button><span class="psub">${p.pos}${V.posRank[p.id]} · ${p.t}${stOf(p.id)?' · '+stHtml(p.id):''}</span></div></div>
      <div class="ss-proj"><b class="num">${f1(x.proj)}</b><span>projected</span></div>
      <dl class="ss-dl"><dt>Matchup</dt><dd>${g.next?`${g.next.home?'vs':'at'} ${g.next.opp} <span class="drk ${g.next.rank>=24?'easy':g.next.rank<=8?'hard':''}">${ord(g.next.rank)}</span>`:'Bye'}</dd><dt>Range</dt><dd>${f1(x.floor)}&ndash;${f1(x.ceil)}</dd><dt>Last 3</dt><dd>${f1(g.last3)}</dd><dt>Risk</dt><dd>${riskHtml(p.id)}</dd></dl>
-     ${SS.length>2?`<button class="linkish ss-rm" data-ssrm="${p.id}">Remove</button>`:''}</div>`}).join('')}</div>`}
+     </div>`}).join('')}</div>`}
 
 /* ===== Alerts (bell in the top bar) ===== */
 const ALERT_LS='tm-alerts-seen';
@@ -2207,7 +2217,7 @@ document.addEventListener('click',e=>{const t=e.target.closest&&e.target.closest
   if(d.vpos){valPos=d.vpos;renderValues();return}
   if(t.id==='val-all'){VAL_ALL=true;renderValues();return}
   if(d.ssrm){SS=SS.filter(x=>x!==d.ssrm);renderStartSit();return}
-  if(t.id==='ss-add-btn'){const p=findByName($('ss-add').value);if(!p){toast('No player found with that name');return}SS=(SS||[]).filter(x=>x!==p.id).slice(0,2).concat(p.id);renderStartSit();return}
+  if(t.id==='ss-add-btn'){ssAdd();return}
   if(d.dr){drView=d.dr;clearTimeout(DR_TIMER);renderDraft();return}
   if(d.dpos){drPos=d.dpos;renderDraft();return}
   if(d.drpick){drPick(d.drpick);return}
@@ -2219,12 +2229,12 @@ document.addEventListener('click',e=>{const t=e.target.closest&&e.target.closest
 });
 function confirmLiveReset(){const b=$('dr-reset');if(b.dataset.armed){return true}b.dataset.armed='1';b.textContent='Tap again to clear';setTimeout(()=>{if(b.isConnected){delete b.dataset.armed;b.textContent='Clear draft'}},3000);return false}
 document.addEventListener('change',e=>{const t=e.target;
-  if(t.dataset.ss!==undefined){const i=+t.dataset.ss;SS=SS.slice();if(t.value)SS[i]=t.value;else SS.splice(i,1);SS=SS.filter((x,j,a)=>x&&a.indexOf(x)===j);renderStartSit()}
+  if(t.id==='ss-add')ssAdd()
   else if(t.id==='dr-slot'||t.id==='dr-slot-live'){DR.slot=+t.value;saveLive();renderDraft()}
   else if(t.id==='dr-teams'||t.id==='dr-teams-live'){DR.n=+t.value;DR.slot=Math.min(DR.slot,DR.n);saveLive();renderDraft()}
   else if(t.id==='dr-rounds'){DR.R=+t.value;renderDraft()}});
 document.addEventListener('input',e=>{if(e.target.id==='val-search')renderValues();else if(e.target.id==='dr-q')renderDraft()});
-document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!$('alert-pop').hidden)toggleAlerts(false);if(e.key==='Enter'&&e.target.id==='ss-add')$('ss-add-btn').click()});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!$('alert-pop').hidden)toggleAlerts(false);if(e.key==='Enter'&&e.target.id==='ss-add'){e.preventDefault();ssAdd()}});
 
 /* ===== How this works (help page) ===== */
 function openHelp(sec){document.querySelectorAll('#v-help details').forEach(d=>{if(sec)d.open=d.id==='faq-'+sec});if(sec){const el=$('faq-'+sec);if(el)setTimeout(()=>el.scrollIntoView({block:'start'}),30)}}
