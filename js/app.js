@@ -37,8 +37,8 @@ function genLog(p){
     if(e&&e.k){const [opp,home,k39,k49,k50,kmiss,xpm,xpmiss]=e.e;log.push({w,opp,home:!!home,k39,k49,k50,kmiss,xpm,xpmiss,...Z,fl:0});continue}
     if(e&&e.dst){const [opp,home,dsk,dint,dfr,dtd,dsf,pa]=e.e;log.push({w,opp,home:!!home,dsk,dint,dfr,dtd,dsf,pa,cmp:0,pyd:0,ptd:0,int:0,ratt:0,ryd:0,rtd:0,tgt:0,rec:0,recyd:0,rectd:0,fl:0});continue}
     if(!e||e.length===2){const o=e?{opp:e[0],home:!!e[1]}:sch;log.push({w,dnp:true,opp:o.opp,home:o.home});continue}
-    const [opp,home,cmp,pyd,ptd,int,ratt,ryd,rtd,tgt,rec,recyd,rectd,fl,ts,snap]=e;
-    log.push({w,opp,home:!!home,cmp,pyd,ptd,int,ratt,ryd,rtd,tgt,rec,recyd,rectd,fl,ts,snap})}
+    const [opp,home,cmp,pyd,ptd,int,ratt,ryd,rtd,tgt,rec,recyd,rectd,fl,ts,snap,ays,cs]=e;
+    log.push({w,opp,home:!!home,cmp,pyd,ptd,int,ratt,ryd,rtd,tgt,rec,recyd,rectd,fl,ts,snap,ays:ays||0,cs:cs||0})}
   return LOGS[p.id]={trend:'',log};
 }
 

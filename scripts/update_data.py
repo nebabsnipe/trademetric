@@ -56,7 +56,12 @@ for k,name,team,nums in json.load(open(os.path.join(ROOT,'data','preseason.json'
 print('preseason',len(pre),file=sys.stderr)
 
 w=pd.read_csv(D+'stats_player_week_'+str(SEASON)+'.csv',low_memory=False)
-w=w[(w.season_type=='REG')&w.position.isin(['QB','RB','WR','TE'])].copy()
+w=w[w.season_type=='REG'].copy()
+# carry share needs every position in the denominator, so take team totals before filtering to skill players
+_tc=w.copy();_tc['team']=_tc.team.map(fix);_tc['carries']=_tc.carries.fillna(0)
+TEAMCAR={(t,int(wk)):float(c) for (t,wk),c in _tc.groupby(['team','week']).carries.sum().items() if c>0}
+del _tc
+w=w[w.position.isin(['QB','RB','WR','TE'])].copy()
 # A week counts as played only when every game in it is final (Thursday games alone don't count)
 _g=pd.read_csv(D+'games.csv',low_memory=False);_g=_g[(_g.season==SEASON)&(_g.game_type=='REG')]
 _done={int(k):bool(v) for k,v in _g.groupby('week').home_score.apply(lambda x:x.notna().all()).items()}
@@ -165,7 +170,11 @@ for pid in keep:
             vals=[int(getattr(r,C[f])) if f!='fl' else int(r.fl) for f in F]
             ts=getattr(r,'target_share');ts=round(float(ts)*100,1) if pd.notna(ts) else 0
             sp=snapd.get((k,fix(r.team),wk),-1)
-            log.append([opp,home]+vals+[ts,round(sp*100) if sp>=0 else -1])
+            ays=getattr(r,'air_yards_share');ays=round(float(ays)*100,1) if pd.notna(ays) else 0
+            _c=getattr(r,'carries');_c=float(_c) if pd.notna(_c) else 0.0
+            _tcar=TEAMCAR.get((fix(r.team),wk),0)
+            cs=round(_c/_tcar*100,1) if _tcar else 0
+            log.append([opp,home]+vals+[ts,round(sp*100) if sp>=0 else -1,ays,cs])
         elif sch==0: log.append(0)
         else: log.append([sch[0],sch[1]])  # did not play
     st,note=status_for(k,pid)
