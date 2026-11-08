@@ -501,10 +501,10 @@ function rosterAfter(players,out,inn,taken){let after=players.filter(x=>!out.inc
   const over=after.length>Math.max(lim,players.length);
   if(after.length<players.length){const best=POOL.filter(p=>!OWN[p.id]&&!taken.has(p.id)&&p.pos!=='DST'&&p.pos!=='K').map(p=>p.id).sort((a,b)=>playerValue(b)-playerValue(a))[0];if(best){fa=best;after=after.concat(best)}}
   return {after,drop,fa,over}}
-function teamImpact(before,after){const W=tmWeeks(),PO=poWeeks(),RW=(S.real&&S.real.regWeeks)||14;let tot=0,po=0,poB=0,poA=0,reg=0,nReg=0;const weeks=[];
-  W.forEach(w=>{const b=weekTeam(before,w),a=weekTeam(after,w),d=(a.pts+a.ins)-(b.pts+b.ins);tot+=d*wkWt(w);if(w<=RW){reg+=a.pts-b.pts;nReg++}
+function teamImpact(before,after){const W=tmWeeks(),PO=poWeeks(),RW=(S.real&&S.real.regWeeks)||14;let tot=0,po=0,poB=0,poA=0,reg=0,nReg=0,lpB=0,lpA=0;const weeks=[];
+  W.forEach(w=>{const b=weekTeam(before,w),a=weekTeam(after,w),d=(a.pts+a.ins)-(b.pts+b.ins);tot+=d*wkWt(w);lpB+=b.pts;lpA+=a.pts;if(w<=RW){reg+=a.pts-b.pts;nReg++}
     if(PO.includes(w)){po+=a.pts-b.pts;poB+=b.pts;poA+=a.pts;weeks.push({w,b:b.pts,a:a.pts})}});
-  const wsum=sum(W,wkWt)||1;return {perWeek:tot/wsum,po:po/Math.max(1,PO.length),reg:nReg?reg/nReg:0,poB,poA,weeks}}
+  const wsum=sum(W,wkWt)||1,nW=Math.max(1,W.length);return {perWeek:tot/wsum,po:po/Math.max(1,PO.length),reg:nReg?reg/nReg:0,poB,poA,weeks,lpB:lpB/nW,lpA:lpA/nW,lp:(lpA-lpB)/nW}}
 /* market value: each source's ranking mapped onto this league's points-above-replacement scale, then averaged */
 let MKT={v:-1},LIVE_FC=null,MKT_TIMER=null;
 /* FantasyCalc values straight from /api/market every 5 minutes (the daily snapshot stays as the fallback) */
@@ -551,6 +551,49 @@ function shapeFit(sit,inN,outN){const net=inN-outN;let f=0;
   if(net>0){f+=Math.min(net,sit.thin)*.5;if(!sit.thin&&sit.deep>6)f-=.25*net;if(sit.space<net&&sit.deep>4)f-=.15*net}
   else if(net<0){const k=-net;if(sit.deep>4)f+=Math.min(k,2)*.4;if(sit.thin)f-=.35*k}
   return f}
+/* ===== Realistic-trade layer =====
+   True VAR: rest-of-season points per game above a replacement-level starter at his position, raised to the 1.2 power so
+   elite players are worth more than the sum of lesser ones. Drop cost: whoever ends up over the roster limit cuts their least
+   valuable bench player, and that player's VAR counts against the deal. Consolidation tax: giving a top-5 player at his
+   position for a package of lesser players, without a big starting-lineup upgrade in return, is penalized. Team profiles
+   and the Realism Score decide which deals real managers would accept. */
+const VAR_POW=1.2;
+const varV=id=>Math.pow(Math.max(0,aboveRepl(id)),VAR_POW);
+const tierN=()=>Math.max(.67,S.teams.length/12);
+/* elite: top 5 at RB/WR, top 3 at TE, top 3 QBs in 1-QB leagues (top 5 in superflex) */
+function isElite(id){const p=byId[id];if(!p||p.pos==='K'||p.pos==='DST')return false;const r=V.posRank[id],cut={QB:sfLeague()?5:3,RB:5,WR:5,TE:3}[p.pos];return r<=cut}
+/* a star: a starter in roughly the top tier of his position for this league size */
+function isStud(id){const p=byId[id];if(!p||p.pos==='K'||p.pos==='DST')return false;const c={QB:sfLeague()?8:5,RB:8,WR:10,TE:4}[p.pos]*tierN();return V.posRank[id]<=Math.round(c)}
+function dropCost(drop){return drop?sum([].concat(drop),varV):0}
+/* the side giving an elite player for 2+ lesser ones pays a tax unless its own starting lineup gets much better */
+function consTax(out,inn,lpGain){if(inn.length<2)return {tax:0};const el=out.filter(isElite).sort((a,b)=>varV(b)-varV(a))[0];if(!el)return {tax:0};
+  const best=inn.slice().sort((a,b)=>varV(b)-varV(a))[0],gap=varV(el)-varV(best);if(gap<=0||varV(best)>=.75*varV(el))return {tax:0};
+  const relief=Math.max(0,Math.min(1,lpGain/3));return {tax:Math.min(5,gap*.6*(1-relief)),el,best}}
+/* team profile: standing (from the Season Sim) plus roster build (stars vs depth) */
+const PROF_TXT={contender:'Win-Now Contender',bubble:'Playoff Bubble',depth:'Depth-Rich / Stud-Needy',stars:'Star-Heavy / Zero-Depth',rebuild:'Out of the Race',balanced:'Balanced'};
+const PROF_NEED={contender:'high-ceiling studs for the Week 15–17 playoffs',bubble:'a steady weekly floor and bye-week fill-ins',depth:'to turn depth into one stronger starter (a 2-for-1)',stars:'starting-caliber depth to stop zeroes in the lineup',rebuild:'to sell veterans for value',balanced:'a straight upgrade'};
+let PROF={v:-1,m:{}};
+function profileOf(teamId){if(PROF.v!==VER)PROF={v:VER,m:{}};if(PROF.m[teamId])return PROF.m[teamId];
+  const T=teamById(teamId),r=teamStats().rows.find(x=>x.T.id===teamId),sit=teamSit(teamId),sim=simulate(),po=sim&&sim[teamId]?sim[teamId].playoff:.5;
+  const starters=r?r.lu.slots.filter(x=>x.p).map(x=>x.p.id):[],studs=starters.filter(isStud).length;
+  /* startable depth: bench players within 80% of the team's weakest flex-type starter */
+  const weak=Math.min(...starters.filter(id=>!['QB','K','DST'].includes(byId[id].pos)).map(id=>playerValue(id)),Infinity),bench=r?r.lu.bench.filter(id=>!['K','DST'].includes(byId[id].pos)):[];
+  const startable=bench.filter(id=>weak<Infinity&&playerValue(id)>=.8*weak).length;
+  const standing=po>=.75?'contender':po>=.3?'bubble':'rebuild';
+  const build=startable>=3&&studs<=2?'depth':studs>=4&&(startable<=1||sit.thin>0)?'stars':'balanced';
+  return PROF.m[teamId]={standing,build,po,studs,startable,label:PROF_TXT[build!=='balanced'?build:standing],sub:build!=='balanced'?PROF_TXT[standing]:null}}
+/* does the deal hit each side's surplus/deficit? consolidation to the deep team, extra starters to the thin one, needs filled */
+function reciprocity(give,get,partnerId,fillsMine,fillsTheirs){const me=profileOf(S.me),th=profileOf(partnerId),out=[];
+  if(me.build==='depth'&&give.length>get.length)out.push(['me','depth']);if(me.build==='stars'&&get.length>give.length)out.push(['me','stars']);
+  if(th.build==='depth'&&get.length>give.length)out.push(['them','depth']);if(th.build==='stars'&&give.length>get.length)out.push(['them','stars']);
+  if(fillsMine)out.push(['me','need']);if(fillsTheirs)out.push(['them','need']);
+  return {hits:out,both:out.some(x=>x[0]==='me')&&out.some(x=>x[0]==='them')}}
+/* Realism Score 0–100: would two real managers make this deal? */
+function realismOf(e,n){const sig=x=>1/(1+Math.exp(-x));
+  const mut=Math.min(e.you.lp,e.them.lp),bal=1-Math.min(1,Math.abs(e.mIn-e.mOut)/Math.max(1,(e.mIn+e.mOut)/2));
+  let r=38*sig(mut/1.2)+30*bal+22*sig(e.themNet)+(e.recip.both?10:e.recip.hits.length?5:0);
+  r-=Math.min(25,(e.taxThem.tax+e.taxMe.tax)*7)+Math.min(10,(e.dcMe+e.dcThem)*2)+Math.max(0,n-3)*3+(e.infeasible?40:0);
+  r=Math.round(Math.max(0,Math.min(100,r)));return {score:r,label:r>=80?'Very realistic':r>=62?'Realistic':r>=45?'A stretch':'Unlikely'}}
 function evalTrade(give,get,partnerId,opts={}){
   const me=myTeam(),P=teamById(partnerId),taken=new Set([...give,...get]);
   const mine=rosterAfter(me.players,give,get,taken);if(mine.fa)taken.add(mine.fa);const theirs=P?rosterAfter(P.players,get,give,taken):{after:[],drop:null,fa:null};
@@ -561,7 +604,14 @@ function evalTrade(give,get,partnerId,opts={}){
   const theirStart=P?new Set(lineup(theirs.after,id=>playerValue(id)).slots.filter(x=>x.p).map(x=>x.p.id)):new Set();
   const fillsNeed=give.some(id=>tn.includes(byId[id].pos)&&theirStart.has(id));
   const sitMe=teamSit(S.me),sitThem=P?teamSit(partnerId):null,fitMe=shapeFit(sitMe,get.length,give.length),fitThem=P?shapeFit(sitThem,give.length,get.length):0;
-  const themNet=.55*(mIn-mOut)+.45*them.perWeek+(fillsNeed?.6:0)+.4*fitThem;
+  /* new layer: drop cost, consolidation tax, team profiles */
+  const dcMe=dropCost(mine.drop),dcThem=P?dropCost(theirs.drop):0;
+  const taxThem=P?consTax(get,give,them.lp):{tax:0},taxMe=consTax(give,get,you.lp);
+  const myNeeds=needsOf(S.me),myStart=new Set(lineup(mine.after,id=>playerValue(id)).slots.filter(x=>x.p).map(x=>x.p.id)),fillsMine=get.some(id=>myNeeds.includes(byId[id].pos)&&myStart.has(id));
+  const recip=P?reciprocity(give,get,partnerId,fillsMine,fillsNeed):{hits:[],both:false},thProf=P?profileOf(partnerId):null;
+  /* their lineup, weighted by what their profile needs: contenders weigh the playoff weeks, bubble teams the next few weeks */
+  const thLineup=!thProf?them.perWeek:thProf.standing==='contender'?.5*them.perWeek+.5*them.po:thProf.standing==='bubble'?.5*them.perWeek+.5*them.reg:them.perWeek;
+  const themNet=.55*(mIn-mOut)+.45*thLineup+(fillsNeed?.6:0)+.4*fitThem-.5*dcThem-taxThem.tax+(recip.hits.some(x=>x[0]==='them')?.3:0);
   /* your side */
   let sb=simulate(),sa=null;if(opts.sim!==false)sa=simulate({[S.me]:mine.after,...(P?{[partnerId]:theirs.after}:{})});
   const po0=sb?sb[S.me].playoff:.5,mode=teamMode(po0),Wm=MODE_W[mode];
@@ -571,10 +621,12 @@ function evalTrade(give,get,partnerId,opts={}){
   const unc=ids=>sum(ids,id=>(G[id].risk2?G[id].risk2.score:0)*Math.max(.5,V.pts[id]/10));
   const risk=(sum(get,injRisk)-sum(give,injRisk))*.6+(unc(get)-unc(give))*.35+(stackPen(mine.after)-stackPen(me.players));
   const dw=DY_W[fmtOf()]||0,dy=dw?(sum(get,dynV)-sum(give,dynV))*dw*.5:0;
-  const parts={N:Wm.N*you.reg,L:Wm.L*you.perWeek,P:Wm.P*you.po,PO:Wm.PO*dPO,T:Wm.T*dT,U:Wm.U*upside,SH:Wm.SH*sellHigh,R:-Wm.R*risk,DY:dy,F:.35*fitMe};
+  const parts={N:Wm.N*you.reg,L:Wm.L*you.perWeek,P:Wm.P*you.po,PO:Wm.PO*dPO,T:Wm.T*dT,U:Wm.U*upside,SH:Wm.SH*sellHigh,R:-Wm.R*risk,DY:dy,F:.35*fitMe,DC:-.5*dcMe,CT:-taxMe.tax};
   const youNet=sum(Object.values(parts),x=>x);
   return {mode,parts,youNet,themNet,d:youNet-themNet,gYou:tradeGrade(youNet),gThem:tradeGrade(themNet),myLG:you.perWeek,thLG:them.perWeek,
-    vIn,vOut,mIn,mOut,fillsNeed,you,them,mine,theirs,sitMe,sitThem,fitMe,fitThem,dy,infeasible:mine.over||theirs.over,dPO,dT,po0,po1:sa?sa[S.me].playoff:null,t0:sb?sb[S.me].title:null,t1:sa?sa[S.me].title:null,risk,upside,sellHigh}}
+    vIn,vOut,mIn,mOut,fillsNeed,fillsMine,you,them,mine,theirs,sitMe,sitThem,fitMe,fitThem,dy,infeasible:mine.over||theirs.over,dPO,dT,po0,po1:sa?sa[S.me].playoff:null,t0:sb?sb[S.me].title:null,t1:sa?sa[S.me].title:null,risk,upside,sellHigh,
+    dcMe,dcThem,taxMe,taxThem,recip,thProf,thLine:thLineup,real:null}}
+function realism(e,give,get){if(!e.real)e.real=realismOf(e,give.length+get.length);return e.real}
 function fairness(give,get,partnerId,mode=RATE_MODE,pre){
   const e=pre||evalTrade(give,get,partnerId),d=mode==='hm'?e.d:e.myLG-e.thLG,share=1/(1+Math.exp(-d/(mode==='hm'?3:4))),x=share-.5,ad=Math.abs(x);
   const who=x>0?'you':'them',label=ad<.04?'Even trade':ad<.1?`Slightly favors ${who}`:ad<.2?`Favors ${who}`:`Heavily favors ${who}`;
@@ -604,7 +656,9 @@ function allTrades(loose=false){
 
   const out=[];
   for(const t of pre){const e=t.e;if(e.youNet<(loose?.05:.3)||e.d>(loose?3.2:2.8))continue;
-    out.push({team:t.team,give:t.give,get:t.get,e,full:false,myGain:e.myLG,thGain:e.thLG,fillsNeed:e.fillsNeed,score:e.youNet+.4*Math.min(e.themNet,1.5)-.12*(t.give.length+t.get.length-2)})}
+    /* realistic deals only: both starting lineups gain (a little slack in the fallback list), and the Realism Score clears the bar */
+    if(e.you.lp<(loose?-.6:-.1)||e.them.lp<(loose?-1:-.3))continue;const rl=realism(e,t.give,t.get);if(rl.score<(loose?30:45))continue;
+    out.push({team:t.team,give:t.give,get:t.get,e,full:false,myGain:e.myLG,thGain:e.thLG,fillsNeed:e.fillsNeed,score:e.youNet+.4*Math.min(e.themNet,1.5)-.12*(t.give.length+t.get.length-2)+.012*(rl.score-60)})}
   out.sort((a,b)=>b.score-a.score);if(loose){TR_LOOSE={v:VER,list:out};return out}TR_CACHE={v:VER,list:out};return out;
 }
 function fullEval(t){if(!t.full){t.e=evalTrade(t.give,t.get,t.team);t.full=true;t.myGain=t.e.myLG;t.thGain=t.e.thLG}return t}
@@ -614,7 +668,7 @@ function pickDiverse(list,n,skip=0,loose=false,qbTaken=0){
   const res=[],usedP=new Set(),usedT=new Set(),usedS=new Set();let qb=qbTaken;const hasQB=t=>t.give.concat(t.get).some(id=>byId[id].pos==='QB');
   const order=list.slice(skip).concat(list.slice(0,skip)),top=order.length?order[0].score:0;
   /* first pass: mix trade shapes (1-for-1, 2-for-1, 2-for-3 ...) among close-scoring deals; second pass fills by score */
-  for(const pass of [0,1,2])for(const t of order){if(res.length>=n)break;if(res.includes(t)||usedT.has(t.team)||t.give.concat(t.get).some(id=>usedP.has(id))||(qb&&hasQB(t)))continue;
+  for(const pass of [0,1,2])for(const t of order){if(res.length>=n)break;if(res.includes(t)||usedT.has(t.team)||(loose?t.get:t.give.concat(t.get)).some(id=>usedP.has(id))||(qb&&hasQB(t)))continue;
     if(pass===0&&n>1&&(usedS.has(shapeOf(t))||t.score<top-1.2))continue;
     fullEval(t);if(!loose&&(t.e.dPO<-1||t.e.youNet<.2||(pass<2&&t.e.d>2.6)))continue;res.push(t);usedS.add(shapeOf(t));if(hasQB(t))qb++;usedT.add(t.team);t.give.concat(t.get).forEach(id=>usedP.add(id))}
   return res.sort((a,b)=>b.score-a.score)}
@@ -639,6 +693,27 @@ function playoffPanel(e,give,get,compact){const PO=poWeeks(),c=playoffCall(e),ca
     ${pr(`Weeks ${PO[0]}–${PO[PO.length-1]} points`,e.you.poB,e.you.poA,f1)}${wkRows}</tbody></table>
     ${compact?`<p class="po-mus">${who(get).map(id=>`<b>${esc(byId[id].n)}</b> ${PO.map(w=>opp(id,w)).join('')}`).join(' ')}</p>`:''}</div>`}
 const gcls=g=>g[0]==='A'?'ga':g[0]==='B'?'gb':g==='C'?'gc':'gd';
+/* why it works for both sides: each team's profile and the surplus/deficit the deal addresses */
+function bothSides(e,partnerId,give,get){const T=teamById(partnerId),me=profileOf(S.me),th=e.thProf||profileOf(partnerId),hit=(who,k)=>e.recip.hits.some(x=>x[0]===who&&x[1]===k),out=[];
+  const side=(who,name,pr,lp,ins,outs)=>{const bits=[];
+    if(hit(who,'depth'))bits.push(`turns ${outs.length} players into ${ins.length===1?'one stronger starter':ins.length+' better ones'}`);
+    if(hit(who,'stars'))bits.push(`adds ${ins.length} players to fill holes behind the stars`);
+    if(hit(who,'need'))bits.push(`fills the ${[...new Set(ins.map(id=>byId[id].pos))].join('/')} need`);
+    if(lp>=.2)bits.push(`adds ${f1(lp)} pts/week to the starting lineup`);else if(lp<=-.2)bits.push(`costs the starting lineup ${f1(-lp)} pts/week`);else bits.push('keeps the starting lineup about even');
+    return `<li><b>${esc(name)}</b><span class="prof">${esc(pr.label)}${pr.sub?' · '+esc(pr.sub):''}</span> Needs ${esc(PROF_NEED[pr.build!=='balanced'?pr.build:pr.standing])}. This deal ${bits.join(', ').replace(/, ([^,]*)$/,' and $1')}.</li>`};
+  return `<ul class="both">${side('me','You',me,e.you.lp,get,give)}${side('them',T.name,th,e.them.lp,give,get)}</ul>`}
+function realGauge(rl){return `<div class="real"><div class="real-h"><span class="lab2">Realism Score</span><b class="${rl.score>=62?'up':rl.score>=45?'':'down'}">${rl.score}</b><span class="real-l">${rl.label}</span></div><div class="real-track"><span style="width:${rl.score}%"></span></div></div>`}
+function dealBreakdown(e,partnerId,give,get,compact){const T=teamById(partnerId),rl=realism(e,give,get),cls=v=>v>=0?'up':'down';
+  const row=(n,b,a)=>`<tr><td>${esc(n)}</td><td class="r num">${f1(b)}</td><td class="r num"><b>${f1(a)}</b></td><td class="r num ${cls(a-b)}">${sgn(a-b)}</td></tr>`;
+  const dn=d=>[].concat(d).map(x=>esc(byId[x].n)).join(' and ');
+  const costs=[e.mine.drop?`You cut ${dn(e.mine.drop)} to make room (drop cost −${f1(e.dcMe)} VAR).`:'',e.theirs.drop?`${esc(T.name)} cuts ${dn(e.theirs.drop)} (drop cost −${f1(e.dcThem)} VAR).`:'',
+    e.taxMe.tax>.05?`Consolidation tax on you: −${f1(e.taxMe.tax)} for giving ${esc(byId[e.taxMe.el].n)} (a top-5 ${byId[e.taxMe.el].pos}) for lesser pieces.`:'',
+    e.taxThem.tax>.05?`Consolidation tax on ${esc(T.name)}: −${f1(e.taxThem.tax)} for giving ${esc(byId[e.taxThem.el].n)} (a top-5 ${byId[e.taxThem.el].pos}) for lesser pieces. They'd likely say no.`:''].filter(Boolean);
+  if(compact)return `<div class="deal mini">${realGauge(rl)}<p class="deal-lu">Starting lineup per week: you <b>${sgn(e.you.lp)}</b> · ${esc(T.name)} <b>${sgn(e.them.lp)}</b>${e.dcMe||e.dcThem?` · drop cost ${e.dcMe?'you −'+f1(e.dcMe):''}${e.dcMe&&e.dcThem?', ':''}${e.dcThem?'them −'+f1(e.dcThem):''}`:''}</p></div>`;
+  return `<div class="deal">${realGauge(rl)}
+   <table class="po-t"><thead><tr><th>Starting lineup, pts/week</th><th class="r">Now</th><th class="r">After</th><th class="r">Change</th></tr></thead><tbody>${row('You',e.you.lpB,e.you.lpA)}${row(T.name,e.them.lpB,e.them.lpA)}</tbody></table>
+   <div class="lab2" style="margin-top:12px">Why this works for both sides</div>${bothSides(e,partnerId,give,get)}
+   ${costs.length?`<p class="note deal-costs">${costs.join(' ')}</p>`:''}</div>`}
 function tradeWhy(t){const T=teamById(t.team),gp=t.get.map(id=>byId[id]),giv=t.give.map(id=>byId[id]);
   const e=t.e||{},bits=[t.myGain>=.3?`Adds ${t.myGain.toFixed(1)} pts/week to your lineup`:e.you&&e.you.po>=.5?`Adds ${f1(e.you.po)} pts/week in the playoffs`:'Adds rest-of-season value'];
   if(e.mine&&e.mine.fa)bits.push(`frees a spot for ${byId[e.mine.fa].n}`);
@@ -772,7 +847,7 @@ function tradeCardHtml(t,title,mini){const fr=fairness(t.give,t.get,t.team,RATE_
   const side=ids=>ids.map(id=>{const p=byId[id];return `<div class="tp">${av(p,'sm')}<div class="meta"><span style="display:flex;gap:5px;align-items:center;min-width:0"><button class="pname" data-open="${id}">${esc(p.n)}</button>${tagHtml(id)}</span><span class="psub">${p.pos}${V.posRank[id]} · ${f1(V.pts[id])}/G</span></div></div>`}).join('');
   return `<div class="tcard">${title?`<div class="t-title">${title}</div>`:''}<div class="with"><span>Trade with</span><b><i class="tsq" style="background:${teamColor(t.team)}"></i>${esc(T.name)}</b></div>
    <div class="sides"><div><div class="lab">You give</div>${side(t.give)}</div><div><div class="lab get">You get</div>${side(t.get)}</div></div>
-   ${balanceHtml(fr,T.name,true)}<div class="t-grades"><span>You <b class="g ${gcls(t.e.gYou)}">${t.e.gYou}</b></span><span>${esc(T.name)} <b class="g ${gcls(t.e.gThem)}">${t.e.gThem}</b></span></div><p class="why">${esc(tradeWhy(t))}</p>${playoffPanel(t.e,t.give,t.get,mini?'mini':true)}<button class="btn primary" data-load="${t.give.join(',')}|${t.get.join(',')}">Open in trade builder</button></div>`}
+   ${balanceHtml(fr,T.name,true)}${dealBreakdown(t.e,t.team,t.give,t.get,true)}<div class="t-grades"><span>You <b class="g ${gcls(t.e.gYou)}">${t.e.gYou}</b></span><span>${esc(T.name)} <b class="g ${gcls(t.e.gThem)}">${t.e.gThem}</b></span></div><p class="why">${esc(tradeWhy(t))}</p>${playoffPanel(t.e,t.give,t.get,mini?'mini':true)}<button class="btn primary" data-load="${t.give.join(',')}|${t.get.join(',')}">Open in trade builder</button></div>`}
 function renderFix(mine){
   const me=myTeam(),before=lineup(me.players,projV).total,wl=weakList(mine),focus=wl.filter((x,i)=>i===0||mine.rel[x]<0).slice(0,2);
   const faFor=pos=>POOL.filter(p=>p.pos===pos&&!OWN[p.id]).map(p=>{const drop=dropFor(p.id);return {p,drop,g:drop?lineup(me.players.filter(x=>x!==drop).concat(p.id),projV).total-before:0}}).sort((a,b)=>b.g-a.g||V.pts[b.p.id]-V.pts[a.p.id]).slice(0,2);
@@ -819,7 +894,8 @@ if(!window.__trade)window.__trade={give:[],get:[]};
 const TD=window.__trade;
 function renderTrade(){
   let sug=pickDiverse(allTrades(),3,sugSkip);
-  if(sug.length<3){const used=new Set(sug.map(t=>t.team)),pool=allTrades(true).filter(t=>!used.has(t.team)&&!sug.some(x=>x.give.concat(x.get).some(id=>t.give.includes(id)||t.get.includes(id))));sug=sug.concat(pickDiverse(pool,3-sug.length,0,true,sug.some(t=>t.give.concat(t.get).some(id=>byId[id].pos==='QB'))?1:0))}
+  /* fill with alternatives from other teams; they may reuse one of your players, since you'd only make one of these deals */
+  if(sug.length<3){const used=new Set(sug.map(t=>t.team)),pool=allTrades(true).filter(t=>!used.has(t.team)&&!sug.some(x=>x.get.some(id=>t.get.includes(id))&&x.give.join()===t.give.join()));sug=sug.concat(pickDiverse(pool,3-sug.length,0,true,sug.some(t=>t.give.concat(t.get).some(id=>byId[id].pos==='QB'))?1:0))}
   $('suggestions').innerHTML=sug.length?(()=>{const used=new Set();return sug.map(t=>tradeCardHtml(t,tradeTitle(t,null,used))).join('')})()
     :`<div class="card" style="grid-column:1/-1"><p class="empty" style="margin:0">No fair trades found. Fill in the other teams in League Hub and TradeMetric will build ideas from their rosters.</p></div>`;
   const me=myTeam();TD.give=TD.give.filter(id=>me.players.includes(id));TD.get=TD.get.filter(id=>OWN[id]&&OWN[id]!==S.me);
@@ -847,13 +923,14 @@ function renderRating(partner){
    ${balanceHtml(fr,partner.name,false)}
    <div class="kv" style="margin-top:14px">${hm?`<div><span class="note">Your grade</span><b class="${cls(e.youNet)}">${e.gYou} <small style="font-size:.6em">${sgn(e.youNet)}</small></b></div><div><span class="note">${esc(partner.name)}'s grade</span><b class="${cls(e.themNet)}">${e.gThem} <small style="font-size:.6em">${sgn(e.themNet)}</small></b></div>`
      :`<div><span class="note">Your lineup</span><b class="${cls(e.myLG)}">${sgn(e.myLG)}/wk</b></div><div><span class="note">${esc(partner.name)} lineup</span><b class="${cls(e.thLG)}">${sgn(e.thLG)}/wk</b></div>`}</div>
+   ${dealBreakdown(e,partner.id,TD.give,TD.get,false)}
    ${playoffPanel(e,TD.give,TD.get,false)}
    ${hm?`<table class="bd"><thead><tr><th>Your score · ${esc(MODE_TXT[e.mode])}</th><th class="r">Pts</th></tr></thead><tbody>
       ${row(`Next ${Math.max(0,((S.real&&S.real.regWeeks)||14)-WEEK+1)} weeks (regular season)`,P.N,`${sgn(e.you.reg)}/wk`)}${row('Lineup change, all remaining weeks',P.L,`${sgn(e.myLG)}/wk incl. bench insurance`)}${row('Playoff weeks lineup change',P.P,`${sgn(e.you.po)}/wk in Weeks ${poWeeks()[0]}–${poWeeks().slice(-1)[0]}`)}
-      ${row('Playoff odds',P.PO,`${sgn(e.dPO)} pts`)}${row('Title odds',P.T,`${sgn(e.dT)} pts`)}${P.U||P.SH?row('Upside',P.U)+row('Sell high / buy low',P.SH):''}${row('Injury and stacking risk',P.R)}</tbody>
+      ${row('Playoff odds',P.PO,`${sgn(e.dPO)} pts`)}${row('Title odds',P.T,`${sgn(e.dT)} pts`)}${P.U||P.SH?row('Upside',P.U)+row('Sell high / buy low',P.SH):''}${row('Injury and stacking risk',P.R)}${P.DC?row('Drop cost',P.DC,'VAR of the player you cut'):''}${P.CT?row('Consolidation tax',P.CT,'top-5 player for lesser pieces'):''}</tbody>
       <tfoot><tr><td>Your score</td><td class="r num">${sgn(e.youNet)}</td></tr></tfoot></table>
      <table class="bd"><thead><tr><th>Would ${esc(partner.name)} accept?</th><th class="r">Pts</th></tr></thead><tbody>
-      ${row('Market value they get',.55*(e.mIn-e.mOut),Object.keys(marketTable().srcs).join(' / ')||'projections')}${row('Their lineup change',.45*e.thLG,`${sgn(e.thLG)}/wk`)}${e.fillsNeed?row('Fills one of their needs',.6):''}</tbody>
+      ${row('Market value they get',.55*(e.mIn-e.mOut),Object.keys(marketTable().srcs).join(' / ')||'projections')}${row('Their lineup change',.45*e.thLine,`${sgn(e.thLG)}/wk, weighted for a ${esc((e.thProf&&PROF_TXT[e.thProf.standing])||'')} team`)}${e.fillsNeed?row('Fills one of their needs',.6):''}${e.fitThem?row('Trade shape suits their roster',.4*e.fitThem):''}${e.recip.hits.some(x=>x[0]==='them')?row('Fixes their surplus or deficit',.3):''}${e.dcThem?row('Their drop cost',-.5*e.dcThem):''}${e.taxThem.tax?row('Consolidation tax',-e.taxThem.tax,'they give a top-5 player for lesser pieces'):''}</tbody>
       <tfoot><tr><td>Their score</td><td class="r num">${sgn(e.themNet)}</td></tr></tfoot></table>`:''}
    ${e.mine.fa||e.mine.drop||e.theirs.fa||e.theirs.drop?`<p class="note" style="margin:10px 0 0">${[e.mine.fa?`You'd pick up ${esc(byId[e.mine.fa].n)} with the open roster spot.`:'',e.mine.drop?`You'd drop ${esc([].concat(e.mine.drop).map(x=>byId[x].n).join(' and '))} to make room.`:'',e.theirs.drop?`${esc(partner.name)} would drop ${esc([].concat(e.theirs.drop).map(x=>byId[x].n).join(' and '))}.`:'',e.theirs.fa?`${esc(partner.name)} would pick up ${esc(byId[e.theirs.fa].n)}.`:''].filter(Boolean).join(' ')}</p>`:''}
    ${over>0?`<p class="note" style="margin:10px 0 0">You would be ${over} over your roster limit and need to drop ${over>1?'players':'a player'}.</p>`:''}

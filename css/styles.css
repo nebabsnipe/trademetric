@@ -1076,3 +1076,19 @@ body.signed-out .alerts-wrap{display:none}
 .faq-b{padding:0 16px 14px;color:var(--ink);font-size:14px;line-height:1.55;max-width:70ch}.faq-b p{margin:0 0 10px}.faq-b ul{margin:0 0 10px;padding-left:20px;display:flex;flex-direction:column;gap:4px}
 .foot-help{color:inherit;font-weight:600}
 .hero p .how{margin-left:4px}
+
+/* realistic-trade layer: Realism Score gauge, lineup before/after, both-sides breakdown */
+.real{margin:10px 0 0}
+.real-h{display:flex;align-items:baseline;gap:8px}.real-h b{font-family:var(--f-mono);font-size:18px;font-weight:600}.real-h b.up{color:var(--good)}.real-h b.down{color:var(--bad)}
+.real-l{font-size:13px;color:var(--muted)}
+.real-track{height:6px;border-radius:99px;background:var(--surface-2);overflow:hidden;margin-top:5px}
+.real-track span{display:block;height:100%;border-radius:99px;background:linear-gradient(90deg,var(--bad),#E8A317 45%,var(--good) 75%)}
+.deal{margin:14px 0 4px}.deal.mini{margin:6px 0 2px}
+.deal-lu{font-size:13px;color:var(--muted);margin:6px 0 0}.deal-lu b{color:var(--ink);font-family:var(--f-mono);font-weight:600}
+.both{list-style:none;margin:6px 0 0;padding:0;display:flex;flex-direction:column;gap:6px;font-size:14px}
+.both .prof{display:inline-block;font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;padding:1px 7px;border-radius:99px;background:var(--surface-2);color:var(--muted);margin:0 4px}
+.deal-costs{margin:8px 0 0}
+/* let long labels wrap so the points column stays visible in the rating panel */
+.bd th:first-child,.bd td:first-child{white-space:normal}
+.bd td.r,.bd th.r{width:1%}
+.po-t td.po-mu{white-space:normal;min-width:0}
