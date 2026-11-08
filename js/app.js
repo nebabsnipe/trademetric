@@ -1504,12 +1504,12 @@ function applyTheme(){if(themePref)document.documentElement.setAttribute('data-t
 $('theme-btn').addEventListener('click',()=>{themePref=isDark()?'light':'dark';try{localStorage.setItem('hashmark-theme',themePref)}catch(e){}applyTheme()});
 
 /* ===== Routing & events ===== */
-const TABS=['team','feed','trade','rankings','hub','season','league','draft','help','welcome','signin','account'];let tab='team';
+const TABS=['team','trade','rankings','hub','season','league','draft','help','welcome','signin','account'];let tab='team';
 function howLink(k){return `<a class="how how-wrap" href="#help-${k}">How this works</a>`}
 const TAB_ALIAS={players:['rankings','rank'],waivers:['rankings','waiv'],values:['rankings','vals']};
 function go(t){let helpSec=null;if(t&&t.startsWith('help-')){helpSec=t.slice(5);t='help'}if(TAB_ALIAS[t]){plView=TAB_ALIAS[t][1];t=TAB_ALIAS[t][0]}if(t==='helper'){if(USER)openAI();t=TABS.includes(tab)?tab:'team';history.replaceState(null,'','#'+t)}if(!USER&&t!=='signin')t='signin';tab=TABS.includes(t)?t:'team';if(tab!=='welcome'&&S&&!S.onboarded){S.onboarded=true;save()}document.querySelectorAll('.nav button').forEach(b=>{if(b.dataset.tab===tab)b.setAttribute('aria-current','page');else b.removeAttribute('aria-current')});
   TABS.forEach(x=>$('v-'+x).hidden=x!==tab);render();window.scrollTo(0,0);if(tab==='help')openHelp(helpSec)}
-function render(){({team:renderTeam,rankings:renderPlayers,draft:renderDraft,help:()=>{},trade:renderTrade,hub:renderHub,season:renderSeason,welcome:renderWelcome,league:fillLeagueForm,signin:renderSignin,feed:renderFeed,account:renderAccount})[tab]();renderAlerts();if(openId&&!$('scrim').hidden)openCard(openId);queueBalance()}
+function render(){({team:renderTeam,rankings:renderPlayers,draft:renderDraft,help:()=>{},trade:renderTrade,hub:renderHub,season:renderSeason,welcome:renderWelcome,league:fillLeagueForm,signin:renderSignin,account:renderAccount})[tab]();renderAlerts();if(openId&&!$('scrim').hidden)openCard(openId);queueBalance()}
 document.querySelectorAll('.nav button').forEach(b=>b.addEventListener('click',()=>{location.hash=b.dataset.hash||b.dataset.tab}));
 window.addEventListener('hashchange',()=>{closeCard();go(location.hash.slice(1))});
 function loadTrade(str){const [g,r]=str.split('|');TD.give=g?g.split(','):[];TD.get=r?r.split(','):[];closeCard();if(tab==='trade')renderTrade();else location.hash='trade';setTimeout(()=>$('rating').scrollIntoView({behavior:'smooth',block:'center'}),60)}
@@ -1715,7 +1715,7 @@ const isFollowing=id=>(S.following||[]).includes(id);
 function followBtn(id,mini){const on=isFollowing(id);return mini?`<button class="star${on?' on':''}" data-follow="${id}" title="${on?'Following. Click to unfollow':'Follow this player in Highlights'}" aria-label="${on?'Unfollow':'Follow'}">${on?'★':'☆'}</button>`
   :`<button class="follow-btn${on?' on':''}" data-follow="${id}">${on?'★ Following':'☆ Follow'}</button>`}
 function toggleFollow(id){S.following=S.following||[];const i=S.following.indexOf(id);if(i>=0)S.following.splice(i,1);else S.following.unshift(id);save();
-  toast(i>=0?`Unfollowed ${byId[id].n}`:`Following ${byId[id].n}. See him in Highlights.`);render()}
+  toast(i>=0?`Unfollowed ${byId[id].n}`:`Following ${byId[id].n}.`);render()}
 function ago(t){const m=(Date.now()-Date.parse(t))/60e3;if(!isFinite(m))return '';if(m<60)return Math.max(1,Math.round(m))+'m ago';if(m<1440)return Math.round(m/60)+'h ago';return Math.round(m/1440)+'d ago'}
 const wordIn=(hay,w)=>new RegExp('(^|[^a-z])'+w.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'([^a-z]|$)').test(hay);
 function statLineTxt(pos,s){if(!s)return '';const parts=[],n=x=>Math.round(x||0);
@@ -1745,11 +1745,10 @@ function feedPlayers(){const me=myTeam();if(!me)return [];const out=[],seen=new 
 
 async function loadFeed(force){if(FEED_LOADING||(!force&&FEED&&Date.now()-FEED_AT<4*60e3))return;FEED_LOADING=true;
   try{const r=await fetch('/api/feed?week='+WEEK+'&b='+Math.floor(Date.now()/300000));if(r.ok){const d=await r.json();if(d&&d.videos){FEED=d;FEED_AT=Date.now();try{localStorage.setItem(FEED_LS,JSON.stringify({at:FEED_AT,d}))}catch(e){}}}}catch(e){}
-  FEED_LOADING=false;if(tab==='feed')renderFeed();const ch=$('card-hl');if(ch&&openId)ch.innerHTML=cardHighlights(openId)}
+  FEED_LOADING=false;const ch=$('card-hl');if(ch&&openId)ch.innerHTML=cardHighlights(openId)}
 /* show the last copy instantly, then refresh in the background */
 try{const c=JSON.parse(localStorage.getItem(FEED_LS)||'null');if(c&&c.d&&c.d.week===WEEK&&Date.now()-c.at<6*3600e3){FEED=c.d;FEED_AT=c.at-4*60e3}}catch(e){}
 setTimeout(()=>loadFeed(),1500);
-setInterval(()=>{if(tab==='feed'&&!document.hidden)loadFeed()},5*60e3);
 /* Only clips of this player's own plays: ESPN clips tagged with him, plus YouTube clips whose title is a specific play by him.
    Press conferences, interviews, recaps and full-game packages are left out. */
 const normT=x=>norm(String(x||'').replace(/['’]s\b/gi,''));
@@ -1843,7 +1842,6 @@ function stepClip(d){const sc=$('cv-scroll');if(!sc)return;const j=Math.max(0,Ma
 function closeViewer(){const el=$('clipview');if(el.hidden)return;if(CV_OBS)CV_OBS.disconnect();CV_OBS=null;CV_CUR=-1;el.hidden=true;el.innerHTML='';document.body.style.overflow=''}
 document.addEventListener('click',e=>{const t=e.target;if(!t.closest)return;
   const f=t.closest('[data-follow]');if(f){e.preventDefault();e.stopPropagation();toggleFollow(f.dataset.follow);if(openId&&!$('scrim').hidden)openCard(openId);return}
-  const ff=t.closest('[data-ff]');if(ff){FEED_F=ff.dataset.ff;renderFeed();return}
   const cl=t.closest('[data-clip]');if(cl){openViewer(Math.max(0,+cl.dataset.clip));return}
   const cp=t.closest('[data-cvplay]');if(cp){activateClip(+cp.dataset.cvplay);return}
   const cs=t.closest('[data-cvstep]');if(cs){stepClip(+cs.dataset.cvstep);return}

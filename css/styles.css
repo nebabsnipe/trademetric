@@ -538,9 +538,6 @@ label.btn.shot-btn{display:inline-flex;align-items:center;gap:8px;white-space:no
 @media (max-width:600px){.acct-btn{padding:0 10px;font-size:12px}.auth-card{padding:20px}.auth-card h1{font-size:32px}}
 body.signed-out .nav,body.signed-out #week-pill,body.signed-out #acct-btn{display:none}
 /* ===== Highlights tab ===== */
-.nav button.nav-hot{opacity:1;color:var(--accent);display:inline-flex;align-items:center;gap:7px}
-.nav button.nav-hot .play{width:0;height:0;border-left:8px solid currentColor;border-top:5px solid transparent;border-bottom:5px solid transparent}
-.nav button.nav-hot[aria-current="page"]{background:var(--accent);color:#fff}
 .reel-card{padding-bottom:14px}
 .reel{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(240px,280px);gap:14px;overflow-x:auto;padding-bottom:6px;scroll-snap-type:x mandatory}
 .reel>*{scroll-snap-align:start}
