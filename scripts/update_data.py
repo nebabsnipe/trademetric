@@ -25,8 +25,9 @@ SOURCES={
   'fp_latest_weekly.csv':             'https://raw.githubusercontent.com/dynastyprocess/data/master/files/fp_latest_weekly.csv',
   'db_fpecr_latest.csv':              'https://raw.githubusercontent.com/dynastyprocess/data/master/files/db_fpecr_latest.csv',
   'values-players.csv':               'https://raw.githubusercontent.com/dynastyprocess/data/master/files/values-players.csv',
+  f'ep_weekly_{SEASON}.csv':            f'https://github.com/ffverse/ffopportunity/releases/download/latest-data/ep_weekly_{SEASON}.csv',
 }
-OPTIONAL=('fp_latest_weekly.csv',f'depth_charts_{SEASON}.csv','db_fpecr_latest.csv','values-players.csv')
+OPTIONAL=('fp_latest_weekly.csv',f'depth_charts_{SEASON}.csv','db_fpecr_latest.csv','values-players.csv',f'ep_weekly_{SEASON}.csv')
 os.makedirs(RAW,exist_ok=True)
 for name,url in SOURCES.items():
     try:
@@ -202,6 +203,21 @@ for p in out:
 data={'week':WEEK,'played':PLAYED,'injWeek':IW,'asOf':datetime.date.today().isoformat(),'fields':F,'players':final,'sched':sched,'bye':bye,'vegas':vegas,'kick':kick,'def':DEF}
 data['depth']={p[0]:depth[GID[p[0]]] for p in final if GID.get(p[0]) in depth}
 data['practice']={p[0]:prac[GID[p[0]]] for p in final if GID.get(p[0]) in prac}
+# Expected fantasy points from ffopportunity, published in FULL PPR. Stored as
+# [TD, xTD, xFP, FPOE] season to date; TDOE is TD - xTD on the client.
+data['exp']={}
+try:
+    _ep=pd.read_csv(D+f'ep_weekly_{SEASON}.csv',low_memory=False)
+    _ep['week']=pd.to_numeric(_ep.week,errors='coerce')
+    _ep=_ep[_ep.week<=PLAYED]
+    _ec=['total_touchdown','total_touchdown_exp','total_fantasy_points_exp','total_fantasy_points_diff']
+    for _c in _ec: _ep[_c]=pd.to_numeric(_ep[_c],errors='coerce').fillna(0)
+    _agg=_ep.groupby('player_id')[_ec].sum()
+    _byid={i:[round(float(v),2) for v in row] for i,row in zip(_agg.index,_agg.values)}
+    data['exp']={p[0]:_byid[GID[p[0]]] for p in final if GID.get(p[0]) in _byid}
+    print(len(data['exp']),'players with expected points',file=sys.stderr)
+except Exception as _e:
+    print('expected points skipped',_e,file=sys.stderr)
 # efficiency: weighted opportunity (WOPR) and air yards per game, which predict future scoring better than raw points
 try:
     eff={}
