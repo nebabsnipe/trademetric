@@ -1,0 +1,16 @@
+<!-- TradeMetric: paste into Supabase -> Authentication -> Emails -> "Confirm signup". Subject: Your TradeMetric code: {{ .Token }} -->
+<div style="margin:0;padding:32px 16px;background:#F4F5F7;font-family:Inter,Segoe UI,Helvetica,Arial,sans-serif;color:#0B0C0E">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:480px;margin:0 auto;background:#FFFFFF;border:1px solid #E2E4E8;border-radius:16px;overflow:hidden">
+    <tr><td style="background:#0B0C0E;padding:22px 28px">
+      <span style="font-family:Arial Black,Arial,sans-serif;font-style:italic;font-weight:900;font-size:22px;letter-spacing:1px;text-transform:uppercase;color:#FFFFFF">TRADE<span style="color:#FF4F12">METRIC</span></span>
+    </td></tr>
+    <tr><td style="padding:30px 28px 8px">
+      <h1 style="margin:0 0 10px;font-size:22px;line-height:1.25">Confirm your email</h1>
+      <p style="margin:0 0 22px;font-size:15px;line-height:1.55;color:#4A4F57">Type this code on the TradeMetric page you just signed up on:</p>
+      <div style="background:#FFEDE4;border-radius:12px;padding:18px;text-align:center;font-family:Menlo,Consolas,monospace;font-size:32px;font-weight:700;letter-spacing:10px;color:#0B0C0E">{{ .Token }}</div>
+      <p style="margin:22px 0 8px;font-size:14px;line-height:1.55;color:#4A4F57">Or tap the button. The page you signed up on signs you in by itself, even if you tap it on your phone.</p>
+      <p style="margin:0 0 26px"><a href="{{ .ConfirmationURL }}" style="display:inline-block;background:#FF4F12;color:#FFFFFF;text-decoration:none;font-weight:700;font-size:15px;padding:12px 22px;border-radius:10px">Confirm my email</a></p>
+    </td></tr>
+    <tr><td style="padding:16px 28px 24px;border-top:1px solid #E2E4E8;font-size:12px;line-height:1.5;color:#8A8F98">You're getting this because someone created a TradeMetric account with {{ .Email }}. If that wasn't you, ignore this email.</td></tr>
+  </table>
+</div>

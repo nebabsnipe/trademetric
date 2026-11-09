@@ -1585,7 +1585,7 @@ $('theme-btn').addEventListener('click',()=>{themePref=isDark()?'light':'dark';t
 const TABS=['team','trade','rankings','hub','season','league','draft','help','welcome','signin','account'];let tab='team';
 function howLink(k){return `<a class="how how-wrap" href="#help-${k}">How this works</a>`}
 const TAB_ALIAS={players:['rankings','rank'],waivers:['rankings','waiv'],values:['rankings','vals']};
-function go(t){let helpSec=null;if(t&&t.startsWith('help-')){helpSec=t.slice(5);t='help'}if(TAB_ALIAS[t]){plView=TAB_ALIAS[t][1];t=TAB_ALIAS[t][0]}if(t==='helper'){if(USER)openAI();t=TABS.includes(tab)?tab:'team';history.replaceState(null,'','#'+t)}if(!USER&&t!=='signin')t='signin';tab=TABS.includes(t)?t:'team';if(tab!=='welcome'&&S&&!S.onboarded){S.onboarded=true;save()}document.querySelectorAll('.nav button').forEach(b=>{if(b.dataset.tab===tab)b.setAttribute('aria-current','page');else b.removeAttribute('aria-current')});
+function go(t){let helpSec=null;if(t&&t.startsWith('help-')){helpSec=t.slice(5);t='help'}if(t&&t.startsWith('account-')){ACC_TAB=t.slice(8);t='account'}else if(t==='account')ACC_TAB='profile';if(t!==tab||t==='account'){ACC_EDIT=null;ACC_MSG=null}if(TAB_ALIAS[t]){plView=TAB_ALIAS[t][1];t=TAB_ALIAS[t][0]}if(t==='helper'){if(USER)openAI();t=TABS.includes(tab)?tab:'team';history.replaceState(null,'','#'+t)}if(!USER&&t!=='signin')t='signin';tab=TABS.includes(t)?t:'team';if(tab!=='welcome'&&S&&!S.onboarded){S.onboarded=true;save()}document.querySelectorAll('.nav button').forEach(b=>{if(b.dataset.tab===tab)b.setAttribute('aria-current','page');else b.removeAttribute('aria-current')});
   TABS.forEach(x=>$('v-'+x).hidden=x!==tab);render();window.scrollTo(0,0);if(tab==='help')openHelp(helpSec)}
 function render(){({team:renderTeam,rankings:renderPlayers,draft:renderDraft,help:()=>{},trade:renderTrade,hub:renderHub,season:renderSeason,welcome:renderWelcome,league:fillLeagueForm,signin:renderSignin,account:renderAccount})[tab]();renderAlerts();if(openId&&!$('scrim').hidden)openCard(openId);queueBalance()}
 document.querySelectorAll('.nav button').forEach(b=>b.addEventListener('click',()=>{location.hash=b.dataset.hash||b.dataset.tab}));
@@ -1681,15 +1681,20 @@ S.chat=(S.chat||[]).filter(x=>x.status==='done'||x.status==='error');
 var INTENDED=location.hash.slice(1);go('signin');
 loadLive();loadProj();loadMarket();
 
-/* ===== Accounts (Supabase): username or email + password, own sign-in page, league saved to the cloud ===== */
+/* ===== Accounts (Supabase): TradeMetric's own sign-in page, social sign-in, email codes, league saved to the cloud =====
+   Sign-up confirmation happens on the page you signed up from: type the code from the email, or click the email's link
+   anywhere and this tab notices and signs you in. Sessions last one season (until Feb 15 after the season). */
 var SUPA_URL='https://rltmfnmgbfgecbaevfvc.supabase.co',SUPA_KEY='sb_publishable_AFX79aKgqorAx3zgOyKatw_o_3_ERWG';
-var SB_FAILED=false,AUTH_VALS={},SB=null,USER=null,PROFILE=null,CLOUD={timer:null,last:null,busy:false,err:null},AUTH_MODE='in',AUTH_MSG=null,AUTH_BUSY=false;
-var EXP_KEY='tm-auth-exp',KEEP_KEY='tm-keep',TWO_WEEKS=14*864e5;
+var SB_FAILED=false,AUTH_VALS={},SB=null,USER=null,PROFILE=null,PROFILE_OK=false,CLOUD={timer:null,last:null,busy:false,err:null},AUTH_MODE='in',AUTH_MSG=null,AUTH_BUSY=false;
+var SIGNING=false,PENDING=null,PROVIDERS=null,CONF_T=null,RESEND_AT=0,UN_T=null,UN_STATE=null;
+var UNTIL_KEY='tm-auth-until',SKIP_UN='tm-skip-username-';
+/* Social sign-in buttons. Each one also has to be switched on in Supabase (Authentication -> Providers). */
+var OAUTH=[{id:'google',name:'Google'},{id:'apple',name:'Apple'},{id:'discord',name:'Discord'}];
 function lsGet(k){try{return localStorage.getItem(k)}catch(e){return null}}
 function lsSet(k,v){try{localStorage.setItem(k,v)}catch(e){}}
 function lsDel(k){try{localStorage.removeItem(k)}catch(e){}}
 function adoptState(st){S=st;setPool();SCHED=null;LIVE_LU=null;recompute();buildLeagueForm();hubSel=S.me;if(tab==='welcome')location.hash='team';render();if(S.real&&S.real.src)loadPlatform().then(()=>{recompute();render()})}
-async function cloudPull(){
+async function cloudPull(){if(!SB||!USER)return;
   const {data,error}=await SB.from('user_state').select('state,updated_at').eq('user_id',USER.id).maybeSingle();
   if(error){CLOUD.err=error.message;acctUI();return}
   const cs=data&&data.state,other=S.owner&&S.owner!==USER.id;
@@ -1701,88 +1706,205 @@ async function cloudPush(){if(!SB||!USER)return;S.owner=USER.id;CLOUD.busy=true;
   const {error}=await SB.from('user_state').upsert({user_id:USER.id,state:S,updated_at:new Date().toISOString()});
   CLOUD.busy=false;CLOUD.err=error?error.message:null;if(!error)CLOUD.last=Date.now();acctUI()}
 function cloudSave(){if(!SB||!USER)return;clearTimeout(CLOUD.timer);CLOUD.timer=setTimeout(cloudPush,1500)}
-async function loadProfile(){if(!USER)return;const {data}=await SB.from('profiles').select('username').eq('id',USER.id).maybeSingle();PROFILE=data||null;acctUI()}
-/* "Keep me signed in": unchecked means the session ends 2 weeks after signing in. Saved data is never touched. */
-function startSessionClock(){if(lsGet(EXP_KEY)!==null)return;lsSet(EXP_KEY,lsGet(KEEP_KEY)==='1'?'0':String(Date.now()+TWO_WEEKS))}
-async function checkExpiry(){const v=lsGet(EXP_KEY);if(!USER||!v||v==='0'||Date.now()<+v)return false;
-  await SB.auth.signOut({scope:'local'});lsDel(EXP_KEY);leaveApp();toast('Signed out after 2 weeks. Sign in again; your league is still here.');return true}
-function acctName(){return PROFILE&&PROFILE.username||(USER&&USER.email)||''}
-function acctUI(){const b=$('acct-btn');if(b){if(USER){b.textContent=(acctName()[0]||'?').toUpperCase();b.classList.add('in');b.title='Signed in as '+acctName()}else{b.textContent='Sign in';b.classList.remove('in');b.title=''}}
-  if(tab==='signin')renderSignin()}
+async function loadProfile(){if(!USER)return;const {data,error}=await SB.from('profiles').select('*').eq('id',USER.id).maybeSingle();
+  if(error){PROFILE_OK=false}else{PROFILE=data||null;PROFILE_OK=true}acctUI();if(tab==='account')renderAccount()}
+
+/* ---- One season per sign-in: the session ends Feb 15 after the season (at least 60 days out). Saved leagues are never touched. */
+function seasonEnd(from){const d=new Date(from||Date.now());let y=d.getFullYear(),e=new Date(y,1,15);while(e-d<60*864e5)e=new Date(++y,1,15);return e.getTime()}
+function startSessionClock(fresh){lsDel('tm-auth-exp');lsDel('tm-keep');const v=lsGet(UNTIL_KEY);if(fresh||!v)lsSet(UNTIL_KEY,String(seasonEnd()))}
+async function checkExpiry(){const v=lsGet(UNTIL_KEY);if(!USER||!v||Date.now()<+v)return false;
+  await SB.auth.signOut({scope:'local'});lsDel(UNTIL_KEY);leaveApp();authNote('New season, fresh sign-in. Your leagues are still saved.');return true}
+
+/* ---- Names: the username everywhere, never the email */
+function acctName(){const md=USER&&USER.user_metadata||{};return PROFILE&&PROFILE.username||md.username||md.user_name||md.preferred_username||md.full_name||md.name||''}
+function acctAvatar(){const md=USER&&USER.user_metadata||{};return md.avatar_url||md.picture||''}
+function avatarHtml(cls){const a=acctAvatar(),n=acctName();return a?`<span class="${cls}"><img src="${esc(a)}" alt="" referrerpolicy="no-referrer"></span>`:`<span class="${cls}">${esc((n[0]||'•').toUpperCase())}</span>`}
+function acctUI(){const b=$('acct-btn');if(b){if(USER){b.innerHTML=avatarHtml('acct-av');b.classList.add('in');b.title=acctName()?'Account: '+acctName():'Account';b.setAttribute('aria-label',b.title)}else{b.textContent='Sign in';b.classList.remove('in');b.title='';b.removeAttribute('aria-label')}}
+  if(tab==='signin')renderSignin();else if(tab==='account'&&!ACC_EDIT&&USER)renderAccount()}
+function suggestUsername(){const md=USER&&USER.user_metadata||{},src=md.user_name||md.preferred_username||md.full_name||md.name||(USER&&USER.email||'').split('@')[0]||'';return src.toLowerCase().replace(/[^a-z0-9_]+/g,'_').replace(/^_+|_+$/g,'').slice(0,20)}
+
+/* ---- Sign-in page */
+function friendly(m){m=String(m||'');
+  if(/invalid login/i.test(m))return 'Wrong username or password.';
+  if(/email rate limit|over_email_send_rate/i.test(m))return 'Too many emails in a short time. Wait a few minutes, then try again.';
+  if(/rate limit|too many requests/i.test(m))return 'Too many tries. Wait a minute and try again.';
+  if(/token has expired|otp.*(expired|invalid)|invalid.*(otp|token)/i.test(m))return "That code didn't work. It may have expired, so check the newest email or send a new code.";
+  if(/provider is not enabled|unsupported provider/i.test(m))return "That sign-in option isn't switched on yet. Use your email for now.";
+  if(/different from the old|same as the old/i.test(m))return "Pick a password you haven't used here before.";
+  if(/failed to fetch|network/i.test(m))return "Can't reach TradeMetric's sign-in. Check your connection and try again.";
+  if(/duplicate key|profiles_username_key/i.test(m))return 'That username is taken. Try another.';
+  return m||'Something went wrong. Try again.'}
+const EYE='<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>';
+function pwField(id,label,ac,extra=''){return `<label>${label}<span class="pw-wrap"><input type="password" id="${id}" autocomplete="${ac}" required ${extra}><button type="button" class="pw-eye" data-pw-eye="${id}" aria-label="Show password" aria-pressed="false">${EYE}</button></span></label>`}
+function oauthHtml(){return `<div class="auth-social">${OAUTH.map(p=>{const off=PROVIDERS&&PROVIDERS[p.id]===false;return `<button type="button" class="auth-sso${off?' off':''}" data-oauth="${p.id}" ${AUTH_BUSY?'disabled':''} title="${off?esc(p.name)+' sign-in is coming soon':''}"><span class="sso-ic sso-${p.id}" aria-hidden="true">${p.name[0]}</span>${esc(p.name)}</button>`}).join('')}</div><div class="auth-or"><span>or with email</span></div>`}
 function renderSignin(){const el=$('signin-card');if(!el)return;
-  const msg=AUTH_MSG?`<p class="auth-msg ${AUTH_MSG.bad?'bad':''}">${AUTH_MSG.html}</p>`:'';
-  const keep=`<label class="auth-keep"><input type="checkbox" id="auth-keep" ${lsGet(KEEP_KEY)==='1'?'checked':''}> Keep me signed in<span class="note">Otherwise you're signed out after 2 weeks. Your league stays saved either way.</span></label>`;
-  const btn=t=>`<button class="btn primary auth-go" type="submit" ${AUTH_BUSY?'disabled':''}>${AUTH_BUSY?'One moment...':t}</button>`;
-  if(!SB){el.innerHTML=SB_FAILED?`<h1>Can't sign in</h1><p class="note">Sign-in didn't load. Check your connection and refresh the page.</p>`:`<h1>Loading</h1><p class="note">One moment...</p>`;return}
-  if(USER&&AUTH_MODE!=='reset'){el.innerHTML='';setTimeout(()=>{if(tab==='signin'&&USER)location.hash='account'},0);return}
-  const tabs=AUTH_MODE==='in'||AUTH_MODE==='up'?`<div class="seg auth-tabs"><button type="button" data-auth-mode="in" aria-pressed="${AUTH_MODE==='in'}">Sign in</button><button type="button" data-auth-mode="up" aria-pressed="${AUTH_MODE==='up'}">Create account</button></div>`:'';
-  let body='';
-  if(AUTH_MODE==='in')body=`<h1>Welcome back</h1><form id="auth-form" data-mode="in">
-     <label>Username or email<input type="text" id="auth-id" autocomplete="username" autocapitalize="none" spellcheck="false" required></label>
-     <label>Password<input type="password" id="auth-pw" autocomplete="current-password" required></label>${keep}${msg}${btn('Sign in')}
-     <button type="button" class="linkish" data-auth-mode="forgot">Forgot your password?</button></form>`;
-  else if(AUTH_MODE==='up')body=`<h1>Create your account</h1><form id="auth-form" data-mode="up">
-     <label>Username<input type="text" id="auth-user" autocomplete="username" autocapitalize="none" spellcheck="false" maxlength="20" required placeholder="Pick a username"></label>
-     <label>Email<input type="email" id="auth-email" autocomplete="email" required></label>
-     <label>Password<input type="password" id="auth-pw" autocomplete="new-password" minlength="8" required placeholder="At least 8 characters"></label>${keep}${msg}${btn('Create account')}</form>`;
-  else if(AUTH_MODE==='forgot')body=`<h1>Reset your password</h1><form id="auth-form" data-mode="forgot"><p class="note">Enter your account email and we'll send a link to set a new password.</p>
-     <label>Email<input type="email" id="auth-email" autocomplete="email" required></label>${msg}${btn('Send reset link')}<button type="button" class="linkish" data-auth-mode="in">Back to sign in</button></form>`;
-  else if(AUTH_MODE==='reset')body=`<h1>Set a new password</h1><form id="auth-form" data-mode="reset">
-     <label>New password<input type="password" id="auth-pw" autocomplete="new-password" minlength="8" required placeholder="At least 8 characters"></label>${msg}${btn('Save password')}</form>`;
-  el.innerHTML=tabs+body;['auth-id','auth-user','auth-email'].forEach(k=>{const i=$(k);if(i&&AUTH_VALS[k])i.value=AUTH_VALS[k]});
-  const f=[...el.querySelectorAll('input[type=text],input[type=email],input[type=password]')].find(i=>!i.value);if(f)setTimeout(()=>f.focus(),0)}
-function enterApp(){document.body.classList.remove('signed-out');setTimeout(syncNow,300);AUTH_MODE='in';AUTH_MSG=null;
-  let t=TABS.includes(INTENDED)&&INTENDED!=='signin'?INTENDED:'team';INTENDED=null;if(!S.onboarded)t='welcome';
+  const msg=AUTH_MSG?`<p class="auth-msg ${AUTH_MSG.bad?'bad':''}" role="${AUTH_MSG.bad?'alert':'status'}">${AUTH_MSG.html}</p>`:'';
+  const btn=t=>`<button class="btn primary auth-go" type="submit" ${AUTH_BUSY?'disabled':''}>${AUTH_BUSY?'<span class="spin" aria-hidden="true"></span>One moment':t}</button>`;
+  if(!SB){el.innerHTML=SB_FAILED?`<h1>Can't sign in</h1><p class="note">Sign-in didn't load. Check your connection and refresh the page.</p><button class="btn primary auth-go" type="button" onclick="location.reload()">Refresh</button>`:`<div class="auth-loading"><span class="spin" aria-hidden="true"></span>Loading</div>`;return}
+  if(USER&&SIGNING&&!['confirmed','reset','recover'].includes(AUTH_MODE)){el.innerHTML=`<div class="auth-loading"><span class="spin" aria-hidden="true"></span>Signing you in</div>`;return}
+  if(USER&&!['reset','recover','username','confirmed'].includes(AUTH_MODE)){el.innerHTML='';setTimeout(()=>{if(tab==='signin'&&USER)enterApp()},0);return}
+  const pe=PENDING&&PENDING.email?`<b>${esc(PENDING.email)}</b>`:'your email';
+  let h='';
+  if(AUTH_MODE==='in')h=`<h1>Welcome back</h1><p class="auth-sub">Sign in to your leagues, trades and rankings.</p>${oauthHtml()}<form id="auth-form" data-mode="in" novalidate>
+     <label>Username or email<input type="text" id="auth-id" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" required></label>
+     ${pwField('auth-pw','<span class="lab-row">Password<button type="button" class="linkish" data-auth-mode="forgot">Forgot?</button></span>','current-password')}${msg}${btn('Sign in')}</form>
+     <p class="auth-foot">New to TradeMetric? <button type="button" class="linkish strong" data-auth-mode="up">Create an account</button></p>`;
+  else if(AUTH_MODE==='up')h=`<h1>Create your account</h1><p class="auth-sub">Free during the beta. Takes about a minute.</p>${oauthHtml()}<form id="auth-form" data-mode="up" novalidate>
+     <label>Username<input type="text" id="auth-user" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" maxlength="20" required placeholder="3 to 20 letters, numbers or _"><span class="hint" id="un-hint" aria-live="polite"></span></label>
+     <label>Email<input type="email" id="auth-email" autocomplete="email" autocapitalize="none" spellcheck="false" required></label>
+     ${pwField('auth-pw','Password','new-password','minlength="8" placeholder="At least 8 characters"')}${msg}${btn('Create account')}</form>
+     <p class="auth-foot">Already have an account? <button type="button" class="linkish strong" data-auth-mode="in">Sign in</button></p>`;
+  else if(AUTH_MODE==='verify')h=`<div class="auth-ic" aria-hidden="true"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg></div><h1>Check your email</h1>
+     <p class="auth-sub">We sent a code to ${pe}. Type it here, or tap the link in the email on any device and this page signs you in by itself.</p>
+     <form id="auth-form" data-mode="verify" novalidate><label>Confirmation code<input type="text" id="auth-code" class="code-in" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]*" maxlength="10" required placeholder="••••••"></label>${msg}${btn('Confirm email')}</form>
+     <p class="auth-wait"><span class="pulse" aria-hidden="true"></span>Waiting for you to confirm</p>
+     <p class="auth-foot">${resendBtn('Send a new code')} · <button type="button" class="linkish" data-auth-mode="up">Use a different email</button></p>`;
+  else if(AUTH_MODE==='forgot')h=`<h1>Reset your password</h1><p class="auth-sub">Enter your account email. We'll send a code to set a new password, right here on this page.</p><form id="auth-form" data-mode="forgot" novalidate>
+     <label>Email<input type="email" id="auth-email" autocomplete="email" autocapitalize="none" spellcheck="false" required></label>${msg}${btn('Send code')}</form>
+     <p class="auth-foot"><button type="button" class="linkish" data-auth-mode="in">Back to sign in</button></p>`;
+  else if(AUTH_MODE==='recover')h=`<h1>Set a new password</h1><p class="auth-sub">Enter the code we sent to ${pe} and pick a new password.</p><form id="auth-form" data-mode="recover" novalidate>
+     <label>Code from the email<input type="text" id="auth-code" class="code-in" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]*" maxlength="10" required placeholder="••••••"></label>
+     ${pwField('auth-pw','New password','new-password','minlength="8" placeholder="At least 8 characters"')}${msg}${btn('Save and sign in')}</form>
+     <p class="auth-foot">${resendBtn('Send a new code')} · <button type="button" class="linkish" data-auth-mode="in">Back to sign in</button></p>`;
+  else if(AUTH_MODE==='reset')h=`<h1>Set a new password</h1><p class="auth-sub">You're signed in. Pick a new password to finish.</p><form id="auth-form" data-mode="reset" novalidate>
+     ${pwField('auth-pw','New password','new-password','minlength="8" placeholder="At least 8 characters"')}${msg}${btn('Save password')}</form>`;
+  else if(AUTH_MODE==='username')h=`<h1>Pick a username</h1><p class="auth-sub">This is the name TradeMetric shows for you, and you can sign in with it too.</p><form id="auth-form" data-mode="username" novalidate>
+     <label>Username<input type="text" id="auth-user" autocapitalize="none" autocorrect="off" spellcheck="false" maxlength="20" required placeholder="3 to 20 letters, numbers or _"><span class="hint" id="un-hint" aria-live="polite"></span></label>${msg}${btn('Continue')}</form>
+     <p class="auth-foot"><button type="button" class="linkish" data-auth-skip-un>Skip for now</button></p>`;
+  else if(AUTH_MODE==='confirmed')h=`<div class="auth-ic ok" aria-hidden="true"><svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg></div><h1>You're confirmed</h1>
+     <p class="auth-sub">Your email is verified and you're signed in. If TradeMetric is open in another tab, it's signed in there too, so you can close this one.</p>
+     <button class="btn primary auth-go" type="button" data-auth-continue>Continue to TradeMetric</button>`;
+  el.innerHTML=h;el.dataset.mode=AUTH_MODE;
+  ['auth-id','auth-user','auth-email'].forEach(k=>{const i=$(k);if(i&&AUTH_VALS[k])i.value=AUTH_VALS[k]});
+  if(AUTH_MODE==='username'&&!AUTH_VALS['auth-user']){const i=$('auth-user');if(i){i.value=suggestUsername();if(i.value)checkUsername(i.value)}}
+  if(UN_STATE&&$('un-hint'))paintUn();
+  const f=[...el.querySelectorAll('input')].find(i=>!i.value);if(f&&innerWidth>820)setTimeout(()=>f.focus(),0)}
+function resendBtn(t){const left=Math.ceil((RESEND_AT-Date.now())/1000);return left>0?`<span class="note" data-resend-wait>${t} in ${left}s</span>`:`<button type="button" class="linkish" data-auth-resend>${t}</button>`}
+setInterval(()=>{const w=document.querySelector('[data-resend-wait]');if(w&&tab==='signin')renderSignin()},1000);
+function paintUn(){const h=$('un-hint');if(!h||!UN_STATE)return;h.className='hint '+(UN_STATE.ok===true?'ok':UN_STATE.ok===false?'bad':'');h.textContent=UN_STATE.text}
+function checkUsername(raw){const u=String(raw||'').trim().toLowerCase();clearTimeout(UN_T);
+  if(!u){UN_STATE=null;const h=$('un-hint');if(h){h.textContent='';h.className='hint'}return}
+  if(!/^[a-z0-9_]{3,20}$/.test(u)){UN_STATE={u,ok:false,text:u.length<3?'At least 3 characters':'Only letters, numbers and _'};paintUn();return}
+  if(PROFILE&&PROFILE.username===u){UN_STATE={u,ok:null,text:"That's your current username"};paintUn();return}
+  UN_STATE={u,ok:null,text:'Checking...'};paintUn();
+  UN_T=setTimeout(async()=>{const {data,error}=await SB.rpc('username_available',{p_username:u});if(!UN_STATE||UN_STATE.u!==u)return;
+    UN_STATE=error?null:{u,ok:data!==false,text:data===false?'Taken. Try another.':'Available'};paintUn()},350)}
+function enterApp(){stopConfirmWatch();document.body.classList.remove('signed-out');setTimeout(syncNow,300);AUTH_MODE='in';AUTH_MSG=null;PENDING=null;AUTH_VALS={};UN_STATE=null;
+  let t=INTENDED&&TABS.includes(INTENDED.replace(/-.*/,''))&&INTENDED!=='signin'?INTENDED:'team';INTENDED=null;if(!S.onboarded)t='welcome';
   if(location.hash.slice(1)===t)go(t);else location.hash=t}
-function leaveApp(){document.body.classList.add('signed-out');USER=null;PROFILE=null;AUTH_MODE='in';AUTH_MSG=null;if(location.hash!=='#signin')location.hash='signin';else go('signin');acctUI()}
-function authFail(t){AUTH_BUSY=false;AUTH_MSG={bad:true,html:esc(t)};renderSignin()}
+function showSignin(){if(tab!=='signin'){if(location.hash==='#signin')go('signin');else location.hash='signin'}else renderSignin()}
+function leaveApp(){stopConfirmWatch();document.body.classList.add('signed-out');USER=null;PROFILE=null;PROFILE_OK=false;AUTH_MODE='in';AUTH_MSG=null;ACC_EDIT=null;showSignin();acctUI()}
+function authFail(t){AUTH_BUSY=false;AUTH_MSG={bad:true,html:esc(friendly(t))};renderSignin()}
 function authNote(h){AUTH_BUSY=false;AUTH_MSG={bad:false,html:h};renderSignin()}
+/* Everything that happens once someone is signed in, however they got there (form, code, link, Google, another tab). */
+async function signedIn(user,fresh){SIGNING=true;USER=user;startSessionClock(fresh);acctUI();cloudPull();try{await loadProfile()}finally{SIGNING=false}if(!USER||USER.id!==user.id)return;
+  if(AUTH_MODE==='recover')return;
+  if(!PROFILE&&PROFILE_OK&&!lsGet(SKIP_UN+user.id)){AUTH_MODE='username';AUTH_MSG=null;AUTH_BUSY=false;AUTH_VALS={};UN_STATE=null;showSignin();return}
+  if(AUTH_MODE==='confirmed'||AUTH_MODE==='reset'){AUTH_BUSY=false;showSignin();return}
+  AUTH_BUSY=false;enterApp()}
+function adoptSession(s,fresh){if(s&&s.user&&(!USER||USER.id!==s.user.id)){const u=s.user;USER=u;setTimeout(()=>signedIn(u,fresh),0);return true}if(s&&s.user)USER=s.user;return false}
+/* Waiting on an email confirmation: also try the saved-in-memory password every 15s, so confirming on a phone signs this tab in. */
+function startConfirmWatch(){stopConfirmWatch();CONF_T=setInterval(pollConfirm,15000)}
+function stopConfirmWatch(){clearInterval(CONF_T);CONF_T=null}
+async function pollConfirm(){if(USER||AUTH_MODE!=='verify'||!PENDING||!PENDING.pw){stopConfirmWatch();return}if(document.hidden||AUTH_BUSY)return;
+  if(Date.now()-PENDING.sentAt>45*60e3){stopConfirmWatch();return}
+  const {data,error}=await SB.auth.signInWithPassword({email:PENDING.email,password:PENDING.pw});
+  if(!error&&data&&data.session){toast('Email confirmed. You are signed in.');adoptSession(data.session,true)}}
+async function recheckSession(){if(!SB)return;const {data}=await SB.auth.getSession();const s=data&&data.session;
+  if(s){if(adoptSession(s,true)&&AUTH_MODE==='verify')toast('Email confirmed. You are signed in.')}
+  else if(USER){lsDel(UNTIL_KEY);leaveApp()}}
+async function sendSignupCode(email){const {error}=await SB.auth.resend({type:'signup',email,options:{emailRedirectTo:location.origin+location.pathname}});if(!error)RESEND_AT=Date.now()+60e3;return error}
 async function authSubmit(mode){
-  const F={};['auth-id','auth-user','auth-email','auth-pw'].forEach(k=>F[k]=($(k)||{}).value||'');AUTH_VALS={'auth-id':F['auth-id'],'auth-user':F['auth-user'],'auth-email':F['auth-email']};const v=k=>F[k].trim(),keep=!!($('auth-keep')&&$('auth-keep').checked);AUTH_BUSY=true;AUTH_MSG=null;renderSignin();
+  const F={};['auth-id','auth-user','auth-email','auth-pw','auth-code'].forEach(k=>F[k]=($(k)||{}).value||'');
+  ['auth-id','auth-user','auth-email'].forEach(k=>{if($(k))AUTH_VALS[k]=F[k]});const v=k=>F[k].trim();
+  const need=(c,m)=>{if(!c){authFail(m);return true}return false};
   try{
-    if(mode==='in'){const id=v('auth-id'),pw=F['auth-pw'];let email=id;
+    if(mode==='in'){const id=v('auth-id'),pw=F['auth-pw'];if(need(id&&pw,'Enter your username or email and your password.'))return;
+      AUTH_BUSY=true;AUTH_MSG=null;renderSignin();let email=id;
       if(!id.includes('@')){const {data,error}=await SB.rpc('login_email',{p_username:id.toLowerCase(),p_password:pw});
         if(error)return authFail(error.message);if(!data)return authFail('Wrong username or password.');email=data}
-      lsSet(KEEP_KEY,keep?'1':'0');lsDel(EXP_KEY);
       const {data:sd,error}=await SB.auth.signInWithPassword({email,password:pw});
-      if(error)return authFail(/not confirmed/i.test(error.message)?'Confirm your email first. Check your inbox for the link.':/invalid login/i.test(error.message)?'Wrong username or password.':error.message);
-      AUTH_BUSY=false;AUTH_MSG=null;if(sd&&sd.session&&!USER){USER=sd.session.user;startSessionClock();loadProfile();cloudPull()}enterApp();return}
+      if(error&&/not confirmed/i.test(error.message)){PENDING={kind:'signup',email,pw,sentAt:Date.now()};AUTH_MODE='verify';AUTH_BUSY=false;
+        const e2=await sendSignupCode(email);startConfirmWatch();return authNote(e2?'Your email still needs confirming. Use the code from your earlier email.':'Your email still needs confirming. We just sent you a fresh code.')}
+      if(error)return authFail(error.message);
+      if(sd&&sd.session)adoptSession(sd.session,true);return}
     if(mode==='up'){const u=v('auth-user').toLowerCase(),em=v('auth-email'),pw=F['auth-pw'];
       if(!/^[a-z0-9_]{3,20}$/.test(u))return authFail('Usernames are 3 to 20 letters, numbers or underscores.');
+      if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(em))return authFail('Enter a real email address. Your confirmation code goes there.');
       if(pw.length<8)return authFail('Use at least 8 characters for your password.');
+      AUTH_BUSY=true;AUTH_MSG=null;renderSignin();
       const av=await SB.rpc('username_available',{p_username:u});if(av.data===false)return authFail('That username is taken. Try another.');
-      lsSet(KEEP_KEY,keep?'1':'0');lsDel(EXP_KEY);
       const {data,error}=await SB.auth.signUp({email:em,password:pw,options:{data:{username:u},emailRedirectTo:location.origin+location.pathname}});
       if(error)return authFail(/database error/i.test(error.message)?'That username is taken. Try another.':error.message);
-      if(data&&data.session){AUTH_BUSY=false;AUTH_MSG=null;if(!USER){USER=data.session.user;startSessionClock();loadProfile();cloudPull()}enterApp();toast('Account created');return}
-      AUTH_MODE='in';return authNote(`Almost done. We sent a confirmation link to <b>${esc(em)}</b>. Open it, then sign in with <b>${esc(u)}</b>.`)}
-    if(mode==='forgot'){const em=v('auth-email');const {error}=await SB.auth.resetPasswordForEmail(em,{redirectTo:location.origin+location.pathname});
-      if(error)return authFail(error.message);return authNote(`If <b>${esc(em)}</b> has an account, a reset link is on its way.`)}
-    if(mode==='reset'){const pw=F['auth-pw'];if(pw.length<8)return authFail('Use at least 8 characters for your password.');
-      const {error}=await SB.auth.updateUser({password:pw});if(error)return authFail(error.message);AUTH_BUSY=false;toast('Password updated');enterApp()}
-  }catch(e){authFail('Something went wrong. Try again.')}}
+      if(data&&data.user&&Array.isArray(data.user.identities)&&!data.user.identities.length){AUTH_MODE='in';AUTH_VALS['auth-id']=em;return authFail('An account with that email already exists. Sign in instead, or reset your password.')}
+      if(data&&data.session){toast('Account created');adoptSession(data.session,true);return}
+      PENDING={kind:'signup',email:em,pw,user:u,sentAt:Date.now()};RESEND_AT=Date.now()+60e3;AUTH_MODE='verify';AUTH_BUSY=false;AUTH_MSG=null;startConfirmWatch();renderSignin();return}
+    if(mode==='verify'){const code=v('auth-code').replace(/\D/g,'');if(need(code.length>=6,'Enter the code from the email.'))return;
+      if(need(PENDING&&PENDING.email,'Start again from Create account.'))return;
+      AUTH_BUSY=true;AUTH_MSG=null;renderSignin();
+      let r=await SB.auth.verifyOtp({email:PENDING.email,token:code,type:'signup'});
+      if(r.error&&!/expired/i.test(r.error.message))r=await SB.auth.verifyOtp({email:PENDING.email,token:code,type:'email'});
+      if(r.error)return authFail(r.error.message);toast('Email confirmed. Welcome to TradeMetric.');if(r.data&&r.data.session)adoptSession(r.data.session,true);return}
+    if(mode==='forgot'){const em=v('auth-email');if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(em))return authFail('Enter the email on your account.');
+      AUTH_BUSY=true;AUTH_MSG=null;renderSignin();
+      const {error}=await SB.auth.resetPasswordForEmail(em,{redirectTo:location.origin+location.pathname});if(error)return authFail(error.message);
+      PENDING={kind:'recovery',email:em,sentAt:Date.now()};RESEND_AT=Date.now()+60e3;AUTH_MODE='recover';return authNote(`If <b>${esc(em)}</b> has an account, the code is on its way.`)}
+    if(mode==='recover'){const code=v('auth-code').replace(/\D/g,''),pw=F['auth-pw'];if(need(code.length>=6,'Enter the code from the email.'))return;
+      if(need(pw.length>=8,'Use at least 8 characters for your new password.'))return;
+      AUTH_BUSY=true;AUTH_MSG=null;renderSignin();
+      const r=await SB.auth.verifyOtp({email:PENDING.email,token:code,type:'recovery'});if(r.error)return authFail(r.error.message);
+      const {error}=await SB.auth.updateUser({password:pw});if(error)return authFail(error.message);
+      AUTH_BUSY=false;AUTH_MODE='in';toast('Password updated. You are signed in.');if(USER)enterApp();else if(r.data&&r.data.session)adoptSession(r.data.session,true);return}
+    if(mode==='reset'){const pw=F['auth-pw'];if(need(pw.length>=8,'Use at least 8 characters for your password.'))return;
+      AUTH_BUSY=true;renderSignin();const {error}=await SB.auth.updateUser({password:pw});if(error)return authFail(error.message);AUTH_BUSY=false;toast('Password updated');enterApp();return}
+    if(mode==='username'){const u=v('auth-user').toLowerCase();if(!/^[a-z0-9_]{3,20}$/.test(u))return authFail('Usernames are 3 to 20 letters, numbers or underscores.');
+      AUTH_BUSY=true;AUTH_MSG=null;renderSignin();const err=await saveUsername(u);if(err)return authFail(err);AUTH_BUSY=false;toast('Welcome, '+u);enterApp();return}
+  }catch(e){authFail(e&&e.message||'Something went wrong. Try again.')}}
+async function saveUsername(u){const av=await SB.rpc('username_available',{p_username:u});if(av.data===false)return 'That username is taken. Try another.';
+  const q=PROFILE?SB.from('profiles').update({username:u}).eq('id',USER.id).select().maybeSingle():SB.from('profiles').insert({id:USER.id,username:u}).select().maybeSingle();
+  const {data,error}=await q;if(error)return friendly(/row-level security|permission/i.test(error.message)?"Usernames can't be saved yet. Run supabase/accounts_v2.sql in Supabase.":error.message);
+  PROFILE=data||{...(PROFILE||{}),id:USER.id,username:u};SB.auth.updateUser({data:{username:u}}).catch(()=>{});acctUI();return null}
+async function startOAuth(id){const p=OAUTH.find(x=>x.id===id);if(!p||!SB)return;
+  if(PROVIDERS&&PROVIDERS[id]===false){AUTH_MSG={bad:true,html:esc(p.name+' sign-in is coming soon. Use your email for now.')};renderSignin();return}
+  AUTH_BUSY=true;AUTH_MSG=null;renderSignin();
+  const {error}=await SB.auth.signInWithOAuth({provider:id,options:{redirectTo:location.origin+location.pathname}});if(error)authFail(error.message)}
 async function initAccounts(){
   acctUI();
   try{const {createClient}=await import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/+esm');
     SB=createClient(SUPA_URL,SUPA_KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:false,flowType:'implicit'}})}catch(e){SB_FAILED=true;renderSignin();return}
-  if(AUTH_HASH){const q=new URLSearchParams(AUTH_HASH),rec=q.get('type')==='recovery';INTENDED='team';
-    history.replaceState(null,'',location.pathname+location.search+'#signin');if(rec)AUTH_MODE='reset';
+  fetch(SUPA_URL+'/auth/v1/settings',{headers:{apikey:SUPA_KEY}}).then(r=>r.ok?r.json():null).then(j=>{if(j&&j.external){PROVIDERS=j.external;if(tab==='signin')renderSignin()}}).catch(()=>{});
+  let fromLink=false;
+  if(AUTH_HASH){const q=new URLSearchParams(AUTH_HASH),type=q.get('type');INTENDED='team';
+    history.replaceState(null,'',location.pathname+location.search+'#signin');
     if(q.get('access_token')){const {error}=await SB.auth.setSession({access_token:q.get('access_token'),refresh_token:q.get('refresh_token')});
-      if(error){AUTH_MODE='in';toast('That link expired. Request a new one.')}else if(!rec)toast('Email confirmed. You are signed in.')}
-    else if(q.get('error_description'))toast(q.get('error_description').replace(/\+/g,' '))}
-  const {data}=await SB.auth.getSession();USER=data&&data.session?data.session.user:null;
-  if(USER){startSessionClock();if(!(await checkExpiry())){loadProfile();cloudPull();if(AUTH_MODE!=='reset')enterApp()}}
+      if(error)AUTH_MSG={bad:true,html:'That link expired. Sign in, or ask for a new code.'};
+      else{fromLink=true;if(type==='recovery')AUTH_MODE='reset';else if(type==='signup'||type==='email'||type==='invite')AUTH_MODE='confirmed'}}
+    else if(q.get('error_description'))AUTH_MSG={bad:true,html:esc(friendly(q.get('error_description').replace(/\+/g,' ')))}}
+  const {data}=await SB.auth.getSession();const s=data&&data.session;
+  if(s){USER=s.user;if(!(await checkExpiry()))await signedIn(s.user,fromLink)}else renderSignin();
   acctUI();
-  SB.auth.onAuthStateChange((ev,session)=>{const was=USER&&USER.id;USER=session?session.user:null;
-    if(ev==='SIGNED_OUT'){lsDel(EXP_KEY);if(was)leaveApp();return}
-    if(USER&&USER.id!==was){startSessionClock();loadProfile();cloudPull();if(tab==='signin'&&AUTH_MODE!=='reset'&&!AUTH_BUSY)enterApp()}acctUI()});
+  SB.auth.onAuthStateChange((ev,session)=>{
+    if(ev==='SIGNED_OUT'){lsDel(UNTIL_KEY);if(USER)leaveApp();return}
+    if(ev==='PASSWORD_RECOVERY'&&AUTH_MODE!=='recover'){AUTH_MODE='reset'}
+    adoptSession(session,ev==='SIGNED_IN')});
+  /* Another tab (the email link) signed in or out: follow it. */
+  addEventListener('storage',e=>{if(e.key&&/^sb-.*-auth-token$/.test(e.key))recheckSession()});
+  document.addEventListener('visibilitychange',()=>{if(document.hidden)return;if(!USER&&AUTH_MODE==='verify'){recheckSession();pollConfirm()}});
   setInterval(checkExpiry,60*60e3)}
 document.addEventListener('click',e=>{const t=e.target;if(!t.closest)return;
   if(t.closest('#acct-btn')){location.hash=USER?'account':'signin';return}
-  if(t.closest('[data-acct-pw]')){AUTH_MODE='reset';AUTH_MSG=null;location.hash='signin';return}
-  const m=t.closest('[data-auth-mode]');if(m){AUTH_MODE=m.dataset.authMode;AUTH_MSG=null;renderSignin();return}
-  if(t.closest('[data-auth-home]')){location.hash='team';return}
-  if(t.id==='auth-out'){SB.auth.signOut({scope:'local'}).then(()=>{lsDel(EXP_KEY);leaveApp();toast('Signed out. Your league is saved.')})}});
+  const eye=t.closest('[data-pw-eye]');if(eye){const i=$(eye.dataset.pwEye);if(i){const show=i.type==='password';i.type=show?'text':'password';eye.setAttribute('aria-pressed',String(show));eye.setAttribute('aria-label',show?'Hide password':'Show password');i.focus()}return}
+  const o=t.closest('[data-oauth]');if(o){if(!AUTH_BUSY)startOAuth(o.dataset.oauth);return}
+  const m=t.closest('[data-auth-mode]');if(m){const md=m.dataset.authMode;if(md==='up'&&AUTH_MODE==='verify'){stopConfirmWatch();PENDING=null}
+    if(md==='forgot'&&AUTH_VALS['auth-id']&&AUTH_VALS['auth-id'].includes('@'))AUTH_VALS['auth-email']=AUTH_VALS['auth-id'];
+    const idv=$('auth-id');if(idv)AUTH_VALS['auth-id']=idv.value;AUTH_MODE=md;AUTH_MSG=null;UN_STATE=null;renderSignin();return}
+  if(t.closest('[data-auth-resend]')){if(!PENDING)return;(async()=>{const err=PENDING.kind==='recovery'?(await SB.auth.resetPasswordForEmail(PENDING.email,{redirectTo:location.origin+location.pathname})).error:await sendSignupCode(PENDING.email);
+    if(err)return authFail(err.message);RESEND_AT=Date.now()+60e3;authNote('New code sent. Use the newest email.')})();return}
+  if(t.closest('[data-auth-skip-un]')){if(USER)lsSet(SKIP_UN+USER.id,'1');enterApp();return}
+  if(t.closest('[data-auth-continue]')){enterApp();return}});
+document.addEventListener('input',e=>{const t=e.target;
+  if(t.id==='auth-user'||t.id==='acc-un')checkUsername(t.value);
+  if(t.id==='auth-code'&&tab==='signin'){t.value=t.value.replace(/\D/g,'');if((e.inputType==='insertFromPaste'||e.inputType==='insertReplacementText'||!e.inputType)&&t.value.length>=6&&!AUTH_BUSY)t.form.requestSubmit()}});
 document.addEventListener('submit',e=>{if(e.target.id!=='auth-form')return;e.preventDefault();if(!AUTH_BUSY)authSubmit(e.target.dataset.mode)});
 initAccounts();
 
@@ -2029,36 +2151,85 @@ addEventListener('resize',queueBalance);
 try{const ro=new ResizeObserver(queueBalance);document.querySelectorAll('.grid2>*').forEach(c=>ro.observe(c));
   document.querySelectorAll('.grid2>.stack>*').forEach(c=>ro.observe(c))}catch(e){}
 
-/* ===== Account page ===== */
+/* ===== Account area: Profile, Leagues, Subscription, Security. Headed by the username, never the email. ===== */
+var ACC_TAB='profile',ACC_EDIT=null,ACC_MSG=null,ACC_BUSY=false;
+const ACC_IC={
+  profile:'<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/>',
+  leagues:'<path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0z"/><path d="M17 5h3v2a3 3 0 0 1-3 3M7 5H4v2a3 3 0 0 0 3 3"/>',
+  plan:'<rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20M6 15h4"/>',
+  security:'<rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>'};
+const ACC_TABS=[['profile','Profile'],['leagues','Leagues'],['plan','Subscription'],['security','Security']];
+const accIc=k=>`<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ACC_IC[k]}</svg>`;
 function fmtDate(d,time){if(!d)return '—';const x=new Date(d);if(isNaN(x))return '—';return x.toLocaleDateString([], {month:'short',day:'numeric',year:'numeric'})+(time?' · '+x.toLocaleTimeString([], {hour:'numeric',minute:'2-digit'}):'')}
-function renderAccount(){const el=$('account-body');if(!el)return;if(!USER){el.innerHTML='';return}acctUI();
-  const name=acctName(),email=USER.email||'',v=lsGet(EXP_KEY),L=S.leagues||[],cur=L.find(x=>x.key===S.leagueKey),me=myTeam&&S.teams&&S.teams.length?myTeam():null;
-  const prov=(USER.app_metadata&&USER.app_metadata.provider)||'email';
-  const row=(k,val,cls='')=>`<div class="acc-row"><span class="acc-k">${k}</span><span class="acc-v ${cls}">${val}</span></div>`;
-  const save=CLOUD.err?`<span style="color:var(--bad)">Couldn't save: ${esc(CLOUD.err)}</span>`:CLOUD.busy?'Saving...':CLOUD.last?'Saved at '+new Date(CLOUD.last).toLocaleTimeString([], {hour:'numeric',minute:'2-digit'}):'Saved';
-  el.innerHTML=`<div class="card acc-head"><div class="acc-av" aria-hidden="true">${esc((name[0]||'?').toUpperCase())}</div>
-      <div class="acc-id"><h2 class="acc-name" title="${esc(name)}">${esc(name)}</h2><p class="acc-email" title="${esc(email)}">${esc(email)}</p>
-        <div class="acc-badges"><span class="acc-badge ok">Signed in</span>${USER.email_confirmed_at?'<span class="acc-badge">Email verified</span>':'<span class="acc-badge warn">Email not verified</span>'}</div></div>
-      <div class="acc-act"><button class="btn" type="button" data-acct-pw="1">Change password</button><button class="btn" type="button" id="auth-out">Sign out</button></div></div>
-    <div class="grid2 acc-grid">
-      <div class="card"><div class="card-h"><h2>Profile</h2></div>
-        ${row('Username',PROFILE&&PROFILE.username?esc(PROFILE.username):'<span class="note">Not set</span>','acc-wrap')}
-        ${row('Email',esc(email)||'—','acc-wrap')}
-        ${row('Sign-in method',prov==='email'?'Username or email + password':esc(prov))}
-        ${row('Member since',fmtDate(USER.created_at))}
-        ${row('Last sign-in',fmtDate(USER.last_sign_in_at,true))}
-        ${row('Account ID',`<code title="${esc(USER.id)}">${esc(USER.id)}</code>`,'acc-trunc')}</div>
-      <div class="stack">
-        <div class="card"><div class="card-h"><h2>Leagues</h2><a class="note" href="#hub">Manage in League Hub</a></div>
-          ${row('Current league',cur?esc(cur.name):esc(S.league&&S.league.name||'—'),'acc-wrap')}
-          ${row('Your team',me?esc(me.name):'—','acc-wrap')}
-          ${row('Platform',cur&&cur.src?esc(cur.src):'—')}
-          ${row('Saved leagues',String(L.length))}</div>
-        <div class="card"><div class="card-h"><h2>This device</h2></div>
-          ${row('Session',!v||v==='0'?'Stays signed in':'Signed in until '+fmtDate(+v))}
-          ${row('League sync',save,'acc-wrap')}
-          ${row('Theme',document.documentElement.dataset.theme==='dark'?'Dark':'Light')}</div>
-      </div></div>`}
+function fmtMonth(d){const x=new Date(d);return isNaN(x)?'':x.toLocaleDateString([], {month:'long',year:'numeric'})}
+/* Plans: everyone is on the beta plan until subscriptions launch. profiles.plan is read if it exists. */
+const PLANS={free:{name:'Beta',price:'Free',blurb:'Every TradeMetric feature is included while the site is in beta.'},pro:{name:'Pro',price:'',blurb:''}};
+function planOf(){const k=PROFILE&&PROFILE.plan||'free';return {key:k,...(PLANS[k]||PLANS.free)}}
+function hasPassword(){const ids=USER&&USER.identities;return !ids||!ids.length||ids.some(i=>i.provider==='email')}
+function socialName(){const ids=(USER&&USER.identities||[]).filter(i=>i.provider!=='email');const p=ids[0]&&OAUTH.find(x=>x.id===ids[0].provider);return p?p.name:(ids[0]?ids[0].provider:'')}
+function accRow(k,v,act=''){return `<div class="acc-row"><div class="acc-k">${k}</div><div class="acc-v">${v}</div>${act?`<div class="acc-a">${act}</div>`:''}</div>`}
+function accMsg(){return ACC_MSG?`<p class="auth-msg ${ACC_MSG.bad?'bad':''}" role="${ACC_MSG.bad?'alert':'status'}">${ACC_MSG.html}</p>`:''}
+function accBtn(t,cls='primary'){return `<button class="btn ${cls}" type="submit" ${ACC_BUSY?'disabled':''}>${ACC_BUSY?'Saving...':t}</button>`}
+function renderAccount(){const el=$('account-body');if(!el)return;if(!USER){el.innerHTML='';return}
+  if(!ACC_TABS.some(x=>x[0]===ACC_TAB))ACC_TAB='profile';
+  const name=acctName(),plan=planOf();
+  const head=`<div class="acc-hero"><div class="acc-hero-in">${avatarHtml('acc-av')}
+      <div class="acc-id"><div class="kicker">Account</div><h1 class="acc-name">${name?esc(name):'Your account'}</h1>
+        <div class="acc-badges"><span class="acc-badge plan">${esc(plan.name)} plan</span>${USER.created_at?`<span class="acc-badge">Member since ${esc(fmtMonth(USER.created_at))}</span>`:''}</div></div>
+      <button class="btn acc-out" type="button" id="auth-out">Sign out</button></div></div>`;
+  const nav=`<nav class="acc-nav" aria-label="Account sections">${ACC_TABS.map(([k,l])=>`<a href="#account-${k}" ${k===ACC_TAB?'aria-current="page"':''}>${accIc(k)}<span>${l}</span></a>`).join('')}</nav>`;
+  el.innerHTML=head+`<div class="acc-shell">${nav}<div class="acc-main">${({profile:accProfile,leagues:accLeagues,plan:accPlan,security:accSecurity})[ACC_TAB]()}</div></div>`;
+  const f=el.querySelector('.acc-form input');if(f&&innerWidth>820)setTimeout(()=>f.focus(),0)}
+function accProfile(){const un=PROFILE&&PROFILE.username,email=USER.email||'';
+  const unForm=`<form class="acc-form" id="acc-form" data-kind="username" novalidate><label>New username<input type="text" id="acc-un" value="${esc(un||suggestUsername())}" autocapitalize="none" autocorrect="off" spellcheck="false" maxlength="20" required><span class="hint" id="un-hint" aria-live="polite"></span></label>${accMsg()}<div class="acc-form-act">${accBtn('Save username')}<button class="btn" type="button" data-acc-cancel>Cancel</button></div></form>`;
+  return `<section class="card acc-sec"><header class="acc-sec-h"><h2>Profile</h2><p>How you show up on TradeMetric.</p></header>
+    ${ACC_EDIT==='username'?unForm:accRow('Username',un?`<b>${esc(un)}</b><span class="note">You can sign in with this or your email.</span>`:'<span class="note">Not set yet</span>',`<button class="btn" type="button" data-acc-edit="username">${un?'Change':'Pick one'}</button>`)}
+    ${accRow('Email',email?`<span class="acc-mail">${esc(email)}</span>${USER.email_confirmed_at?'<span class="pill-ok">Verified</span>':'<span class="pill-warn">Not verified</span>'}`:'<span class="note">None</span>')}
+    ${accRow('Member since',esc(fmtDate(USER.created_at)))}</section>`}
+function accLeagues(){const L=S.leagues||[],me=typeof myTeam==='function'&&S.teams&&S.teams.length?myTeam():null;
+  const sync=CLOUD.err?`<span class="pill-warn">Not saved</span><span class="note">${esc(CLOUD.err)}</span>`:CLOUD.busy?'<span class="note">Saving...</span>':`<span class="pill-ok">Saved</span><span class="note">${CLOUD.last?'Last saved '+new Date(CLOUD.last).toLocaleTimeString([], {hour:'numeric',minute:'2-digit'}):'To your account'}</span>`;
+  const list=L.length?`<ul class="acc-lg">${L.map(x=>`<li class="${x.key===S.leagueKey?'cur':''}"><span class="acc-lg-ic" aria-hidden="true">${esc((x.name||'L')[0].toUpperCase())}</span><span class="acc-lg-t"><b>${esc(x.name||'League')}</b><span class="note">${esc(x.src||'')}${x.key===S.leagueKey&&me?' · '+esc(me.name):''}</span></span>${x.key===S.leagueKey?'<span class="pill-ok">Current</span>':''}</li>`).join('')}</ul>`
+    :`<div class="acc-empty"><b>${esc(S.league&&S.league.name||'Sample League')}</b><p class="note">${S.example?"You're looking at the sample league. Bring in yours from Sleeper or ESPN.":'This is the league on this account.'}</p></div>`;
+  return `<section class="card acc-sec"><header class="acc-sec-h"><h2>Leagues</h2><p>Saved to your account, so they follow you to any device.</p></header>
+    ${list}<div class="acc-sec-f"><a class="btn primary" href="#hub">Manage leagues</a><a class="btn" href="#league">League settings</a></div></section>
+    <section class="card acc-sec"><header class="acc-sec-h"><h2>Sync</h2></header>${accRow('Cloud save',sync)}</section>`}
+function accPlan(){const p=planOf();
+  return `<section class="acc-plans">
+      <div class="card acc-plan cur"><div class="acc-plan-top"><span class="acc-badge plan">Current plan</span></div><h3>${esc(p.name)}</h3><div class="acc-price">${esc(p.price)}</div><p>${esc(p.blurb)}</p>
+        <ul class="acc-feat"><li>Trade analyzer and Trade Score</li><li>Rankings, waivers and Season Sim</li><li>League sync for Sleeper and ESPN</li><li>AI Helper</li></ul></div>
+      <div class="card acc-plan next"><div class="acc-plan-top"><span class="acc-badge soon">Coming soon</span></div><h3>Pro</h3><div class="acc-price muted">Pricing to come</div><p>Paid plans are on the way. When they launch you'll upgrade, switch plans and cancel right here.</p>
+        <button class="btn" type="button" disabled>Not available yet</button></div></section>
+    <section class="card acc-sec"><header class="acc-sec-h"><h2>Billing</h2><p>Payment details and receipts will live here.</p></header>
+      ${accRow('Payment method','<span class="note">None on file</span>')}${accRow('Receipts','<span class="note">No receipts yet</span>')}</section>`}
+function accSecurity(){const until=lsGet(UNTIL_KEY),pw=hasPassword(),soc=socialName();
+  const pwForm=`<form class="acc-form" id="acc-form" data-kind="password" novalidate>${pwField('acc-pw','New password','new-password','minlength="8" placeholder="At least 8 characters"')}${pwField('acc-pw2','Type it again','new-password','minlength="8"')}${accMsg()}<div class="acc-form-act">${accBtn(pw?'Change password':'Set password')}<button class="btn" type="button" data-acc-cancel>Cancel</button></div></form>`;
+  const delForm=`<form class="acc-form" id="acc-form" data-kind="delete" novalidate><p class="note">This deletes your account and every league saved to it. It can't be undone.</p><label><span>Type <b>${esc(acctName()||'delete')}</b> to confirm</span><input type="text" id="acc-del" autocapitalize="none" autocorrect="off" spellcheck="false" autocomplete="off" required></label>${accMsg()}<div class="acc-form-act"><button class="btn danger" type="submit" ${ACC_BUSY?'disabled':''}>${ACC_BUSY?'Deleting...':'Delete my account'}</button><button class="btn" type="button" data-acc-cancel>Cancel</button></div></form>`;
+  return `<section class="card acc-sec"><header class="acc-sec-h"><h2>Password</h2><p>${pw?'Used with your username or email.':`You sign in with ${esc(soc||'a linked account')}. Add a password to also sign in with your username.`}</p></header>
+      ${ACC_EDIT==='password'?pwForm:accRow('Password',pw?'<span class="acc-dots">••••••••••</span>':'<span class="note">Not set</span>',`<button class="btn" type="button" data-acc-edit="password">${pw?'Change':'Set password'}</button>`)}</section>
+    <section class="card acc-sec"><header class="acc-sec-h"><h2>Sessions</h2><p>You stay signed in for the whole season, then sign in once more.</p></header>
+      ${accRow('This device',until?`Signed in until <b>${esc(fmtDate(+until))}</b>`:'Signed in')}
+      <div class="acc-sec-f"><button class="btn" type="button" data-acc-out-all>Sign out everywhere</button></div></section>
+    <section class="card acc-sec danger"><header class="acc-sec-h"><h2>Delete account</h2><p>Remove your account and saved leagues for good.</p></header>
+      ${ACC_EDIT==='delete'?delForm:`<div class="acc-sec-f"><button class="btn danger-ghost" type="button" data-acc-edit="delete">Delete account</button></div>`}</section>`}
+function accFail(t){ACC_BUSY=false;ACC_MSG={bad:true,html:esc(friendly(t))};renderAccount()}
+async function accSubmit(kind){if(ACC_BUSY)return;ACC_MSG=null;
+  try{
+    if(kind==='username'){const u=($('acc-un').value||'').trim().toLowerCase();if(!/^[a-z0-9_]{3,20}$/.test(u))return accFail('Usernames are 3 to 20 letters, numbers or underscores.');
+      if(PROFILE&&PROFILE.username===u){ACC_EDIT=null;return renderAccount()}
+      ACC_BUSY=true;renderAccount();const err=await saveUsername(u);if(err)return accFail(err);ACC_BUSY=false;ACC_EDIT=null;UN_STATE=null;toast('Username updated');renderAccount();return}
+    if(kind==='password'){const a=$('acc-pw').value,b=$('acc-pw2').value;if(a.length<8)return accFail('Use at least 8 characters.');if(a!==b)return accFail("Those passwords don't match.");
+      ACC_BUSY=true;renderAccount();const {data,error}=await SB.auth.updateUser({password:a});if(error)return accFail(error.message);if(data&&data.user)USER=data.user;
+      ACC_BUSY=false;ACC_EDIT=null;toast('Password saved');renderAccount();return}
+    if(kind==='delete'){const want=acctName()||'delete';if(($('acc-del').value||'').trim().toLowerCase()!==want.toLowerCase())return accFail(`Type ${want} exactly to confirm.`);
+      ACC_BUSY=true;renderAccount();const {error}=await SB.rpc('delete_my_account');if(error)return accFail(/could not find|does not exist/i.test(error.message)?"Account deletion isn't switched on yet. Run supabase/accounts_v2.sql in Supabase.":error.message);
+      ACC_BUSY=false;ACC_EDIT=null;try{localStorage.removeItem(KEY)}catch(e){}lsDel(UNTIL_KEY);await SB.auth.signOut({scope:'local'}).catch(()=>{});location.hash='signin';location.reload();return}
+  }catch(e){accFail(e&&e.message)}}
+document.addEventListener('click',e=>{const t=e.target;if(!t.closest)return;
+  const ed=t.closest('[data-acc-edit]');if(ed){ACC_EDIT=ed.dataset.accEdit;ACC_MSG=null;UN_STATE=null;renderAccount();return}
+  if(t.closest('[data-acc-cancel]')){ACC_EDIT=null;ACC_MSG=null;UN_STATE=null;renderAccount();return}
+  if(t.closest('#auth-out')){SB.auth.signOut({scope:'local'}).then(()=>{lsDel(UNTIL_KEY);leaveApp();toast('Signed out. Your leagues are saved.')});return}
+  if(t.closest('[data-acc-out-all]')){SB.auth.signOut({scope:'global'}).then(({error})=>{if(error)return toast(friendly(error.message));lsDel(UNTIL_KEY);leaveApp();toast('Signed out on every device.')});return}});
+document.addEventListener('submit',e=>{if(e.target.id!=='acc-form')return;e.preventDefault();accSubmit(e.target.dataset.kind)});
 
 /* ===== AI Helper: floating button + slide-over panel on every page ===== */
 function openAI(){const d=$('ai-drawer');if(!d||!USER)return;if(!document.body.classList.contains('ai-open')){document.body.classList.add('ai-open');d.setAttribute('aria-hidden','false');$('ai-scrim').hidden=false;$('ai-fab').setAttribute('aria-expanded','true');renderHelper();setTimeout(()=>{const q=$('helper-q');if(q&&innerWidth>820)q.focus()},250)}}

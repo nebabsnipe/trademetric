@@ -149,11 +149,22 @@
   <!-- WELCOME -->
   <div class="clipview" id="clipview" hidden></div>
 
-  <section class="view" id="v-account" hidden>
-    <div class="hero"><div><div class="kicker">Settings</div><h1>Your account</h1><p>Your sign-in details and where your leagues are saved.</p></div></div>
-    <div id="account-body"></div>
+  <section class="view" id="v-account" hidden><div id="account-body"></div></section>
+  <section class="view" id="v-signin" hidden>
+    <div class="auth-wrap">
+      <aside class="auth-brand" aria-hidden="true">
+        <div class="auth-brand-logo"><img src="/logo-tm.png?v=2" width="398" height="160" alt=""><b>Trade<span>Metric</span></b></div>
+        <h2>Win the trade.<br>Win the league.</h2>
+        <ul>
+          <li><b>Trade Score</b> for every deal, graded on your league's exact rules</li>
+          <li><b>Season Sim</b> playoff and title odds, updated every morning</li>
+          <li><b>League sync</b> with Sleeper and ESPN, on every device</li>
+        </ul>
+        <p class="auth-brand-foot">Free during the beta</p>
+      </aside>
+      <div class="auth-card" id="signin-card"></div>
+    </div>
   </section>
-  <section class="view" id="v-signin" hidden><div class="auth-wrap"><div class="card auth-card" id="signin-card"></div></div></section>
 
   <section class="view" id="v-welcome" hidden>
     <div class="wl">

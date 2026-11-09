@@ -22,6 +22,8 @@ Fantasy football trades, rankings and lineup advice built on your league's exact
 | `api/espn.js` | Reads private ESPN leagues with the user's espn_s2 and SWID codes (never stored) |
 | `supabase/schema.sql` | Table that stores each user's saved league. Run once in Supabase's SQL Editor |
 | `supabase/accounts.sql` | Usernames, username sign-in and the wrong-password lockout. Run once after schema.sql |
+| `supabase/accounts_v2.sql` | Usernames for social sign-in, username changes, plans, account deletion. Run once after accounts.sql |
+| `supabase/email/` | TradeMetric-branded confirmation and password-reset emails to paste into Supabase |
 | `scripts/update_data.py` | Downloads fresh stats, injuries, schedules, betting lines and expert rankings |
 
 Handy places in `js/app.js`:
@@ -66,9 +68,21 @@ Data: [nflverse](https://github.com/nflverse/nflverse-data) (stats, schedules, b
 
 ## Accounts (Supabase)
 
-People create an account with a username, email and password, and sign in with their username or email. "Keep me signed in" keeps them signed in on that device; without it they're signed out after 2 weeks (their league stays saved). Each user's league is saved to the `user_state` table, and row-level security means people can only read their own row. The project URL and publishable key are at the bottom of `js/app.js` (search for `SUPA_URL`); both are safe to be public.
+TradeMetric has its own sign-in page (no Supabase screens). People sign up with a username, email and password, or with Google, Apple or Discord, and sign in with their username or email. Sign-in lasts one season: everyone stays signed in until Feb 15 after the season, then signs in once more (their leagues stay saved). Each user's league is saved to the `user_state` table, and row-level security means people can only read their own row. The project URL and publishable key are in `js/app.js` (search for `SUPA_URL`); both are safe to be public.
+
+**Email confirmation stays on the page you signed up on.** The email carries a code to type in, and its link still works: whoever clicks it, on any device, the original tab notices and signs in by itself.
+
+The account area (`#account`) has Profile, Leagues, Subscription and Security sections. Subscription is a placeholder until paid plans launch; `profiles.plan` is already there for it.
+
+### One-time Supabase setup
+
+1. **SQL:** run `supabase/schema.sql`, then `supabase/accounts.sql`, then `supabase/accounts_v2.sql` in the SQL Editor.
+2. **Emails:** Authentication -> Emails. Paste `supabase/email/confirm-signup.html` into *Confirm signup* and `supabase/email/reset-password.html` into *Reset password* (the subject line is in the comment at the top of each file). These add the code.
+3. **Sender:** Authentication -> Emails -> SMTP Settings. Supabase's built-in sender only allows a couple of emails an hour and sends from Supabase's address. Connect a sender such as Resend or Postmark with an address like `hello@trademetric.app`.
+4. **Redirect URLs:** Authentication -> URL Configuration. Site URL `https://www.trademetric.app`; add `https://www.trademetric.app/**` and `https://*-trademetric.vercel.app/**` to Redirect URLs so links and social sign-in work on previews too.
+5. **Social sign-in:** Authentication -> Providers. Switch on Google, Apple and Discord and paste each one's client ID and secret. Buttons for providers that are still off show as dimmed with a "coming soon" note.
 
 ## Coming next
 
-- Sign in with Google
+- Paid plans (Stripe), managed from Account -> Subscription
 - Mobile layout pass
