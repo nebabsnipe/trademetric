@@ -11,7 +11,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600;700;800&family=Kanit:ital,wght@0,700;0,800;1,600;1,700;1,800&display=swap">
 <meta name="description" content="Fantasy football trades, rankings and lineup advice built on your league's exact settings.">
-<link rel="stylesheet" href="css/styles.css?v=4">
+<link rel="stylesheet" href="css/styles.css?v=5">
 </head>
 <body class="signed-out">
 <div class="topbar">
@@ -253,7 +253,7 @@
 <p><b>Team total</b> is the points his team is expected to score, from the betting line.</p></div></details>
       <details class="faq-i" id="faq-news"><summary>News and practice</summary><div class="faq-b"><p>Stories come from ESPN, CBS, Yahoo, ProFootballTalk, RotoBaller, Pro Football Network, The Athletic and Google News. The same story from different outlets is combined, and the four most useful recent ones are shown. Titles and summaries are written by AI from each story.</p>
 <p>Practice reports show his final practice of each week from the official NFL injury report.</p></div></details>
-      <details class="faq-i" id="faq-bigplays"><summary>News tab and big-play banners</summary><div class="faq-b"><p>The News tab covers every league you've saved at once. Each item is tagged with the leagues it touches, and the strip at the top shows all of your matchups live.</p><p>A banner pops up, wherever you are on the site, when one of your starters does something worth texting a friend about: a run of 30+ yards, a catch of 40+, a second (or third) touchdown, a first touchdown of 20+ yards or worth 12+ points, or a game of 28+ points or 2.2 times his projection. It also pops up when a late score flips your matchup from losing to winning, when your week is clinched (you're 99%+ to win and nothing left on their side can catch you), and when an opponent's starter is ruled out mid-game. The banner shows big for a few seconds, then shrinks to a chip in the corner for 5 minutes. Tap either to jump to it in News.</p><p>Turn banners on or off for each league in Account, under Leagues. The News tab always shows every league. Banners show while the site is open in a tab.</p></div></details>
+      <details class="faq-i" id="faq-bigplays"><summary>News tab and big-play banners</summary><div class="faq-b"><p>The News tab covers every league you've saved at once. Each item is tagged with the leagues it touches, and the strip at the top shows all of your matchups live.</p><p>A banner pops up, wherever you are on the site, when one of your starters does something worth texting a friend about: a run of 30+ yards, a catch of 40+, a second (or third) touchdown, a first touchdown of 20+ yards or worth 12+ points, or a game of 28+ points or 2.2 times his projection. It also pops up when a late score flips your matchup from losing to winning, when your week is clinched (you're 99%+ to win and nothing left on their side can catch you), and when an opponent's starter is ruled out mid-game. The banner shows big for a few seconds, then shrinks to a chip in the corner for 5 minutes. Tap either to jump to it in News.</p><p>When an official clip of a big play is posted, it's attached to that play in the feed, so you can watch it right there. The Clips filter shows every clip of your players, with the matched ones linked back to their play.</p><p>Turn banners on or off for each league in Account, under Leagues. The News tab always shows every league. Banners show while the site is open in a tab.</p></div></details>
       <details class="faq-i" id="faq-draft"><summary>Draft tools</summary><div class="faq-b"><p>Draft values use value over a replacement-level starter for your league's scoring and roster. During the season they are rest-of-season values; next summer they switch to full-season projections.</p>
 <p><b>Mock draft:</b> computer drafters pick by value and roster need, with some randomness. <b>Live draft:</b> keep it open during your real draft and tap each pick as it happens. Best picks favor open starting spots and warn when a player probably won't last until your next pick.</p></div></details>
       <details class="faq-i" id="faq-league"><summary>League type, waivers and QB value</summary><div class="faq-b"><p><b>Keeper and dynasty</b> leagues blend in long-term value (age, draft year and DynastyProcess market values) for trades, trade values and the draft. Redraft leagues count this season only.</p>
@@ -327,7 +327,7 @@
 <script>
 /* Load the stats snapshot, then start the app */
 fetch('data/nfl.json',{cache:'no-cache'}).then(r=>r.json()).then(d=>{
-  window.NFL_DATA=d;const n=document.createElement('script');n.src='js/news.js?v=1';n.onload=n.onerror=()=>{const s=document.createElement('script');s.src='js/app.js?v=4';document.body.appendChild(s)};document.body.appendChild(n);
+  window.NFL_DATA=d;const n=document.createElement('script');n.src='js/news.js?v=2';n.onload=n.onerror=()=>{const s=document.createElement('script');s.src='js/app.js?v=4';document.body.appendChild(s)};document.body.appendChild(n);
 }).catch(()=>{document.body.insertAdjacentHTML('afterbegin','<p style="padding:20px;font-family:sans-serif">Could not load player data. Refresh to try again.</p>')});
 </script>
 </body>
