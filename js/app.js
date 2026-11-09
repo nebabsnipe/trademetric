@@ -949,6 +949,9 @@ function toggleStat(k,on){
     if(th){SORTS['rank-table']={col:[...th.parentNode.children].indexOf(th),dir:'desc'};sortTable('rank-table')}}}
 function statPanelOpen(v){const b=$('add-stats'),p=$('sp-panel');if(!b||!p)return;
   p.hidden=!v;b.setAttribute('aria-expanded',v?'true':'false')}
+document.addEventListener('keydown',e=>{
+  if(e.key!=='Escape')return;const p=$('sp-panel');
+  if(p&&!p.hidden){statPanelOpen(false);const b=$('add-stats');if(b)b.focus()}},true);
 function trendHtml(x){if(x===null)return '<span class="muted">-</span>';const v=Math.round(x*100);return `<span class="delta ${v>=10?'up':v<=-10?'down':'flat'}">${v>0?'▲':v<0?'▼':''}${Math.abs(v)}%</span>`}
 function sortTable(id){const tbl=document.getElementById(id);if(!tbl)return;const st=SORTS[id];
   [...tbl.querySelectorAll('thead th')].forEach((th,i)=>{const on=!!st&&st.col===i;th.classList.toggle('sorted',on);if(on)th.dataset.dir=st.dir;else delete th.dataset.dir});
@@ -2291,6 +2294,7 @@ function drSummary(){const tot=Array.from({length:DR.n},(_,t)=>({t,v:lineup(DR.p
     <ol class="dr-rank">${tot.map(x=>`<li class="${x.t===DR.slot-1?'me':''}"><span>${esc(drTeamName(x.t))}</span><b class="num">${f1(x.v)}</b></li>`).join('')}</ol></div>`}
 document.addEventListener('click',e=>{const t=e.target.closest&&e.target.closest('button,a');
   if(!e.target.closest('.alerts-wrap')&&!$('alert-pop').hidden)toggleAlerts(false);
+  if(!e.target.closest('.statpick')&&$('sp-panel')&&!$('sp-panel').hidden)statPanelOpen(false);
   if(!t)return;const d=t.dataset;
   if(t.id==='alert-btn'){toggleAlerts();return}
   if(t.closest('#alert-pop')&&d.open){toggleAlerts(false);return}
@@ -2302,7 +2306,6 @@ document.addEventListener('click',e=>{const t=e.target.closest&&e.target.closest
   if(t.closest('#add-stats')){statPanelOpen($('sp-panel').hidden);return}
   if(d.drop){toggleStat(d.drop,false);return}
   if(t.id==='sp-clear'){STATS_ON=[];saveStats();renderPlayers();return}
-  if(!t.closest('#sp-panel'))statPanelOpen(false);
   if(d.ssfa!==undefined){SS_FA=d.ssfa==='1';renderStartSit();const b=$('ss-add');if(b)b.focus();return}
   if(d.dr){drView=d.dr;clearTimeout(DR_TIMER);renderDraft();return}
   if(d.dpos){drPos=d.dpos;renderDraft();return}
