@@ -828,21 +828,17 @@ function syncTeamCount(){const n=S.league.teams;while(S.teams.length<n)S.teams.p
   while(S.teams.length>n){const i=S.teams.map(T=>T.id).lastIndexOf(S.teams.filter(T=>T.id!==S.me).pop().id);S.teams.splice(i,1)}}
 
 /* ===== MY TEAM ===== */
+const irApp=()=>(S.real&&S.real.src&&({sleeper:'Sleeper',espn:'ESPN'})[S.real.src.type])||'your league app';
 function irPill(id,IRS){if(!IRS.cand.includes(id))return '';const p=byId[id],why=IR_WHY[stOf(id)]||'injured';
-  return IRS.open?`<button class="ir-pill" data-ir-on="${id}" title="${esc(p.n)} is ${why}. Moving him to your open IR slot frees a roster spot.">Move to IR</button>`
-    :`<span class="ir-pill full" title="${esc(p.n)} is ${why}, but your IR slots are full.">IR eligible</span>`}
+  return `<span class="ir-pill${IRS.open?'':' full'}" title="${esc(p.n)} is ${why}${IRS.open?` and you have an open IR slot. Move him there in ${irApp()} to free a roster spot.`:', but your IR slots are full.'}">IR eligible</span>`}
 function renderIR(me,IRS){const el=$('ir-card');if(!el)return;const n=irSlots();
   el.hidden=!(n>0&&(IRS.ir.length||IRS.cand.length));if(el.hidden){el.innerHTML='';return}
-  const plat=S.real&&S.real.src?({sleeper:'Sleeper',espn:'ESPN'})[S.real.src.type]:null;
+  const plat=S.real&&S.real.src?({sleeper:'Sleeper',espn:'ESPN'})[S.real.src.type]:null,app=irApp();
   const row=id=>{const p=byId[id],s=stOf(id),stale=IRS.stale.includes(id);
-    return `<div class="lrow ir-row${stale?' stale':''}" data-open="${id}"><span class="slot">IR</span><div class="pl">${av(p)}<div class="meta"><span style="display:flex;gap:6px;align-items:center;min-width:0"><button class="pname" data-open="${id}">${esc(p.n)}</button>${stHtml(id)}</span><span class="psub">${p.pos}${V.posRank[id]} · ${p.t} · ${stale?'<b class="ir-warn">Healthy again. Activate him.</b>':esc(s?ST_LABEL[s]:'No designation')}</span></div></div><button class="btn small${stale?' accent':''}" data-ir-off="${id}">Activate</button></div>`};
-  const open=Array.from({length:IRS.open},()=>`<div class="lrow ir-open" style="cursor:default"><span class="slot">IR</span><span class="empty">${IRS.cand.length?`Open. ${esc(byId[IRS.cand[0]].n)} can go here.`:'Open slot'}</span><span></span></div>`).join('');
+    return `<div class="lrow ir-row${stale?' stale':''}" data-open="${id}"><span class="slot">IR</span><div class="pl">${av(p)}<div class="meta"><span style="display:flex;gap:6px;align-items:center;min-width:0"><button class="pname" data-open="${id}">${esc(p.n)}</button>${stHtml(id)}</span><span class="psub">${p.pos}${V.posRank[id]} · ${p.t} · ${stale?`<b class="ir-warn">Healthy again. Activate him in ${esc(app)}.</b>`:esc(s?ST_LABEL[s]:'No designation')}</span></div></div><span></span></div>`};
+  const open=Array.from({length:IRS.open},()=>`<div class="lrow ir-open" style="cursor:default"><span class="slot">IR</span><span class="empty">${IRS.cand.length?`Open. ${esc(byId[IRS.cand[0]].n)} can go here in ${esc(app)}.`:'Open slot'}</span><span></span></div>`).join('');
   el.innerHTML=`<div class="card-h"><h2>Injured reserve</h2><span class="note">${IRS.ir.length} of ${n} slot${n===1?'':'s'} used</span></div>${IRS.ir.map(row).join('')}${open}
-    ${IRS.cand.length&&!IRS.open?`<p class="note ir-foot">${IRS.cand.map(id=>esc(byId[id].n)).join(', ')} ${IRS.cand.length===1?'is':'are'} IR eligible, but your IR is full.</p>`:''}${plat?`<p class="note ir-foot">Moves here update TradeMetric only. Make the same move in ${plat}; the next sync confirms it.</p>`:''}`}
-function moveIR(id,on){const T=myTeam();if(!T)return;const IRS=irState(T),p=byId[id];
-  if(on){if(!IRS.open){toast('Your IR slots are full');return}T.ir=[...new Set([...irOf(T),id])];toast(`${p.n} moved to IR`)}
-  else{T.ir=irOf(T).filter(x=>x!==id);toast(`${p.n} activated from IR`)}
-  save();recompute();render()}
+    ${IRS.cand.length&&!IRS.open?`<p class="note ir-foot">${IRS.cand.map(id=>esc(byId[id].n)).join(', ')} ${IRS.cand.length===1?'is':'are'} IR eligible, but your IR is full.</p>`:''}<p class="note ir-foot">${plat?`Synced from ${plat}. Make IR moves there and they show up here within a few minutes.`:'Make IR moves in your league app.'}</p>`}
 function renderTeam(){
   const me=myTeam(),st=teamStats(),mine=st.rows.find(r=>r.T.id===S.me),RL=realLineup(S.me);
   const IRS=irState(me),act=activeOf(me);
@@ -1741,8 +1737,6 @@ document.addEventListener('click',e=>{
   else if(t.id==='set-me'){S.me=hubSel;S.example=false;upsertLeague();bump();toast(teamById(S.me).name+' is now your team')}
   else if(d.assignMe){assign(d.assignMe,S.me);toast('Added '+byId[d.assignMe].n);render()}
   else if(d.unassign){const n=byId[d.unassign].n;assign(d.unassign,null);toast('Removed '+n);render()}
-  else if(d.irOn){moveIR(d.irOn,true)}
-  else if(d.irOff){moveIR(d.irOff,false)}
   else if(d.give){if(TD.give.includes(d.give))TD.give=TD.give.filter(x=>x!==d.give);else{TD.give=[...TD.give,d.give];TD.fresh=d.give}renderTrade()}
   else if(d.rpos){rosPos=d.rpos;t.parentNode.querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed',b===t));renderTrade()}
   else if(d.get){if(TD.get.includes(d.get)){TD.get=TD.get.filter(x=>x!==d.get);renderTrade();return}if(TD.get.length&&OWN[TD.get[0]]!==OWN[d.get]){TD.get=[];toast('Started a new deal with '+teamById(OWN[d.get]).name)}TD.get.push(d.get);TD.fresh=d.get;renderTrade();const sb=$('targets').closest('.scrollbox');if(sb)sb.scrollTop=0}
@@ -2551,8 +2545,8 @@ function alertsList(){const me=S&&myTeam&&myTeam();if(!me||!V||!G)return [];cons
     if(st.has(id)&&!g.next)out.push({k:`bye-${WEEK}-${id}`,lvl:'warn',t:`${p.n} is on bye in Week ${WEEK}`,d:RL?'He is in your starting lineup. Start someone else.':'One of your usual starters. Your lineup on My Team already works around him.',open:id});
     if(g.tag==='sell')out.push({k:`sell-${WEEK}-${id}`,lvl:'info',t:`Sell-high window: ${p.n}`,d:g.sellWhy||'He is scoring above what his role supports.',open:id})});
   const IRS=irState(me);
-  if(IRS.open)IRS.cand.slice(0,IRS.open).forEach(id=>out.push({k:`ir-${id}-${stOf(id)}`,lvl:'warn',t:`Move ${byId[id].n} to IR`,d:`He is ${IR_WHY[stOf(id)]||'injured'} and you have an open IR slot. Moving him frees a roster spot.`,open:id}));
-  IRS.stale.forEach(id=>out.push({k:`iract-${WEEK}-${id}`,lvl:'bad',t:`Activate ${byId[id].n} from IR`,d:'He no longer has an IR-eligible designation. Most apps block adds and trades until you move him off IR.',open:id}));
+  if(IRS.open)IRS.cand.slice(0,IRS.open).forEach(id=>out.push({k:`ir-${id}-${stOf(id)}`,lvl:'warn',t:`Move ${byId[id].n} to IR`,d:`He is ${IR_WHY[stOf(id)]||'injured'} and you have an open IR slot. Move him there in ${irApp()} to free a roster spot.`,open:id}));
+  IRS.stale.forEach(id=>out.push({k:`iract-${WEEK}-${id}`,lvl:'bad',t:`Activate ${byId[id].n} from IR`,d:`He no longer has an IR-eligible designation. Activate him in ${irApp()}; most apps block adds and trades until you do.`,open:id}));
   OPPS.filter(o=>!OWN[o.id]&&o.dp>=2).sort((a,b)=>b.dp-a.dp).slice(0,3).forEach(o=>out.push({k:`pick-${WEEK}-${o.id}`,lvl:'good',t:`Pickup: ${byId[o.id].n}`,d:oppTxtLine(o),open:o.id}));
   return out}
 function renderAlerts(){const b=$('alert-btn');if(!b)return;const L=USER?alertsList():[],seen=seenAlerts(),n=L.filter(a=>!seen.has(a.k)).length+(USER&&typeof tmnUnread==='function'&&tab!=='news'?tmnUnread():0);
