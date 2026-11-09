@@ -256,7 +256,8 @@ function tmnRender(){const el=$('news-body');if(!el)return;tmnWeek();TMN.unread=
       ${Ls.length>1?`<select id="tmn-lg" class="tmn-lgsel" aria-label="League"><option value="all">All leagues</option>${Ls.map(c=>`<option value="${esc(c.key)}" ${TMN.lg===c.key?'selected':''}>${esc(c.name)}</option>`).join('')}</select>`:''}</div>
     <div class="tmn-feed" id="tmn-feed"></div>`;
   tmnRenderBody(Ls,mood)}
-function tmnNowHtml(Ls,mood){const M=Ls.filter(c=>c.opp);if(!M.length)return '';
+/* real leagues only: the sample league's made-up matchup is never shown here */
+function tmnNowHtml(Ls,mood){const M=Ls.filter(c=>c.opp&&c.key!=='sample'&&!(c.cur&&S.example));if(!M.length)return '';
   return `<div class="tmn-now" aria-label="Your matchups">${M.map(c=>{const o=c.opp,st=o.final?'Final':o.live?'Live':o.started?'In progress':'Projected',show=o.started,a=show?o.now:o.m,b=show?o.onow:o.om,on=tmnOn(c.key),w=Math.round(o.wp*100),sel=TMN.lg===c.key;
     const res=o.final?(o.now>o.onow?'won':o.now<o.onow?'lost':''):'';
     return `<a class="tmn-mu${res?' '+res:''}${sel?' sel':''}" href="#news" data-nlg="${esc(c.key)}" aria-pressed="${sel}"><div class="tmn-mu-h"><b>${esc(c.name)}</b><span class="tmn-mu-st${o.live?' on':''}">${o.live?'<span class="live-dot on"></span>':''}${st}</span></div>
