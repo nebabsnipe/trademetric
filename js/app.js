@@ -885,53 +885,71 @@ function renderRankings(){
   const cap=q||RANK_ALL?L.length:300,more=L.length-cap;L.length=Math.min(L.length,cap);
   setTimeout(()=>{const m=$('rank-more');if(m)m.innerHTML=more>0?`<button class="btn" id="rank-all">Show all ${(L.length+more).toLocaleString()} players</button>`:''},0);
   $('rank-body').innerHTML=L.map(p=>{const g=G[p.id],o=OWN[p.id];return `<tr><td class="r num">${V.rank[p.id]}</td><td data-v="${esc(p.n.toLowerCase())}"><div class="pl">${av(p,'sm')}<div class="meta"><span style="display:flex;gap:6px;align-items:center"><button class="pname" data-open="${p.id}">${esc(p.n)}</button>${o!==S.me?followBtn(p.id,true):''}${tagHtml(p.id)}${g.risk?'<span class="badge risk" title="Risk: open the player to see why">RISK</span>':''}${g.opp.length?'<span class="badge opp" title="More work with a teammate out">UP</span>':''}</span><span class="psub">${p.t} · ${oppHtml(p.id)}</span>${rankOwn==='buy'&&g.buy?`<span class="why-line">${esc(g.buy[0])}</span>`:rankOwn==='risk'&&g.risk?`<span class="why-line">${esc(g.risk[0])}</span>`:rankOwn==='opp'&&g.opp.length?`<span class="why-line">${esc(oppTxtLine(g.opp[0]))}</span>`:''}</div></div></td>
-    <td data-v="${p.pos}${String(V.posRank[p.id]).padStart(3,'0')}"><span class="pos ${p.pos}">${p.pos}${V.posRank[p.id]}</span></td><td class="r strong" data-v="${g.next?g.projNext.toFixed(2):-1}">${g.next?f1(g.projNext):'<span class="tag bye">Bye</span>'}</td><td class="r num">${f1(V.pts[p.id])}</td><td class="r num" data-v="${g.xr||999}">${g.xr?p.pos+g.xr:'<span class="muted">-</span>'}</td><td class="r" data-v="${g.trendPct===null?-9:g.trendPct.toFixed(3)}">${trendHtml(g.trendPct)}</td><td class="r num" data-v="${g.tshare===null?-1:g.tshare.toFixed(1)}">${g.tshare===null?'<span class="muted">-</span>':Math.round(g.tshare)+'%'}</td><td class="r num" data-v="${g.snap===null?-1:g.snap.toFixed(1)}">${g.snap===null?'<span class="muted">-</span>':Math.round(g.snap)+'%'}</td><td class="r num" data-v="${g.oppg===null?-1:g.oppg.toFixed(2)}">${g.oppg===null?'<span class="muted">-</span>':f1(g.oppg)}</td>${statCell(g)}<td data-v="${o?esc(teamById(o).name.toLowerCase()):'zzzz'}">${ownerHtml(p.id)}</td></tr>`}).join('')||'<tr><td colspan="12" class="empty">No players match.</td></tr>';
-  applyStat();sortTable('rank-table');
+    <td data-v="${p.pos}${String(V.posRank[p.id]).padStart(3,'0')}"><span class="pos ${p.pos}">${p.pos}${V.posRank[p.id]}</span></td><td class="r strong" data-v="${g.next?g.projNext.toFixed(2):-1}">${g.next?f1(g.projNext):'<span class="tag bye">Bye</span>'}</td><td class="r num">${f1(V.pts[p.id])}</td><td class="r num" data-v="${g.xr||999}">${g.xr?p.pos+g.xr:'<span class="muted">-</span>'}</td><td class="r" data-v="${g.trendPct===null?-9:g.trendPct.toFixed(3)}">${trendHtml(g.trendPct)}</td><td class="r num" data-v="${g.tshare===null?-1:g.tshare.toFixed(1)}">${g.tshare===null?'<span class="muted">-</span>':Math.round(g.tshare)+'%'}</td><td class="r num" data-v="${g.snap===null?-1:g.snap.toFixed(1)}">${g.snap===null?'<span class="muted">-</span>':Math.round(g.snap)+'%'}</td><td class="r num" data-v="${g.oppg===null?-1:g.oppg.toFixed(2)}">${g.oppg===null?'<span class="muted">-</span>':f1(g.oppg)}</td>${statCells(g)}<td data-v="${o?esc(teamById(o).name.toLowerCase()):'zzzz'}">${ownerHtml(p.id)}</td></tr>`}).join('')||'<tr><td colspan="27" class="empty">No players match.</td></tr>';
+  applyStats();sortTable('rank-table');
 }
 
 /* ===== Table sorting ===== */
 const SORTS={'tgt-table':{col:2,dir:'desc'},'sim-table':{col:4,dir:'desc'}};
-/* One flexible column. Pick a stat and it appears, sorted, instead of
-   meeting twenty-seven columns at once. */
+/* Add stats: pick the metrics you want and they become columns. */
 const STATS=[
- ['oppT','OPP','Volume','i','Opportunities: carries plus targets this season'],
- ['tgtT','Tgt','Volume','i','Targets this season'],
- ['carT','Car','Volume','i','Carries this season'],
- ['cshare','Car %','Volume','%',"Share of his team's carries"],
- ['rz','RZ opp','Volume','i','Carries plus targets inside the 20'],
- ['rz10','Inside 10','Volume','i','Carries plus targets inside the 10'],
- ['ayshare','AY %','Usage','%',"Share of his team's air yards. Goes negative for backs targeted behind the line"],
- ['wopr','WOPR','Usage','w','Weighted opportunity: 1.5 x target share + 0.7 x air-yards share. 0.70 and up is alpha-receiver usage'],
- ['fp','FP','Scoring','1',"Fantasy points scored this season, in your league's scoring"],
- ['fpg','FP/G','Scoring','1','Fantasy points per game so far. Pts/G is the projection; this is what he has actually scored'],
- ['td','TD','Scoring','i','All touchdowns: passing, rushing and receiving'],
- ['xfp','xFP','Expected','1','Expected fantasy points from his opportunities. Full PPR'],
- ['xfpg','xFP/G','Expected','1','Expected fantasy points per game. Full PPR'],
- ['fpoe','FPOE','Expected','s','Points over expected: what he scored minus what his chances were worth. Full PPR'],
- ['xtd','xTD','Expected','1','Touchdowns his chances were worth'],
- ['tdoe','TDOE','Expected','s','Touchdowns over expected']];
+ ['oppT','OPP','Volume','i','Opportunities: carries plus targets this season','Carries plus targets'],
+ ['tgtT','Tgt','Volume','i','Targets this season','Targets this season'],
+ ['carT','Car','Volume','i','Carries this season','Carries this season'],
+ ['cshare','Car %','Volume','%',"Share of his team's carries",'Share of team carries'],
+ ['rz','RZ opp','Volume','i','Carries plus targets inside the 20','Touches inside the 20'],
+ ['rz10','Inside 10','Volume','i','Carries plus targets inside the 10','Touches inside the 10'],
+ ['ayshare','AY %','Usage','%',"Share of his team's air yards. Goes negative for backs targeted behind the line",'Share of team air yards'],
+ ['wopr','WOPR','Usage','w','Weighted opportunity: 1.5 x target share + 0.7 x air-yards share. 0.70 and up is alpha-receiver usage','How often and how deep, in one number'],
+ ['fp','FP','Scoring','1',"Fantasy points scored this season, in your league's scoring",'Points scored so far'],
+ ['fpg','FP/G','Scoring','1','Fantasy points per game so far. Pts/G is the projection; this is what he has actually scored','Points per game, actual'],
+ ['td','TD','Scoring','i','All touchdowns: passing, rushing and receiving','All touchdowns'],
+ ['xfp','xFP','Expected','1','Expected fantasy points from his opportunities. Full PPR','What his chances were worth'],
+ ['xfpg','xFP/G','Expected','1','Expected fantasy points per game. Full PPR','What his chances were worth, per game'],
+ ['fpoe','FPOE','Expected','s','Points over expected: what he scored minus what his chances were worth. Full PPR','Whether he has been lucky'],
+ ['xtd','xTD','Expected','1','Touchdowns his chances were worth','Touchdowns he should have'],
+ ['tdoe','TDOE','Expected','s','Touchdowns over expected','Touchdown luck']];
 const STAT_BY=Object.fromEntries(STATS.map(x=>[x[0],x]));
-let STAT='';try{STAT=localStorage.getItem('tm_stat')||''}catch(e){}
-if(STAT&&!STAT_BY[STAT])STAT='';
-function statCell(g){
-  if(!STAT)return '<td class="r num flexcol" data-v="-9999"></td>';
-  const f=STAT_BY[STAT][3],v=g[STAT];
-  if(v===null||v===undefined||!isFinite(v))return '<td class="r num flexcol" data-v="-9999"><span class="muted">-</span></td>';
-  const t=f==='%'?Math.round(v)+'%':f==='w'?v.toFixed(2):f==='i'?String(Math.round(v)):f==='s'?(v>0?'+':'')+f1(v):f1(v);
-  return `<td class="r num flexcol${f==='s'?(v>0?' up':v<0?' down':''):''}" data-v="${v.toFixed(3)}">${t}</td>`}
-function fillStatPick(){const el=$('stat-pick');if(!el||el.dataset.built)return;
+let STATS_ON=[];try{STATS_ON=(JSON.parse(localStorage.getItem('tm_stats')||'[]')).filter(k=>STAT_BY[k])}catch(e){STATS_ON=[]}
+const statOrder=()=>STATS.filter(x=>STATS_ON.includes(x[0])).map(x=>x[0]);
+function saveStats(){try{localStorage.setItem('tm_stats',JSON.stringify(STATS_ON))}catch(e){}}
+function fmtStat(v,f){return f==='%'?Math.round(v)+'%':f==='w'?v.toFixed(2):f==='i'?String(Math.round(v)):f==='s'?(v>0?'+':'')+f1(v):f1(v)}
+function statCells(g){return STATS.map(x=>{const on=STATS_ON.includes(x[0]),v=g[x[0]];
+  if(!on)return `<td class="sc sc-${x[0]} r num" data-v="-9999"></td>`;
+  if(v===null||v===undefined||!isFinite(v))return `<td class="sc sc-${x[0]} r num on" data-v="-9999"><span class="muted">-</span></td>`;
+  const cls=x[3]==='s'?(v>0?' up':v<0?' down':''):'';
+  return `<td class="sc sc-${x[0]} r num on${cls}" data-v="${v.toFixed(3)}">${fmtStat(v,x[3])}</td>`}).join('')}
+function buildStatHead(){const tr=document.querySelector('#rank-table thead tr');if(!tr||tr.dataset.sc)return;
+  const last=tr.lastElementChild;
+  STATS.forEach(x=>{const th=document.createElement('th');
+    th.className='sc sc-'+x[0]+' r';th.dataset.sort='';th.title=x[4];
+    th.textContent=x[1][0]==='x'?'x'+x[1].slice(1).toUpperCase():x[1].toUpperCase();
+    tr.insertBefore(th,last)});
+  tr.dataset.sc='1'}
+function buildStatPanel(){const el=$('sp-panel');if(!el||el.dataset.built)return;
   const groups=[...new Set(STATS.map(x=>x[2]))];
-  el.innerHTML='<option value="">Nothing extra</option>'+groups.map(gr=>
-    `<optgroup label="${gr}">${STATS.filter(x=>x[2]===gr).map(x=>`<option value="${x[0]}">${esc(x[1])}</option>`).join('')}</optgroup>`).join('');
-  el.value=STAT;el.dataset.built='1'}
-function applyStat(){const t=$('rank-table'),th=$('stat-th'),nt=$('stat-note');if(!t||!th)return;
-  fillStatPick();t.classList.toggle('has-stat',!!STAT);
-  const col=[...th.parentNode.children].indexOf(th);
-  if(STAT){const x=STAT_BY[STAT];
-    /* headers are uppercased in CSS, but the lower-case x in xFP is the whole
-       point -- it is what separates expected from actual. Keep it. */
-    th.textContent=x[1][0]==='x'?'x'+x[1].slice(1).toUpperCase():x[1].toUpperCase();th.title=x[4];nt.textContent=x[4];SORTS['rank-table']={col,dir:'desc'}}
-  else{th.textContent='';th.removeAttribute('title');nt.textContent='';delete SORTS['rank-table']}}function trendHtml(x){if(x===null)return '<span class="muted">-</span>';const v=Math.round(x*100);return `<span class="delta ${v>=10?'up':v<=-10?'down':'flat'}">${v>0?'▲':v<0?'▼':''}${Math.abs(v)}%</span>`}
+  el.innerHTML='<div class="sp-head"><b>Add stats</b><button class="linkish" id="sp-clear">Clear all</button></div><div class="sp-body">'+
+    groups.map(gr=>`<div class="sp-group"><span class="sp-gl">${gr}</span>`+
+      STATS.filter(x=>x[2]===gr).map(x=>`<label class="sp-row"><input type="checkbox" data-stat="${x[0]}"><span class="sp-txt"><b>${esc(x[1])}</b><span>${esc(x[5])}</span></span><span class="sp-tick" aria-hidden="true"></span></label>`).join('')+
+      '</div>').join('')+'</div>';
+  el.dataset.built='1'}
+function applyStats(){const t=$('rank-table');if(!t)return;
+  buildStatHead();buildStatPanel();
+  STATS.forEach(x=>t.classList.toggle('on-'+x[0],STATS_ON.includes(x[0])));
+  t.classList.toggle('has-stats',STATS_ON.length>0);
+  const c=$('as-count');if(c){c.textContent=STATS_ON.length;c.hidden=!STATS_ON.length}
+  document.querySelectorAll('#sp-panel input[data-stat]').forEach(i=>{i.checked=STATS_ON.includes(i.dataset.stat)});
+  const ch=$('as-chips');
+  if(ch)ch.innerHTML=statOrder().map(k=>`<button class="as-chip" data-drop="${k}" title="Remove ${esc(STAT_BY[k][1])}">${esc(STAT_BY[k][1])}<span aria-hidden="true">&times;</span></button>`).join('');
+  if(STATS_ON.length===0&&SORTS['rank-table'])delete SORTS['rank-table']}
+function toggleStat(k,on){
+  STATS_ON=on?STATS_ON.concat([k]).filter((v,i,a)=>a.indexOf(v)===i):STATS_ON.filter(x=>x!==k);
+  saveStats();renderPlayers();
+  if(on){const th=document.querySelector('#rank-table thead th.sc-'+k);
+    if(th){SORTS['rank-table']={col:[...th.parentNode.children].indexOf(th),dir:'desc'};sortTable('rank-table')}}}
+function statPanelOpen(v){const b=$('add-stats'),p=$('sp-panel');if(!b||!p)return;
+  p.hidden=!v;b.setAttribute('aria-expanded',v?'true':'false')}
+function trendHtml(x){if(x===null)return '<span class="muted">-</span>';const v=Math.round(x*100);return `<span class="delta ${v>=10?'up':v<=-10?'down':'flat'}">${v>0?'▲':v<0?'▼':''}${Math.abs(v)}%</span>`}
 function sortTable(id){const tbl=document.getElementById(id);if(!tbl)return;const st=SORTS[id];
   [...tbl.querySelectorAll('thead th')].forEach((th,i)=>{const on=!!st&&st.col===i;th.classList.toggle('sorted',on);if(on)th.dataset.dir=st.dir;else delete th.dataset.dir});
   if(id==='tgt-table')document.querySelectorAll('#tgt-sort button').forEach(b=>b.setAttribute('aria-pressed',!!st&&+b.dataset.tsort===st.col));
@@ -2281,6 +2299,10 @@ document.addEventListener('click',e=>{const t=e.target.closest&&e.target.closest
   if(d.vpos){valPos=d.vpos;renderValues();return}
   if(t.id==='val-all'){VAL_ALL=true;renderValues();return}
   if(d.ssrm){SS=SS.filter(x=>x!==d.ssrm);renderStartSit();return}
+  if(t.closest('#add-stats')){statPanelOpen($('sp-panel').hidden);return}
+  if(d.drop){toggleStat(d.drop,false);return}
+  if(t.id==='sp-clear'){STATS_ON=[];saveStats();renderPlayers();return}
+  if(!t.closest('#sp-panel'))statPanelOpen(false);
   if(d.ssfa!==undefined){SS_FA=d.ssfa==='1';renderStartSit();const b=$('ss-add');if(b)b.focus();return}
   if(d.dr){drView=d.dr;clearTimeout(DR_TIMER);renderDraft();return}
   if(d.dpos){drPos=d.dpos;renderDraft();return}
@@ -2294,7 +2316,7 @@ document.addEventListener('click',e=>{const t=e.target.closest&&e.target.closest
 function confirmLiveReset(){const b=$('dr-reset');if(b.dataset.armed){return true}b.dataset.armed='1';b.textContent='Tap again to clear';setTimeout(()=>{if(b.isConnected){delete b.dataset.armed;b.textContent='Clear draft'}},3000);return false}
 document.addEventListener('change',e=>{const t=e.target;
   if(t.id==='ss-add')ssAdd();
-  if(t.id==='stat-pick'){STAT=t.value;try{localStorage.setItem('tm_stat',STAT)}catch(e){}renderPlayers()}
+  if(t.dataset.stat!==undefined)toggleStat(t.dataset.stat,t.checked)
   else if(t.id==='dr-slot'||t.id==='dr-slot-live'){DR.slot=+t.value;saveLive();renderDraft()}
   else if(t.id==='dr-teams'||t.id==='dr-teams-live'){DR.n=+t.value;DR.slot=Math.min(DR.slot,DR.n);saveLive();renderDraft()}
   else if(t.id==='dr-rounds'){DR.R=+t.value;renderDraft()}});

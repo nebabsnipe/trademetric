@@ -76,9 +76,15 @@
       
     </div>
     <p class="note" id="rank-note" hidden style="margin:0;max-width:85ch"></p>
-      <div class="statbar"><label class="sb-label" for="stat-pick">Show</label><select id="stat-pick"></select><span class="note" id="stat-note"></span></div>
+      <div class="statbar">
+        <div class="statpick">
+          <button class="addstat" id="add-stats" aria-expanded="false" aria-haspopup="true"><span class="as-plus" aria-hidden="true">+</span>Add stats<span class="as-count" id="as-count" hidden></span></button>
+          <div class="sp-panel" id="sp-panel" hidden role="dialog" aria-label="Add stats to the table"></div>
+        </div>
+        <div class="as-chips" id="as-chips"></div>
+      </div>
     <div class="tablebox"><table id="rank-table" style="min-width:1110px">
-      <thead><tr><th class="r" data-sort data-first="asc">#</th><th data-sort data-first="asc">Player</th><th data-sort data-first="asc">Pos</th><th class="r" data-sort>Wk <span class="wk-num">9</span></th><th class="r" data-sort title="Projected points per game for the rest of the season">Pts/G</th><th class="r" data-sort data-first="asc" title="FantasyPros expert consensus rank at his position for the rest of the season">Experts</th><th class="r" data-sort title="Last 3 games compared with his season average">Trend</th><th class="r" data-sort title="Share of his team's targets">Tgt share</th><th class="r" data-sort title="Share of his team's offensive snaps">Snap %</th><th class="r" data-sort title="Carries plus targets per game">Opp/G</th><th class="r flexcol" id="stat-th" data-sort></th><th data-sort data-first="asc">League team</th></tr></thead>
+      <thead><tr><th class="r" data-sort data-first="asc">#</th><th data-sort data-first="asc">Player</th><th data-sort data-first="asc">Pos</th><th class="r" data-sort>Wk <span class="wk-num">9</span></th><th class="r" data-sort title="Projected points per game for the rest of the season">Pts/G</th><th class="r" data-sort data-first="asc" title="FantasyPros expert consensus rank at his position for the rest of the season">Experts</th><th class="r" data-sort title="Last 3 games compared with his season average">Trend</th><th class="r" data-sort title="Share of his team's targets">Tgt share</th><th class="r" data-sort title="Share of his team's offensive snaps">Snap %</th><th class="r" data-sort title="Carries plus targets per game">Opp/G</th><th data-sort data-first="asc">League team</th></tr></thead>
       <tbody id="rank-body"></tbody></table></div>
       <div id="rank-more" class="rank-more"></div>
     </div>
