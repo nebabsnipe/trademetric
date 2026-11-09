@@ -1721,7 +1721,7 @@ function acctAvatar(){const md=USER&&USER.user_metadata||{};return md.avatar_url
 function avatarHtml(cls){const a=acctAvatar(),n=acctName();return a?`<span class="${cls}"><img src="${esc(a)}" alt="" referrerpolicy="no-referrer"></span>`:`<span class="${cls}">${esc((n[0]||'•').toUpperCase())}</span>`}
 function acctUI(){const b=$('acct-btn');if(b){if(USER){b.innerHTML=avatarHtml('acct-av');b.classList.add('in');b.title=acctName()?'Account: '+acctName():'Account';b.setAttribute('aria-label',b.title)}else{b.textContent='Sign in';b.classList.remove('in');b.title='';b.removeAttribute('aria-label')}}
   if(tab==='signin')renderSignin();else if(tab==='account'&&!ACC_EDIT&&USER)renderAccount()}
-function suggestUsername(){const md=USER&&USER.user_metadata||{},src=md.user_name||md.preferred_username||md.full_name||md.name||(USER&&USER.email||'').split('@')[0]||'';return src.toLowerCase().replace(/[^a-z0-9_]+/g,'_').replace(/^_+|_+$/g,'').slice(0,20)}
+function suggestUsername(){const md=USER&&USER.user_metadata||{},src=md.username||md.user_name||md.preferred_username||md.full_name||md.name||(USER&&USER.email||'').split('@')[0]||'';return src.toLowerCase().replace(/[^a-z0-9_]+/g,'_').replace(/^_+|_+$/g,'').slice(0,20)}
 
 /* ---- Sign-in page */
 function friendly(m){m=String(m||'');

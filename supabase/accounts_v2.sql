@@ -35,3 +35,9 @@ language sql security definer set search_path = public stable as $$
     select 1 from public.profiles
     where username = lower(p_username) and (auth.uid() is null or id <> auth.uid()));
 $$;
+-- Backfill usernames for accounts created before the profiles table existed (skips clashes and invalid names).
+insert into public.profiles (id, username)
+select u.id, lower(u.raw_user_meta_data->>'username') from auth.users u
+where u.raw_user_meta_data ? 'username' and lower(u.raw_user_meta_data->>'username') ~ '^[a-z0-9_]{3,20}$'
+  and not exists (select 1 from public.profiles p where p.id = u.id)
+on conflict do nothing;
