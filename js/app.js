@@ -927,7 +927,10 @@ function fillStatPick(){const el=$('stat-pick');if(!el||el.dataset.built)return;
 function applyStat(){const t=$('rank-table'),th=$('stat-th'),nt=$('stat-note');if(!t||!th)return;
   fillStatPick();t.classList.toggle('has-stat',!!STAT);
   const col=[...th.parentNode.children].indexOf(th);
-  if(STAT){const x=STAT_BY[STAT];th.textContent=x[1];th.title=x[4];nt.textContent=x[4];SORTS['rank-table']={col,dir:'desc'}}
+  if(STAT){const x=STAT_BY[STAT];
+    /* headers are uppercased in CSS, but the lower-case x in xFP is the whole
+       point -- it is what separates expected from actual. Keep it. */
+    th.textContent=x[1][0]==='x'?'x'+x[1].slice(1).toUpperCase():x[1].toUpperCase();th.title=x[4];nt.textContent=x[4];SORTS['rank-table']={col,dir:'desc'}}
   else{th.textContent='';th.removeAttribute('title');nt.textContent='';delete SORTS['rank-table']}}function trendHtml(x){if(x===null)return '<span class="muted">-</span>';const v=Math.round(x*100);return `<span class="delta ${v>=10?'up':v<=-10?'down':'flat'}">${v>0?'▲':v<0?'▼':''}${Math.abs(v)}%</span>`}
 function sortTable(id){const tbl=document.getElementById(id);if(!tbl)return;const st=SORTS[id];
   [...tbl.querySelectorAll('thead th')].forEach((th,i)=>{const on=!!st&&st.col===i;th.classList.toggle('sorted',on);if(on)th.dataset.dir=st.dir;else delete th.dataset.dir});

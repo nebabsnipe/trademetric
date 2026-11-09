@@ -973,6 +973,7 @@ a.btn{text-decoration:none;display:inline-flex;align-items:center}
 .statbar .sb-label{font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
 #rank-table .flexcol{display:none}
 #rank-table.has-stat .flexcol{display:table-cell}
+#rank-table #stat-th{text-transform:none}
 .statbar select{max-width:200px}
 .statbar .note{font-size:12px}
 /* once the table is wider than the screen you lose track of whose row you are on */
