@@ -1466,3 +1466,8 @@ body.signed-out .alerts-wrap{display:none}
   .cmp-impact span:last-child{margin-left:0}
 }
 @media (prefers-reduced-motion:no-preference){.bal-mark{transition:left .45s cubic-bezier(.3,1.4,.5,1)}}
+/* week tag on a number that isn't this week's projection (next week's, or a final score) */
+.wk-tag{display:block;font-size:9.5px;font-weight:600;letter-spacing:.03em;text-transform:uppercase;color:var(--muted);line-height:1.1;margin-top:1px}
+/* trade partner's players float to the top of the target list */
+.tgt-table tr.pin td{background:color-mix(in srgb,var(--accent) 6%,transparent)}
+.tgt-table tr.pin-last td{border-bottom:2px solid color-mix(in srgb,var(--accent) 40%,var(--line))}
