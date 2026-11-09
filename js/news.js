@@ -103,13 +103,13 @@ const TMN_COPY={
   run:['{last} finds a crease and picks up {y}.','Chunk run. {p} for {y} yards.','{last} bounces it outside for {y}.','{p} shakes loose for {y} against the {nick}.','Big gain on the ground. {last} for {y}, {qtxt}.','{last} breaks two tackles and rumbles for {y}.'],
   catch:['Deep shot connects. {p} hauls in {y}.','{last} gets behind the {nick} secondary for {y}.','Moonball. {last} tracks it down for {y} yards.','{p} climbs the ladder for a {y}-yard grab.','{y} yards through the air to {last}.','Big-time catch. {last} goes up and gets it for {y}.'],
   game:['{p} is having a monster day. {pts} points and counting.','{pts} already. {last} is carrying your lineup.','League-winner stuff. {p} is up to {pts}.','{last} just crossed {pts}, and he\'s not done.','{p} is cooking the {nick}. {pts} points so far.'],
-  gameX:['{p} is playing way above his number. {x}x his projection.','Projected for {pr}, already at {pts}. {last} is cooking.','Nobody saw this coming. {last} has {pts} on a {pr}-point projection.','Found money. {p} is at {x}x his projection.','{last} was a {pr}-point guy this week. He\'s at {pts}.'],
+  gameX:['{p} is going off. {pts} points and counting.','{pts} for {last} today, and he\'s not slowing down.','Found money. {last} is up to {pts}.','{last} is carrying your lineup with {pts}.','Big day for {p}: {pts} points against the {nick}.'],
   oinj:['Break your way: {p} is out for {opp}.','{opp} just lost {p}. Your odds go up.','{p} won\'t return. {opp} is down a starter.','Bad news for {opp}: {p} is done for the day.'],
   opp:['{opp}\'s {last} rips off {y}. Hang in there.','Their {p} hits one for {y}.','{last} just gained {y} for {opp}.'],
   oppTd:['{opp}\'s {p} scores. Time to answer.','Touchdown against you. {p} for {opp}.','{last} finds the end zone for {opp}.'],
 };
 const TMN_LBL={clinch:['Clincher','gold'],clinch0:['Clincher','gold'],swing:['Lead change','good'],longtd:['Long touchdown','good'],td:['Touchdown','good'],td2:['Second TD','good'],td3:['Hat trick','good'],tdN:['Touchdown','good'],
-  bigrun:['Breakaway','accent'],run:['Big run','accent'],catch:['Deep ball','accent'],game:['Going off','accent'],gameX:['Going off','accent'],oinj:['Opponent hurt','warn'],opp:['Against you','muted'],oppTd:['Against you','muted']};
+  bigrun:['Breakaway','accent'],run:['Big run','accent'],catch:['Deep ball','accent'],game:['Going off','accent'],gameX:['Going off','accent'],oinj:['Opponent hurt','warn'],myinj:['New injury','bad'],myworse:['Downgraded','bad'],mybetter:['Upgraded','good'],myclear:['Cleared','good'],opp:['Against you','muted'],oppTd:['Against you','muted']};
 function tmnHash(s){let h=0;for(let i=0;i<s.length;i++)h=(h*31+s.charCodeAt(i))|0;return Math.abs(h)}
 const TMN_Q=['','in the 1st','in the 2nd','in the 3rd','in the 4th','in overtime'];
 /* pick a template this play has every detail for, skipping ones used recently for this type */
@@ -150,7 +150,7 @@ async function tmnTick(){try{
   Object.keys(own).forEach(id=>{const p=byId[id],mine=own[id].filter(o=>o.side==='me');if(!p||!mine.length||!LIVEST[id]&&p.pos!=='DST')return;const k='game:'+id;if(TMN.fired.has(k))return;
     let hit=null;mine.forEach(o=>{const pts=tmnPts(id,o.c.sc),pr=projPts(p,o.c.sc);if(pts>=TMN_R.game||(pr>0&&pts>=TMN_R.gameMin&&pts>=TMN_R.gameX*pr)){if(!hit||pts>hit.pts)hit={pts,pr,o}}});
     if(!hit)return;const x=hit.pr>0?hit.pts/hit.pr:0,cls=hit.pts>=TMN_R.game?'game':'gameX',gm=LIVE.games[p.t];
-    tmnAdd({k,type:'play',cls,pid:id,pts:hit.pts,x,ev:gm&&gm.id,sub:[statLineTxt(p.pos,LIVEST[id]),hit.pr>0?`projected ${f1(hit.pr)}`:'',tmnVs(gm)].filter(Boolean).join(' · '),leagues:tmnLg(mine,id),at,
+    tmnAdd({k,type:'play',cls,pid:id,pts:hit.pts,x,ev:gm&&gm.id,sub:[statLineTxt(p.pos,LIVEST[id]),tmnVs(gm)].filter(Boolean).join(' · '),leagues:tmnLg(mine,id),at,
       head:tmnHead(cls,k,tmnVars(p,hit.o.c,{pts:tmnN(hit.pts),x:tmnN(x),pr:hit.pr>0?tmnN(hit.pr):''}))},fresh)});
   /* 3. matchups: crunch swing, clincher, opponent starter ruled out mid-game */
   Ls.forEach(c=>{const o=c.opp;if(!o)return;const mu=o.m-o.om,pv=TMN.prev[c.key],mineHere=fresh.filter(e=>e.type==='play'&&e.pid&&c.starters.has(e.pid)&&e.leagues.some(l=>l.key===c.key));
@@ -165,6 +165,8 @@ async function tmnTick(){try{
     new Set([...c.oppStarters,...(TMN.prevOpp&&TMN.prevOpp[c.key]||[])]).forEach(id=>{const p=byId[id],gm=p&&LIVE.games[p.t];if(!gm||gm.state!=='in'||c.roster.has(id))return;const s=stOf(id),was=TMN.prevStat[id];
       if((s==='O'||s==='IR')&&was!==undefined&&was!=='O'&&was!=='IR'&&!TMN.fired.has('oinj:'+id)){const k='oinj:'+id;tmnAdd({k,type:'oinj',cls:'oinj',pid:id,leagues:[{key:c.key,name:c.name,st:true,wp0:pv?pv.wp:null,wp1:o.wp}],at,
         sub:`${o.name} started him. ${NOTES[id]&&NOTES[id].note?NOTES[id].note:'Ruled out during the game.'}`,head:tmnHead('oinj',k,tmnVars(p,c,{}))},fresh)}})});
+  /* 4. your players: a new injury, or any change to a hurt player's status */
+  tmnMyInj(Ls,fresh,at);
   /* remember this check for the next one */
   TMN.prevOpp=TMN.prevOpp||{};Ls.forEach(c=>{if(c.opp){TMN.prev[c.key]={...(TMN.prev[c.key]||{}),mu:c.opp.m-c.opp.om,wp:c.opp.wp};TMN.prevOpp[c.key]=[...new Set([...c.oppStarters,...(TMN.prevOpp[c.key]||[])])].filter(id=>{const p=byId[id],g=p&&LIVE.games[p.t];return c.oppStarters.has(id)||(g&&g.state!=='pre')})}});
   TMN.prevSt=JSON.parse(JSON.stringify(LIVEST||{}));Ls.forEach(c=>(TMN.prevOpp[c.key]||[]).forEach(id=>TMN.prevStat[id]=stOf(id)||''));Object.keys(own).forEach(id=>TMN.prevStat[id]=stOf(id)||'');
@@ -177,7 +179,7 @@ function tmnPlayEvent(e,fresh){const p=byId[e.id];if(!p||TMN.fired.has(e.k))retu
   const lc=(mine.find(o=>o.c.cur)||mine[0]||theirs[0]).c,pts=tmnPlayPts(e.kind,e.yds,e.td,p.pos,lc.sc),cls=tmnRule(e.kind,e.yds,e.td,e.tdNum||0,pts);if(!cls)return;
   const what=e.kind==='rush'?(e.td?'rushing TD':'run'):(e.td?'TD catch':'catch'),gm=LIVE.games[p.t];
   const sub=[`${e.yds?e.yds+'-yd ':''}${what}`,e.q?`Q${e.q}${e.clk?' '+e.clk:''}`:'',tmnVs(gm)].filter(Boolean).join(' · ');
-  const n=e.tdNum||0,base={pid:e.id,pts,yds:e.yds,td:e.td,kind:e.kind,tdNum:n,q:e.q||0,ev:e.ev||(gm&&gm.id)||null,wall:e.wall||null,sub,txt:e.txt||'',at:e.at};
+  const n=e.tdNum||0,base={pid:e.id,pts,tot:tmnPts(e.id,lc.sc),yds:e.yds,td:e.td,kind:e.kind,tdNum:n,q:e.q||0,ev:e.ev||(gm&&gm.id)||null,wall:e.wall||null,sub,txt:e.txt||'',at:e.at};
   const vars=c=>tmnVars(p,c,{y:e.yds||'',n:n||'',kind:e.kind,pts:tmnN(pts),qtxt:TMN_Q[Math.min(e.q||0,5)]||''});
   if(mine.length){const c2=n>3?'tdN':cls;tmnAdd({...base,k:e.k,type:'play',cls:c2,leagues:tmnLg(mine,e.id),head:tmnHead(c2,e.k,vars(lc))},fresh)}
   else if(theirs.length){const k=e.k+':opp',oc=e.td?'oppTd':'opp';tmnAdd({...base,k,type:'opp',cls:oc,
@@ -185,7 +187,27 @@ function tmnPlayEvent(e,fresh){const p=byId[e.id];if(!p||TMN.fired.has(e.k))retu
 function tmnAdd(ev,fresh){if(TMN.fired.has(ev.k))return;TMN.fired.add(ev.k);ev.at=ev.at||Date.now();TMN.items.unshift(ev);fresh.push(ev)}
 /* a banner only for leagues with banners on, and only when he's in your lineup there */
 function tmnShould(ev){if(typeof USER!=='undefined'&&!USER)return false;const on=ev.leagues.filter(l=>tmnOn(l.key));
-  if(ev.type==='opp')return tmnNotif().opp&&on.length>0;if(ev.type==='play')return on.some(l=>l.st);return on.length>0}
+  if(ev.type==='opp')return tmnNotif().opp&&on.length>0;if(ev.type==='minj')return (ev.cls==='myinj'||ev.cls==='myworse')&&on.some(l=>l.st);if(ev.type==='play')return on.some(l=>l.st);return on.length>0}
+
+/* ---------- your players' injuries ----------
+   Every status on your rosters is remembered (across reloads and weeks), so a change made while the site was closed
+   still lands in the feed the next time you open it. Players you just added don't count as new injuries. */
+const TMN_SEV=['','Q','D','O','SUS','PUP','IR'],TMN_ST_LS='tm-news-st-v1';
+const tmnSev=s=>Math.max(0,TMN_SEV.indexOf(s||''));
+function tmnMyInj(Ls,fresh,at){let snap=null;try{snap=JSON.parse(localStorage.getItem(TMN_ST_LS)||'null')}catch(e){}
+  const now={},mine={};Ls.forEach(c=>c.roster.forEach(id=>{if(!byId[id]||byId[id].pos==='DST')return;now[id]=stOf(id)||'';(mine[id]=mine[id]||[]).push({c,st:c.starters.has(id)})}));
+  if(snap&&snap.st)Object.keys(now).forEach(id=>{const was=snap.st[id],s=now[id];if(was===undefined||was===s)return;const p=byId[id];
+    const cls=!was?'myinj':!s?'myclear':tmnSev(s)>tmnSev(was)?'myworse':'mybetter',lbl=x=>(ST_LABEL[x]||x).toLowerCase();
+    const head=cls==='myclear'?`${p.n} is off the injury report.`:s==='IR'?`${p.n} has been placed on injured reserve.`:s==='O'?(cls==='myinj'?`${p.n} has been ruled out.`:`${p.n} downgraded to out.`):
+      cls==='myinj'?`${p.n} is hurt. He's now ${lbl(s)}.`:cls==='myworse'?`${p.n} downgraded to ${lbl(s)}.`:`${p.n} upgraded to ${lbl(s)}.`;
+    const n=NOTES[id],note=n&&n.note?n.note:p.inj||'';
+    tmnAdd({k:`minj:${id}:${was}>${s}:${WEEK}`,type:'minj',cls,pid:id,st:s,was,at,head,sub:[was?`Was ${lbl(was)}`:'',note].filter(Boolean).join(' · '),
+      leagues:mine[id].map(o=>({key:o.c.key,name:o.c.name,st:o.st,bench:!o.st}))},fresh)});
+  try{localStorage.setItem(TMN_ST_LS,JSON.stringify({st:now,at}))}catch(e){}}
+/* every hurt player on your rosters, any league, starter or bench */
+function tmnInjured(Ls){const inj={};Ls.forEach(c=>{if(TMN.lg!=='all'&&c.key!==TMN.lg)return;c.roster.forEach(id=>{const s=stOf(id),p=byId[id];if(!s||!p||p.pos==='DST')return;
+  (inj[id]=inj[id]||{id,s,L:[]}).L.push({c,st:c.starters.has(id)})})});
+  return Object.values(inj).sort((a,b)=>tmnSev(b.s)-tmnSev(a.s)||(b.L.some(l=>l.st)?1:0)-(a.L.some(l=>l.st)?1:0))}
 
 /* ---------- banners: arrive big, hold, shrink to a chip that stays 5 minutes ---------- */
 function tmnStage(){let s=$('tmn-stage');if(!s){document.body.insertAdjacentHTML('beforeend','<div class="tmn-stage" id="tmn-stage" aria-live="polite"></div><div class="tmn-chips" id="tmn-chips"></div>');s=$('tmn-stage')}return s}
@@ -249,53 +271,46 @@ const TMN_GEAR='<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stro
 function tmnRender(){const el=$('news-body');if(!el)return;tmnWeek();TMN.unread=0;
   if(typeof FEED!=='undefined'&&typeof loadFeed==='function'&&(!FEED||Date.now()-FEED_AT>4*60e3))Promise.resolve(loadFeed()).then(()=>{if(tab==='news'&&FEED)tmnRenderBody()});
   const Ls=tmnLeagues();if(TMN.lg!=='all'&&!Ls.some(c=>c.key===TMN.lg))TMN.lg='all';const mood=tmnMood();
+  try{const fr=[];tmnMyInj(Ls,fr,Date.now());if(fr.length)tmnSave()}catch(e){}
   el.innerHTML=`<header class="tmn-head"><div class="tmn-head-t"><div class="kicker">Week ${WEEK} · ${Ls.length>1?`all ${Ls.length} leagues`:'your league'}</div><h1>News${mood==='live'?' <span class="tmn-live"><span class="live-dot on"></span>Live</span>':''}</h1><p id="tmn-sum"></p></div>
       <a class="btn tmn-gear" href="#account-leagues" data-notif-go="1" title="Notification settings">${TMN_GEAR}<span>Notifications</span></a></header>
-    ${tmnNowHtml(Ls,mood)}
     <div class="tmn-bar"><div class="seg" role="group" aria-label="Show" id="tmn-seg"></div>
       ${Ls.length>1?`<select id="tmn-lg" class="tmn-lgsel" aria-label="League"><option value="all">All leagues</option>${Ls.map(c=>`<option value="${esc(c.key)}" ${TMN.lg===c.key?'selected':''}>${esc(c.name)}</option>`).join('')}</select>`:''}</div>
     <div class="tmn-feed" id="tmn-feed"></div>`;
   tmnRenderBody(Ls,mood)}
-/* real leagues only: the sample league's made-up matchup is never shown here */
-function tmnNowHtml(Ls,mood){const M=Ls.filter(c=>c.opp&&c.key!=='sample'&&!(c.cur&&S.example));if(!M.length)return '';
-  return `<div class="tmn-now" aria-label="Your matchups">${M.map(c=>{const o=c.opp,st=o.final?'Final':o.live?'Live':o.started?'In progress':'Projected',show=o.started,a=show?o.now:o.m,b=show?o.onow:o.om,on=tmnOn(c.key),w=Math.round(o.wp*100),sel=TMN.lg===c.key;
-    const res=o.final?(o.now>o.onow?'won':o.now<o.onow?'lost':''):'';
-    return `<a class="tmn-mu${res?' '+res:''}${sel?' sel':''}" href="#news" data-nlg="${esc(c.key)}" aria-pressed="${sel}"><div class="tmn-mu-h"><b>${esc(c.name)}</b><span class="tmn-mu-st${o.live?' on':''}">${o.live?'<span class="live-dot on"></span>':''}${st}</span></div>
-      <div class="tmn-mu-row me"><span>${esc(c.team||'You')}</span><b class="num">${f1(a)}</b></div><div class="tmn-mu-row"><span>${esc(o.name)}</span><b class="num">${f1(b)}</b></div>
-      <div class="tmn-mu-bar" style="--w:${w}%"><i></i></div><div class="tmn-mu-f"><span>${o.final?(res==='won'?'You won':res==='lost'?'You lost':'Tie'):w+'% to win'}</span>${on?'':'<span class="note">Banners off</span>'}</div></a>`}).join('')}</div>`}
 function tmnRenderBody(Ls,mood){const el=$('tmn-feed');if(!el)return;Ls=Ls||tmnLeagues();mood=mood||tmnMood();
   const inLg=l=>TMN.lg==='all'||l.some(x=>(x.key||x)===TMN.lg),f=TMN.f;tmnBuildClips(Ls);const CM=tmnClipMap();
   /* big plays, newest first */
-  const evs=TMN.items.filter(e=>inLg(e.leagues)&&(e.type!=='opp'||tmnNotif().opp)&&e.type!=='oinj');
-  /* injuries: on your lineups in any league, plus opponents' starters ruled out mid-game */
-  const inj={};Ls.forEach(c=>{if(TMN.lg!=='all'&&c.key!==TMN.lg)return;c.starters.forEach(id=>{const s=stOf(id),p=byId[id],gm=p&&LIVE&&LIVE.week===WEEK&&LIVE.games[p.t];if(!s||!p||(gm&&gm.state==='post')||BYE[p.t]===WEEK)return;(inj[id]=inj[id]||{id,s,L:[]}).L.push(c)})});
-  const injList=Object.values(inj).sort((a,b)=>'OIRPUPSUSDQ'.indexOf(a.s)-'OIRPUPSUSDQ'.indexOf(b.s)),oinj=TMN.items.filter(e=>e.type==='oinj'&&inLg(e.leagues));
+  const evs=TMN.items.filter(e=>inLg(e.leagues)&&(e.type!=='opp'||tmnNotif().opp)&&e.type!=='minj');
+  /* injuries: every hurt player on your rosters, plus status changes as they happen */
+  const injList=tmnInjured(Ls),injUp=TMN.items.filter(e=>e.type==='minj'&&inLg(e.leagues));
   /* results, and trade and waiver signals for the league on screen */
   const res=Ls.filter(c=>(TMN.lg==='all'||c.key===TMN.lg)&&c.opp&&c.opp.final);
   const sig=(TMN.lg==='all'||TMN.lg===S.leagueKey)&&typeof alertsList==='function'?alertsList().filter(a=>/^(sell|pick)-/.test(a.k)).slice(0,4):[];
   const clipsAll=typeof CLIPS!=='undefined'?CLIPS.filter(v=>!v.game):[];
   /* summary line + filter counts */
-  const nBig=evs.length,nInj=injList.length+oinj.length,nClip=clipsAll.length,cnt={all:0,big:nBig,inj:nInj,clips:nClip};
-  const sm=$('tmn-sum');if(sm){const bits=[nBig?`${nBig} big play${nBig>1?'s':''}`:'',nInj?`${nInj} injur${nInj>1?'ies':'y'} to watch`:'',CM.map.size?`${CM.map.size} with video`:''].filter(Boolean);
+  const nBig=evs.length,nInj=injList.length,nClip=clipsAll.length,cnt={all:0,big:nBig,inj:nInj,clips:nClip};
+  const sm=$('tmn-sum');if(sm){const bits=[nBig?`${nBig} big play${nBig>1?'s':''}`:'',nInj?`${nInj} injured player${nInj>1?'s':''}`:'',CM.map.size?`${CM.map.size} with video`:''].filter(Boolean);
     sm.textContent=bits.length?bits.join(' · '):mood==='quiet'?'Injuries, waiver and trade signals until kickoff. Big plays land here live on game day.':'Waiting on the first big play.'}
   const seg=$('tmn-seg');if(seg)seg.innerHTML=TMN_F.map(([k,l])=>`<button type="button" data-nf="${k}" aria-pressed="${f===k}">${l}${cnt[k]?` <span class="tmn-n">${cnt[k]}</span>`:''}</button>`).join('');
   const sec=(id,title,note,html)=>html?`<section class="tmn-sec" data-sec="${id}"><div class="tmn-sec-h"><h2>${title}</h2>${note?`<span class="note">${note}</span>`:''}</div>${html}</section>`:'';
   const S_big=()=>evs.length?`<ol class="tmn-tl">${tmnGroups(evs).map(g=>`<li class="tmn-day"><span>${g.label}</span></li>${g.items.map(e=>`<li>${tmnEvCard(e,CM.map.get(e.k))}</li>`).join('')}`).join('')}</ol>`:'';
-  const S_inj=()=>oinj.map(e=>tmnEvCard(e)).join('')+injList.map(tmnInjCard).join('');
+  const S_injUp=()=>injUp.length?`<ol class="tmn-tl">${tmnGroups(injUp).map(g=>`<li class="tmn-day"><span>${g.label}</span></li>${g.items.map(e=>`<li>${tmnEvCard(e)}</li>`).join('')}`).join('')}</ol>`:'';
+  const S_inj=()=>injList.length?`<div class="tmn-injg">${injList.map(tmnInjCard).join('')}</div>`:'';
   const S_res=()=>res.map(tmnResultCard).join('');
   const S_sig=()=>sig.map(tmnSigCard).join('');
   const S_clips=()=>tmnClipsGrid(clipsAll,CM);
   let html='';
   if(f==='big')html=sec('big','Big plays',nBig?'Newest first':'',S_big());
-  else if(f==='inj')html=sec('inj','Injuries','',S_inj());
+  else if(f==='inj')html=sec('injup','Latest updates',injUp.length?'Newest first':'',S_injUp())+sec('inj','Your injured players',nInj?'Every league, starters and bench':'',S_inj());
   else if(f==='clips')html=sec('clips','Clips',nClip?`${CM.map.size} matched to a play · official NFL and team channels`:'',S_clips());
-  else{const parts={big:sec('big','Big plays','',S_big()),inj:sec('inj','Injuries',nInj?'Starters questionable or worse':'',S_inj()),res:sec('res','Results','',S_res()),sig:sec('sig','Trade and waiver signals','',S_sig())};
+  else{const parts={big:sec('big','Big plays','',S_big()),inj:sec('inj','Injuries',nInj?'Your hurt players, every league':'',S_injUp()+S_inj()),res:sec('res','Results','',S_res()),sig:sec('sig','Trade and waiver signals','',S_sig())};
     const order=mood==='live'?['big','inj','res','sig']:mood==='after'?['res','big','sig','inj']:['inj','sig','big','res'];html=order.map(k=>parts[k]).join('')}
   const empty={all:['Nothing yet this week','When one of your players breaks a long run, catches a deep ball, scores again or clinches your week, it lands here and pops up wherever you are on the site.'],
     big:['No big plays yet','Long runs, deep catches, touchdowns, monster games, lead changes and clinchers for your starters show up here as they happen.'],
-    inj:['Everyone is healthy','Starters in any of your leagues who are questionable or worse show up here, along with opponents\' starters ruled out mid-game.'],
+    inj:['Everyone is healthy','Any player on your rosters who gets hurt shows up here right away, with every status change and the latest news on him until he\'s back.'],
     clips:['No clips yet','Clips of your players show up here as games are played. When a clip shows one of their big plays, it is attached to that play too.']}[f];
-  const lastWk=TMN.last&&TMN.last.items.length&&(f==='all'||f==='big')?`<details class="tmn-last"><summary>Week ${TMN.last.week} big plays <span class="tmn-n">${TMN.last.items.length}</span></summary><div class="tmn-last-l">${TMN.last.items.filter(e=>inLg(e.leagues)).slice(0,30).map(e=>tmnEvCard(e)).join('')}</div></details>`:'';
+  const lastWk=TMN.last&&TMN.last.items.length&&(f==='all'||f==='big')?`<details class="tmn-last"><summary>Week ${TMN.last.week} big plays <span class="tmn-n">${TMN.last.items.length}</span></summary><div class="tmn-last-l">${TMN.last.items.filter(e=>inLg(e.leagues)).slice(0,30).map(e=>tmnEvCard(e,null,true)).join('')}</div></details>`:'';
   el.innerHTML=(html||`<div class="card tmn-empty"><h2>${empty[0]}</h2><p class="note">${empty[1]}</p></div>`)+lastWk;
   if(TMN.focus){const k=TMN.focus;TMN.focus=null;const it=el.querySelector(`[data-nkf="${CSS.escape(k)}"]`);if(it){it.classList.add('focus');setTimeout(()=>it.scrollIntoView({behavior:'smooth',block:'center'}),40);setTimeout(()=>it.classList.remove('focus'),2600)}}}
 /* day headers for the timeline */
@@ -303,16 +318,18 @@ function tmnGroups(evs){const out=[],today=new Date().toDateString(),yest=new Da
   evs.forEach(e=>{const d=new Date(e.at||Date.now()),ds=d.toDateString(),label=ds===today?'Today':ds===yest?'Yesterday':d.toLocaleDateString([], {weekday:'long'});
     let g=out[out.length-1];if(!g||g.label!==label)out.push(g={label,items:[]});g.items.push(e)});return out}
 function tmnClock(t){return t?new Date(t).toLocaleTimeString([], {hour:'numeric',minute:'2-digit'}):''}
-function tmnEvCard(e,clip){const [lbl,tone]=TMN_LBL[e.cls]||['News','accent'],p=e.pid&&byId[e.pid];
+function tmnEvCard(e,clip,old){const [lbl,tone]=TMN_LBL[e.cls]||['News','accent'],p=e.pid&&byId[e.pid];
   const lg=(e.leagues||[]).map(l=>{const d=l.wp0!=null&&l.wp1!=null&&!l.bench?Math.round((l.wp1-l.wp0)*100):null;
     return `<span class="tmn-lchip${l.bench?' bench':''}${l.their?' their':''}">${esc(l.name)}${l.bench?' · bench':''}${l.wp1!=null&&!l.bench?` · <b>${Math.round(l.wp1*100)}%</b>${d?` <em class="${d>0?'up':'dn'}">${d>0?'▲':'▼'}${Math.abs(d)}</em>`:''}`:''}</span>`}).join('');
   const showPts=e.pts!=null&&(e.type==='play'||e.type==='opp'),big=e.cls==='game'||e.cls==='gameX';
   const v=clip?`<div class="tmn-vid">${tmnClipThumb(clip)}</div>`:'';
+  const tot=p&&(e.type==='play'||e.type==='opp')&&!big?(old?e.tot:tmnPts(e.pid,tmnScOf(e))):null,gm=p&&!old&&LIVE&&LIVE.games&&LIVE.games[p.t];
+  const totH=tot!=null?`<span class="tmn-tot"><b class="num">${f1(tot)}</b> pts ${gm&&gm.state==='post'?'final':'so far'}</span>`:'';
   return `<article class="tmn-ev tone-${tone}${e.type==='opp'?' their':''}${e.type==='clinch'?' clinch':''}${v?' has-vid':''}" data-nkf="${esc(e.k)}">
     <div class="tmn-ev-rail"><time>${tmnClock(e.wall?Date.parse(e.wall)||e.at:e.at)}</time>${e.q?`<small>Q${e.q}${e.sub&&/Q\d (\S+)/.test(e.sub)?' '+e.sub.match(/Q\d (\S+)/)[1]:''}</small>`:''}</div>
     <div class="tmn-ev-card"><div class="tmn-ev-top"><span class="tmn-lbl ${tone}">${lbl}</span>${showPts?`<b class="tmn-ev-pts num">${big?'':'+'}${f1(e.pts)}<small>${big?' pts total':' pts'}</small></b>`:''}</div>
       <div class="tmn-ev-main"><div class="tmn-b-av">${p?av(p):`<span class="tmn-seal">W</span>`}</div><div class="tmn-ev-txt"><h3>${esc(e.head)}</h3>${e.sub?`<p>${esc(e.sub)}</p>`:''}${lg?`<div class="tmn-lgs">${lg}</div>`:''}</div>${v}</div>
-      <div class="tmn-ev-f">${p?`<button class="linkish" data-open="${p.id}">Player card</button>`:''}${e.txt?`<span class="tmn-txt" title="${esc(e.txt)}">${esc(e.txt)}</span>`:''}</div></div></article>`}
+      <div class="tmn-ev-f">${totH}${p?`<button class="linkish" data-open="${p.id}">Player card</button>`:''}${e.txt?`<span class="tmn-txt" title="${esc(e.txt)}">${esc(e.txt)}</span>`:''}</div></div></article>`}
 /* a clip thumb wired to the viewer (the clip is added to CLIPS so the viewer can open it) */
 function tmnClipThumb(v){if(typeof CLIPS!=='undefined'&&!CLIPS.some(c=>c.id===v.id))CLIPS.push(v);
   return `<span class="tmn-vid-l">Watch the play</span>${thumbHtml(v,'xs')}`}
@@ -320,13 +337,19 @@ function tmnClipsGrid(list,CM){if(!list.length)return '';const playOf={};CM.map.
   const sorted=[...list].sort((a,b)=>(playOf[b.id]?1:0)-(playOf[a.id]?1:0));
   return `<div class="tmn-cgrid">${sorted.slice(0,40).map(v=>{const e=playOf[v.id];return `<div class="tmn-cl${e?' on':''}">${thumbHtml(v,'sm')}${e?`<button class="tmn-cl-play linkish" data-nk-go="${esc(e.k)}">${esc(e.head)}</button>`:''}</div>`}).join('')}</div>`}
 function tmnWhen(t){const d=new Date(t),m=(Date.now()-t)/60e3;return m<1?'Just now':m<60?Math.round(m)+'m ago':d.toLocaleString([], {weekday:'short',hour:'numeric',minute:'2-digit'})}
-function tmnInjCard(x){const p=byId[x.id],n=NOTES[x.id],out=x.s!=='Q'&&x.s!=='D',cur=x.L.find(c=>c.cur),tone=out?'bad':'warn',gm=LIVE&&LIVE.games&&LIVE.games[p.t];
-  const head=out?`${p.n} is out. Get him out of your lineup.`:x.s==='D'?`${p.n} is doubtful. Line up a backup now.`:`${p.n} is questionable. Have a plan B ready.`;
-  const when=gm&&gm.start&&gm.state==='pre'?`Kicks off ${new Date(gm.start).toLocaleString([], {weekday:'short',hour:'numeric',minute:'2-digit'})}`:'';
-  return `<article class="tmn-ev tone-${tone} flat"><div class="tmn-ev-card"><div class="tmn-ev-top"><span class="tmn-lbl ${tone}">${esc(ST_LABEL[x.s]||x.s)}</span>${n&&n.at?`<span class="note">${tmnWhen(Date.parse(n.at))}</span>`:''}</div>
-    <div class="tmn-ev-main"><div class="tmn-b-av">${av(p)}</div><div class="tmn-ev-txt"><h3>${esc(head)}</h3>${n&&n.note?`<p class="tmn-note">${esc(n.note)}</p>`:''}${when?`<p>${when}${tmnVs(gm)?' '+tmnVs(gm):''}</p>`:''}
-    <div class="tmn-lgs">${x.L.map(c=>`<span class="tmn-lchip">${esc(c.name)}</span>`).join('')}</div></div></div>
-    <div class="tmn-ev-f"><button class="linkish" data-open="${p.id}">Player card</button>${cur?'<a class="linkish" href="#team">Set lineup</a>':''}</div></div></article>`}
+function tmnScOf(e){const k=e.leagues&&e.leagues[0]&&e.leagues[0].key,c=k&&k!==S.leagueKey&&S.leagues&&S.leagues.find(l=>l.key===k),snap=c&&c.snap;
+  return {...BASE_SC,...(((snap||S).league&&(snap||S).league.sc)||{})}}
+function tmnInjCard(x){const p=byId[x.id],n=NOTES[x.id],sev=tmnSev(x.s),out=sev>=3,tone=out?'bad':'warn',gm=LIVE&&LIVE.week===WEEK&&LIVE.games&&LIVE.games[p.t],starts=x.L.some(l=>l.st);
+  const head=x.s==='IR'?`${p.n} is on injured reserve.`:x.s==='O'?`${p.n} is out this week.`:x.s==='D'?`${p.n} is doubtful.`:x.s==='Q'?`${p.n} is questionable.`:`${p.n}: ${ST_LABEL[x.s]||x.s}.`;
+  const what=p.inj&&!(n&&n.note&&n.note.includes(p.inj))?p.inj:'';
+  const when=gm&&gm.start&&gm.state==='pre'?`Kicks off ${new Date(gm.start).toLocaleString([], {weekday:'short',hour:'numeric',minute:'2-digit'})} ${tmnVs(gm)}`:'';
+  const scored=gm&&gm.state!=='pre'&&LIVEST[x.id]?`${f1(tmnPts(x.id,x.L[0].c.sc))} pts ${gm.state==='post'?'final':'so far'}`:'';
+  const stories=typeof playerNews==='function'?playerNews(p).slice(0,2):[];
+  return `<article class="tmn-ev tone-${tone} flat tmn-inj"><div class="tmn-ev-card"><div class="tmn-ev-top"><span class="tmn-lbl ${tone}">${esc(ST_LABEL[x.s]||x.s)}</span>${n&&n.at?`<span class="note">Updated ${tmnWhen(Date.parse(n.at))}</span>`:''}</div>
+    <div class="tmn-ev-main"><div class="tmn-b-av">${av(p)}</div><div class="tmn-ev-txt"><h3>${esc(head)}</h3>${what?`<p>${esc(what)}</p>`:''}${n&&n.note?`<p class="tmn-note">${esc(n.note)}</p>`:''}${when||scored?`<p>${esc(scored||when)}</p>`:''}
+    ${stories.length?`<ul class="tmn-stories">${stories.map(a=>`<li>${a.url?`<a href="${esc(a.url)}" target="_blank" rel="noopener">${esc(a.title)}</a>`:esc(a.title)}${a.at?` <span class="note">${tmnWhen(Date.parse(a.at))}</span>`:''}</li>`).join('')}</ul>`:''}
+    <div class="tmn-lgs">${x.L.map(l=>`<span class="tmn-lchip${l.st?'':' bench'}">${esc(l.c.name)} · ${l.st?'starting':'bench'}</span>`).join('')}</div></div></div>
+    <div class="tmn-ev-f"><button class="linkish" data-open="${p.id}">Player card</button>${starts&&sev>=3&&!(gm&&gm.state!=='pre')?'<a class="linkish" href="#team">Set lineup</a>':''}</div></div></article>`}
 function tmnResultCard(c){const o=c.opp,w=o.now>o.onow,t=o.now===o.onow,m=Math.abs(o.now-o.onow);
   const head=w?(m<5?`Survived. You edged ${o.name} by ${f1(m)}.`:m>30?`Blowout. You buried ${o.name} by ${f1(m)}.`:`W. You beat ${o.name} by ${f1(m)}.`):t?`Dead even with ${o.name}.`:(m<5?`Heartbreaker. ${o.name} got you by ${f1(m)}.`:`${o.name} took this one by ${f1(m)}.`);
   return `<article class="tmn-ev tmn-res flat tone-${w?'good':t?'accent':'bad'}"><div class="tmn-ev-card"><div class="tmn-ev-main"><div class="tmn-b-av"><span class="tmn-seal ${w?'':'l'}">${w?'W':t?'T':'L'}</span></div>
