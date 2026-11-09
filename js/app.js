@@ -364,9 +364,10 @@ function liveNotes(){if(!LIVE||!LIVE.notes)return;NOTES={};
   LIVE.notes.forEach(x=>{const p=findExact(x.n,null,x.t);if(!p||p.pos==='DST'||(p.t!==x.t&&norm(p.n)!==norm(x.n)))return;NOTES[p.id]=x;
     const code=pracCode(x.note),fresh=x.at&&Date.now()-Date.parse(x.at)<6*864e5;if(!code||!fresh||LIVE.week!==WEEK)return;
     const L=PRAC[p.id]=(PRAC[p.id]||[]).filter(r=>r[0]!==WEEK);L.push([WEEK,code,x.type||p.inj||'',['Out','Doubtful','Questionable'].includes(x.st)?x.st:'']);if(L.length>3)L.shift()})}
-var ROLLED=false;
+var ROLLED=false,LASTWK=null;
 function checkRollover(){if(!LIVE||LIVE.week!==WEEK||WEEK>=18)return false;const gs=Object.values(LIVE.games||{});
   const playing=Object.keys(OPP).filter(t=>OPP[t][WEEK]);if(!gs.length||gs.length<playing.length*.9||!gs.every(g=>g.state==='post'))return false;
+  LASTWK={w:WEEK,games:LIVE.games,st:LIVEST,pts:Object.fromEntries(Object.entries(G).filter(([,g])=>g.live).map(([id,g])=>[id,g.live.pts]))};
   WEEK++;ROLLED=true;LIVE=null;PROJ=null;PROJN=null;setTimeout(loadProj,800);LIVEST={};LIVE_LU=null;PLAT=null;SCHED=null;weekLabels();return true}
 async function loadLive(){
   clearTimeout(LIVE_TIMER);let next=5*60e3;
@@ -1624,7 +1625,7 @@ function openCard(id){if(openId!==id)delete SORTS['log-table'];openId=id;const p
     ${g.role?`<div class="callout buy"><b>Hot streak with a reason.</b> ${esc(g.role)}</div>`:''}
     ${liveStatsHtml(p,g,cols)}
     <div class="msec"><h4>Game log</h4><div class="logbox"><table id="log-table"><thead><tr><th data-sort data-first="asc">WK</th><th>OPP</th>${cols.map(c=>`<th class="r" data-sort>${c[0]}</th>`).join('')}<th class="r" data-sort>FPTS</th></tr></thead>
-      <tbody>${g.log.map((x,i)=>x.bye?`<tr><td>${x.w}</td><td colspan="${cols.length+2}" class="muted">Bye week</td></tr>`:x.dnp?`<tr><td>${x.w}</td><td>${x.home?'vs':'@'} ${x.opp}</td><td colspan="${cols.length+1}" class="muted">Did not play</td></tr>`:`<tr><td>${x.w}</td><td>${x.home?'vs':'@'} ${x.opp}</td>${cols.map(c=>`<td class="r num">${x[c[1]]}</td>`).join('')}<td class="r num" style="font-weight:700">${f1(g.pts[i])}</td></tr>`).join('')}</tbody>
+      <tbody>${g.log.map((x,i)=>x.bye?`<tr><td>${x.w}</td><td colspan="${cols.length+2}" class="muted">Bye week</td></tr>`:x.dnp?`<tr><td>${x.w}</td><td>${x.home?'vs':'@'} ${x.opp}</td><td colspan="${cols.length+1}" class="muted">Did not play</td></tr>`:`<tr><td>${x.w}</td><td>${x.home?'vs':'@'} ${x.opp}</td>${cols.map(c=>`<td class="r num">${x[c[1]]}</td>`).join('')}<td class="r num" style="font-weight:700">${f1(g.pts[i])}</td></tr>`).join('')}${pendingLogRows(p,g,cols)}</tbody>
       <tfoot><tr><td colspan="2">Season</td>${cols.map(c=>`<td class="r num">${tot(c[1])}</td>`).join('')}<td class="r num">${f1(season)}</td></tr></tfoot></table></div>
       <p class="note" style="margin:6px 0 0">Through Week ${PLAYED} · updated ${new Date(DATA.asOf+'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric'})}</p></div>
     <div class="msec" id="card-hl">${cardHighlights(id)}</div>
@@ -1664,6 +1665,17 @@ function outlookHtml(p,g){if(p.pos==='K')return '';const r=g.risk2||{lvl:0,why:[
   return `<div class="msec"><h4>Rest-of-season outlook</h4><div class="ol-chips">${chips}</div>
     ${lead||bullets.length?`<ul class="reasons ol-why">${lead?`<li>${lead}</li>`:''}${bullets.map(x=>`<li>${esc(x)}</li>`).join('')}</ul>`:''}
     ${r.lvl&&r.why.length>1?`<p class="note" style="margin:6px 0 0">Risk factors: ${esc(r.why.join(' '))}</p>`:''}${howLink('values')}</div>`}
+/* game log rows for weeks the morning data doesn't have yet: the current week appears as soon as it starts (blank until
+   his game kicks off, then filled from the live feed), and a just-finished week stays until the next data refresh */
+function pendingLogRows(p,g,cols){const last=Math.max(PLAYED,...g.log.map(x=>x.w)),out=[];
+  for(let w=last+1;w<=WEEK;w++){if(BYE[p.t]===w){out.push(`<tr class="log-new"><td>${w}</td><td colspan="${cols.length+2}" class="muted">Bye week</td></tr>`);continue}
+    const o=OPP[p.t]&&OPP[p.t][w];if(!o)continue;
+    let gm=null,st=null,pts=null;
+    if(w===WEEK&&LIVE&&LIVE.week===w){gm=LIVE.games[p.t];st=LIVEST[p.id];pts=g.live?g.live.pts:null}
+    else if(LASTWK&&LASTWK.w===w){gm=LASTWK.games[p.t];st=LASTWK.st[p.id];pts=LASTWK.pts[p.id]??null}
+    const on=gm&&gm.state!=='pre',val=k=>k==='pa'&&p.pos==='DST'?(st&&st.pa!=null?st.pa:gm.oppScore||0):st&&st[k]!=null?st[k]:0;
+    out.push(`<tr class="log-new${on&&gm.state!=='post'?' live':''}"><td>${w}${on&&gm.state!=='post'?' <span class="live-dot on"></span>':''}</td><td>${o.home?'vs':'@'} ${o.opp}</td>${cols.map(c=>`<td class="r num">${on?val(c[1]):''}</td>`).join('')}<td class="r num" style="font-weight:700">${on&&pts!=null&&isFinite(pts)?f1(pts):''}</td></tr>`)}
+  return out.join('')}
 function liveStatsHtml(p,g,cols){const l=liveOf(p.id);if(!l)return '';
   const st=LIVEST[p.id],cells=(st?cols:[]).filter(c=>st[c[1]]).map(c=>`<div><b>${st[c[1]]}</b><span>${esc(c[0])}</span></div>`).join('');
   return `<div class="msec"><h4>${l.state==='post'?'How he did today':'Live right now'}</h4>
