@@ -446,7 +446,8 @@ function irChanged(T,ids){const a=[...(T.ir||[])].sort().join(),b=[...new Set(id
 function rosterChanged(T,ids){const a=[...T.players].sort().join(),b=[...ids].sort().join();if(a===b)return false;T.players=ids;return true}
 async function syncSleeper(){const src=S.real&&S.real.src;if(!src||src.type!=='sleeper')return false;let changed=false;
   const [rosters,users,lg]=await Promise.all([getJSON(`https://api.sleeper.app/v1/league/${src.league}/rosters`),getJSON(`https://api.sleeper.app/v1/league/${src.league}/users`),getJSON(`https://api.sleeper.app/v1/league/${src.league}`).catch(()=>null)]);
-  if(lg&&lg.settings){const n=lg.settings.reserve_slots||0;if(S.league.slots.IR!==n){S.league.slots.IR=n;changed=true}S.league.irOk=sleeperIrOk(lg.settings)}
+  if(lg&&lg.settings){const n=lg.settings.reserve_slots||0;if(S.league.slots.IR!==n){S.league.slots.IR=n;changed=true}
+    const ok=sleeperIrOk(lg.settings);if((S.league.irOk||[]).join()!==ok.join()){S.league.irOk=ok;changed=true}}
   let ids=await sleeperIds();
   /* re-check saved Sleeper-to-player links against Sleeper's real names; drop any that were matched loosely */
   if(ids&&Object.keys(ids).length)for(const [pid,id] of Object.entries(src.pmap)){const x=ids[pid],q=byId[id];if(x&&(!q||norm(q.n)!==norm(x[0])))delete src.pmap[pid]}
@@ -460,7 +461,8 @@ async function syncSleeper(){const src=S.real&&S.real.src;if(!src||src.type!=='s
     const st=r.settings||{};S.real.rec[tid]={w:st.wins||0,l:st.losses||0,t:st.ties||0,pf:(st.fpts||0)+(st.fpts_decimal||0)/100}}
   syncPlayed();return changed}
 function syncEspnRosters(d){const src=S.real&&S.real.src;if(!d||!src||src.type!=='espn')return false;let changed=false;
-  const ls=d.settings&&d.settings.rosterSettings&&d.settings.rosterSettings.lineupSlotCounts;if(ls){const n=+ls[21]||0;if(S.league.slots.IR!==n){S.league.slots.IR=n;changed=true}S.league.irOk=['IR','PUP','O']}
+  const ls=d.settings&&d.settings.rosterSettings&&d.settings.rosterSettings.lineupSlotCounts;if(ls){const n=+ls[21]||0;if(S.league.slots.IR!==n){S.league.slots.IR=n;changed=true}
+    if((S.league.irOk||[]).join()!=='IR,PUP,O'){S.league.irOk=['IR','PUP','O'];changed=true}}
   (d.teams||[]).forEach(t=>{const tid=src.rid[t.id],T=tid&&teamById(tid);if(!T)return;
     const EP={1:'QB',2:'RB',3:'WR',4:'TE',5:'K'};((t.roster&&t.roster.entries)||[]).forEach(e=>{const pl=e.playerPoolEntry&&e.playerPoolEntry.player;if(pl&&EP[pl.defaultPositionId]&&!findExact(pl.fullName,EP[pl.defaultPositionId])){addExtraPlayer(pl.fullName,EP[pl.defaultPositionId]);POOL_DIRTY=true}});if(POOL_DIRTY)setPool();
     const out=((t.roster&&t.roster.entries)||[]).map(e=>e.playerPoolEntry&&e.playerPoolEntry.player).filter(Boolean).map(pl=>{const q=pl.defaultPositionId===16?(byId['dst-'+String(pl.proTeamAbbreviation||'').toLowerCase()]||findExact(pl.fullName)):findExact(pl.fullName);return q&&q.id}).filter(Boolean);
