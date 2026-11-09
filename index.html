@@ -71,7 +71,8 @@
     <div id="pl-rank" class="pl-pane">
     <div class="toolbar">
       <div class="seg" id="pos-filter"><button data-pos="ALL" aria-pressed="true">All</button><button data-pos="QB">QB</button><button data-pos="RB">RB</button><button data-pos="WR">WR</button><button data-pos="TE">TE</button><button data-pos="K">K</button><button data-pos="DST">D/ST</button></div>
-      <div class="seg" id="own-filter"><button data-own="all" aria-pressed="true">Everyone</button><button data-own="free">Available</button><button data-own="buy">Buy low</button><button data-own="risk">Risks</button><button data-own="opp">Opportunities</button></div>
+      <div class="seg seg-primary" id="own-filter" aria-label="Player pool"><button data-own="all" aria-pressed="true">Everyone</button><button data-own="free" aria-pressed="false">Available</button></div>
+      <div class="seg seg-cat" id="cat-filter" aria-label="Category"><button data-cat="all" aria-pressed="true">All</button><button data-cat="buy" aria-pressed="false">Buy low</button><button data-cat="opp" aria-pressed="false">Opportunities</button><button data-cat="sell" aria-pressed="false">Sell high / breakout</button></div>
       <input type="search" id="rank-search" placeholder="Search players or NFL teams">
       
     </div>
@@ -96,10 +97,9 @@
   <section class="view" id="v-trade" hidden>
     <div class="hero"><div><div class="kicker">Trade center</div><h1>Trades</h1><p>Deals built for your roster that the other manager has a reason to accept. <a class="how" href="#help-trades">How this works</a></p></div>
       <button class="btn" id="refresh-trades">New ideas</button></div>
-    <div class="grid3" id="suggestions"></div>
-    <div class="grid2 grid-trade">
+    <div class="grid2 grid-trade tb-main">
       <div class="stack">
-        <div class="card"><div class="card-h"><h2>Build a trade</h2><button class="btn small ghost" id="trade-reset">Clear</button></div>
+        <div class="card tb-card"><div class="card-h"><h2>Trade builder</h2><button class="btn small ghost" id="trade-reset">Clear</button></div>
           <h4 style="margin-top:0">You give</h4><div class="chips" id="give-chips"></div>
           <h4>You get</h4><div class="chips" id="get-chips"></div>
           <p class="note" id="get-hint" style="margin:6px 0 0"></p></div>
@@ -112,6 +112,8 @@
         <div class="scrollbox" data-fill><table class="tgt-table" id="tgt-table"><thead><tr><th data-sort data-first="asc">Player</th><th class="r" data-sort>Wk <span class="wk-num">9</span></th><th class="r" data-sort>Pts/G</th><th class="r" data-sort>Snap %</th><th data-sort data-first="asc">Team</th><th></th></tr></thead><tbody id="targets"></tbody></table></div>
       </div>
     </div>
+    <div class="tb-recs-h"><h2>Recommended trades</h2><span class="note">Built from your roster and what each manager needs</span></div>
+    <div class="grid3" id="suggestions"></div>
   </section>
 
   <!-- HUB -->
