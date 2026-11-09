@@ -1285,6 +1285,9 @@ body.signed-out .alerts-wrap{display:none}
 
 /* ===== Trades tab (2026-11 rework): sections, trade table, rating visuals, recommended trades, head-to-head ===== */
 .tr-sec{display:flex;flex-direction:column;gap:14px}
+.tr-bar{justify-content:space-between;margin:0}
+.tr-n{display:inline-block;min-width:18px;padding:0 5px;margin-left:6px;border-radius:99px;background:var(--surface-3);color:var(--muted);font:700 10.5px/17px var(--f-mono);text-align:center}.tr-n:empty{display:none}
+.seg button[aria-pressed="true"] .tr-n{background:var(--accent);color:#fff}
 .tr-sec-h{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;flex-wrap:wrap;padding-bottom:10px;border-bottom:1px solid var(--line)}
 .tr-sec-h h2{margin:0 0 2px;font-family:var(--f-display);font-style:italic;font-weight:800;font-size:24px;letter-spacing:.02em;text-transform:uppercase;line-height:1}
 #v-trade .grid3{gap:18px;align-items:stretch}
@@ -1571,10 +1574,15 @@ body.signed-out .alerts-wrap{display:none}
 
 /* News tab */
 .tmn-head{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;flex-wrap:wrap}
-.tmn-head h1{margin:2px 0 4px;display:flex;align-items:center;gap:12px}
-.tmn-head p{margin:0;color:var(--muted);font-size:14px}
+.tmn-head h1{display:flex;align-items:center;gap:12px}
+.tmn-head p:empty{display:none}
 .tmn-live{display:inline-flex;align-items:center;gap:6px;font:800 11px var(--f-body);letter-spacing:.1em;text-transform:uppercase;color:var(--bad);background:var(--bad-soft);padding:4px 9px 4px 7px;border-radius:99px;font-style:normal}
-.tmn-gear{display:inline-flex;align-items:center;gap:7px}
+.tmn-gear{display:inline-grid;place-items:center;width:38px;height:38px;flex:none;border-radius:50%;border:1px solid var(--line);background:var(--surface);color:var(--muted);text-decoration:none;transition:color .2s,border-color .2s,background .2s,box-shadow .2s}
+.tmn-gear svg{transition:transform .5s cubic-bezier(.2,.8,.2,1)}
+.tmn-gear:hover,.tmn-gear:focus-visible{color:var(--accent);border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft,transparent)}
+.tmn-gear:hover svg,.tmn-gear:focus-visible svg{transform:rotate(45deg)}
+.tmn-gear:focus-visible{outline:none}
+@media (prefers-reduced-motion:reduce){.tmn-gear svg{transition:none}.tmn-gear:hover svg{transform:none}}
 .tmn-bar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between}
 .tmn-n{display:inline-block;min-width:18px;padding:0 5px;margin-left:3px;border-radius:99px;background:var(--surface-3);color:var(--muted);font:700 10.5px/17px var(--f-mono);text-align:center}
 .seg button[aria-pressed="true"] .tmn-n{background:var(--accent);color:#fff}

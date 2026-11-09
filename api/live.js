@@ -30,6 +30,8 @@ async function injuries() {
   return out;
 }
 
+const SEASON_OVER = /season[- ]ending|out for the (?:rest of the |remainder of the )?season|(?:miss|sidelined for|done for) the (?:rest|remainder) of the (?:\d{4} )?season|done for the (?:\d{4} )?season/i;
+
 /* ESPN injury notes (Rotowire-style), with practice participation through the week */
 let noteCache = { at: 0, data: null };
 async function notes() {
@@ -40,7 +42,10 @@ async function notes() {
     const a = x.athlete || {}, pos = a.position && a.position.abbreviation;
     if (pos && !['QB', 'RB', 'WR', 'TE', 'K', 'FB'].includes(pos)) continue;
     const team = fix((a.team && a.team.abbreviation) || '');
-    out.push({ n: a.displayName, t: team, st: x.status || '', at: x.date || null, note: String(x.shortComment || '').slice(0, 300), type: (x.details && (x.details.type || x.details.location)) || '' });
+    const d = x.details || {}, said = `${x.shortComment || ''} ${x.longComment || ''}`;
+    // ret: ESPN's expected return date. se: the note says he's done for the year.
+    out.push({ n: a.displayName, t: team, st: x.status || '', at: x.date || null, note: String(x.shortComment || '').slice(0, 300), type: d.type || d.location || '',
+      ret: d.returnDate || null, fs: (d.fantasyStatus && d.fantasyStatus.abbreviation) || '', se: SEASON_OVER.test(said) });
   }
   noteCache = { at: Date.now(), data: out };
   return out;

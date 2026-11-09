@@ -84,6 +84,20 @@ const activeOf=T=>{const ir=irOf(T);return T.players.filter(id=>!ir.includes(id)
 const irSet=()=>new Set(S.teams.flatMap(irOf));
 function irState(T){const ir=irOf(T),open=Math.max(0,irSlots()-ir.length),known=hasStatusData();
   return {ir,open,cand:known?activeOf(T).filter(irEligible).sort((a,b)=>tv(b)-tv(a)):[],stale:known?ir.filter(id=>!irEligible(id)):[]}}
+/* IR players coming back this season. ESPN's return date decides (from /api/live notes) unless its note calls the injury
+   season-ending, or its designated-to-return flag (IR-R) says he's practicing. With neither, he isn't treated as coming back.
+   Only IR players who are coming back show under Available and on the waiver wire. */
+const SEASON_OVER=/season[- ]ending|out for the (?:rest of the |remainder of the )?season|(?:miss|sidelined for|done for) the (?:rest|remainder) of the (?:\d{4} )?season|done for the (?:\d{4} )?season/i;
+function irReturn(id){if(!LONG_OUT.includes(stOf(id)))return {back:true,wk:WEEK};
+  const n=NOTES[id],last=Math.max(...poWeeks());
+  if(n&&(n.se||SEASON_OVER.test(n.note||'')))return {back:false,wk:null};
+  const t=n&&n.ret?Date.parse(n.ret):NaN,wk=isNaN(t)?null:WEEK+Math.max(0,Math.ceil((t-Date.now())/6048e5));
+  if(n&&n.fs==='IR-R')return {back:true,wk:wk&&wk<=last?wk:WEEK};
+  return wk!=null&&wk<=last?{back:true,wk}:{back:false,wk:null}}
+const irBack=id=>irReturn(id).back;
+/* share of the weeks left, playoffs included, he should play */
+function backShare(id){if(!LONG_OUT.includes(stOf(id)))return 1;const r=irReturn(id);if(!r.back)return 0;if(r.wk==null)return .5;
+  const last=Math.max(...poWeeks());return Math.max(0,Math.min(1,(last-r.wk+1)/Math.max(1,last-WEEK+1)))}
 const IR_WHY={IR:'on injured reserve',PUP:'on the PUP list',O:'ruled out',D:'doubtful',SUS:'suspended'};
 const grpOf=pos=>pos==='RB'?'RB':pos==='QB'?'QB':pos==='DST'?'DST':pos==='K'?'K':'REC';
 const volOf=p=>p.pos==='RB'?p.ratt+p.tgt:p.tgt;
@@ -131,7 +145,8 @@ function roleTxt2(id){const r=ROLE_UP[id];if(!r)return '';return r.pos==='RB'&&r
 function roleTag(id){const t=roleTxt2(id);return t?`<span class="tag up" title="Was ${ROLE_UP[id].pos}${ROLE_UP[id].was} on his team before the injury">▲ ${t}</span>`:''}
 function weekMult(id){const s=stOf(id);return (s==='O'||LONG_OUT.includes(s)?0:s==='D'?.3:s==='Q'?.92:1)*(WBOOST[id]||1)}
 function matesOut(p){return POOL.filter(q=>q.t===p.t&&q.id!==p.id&&grpOf(q.pos)===grpOf(p.pos)&&isOut(q.id)&&volOf(q)>=3)}
-const stHtml=id=>{const s=stOf(id);return s?`<span class="st st-${s}" title="${ST_LABEL[s]}${byId[id].inj?': '+esc(byId[id].inj):''}">${s}</span>`:''};
+const stHtml=id=>{const s=stOf(id);if(!s)return '';let back='';if(LONG_OUT.includes(s)){const r=irReturn(id);back=!r.back?'. Not expected back this season':r.wk?`. Expected back around Week ${r.wk}`:''}
+  return `<span class="st st-${s}" title="${ST_LABEL[s]}${byId[id].inj?': '+esc(byId[id].inj):''}${back}">${s}</span>`};
 const oppTxtLine=o=>{const pl=(n,w)=>`+${n} ${w}${n===1?'':'s'}`,w=[o.dc>=1?pl(Math.round(o.dc),'carry').replace('carrys','carries'):'',o.dt>=1?pl(Math.round(o.dt),'target'):''].filter(Boolean).join(', ');return `+${f1(o.dp)} pts a game${w?` (${w})`:''} with ${byId[o.from].n} ${o.long?'on '+ST_LABEL[stOf(o.from)].toLowerCase():'out this week'}.`};
 
 /* ===== Scoring engine ===== */
@@ -957,7 +972,7 @@ function renderFix(mine){
   $('fix-card').innerHTML=`<div class="fix-head"><b>${focus.join(' · ')}</b><span>${focus.length>1?'Weakest positions':'Weakest position'}: ${focus.map(x=>`${x}, ${f1(Math.abs(mine.rel[x]))} pts/wk below the league average`).join('; ')}. Recommended moves below.</span></div>
    ${focus.map(x=>{const f=faFor(x);return `<h4>Waiver options · ${x}</h4>${f.length?f.map(faRow).join(''):'<p class="empty">No waiver options improve this position.</p>'}`}).join('')}
    <h4>Best trade target</h4>${forWeak.length?`<div class="fix-trades">${(()=>{const u=new Set();return forWeak.map(t=>tradeCardHtml(t,tradeTitle(t,focus,u),true))})().join('')}</div>`:'<p class="empty">No balanced trades available for this position right now.</p>'}
-   <p class="note fix-more" style="margin:10px 0 0"><a href="#trade">More trade ideas in Trades →</a></p>`;
+   <p class="note fix-more" style="margin:10px 0 0"><a href="#trade-ideas">More trade ideas in Trades →</a></p>`;
 }
 
 /* ===== RANKINGS ===== */
@@ -965,10 +980,10 @@ let rankPos='ALL',rankOwn='all';
 function renderRankings(){
   $('rank-kicker').textContent=`${S.league.name||'My League'} · ${leagueTagline(S.league)}`;
   const q=$('rank-search').value.trim().toLowerCase();
-  const RN={buy:'Buy low: good players who scored less than expected the last two weeks but are still getting the ball. They should bounce back.',
+  const RN={free:'Available: players no one in your league has. Players on IR show only when they are expected back this season.',buy:'Buy low: good players who scored less than expected the last two weeks but are still getting the ball. They should bounce back.',
     opp:'Opportunities: players who should get more work because a teammate at their position just got hurt.'};
   $('rank-note').hidden=!RN[rankOwn];$('rank-note').textContent=RN[rankOwn]||'';
-  const L=V.list.filter(p=>(rankPos==='ALL'||p.pos===rankPos)&&(!q||p.n.toLowerCase().includes(q)||p.t.toLowerCase()===q)&&(rankOwn==='all'||(rankOwn==='free'&&!OWN[p.id])||(rankOwn==='buy'&&G[p.id].buy)||(rankOwn==='opp'&&G[p.id].opp.length)));
+  const L=V.list.filter(p=>(rankPos==='ALL'||p.pos===rankPos)&&(!q||p.n.toLowerCase().includes(q)||p.t.toLowerCase()===q)&&(rankOwn==='all'||(rankOwn==='free'&&!OWN[p.id]&&irBack(p.id))||(rankOwn==='buy'&&G[p.id].buy)||(rankOwn==='opp'&&G[p.id].opp.length)));
   const cap=q||RANK_ALL?L.length:300,more=L.length-cap;L.length=Math.min(L.length,cap);
   setTimeout(()=>{const m=$('rank-more');if(m)m.innerHTML=more>0?`<button class="btn" id="rank-all">Show all ${(L.length+more).toLocaleString()} players</button>`:''},0);
   $('rank-body').innerHTML=L.map(p=>{const g=G[p.id],o=OWN[p.id];return `<tr><td class="r num">${V.rank[p.id]}</td><td data-v="${esc(p.n.toLowerCase())}"><div class="pl">${av(p,'sm')}<div class="meta"><span style="display:flex;gap:6px;align-items:center"><button class="pname" data-open="${p.id}">${esc(p.n)}</button>${o!==S.me?followBtn(p.id,true):''}${tagHtml(p.id)}${g.risk?'<span class="badge risk" title="Risk: open the player to see why">RISK</span>':''}${g.opp.length?'<span class="badge opp" title="More work with a teammate out">UP</span>':''}</span><span class="psub">${p.t} · ${oppHtml(p.id)}</span>${rankOwn==='buy'&&g.buy?`<span class="why-line">${esc(g.buy[0])}</span>`:rankOwn==='opp'&&g.opp.length?`<span class="why-line">${esc(oppTxtLine(g.opp[0]))}</span>`:''}</div></div></td>
@@ -1053,16 +1068,23 @@ function sortTable(id){const tbl=document.getElementById(id);if(!tbl)return;cons
 
 /* ===== TRADES ===== */
 let tgtPos='ALL',rosPos='ALL',sugSkip=0;
+/* Trades tab views, like the Players tab: the builder, or the recommended trades */
+var trView=(()=>{try{return localStorage.getItem('tm_trv')==='ideas'?'ideas':'build'}catch(e){return 'build'}})();
+const TR_INTRO={build:`Build a deal and see how it grades for both teams. <a class="how" href="#help-trades">How this works</a>`,
+  ideas:`Fair deals that make your lineup better. <a class="how" href="#help-trades">How this works</a>`};
+function setTrView(v){trView=v==='ideas'?'ideas':'build';try{localStorage.setItem('tm_trv',trView)}catch(e){}}
 const shortName=n=>{const w=n.split(' ');return w.length>1&&!/D\/ST$/.test(n)?w[0][0]+'. '+w.slice(1).join(' '):n};
 if(!window.__trade)window.__trade={give:[],get:[]};
 const TD=window.__trade;
 function renderTrade(){
+  $('trade-kicker').textContent=`${S.league.name||'My League'} · ${leagueTagline(S.league)}`;$('tr-intro').innerHTML=TR_INTRO[trView];
+  document.querySelectorAll('#tr-seg button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.trv===trView));$('tr-build').hidden=trView!=='build';$('tr-ideas').hidden=trView!=='ideas';
   let sug=pickDiverse(allTrades(),3,sugSkip);
   /* fill with alternatives from other teams; they may reuse one of your players, since you'd only make one of these deals */
   if(sug.length<3){const used=new Set(sug.map(t=>t.team)),pool=allTrades(true).filter(t=>!used.has(t.team)&&!sug.some(x=>x.get.some(id=>t.get.includes(id))&&x.give.join()===t.give.join()));sug=sug.concat(pickDiverse(pool,3-sug.length,0,true,sug.some(t=>t.give.concat(t.get).some(id=>byId[id].pos==='QB'))?1:0))}
   $('suggestions').innerHTML=sug.length?(()=>{const used=new Set();return sug.map(t=>tradeCardHtml(t,tradeTitle(t,null,used))).join('')})()
     :`<div class="card" style="grid-column:1/-1"><p class="empty" style="margin:0">No fair trades found. Fill in the other teams in League Hub and TradeMetric will build ideas from their rosters.</p></div>`;
-  $('sug-note').textContent=sug.length?`${sug.length} ideas for ${myTeam().name}`:'';
+  $('sug-note').textContent=sug.length?`${sug.length} ideas for ${myTeam().name}`:'';$('tr-n').textContent=sug.length||'';
   const me=myTeam();TD.give=TD.give.filter(id=>me.players.includes(id));TD.get=TD.get.filter(id=>OWN[id]&&OWN[id]!==S.me);
   const card=(id,kind)=>{const p=byId[id],g=G[id];
     return `<div class="tb-card ${kind}${TD.fresh===id?' fresh':''}">${av(p,'md')}<div class="tb-meta"><span class="tb-name"><button class="pname" data-open="${id}">${esc(p.n)}</button>${tagHtml(id)}</span><span class="psub">${p.pos}${V.posRank[id]} · ${p.t} · ${oppHtml(id)}</span>
@@ -1707,12 +1729,12 @@ $('theme-btn').addEventListener('click',()=>{themePref=isDark()?'light':'dark';t
 const TABS=['team','news','trade','rankings','hub','season','league','draft','help','welcome','signin','account'];let tab='team';
 function howLink(k){return `<a class="how how-wrap" href="#help-${k}">How this works</a>`}
 const TAB_ALIAS={players:['rankings','rank'],waivers:['rankings','waiv'],values:['rankings','vals']};
-function go(t){let helpSec=null;if(t&&t.startsWith('help-')){helpSec=t.slice(5);t='help'}if(t&&t.startsWith('account-')){ACC_TAB=t.slice(8);t='account'}else if(t==='account')ACC_TAB='profile';if(t!==tab||t==='account'){ACC_EDIT=null;ACC_MSG=null}if(TAB_ALIAS[t]){plView=TAB_ALIAS[t][1];t=TAB_ALIAS[t][0]}if(t==='helper'){if(USER)openAI();t=TABS.includes(tab)?tab:'team';history.replaceState(null,'','#'+t)}if(!USER&&t!=='signin')t='signin';tab=TABS.includes(t)?t:'team';if(tab!=='welcome'&&S&&!S.onboarded){S.onboarded=true;save()}document.querySelectorAll('.nav button').forEach(b=>{if(b.dataset.tab===tab)b.setAttribute('aria-current','page');else b.removeAttribute('aria-current')});
+function go(t){let helpSec=null;if(t&&t.startsWith('help-')){helpSec=t.slice(5);t='help'}if(t&&t.startsWith('account-')){ACC_TAB=t.slice(8);t='account'}else if(t==='account')ACC_TAB='profile';if(t!==tab||t==='account'){ACC_EDIT=null;ACC_MSG=null}if(t==='trade-ideas'||t==='trade-builder'){setTrView(t==='trade-ideas'?'ideas':'build');t='trade'}if(TAB_ALIAS[t]){plView=TAB_ALIAS[t][1];t=TAB_ALIAS[t][0]}if(t==='helper'){if(USER)openAI();t=TABS.includes(tab)?tab:'team';history.replaceState(null,'','#'+t)}if(!USER&&t!=='signin')t='signin';tab=TABS.includes(t)?t:'team';if(tab!=='welcome'&&S&&!S.onboarded){S.onboarded=true;save()}document.querySelectorAll('.nav button').forEach(b=>{if(b.dataset.tab===tab)b.setAttribute('aria-current','page');else b.removeAttribute('aria-current')});
   TABS.forEach(x=>$('v-'+x).hidden=x!==tab);render();window.scrollTo(0,0);if(tab==='help')openHelp(helpSec)}
 function render(){({team:renderTeam,news:tmnRender,rankings:renderPlayers,draft:renderDraft,help:()=>{},trade:renderTrade,hub:renderHub,season:renderSeason,welcome:renderWelcome,league:fillLeagueForm,signin:renderSignin,account:renderAccount})[tab]();renderAlerts();if(openId&&!$('scrim').hidden)openCard(openId);queueBalance()}
 document.querySelectorAll('.nav button').forEach(b=>b.addEventListener('click',()=>{location.hash=b.dataset.hash||b.dataset.tab}));
 window.addEventListener('hashchange',()=>{closeCard();go(location.hash.slice(1))});
-function loadTrade(str){const [g,r]=str.split('|');TD.give=g?g.split(','):[];TD.get=r?r.split(','):[];closeCard();if(tab==='trade')renderTrade();else location.hash='trade';setTimeout(()=>$('rating').scrollIntoView({behavior:'smooth',block:'center'}),60)}
+function loadTrade(str){setTrView('build');const [g,r]=str.split('|');TD.give=g?g.split(','):[];TD.get=r?r.split(','):[];closeCard();if(tab==='trade')renderTrade();else location.hash='trade';setTimeout(()=>$('rating').scrollIntoView({behavior:'smooth',block:'center'}),60)}
 document.addEventListener('click',e=>{
   if(e.target===$('scrim')){closeCard();return}
   const th=e.target.closest('th[data-sort]');if(th){const tbl=th.closest('table'),i=[...th.parentNode.children].indexOf(th),st=SORTS[tbl.id];SORTS[tbl.id]=st&&st.col===i?{col:i,dir:st.dir==='desc'?'asc':'desc'}:{col:i,dir:th.dataset.first||'desc'};sortTable(tbl.id);return}
@@ -2419,16 +2441,17 @@ function posNeed(x){const s=S.league.slots;if(x==='K'||x==='DST')return s[x]||0;
   const fl=s.FLEX||0,sf=s.SFLEX||0,st=(s[x]||0)+(x==='QB'?sf:x==='TE'?fl*.15:fl*.45+sf*.1);return Math.round(st)+(x==='RB'?2:1)}
 function waiverList(){if(WV.v===VER)return WV.rows;const me=myTeam(),rosV=id=>LONG_OUT.includes(stOf(id))?0:V.ros[id]||0;
   const beforeR=lineup(me.players,rosV).total,beforeW=lineup(me.players,nextV).total;
-  const fa=POOL.filter(p=>!OWN[p.id]&&!LONG_OUT.includes(stOf(p.id))),rep={},have={};
-  POS.forEach(x=>{const a=fa.filter(p=>p.pos===x).map(p=>V.ros[p.id]).sort((a,b)=>b-a);rep[x]=a[Math.min(a.length-1,7)]||0;
+  /* IR players count only if they're coming back, valued for the share of the weeks left they should play */
+  const fa=POOL.filter(p=>!OWN[p.id]&&irBack(p.id)),rosOf=id=>(V.ros[id]||0)*backShare(id),rep={},have={};
+  POS.forEach(x=>{const a=fa.filter(p=>p.pos===x).map(p=>rosOf(p.id)).sort((a,b)=>b-a);rep[x]=a[Math.min(a.length-1,7)]||0;
     have[x]=me.players.filter(id=>byId[id]&&byId[id].pos===x&&!LONG_OUT.includes(stOf(id))).length});
   const want={};POS.forEach(x=>want[x]=teamStats().rows.filter(r=>r.T.id!==S.me&&r.needs.includes(x)).length);
-  const rows=fa.filter(p=>V.ros[p.id]>2||G[p.id].opp.length).map(p=>{const drop=dropFor(p.id),after=me.players.filter(x=>x!==drop).concat(p.id);
-    const gR=drop?lineup(after,rosV).total-beforeR:0,gW=drop?lineup(after,nextV).total-beforeW:0;
+  const rows=fa.filter(p=>rosOf(p.id)>2||G[p.id].opp.length).map(p=>{const drop=dropFor(p.id),after=me.players.filter(x=>x!==drop).concat(p.id),rv=id=>id===p.id?rosOf(id):rosV(id);
+    const gR=drop?lineup(after,rv).total-beforeR:0,gW=drop?lineup(after,nextV).total-beforeW:0;
     /* need: 1 when short at the position, .3 when you already have enough, .1 once he'd be well past that */
     const gap=posNeed(p.pos)-have[p.pos]+(drop&&byId[drop].pos===p.pos?1:0),need=gap>0?1:gap===0?.3:.1;
     /* depth is judged above what's freely available at each position, so high-scoring QBs don't win on raw points */
-    const over=Math.max(0,V.ros[p.id]-rep[p.pos]),dOver=drop?Math.max(0,(V.ros[drop]||0)-(rep[byId[drop].pos]||0)):0,depth=Math.max(0,over-dOver)*need*.6;
+    const over=Math.max(0,rosOf(p.id)-rep[p.pos]),dOver=drop?Math.max(0,(V.ros[drop]||0)-(rep[byId[drop].pos]||0)):0,depth=Math.max(0,over-dOver)*need*.6;
     const hot=G[p.id].opp.some(o=>o.long)?1.35:G[p.id].opp.length?1.15:1;
     const score=(Math.max(0,gR)+Math.max(0,gW)*.35+depth)*hot;
     return {p,drop,g:gR,gW,need,over,want:want[p.pos]||0,score}}).sort((a,b)=>b.score-a.score);
@@ -2440,12 +2463,14 @@ function bidFor(r){const B=S.league.budget??100,wf=Math.min(1,weeksLeft()/9),com
   let pc=r.score<.3?0:Math.min(45,1.6*Math.pow(r.score,1.35))*(.45+.55*wf)*comp;pc=Math.min(pc,r.p.pos==='K'||r.p.pos==='DST'?2:45);
   const lo=Math.round(B*pc*.8/100),hi=Math.round(B*pc*1.2/100);return {pc,lo:pc>0?Math.max(1,lo):0,hi:pc>0?Math.max(1,hi):0}}
 function claimTxt(r){return r.score>=3?'Use a top claim':r.score>=1.2?'Worth a claim':'Free agent add'}
+const irLine=id=>{if(!LONG_OUT.includes(stOf(id)))return '';const r=irReturn(id);
+  return `<span class="why-line">${ST_LABEL[stOf(id)]}. ${r.wk?(r.wk<=WEEK?'Could be back this week.':`Expected back around Week ${r.wk}.`):'Experts expect him back this season.'}</span>`};
 function renderWaivers(){const faab=(S.league.waiver||'faab')==='faab',B=S.league.budget??100;
   const rows=waiverList().filter(r=>waivPos==='ALL'||r.p.pos===waivPos).slice(0,40);
   $('pl-waiv').innerHTML=`<div class="toolbar">${posSeg('wpos',waivPos,['ALL','QB','RB','WR','TE','K','DST'])}
     <span class="note">${faab?`Bids assume a <b>$${B}</b> season budget with ${weeksLeft()} weeks left, playoffs included. <a href="#league">Change</a>`:`Your league uses waiver order. <a href="#league">Switch to bidding</a>`}</span></div>
     <div class="tablebox"><table class="waiv-t" style="min-width:880px"><thead><tr><th>Player</th><th class="r">Pts/G ahead</th><th class="r">Wk ${WEEK}</th><th class="r" title="Share of leagues where he is rostered (FantasyPros)">Rostered</th><th class="r">Your gain</th><th class="r">${faab?'Suggested bid':'Claim'}</th><th>Drop</th><th></th></tr></thead><tbody>
-    ${rows.map(r=>{const p=r.p,g=G[p.id],b=bidFor(r);return `<tr><td>${plCell(p,`${p.pos}${V.posRank[p.id]} · ${p.t} · ${oppHtml(p.id)}${roleTag(p.id)?' '+roleTag(p.id):''}`)}${g.opp.length?`<span class="why-line">${esc(oppTxtLine(g.opp[0]))}</span>`:g.look&&g.look[0]?`<span class="why-line">${esc(g.look[0])}</span>`:''}</td>
+    ${rows.map(r=>{const p=r.p,g=G[p.id],b=bidFor(r);return `<tr><td>${plCell(p,`${p.pos}${V.posRank[p.id]} · ${p.t} · ${oppHtml(p.id)}${roleTag(p.id)?' '+roleTag(p.id):''}`)}${irLine(p.id)||(g.opp.length?`<span class="why-line">${esc(oppTxtLine(g.opp[0]))}</span>`:'')||(g.look&&g.look[0]?`<span class="why-line">${esc(g.look[0])}</span>`:'')}</td>
       <td class="r num">${f1(V.ros[p.id])}</td><td class="r num">${wkCell(nextWk(p.id))}</td><td class="r num">${ROST[p.id]!=null?ROST[p.id]+'%':'<span class="muted">-</span>'}</td>
       <td class="r">${r.g>.05?`<span class="gain">+${f1(r.g)}/wk</span>`:r.gW>.05?`<span class="gain">+${f1(r.gW)} Wk ${WEEK}</span>`:r.need>=1?`<span class="note">Need at ${p.pos==='DST'?'D/ST':p.pos}</span>`:r.need>=.3?'<span class="note">Depth</span>':`<span class="note">Already deep at ${p.pos==='DST'?'D/ST':p.pos}</span>`}</td>
       <td class="r">${faab?(b.hi?`<b class="bid num">$${b.lo===b.hi?b.lo:b.lo+'–'+b.hi}</b><span class="bid-p">${Math.round(b.pc)}% of budget</span>`:'<span class="note">$0–1</span>'):`<b class="bid">${claimTxt(r)}</b>`}</td>
@@ -2617,6 +2642,7 @@ document.addEventListener('click',e=>{const t=e.target.closest&&e.target.closest
   if(t.id==='alert-btn'){toggleAlerts();return}
   if(t.closest('#alert-pop')&&d.open){toggleAlerts(false);return}
   if(d.pl){plView=d.pl;renderPlayers();queueBalance();return}
+  if(d.trv){setTrView(d.trv);renderTrade();queueBalance();return}
   if(d.wpos){waivPos=d.wpos;renderWaivers();return}
   if(d.vpos){valPos=d.vpos;renderValues();return}
   if(t.id==='val-all'){VAL_ALL=true;renderValues();return}

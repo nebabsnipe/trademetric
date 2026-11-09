@@ -11,7 +11,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600;700;800&family=Kanit:ital,wght@0,700;0,800;1,600;1,700;1,800&display=swap">
 <meta name="description" content="Fantasy football trades, rankings and lineup advice built on your league's exact settings.">
-<link rel="stylesheet" href="css/styles.css?v=8">
+<link rel="stylesheet" href="css/styles.css?v=9">
 </head>
 <body class="signed-out">
 <div class="topbar">
@@ -96,9 +96,9 @@
 
   <!-- TRADES -->
   <section class="view" id="v-trade" hidden>
-    <div class="hero"><div><div class="kicker">Trade center</div><h1>Trades</h1><p><a class="how" href="#help-trades">How this works</a></p></div></div>
-    <div class="tr-sec">
-      <div class="tr-sec-h"><div><h2>Trade builder</h2></div></div>
+    <div class="hero"><div><div class="kicker" id="trade-kicker"></div><h1>Trades</h1><p id="tr-intro"></p></div>
+      <div class="seg pl-seg" id="tr-seg" aria-label="Trade views"><button data-trv="build" aria-pressed="true">Trade builder</button><button data-trv="ideas" aria-pressed="false">Trade ideas<span class="tr-n" id="tr-n"></span></button></div></div>
+    <div class="tr-sec" id="tr-build">
       <div class="grid2 grid-trade">
         <div class="stack">
           <div class="card tb"><div class="card-h"><h2>Trade table</h2><button class="btn small ghost" id="trade-reset">Clear</button></div>
@@ -123,8 +123,8 @@
         </div>
       </div>
     </div>
-    <div class="tr-sec">
-      <div class="tr-sec-h"><div><h2>Recommended trades</h2><span class="note" id="sug-note"></span></div><button class="btn" id="refresh-trades">New ideas</button></div>
+    <div class="tr-sec" id="tr-ideas" hidden>
+      <div class="toolbar tr-bar"><span class="note" id="sug-note"></span><button class="btn" id="refresh-trades">New ideas</button></div>
       <div class="grid3" id="suggestions"></div>
     </div>
   </section>
@@ -238,11 +238,11 @@
       <details class="faq-i" id="faq-rankings"><summary>Rankings and tags</summary><div class="faq-b"><p>Players are ranked by value over a waiver-level player for your league's scoring and roster. <b>Pts/G</b> is projected points per game from here on.</p>
 <p><span class="badge buy">BL</span> <b>Buy low:</b> a good player who scored less than expected lately but is still getting the ball, or whom experts rank well above how he has scored. <span class="badge sell">SH</span> <b>Sell high:</b> scoring above what his role or the experts support. <span class="badge risk">RISK</span>: scoring above his workload, or facing a hard schedule. Defenses and kickers never get buy or sell tags.</p>
 <p><b>Trend</b> is his last three games against his season average. <b>Opp/G</b> is carries plus targets per game.</p></div></details>
-      <details class="faq-i" id="faq-waivers"><summary>Waiver wire and bids</summary><div class="faq-b"><p><b>Your gain</b> is how many points a week your best lineup changes after adding him and dropping the player shown. <b>Pts/G ahead</b> blends TradeMetric's projection with the experts' rest-of-season ranks.</p>
+      <details class="faq-i" id="faq-waivers"><summary>Waiver wire and bids</summary><div class="faq-b"><p><b>Your gain</b> is how many points a week your best lineup changes after adding him and dropping the player shown. <b>Pts/G ahead</b> blends TradeMetric's projection with the experts' rest-of-season ranks.</p><p>Players on injured reserve show on the waiver wire and under <b>Available</b> only when they're expected back this season, using ESPN's return date. Their value counts only the weeks they should play.</p>
 <p>The suggested bid is a share of your season budget. It rises with his value to you and to the league, rises when other teams need his position and when he is moving into a bigger role, and falls as fewer weeks are left. In leagues that use waiver order, it suggests whether he is worth a high claim instead.</p></div></details>
       <details class="faq-i" id="faq-tradevalues"><summary>Trade values</summary><div class="faq-b"><p>Each player gets a 0 to 100 score: half from trade market values (FantasyCalc, KeepTradeCut and FantasyPros) and half from TradeMetric's rest-of-season projection for your scoring. Stars count for more than the sum of lesser players, so two 30s rarely get you a 60.</p>
 <p>Tiers group players with similar scores at each position. In keeper and dynasty leagues, long-term value is blended in.</p></div></details>
-      <details class="faq-i" id="faq-trades"><summary>Trade suggestions and grades</summary><div class="faq-b"><p>TradeMetric looks at every deal from one-for-one up to three-for-two with each team, then keeps the ones that help you and that the other manager has a reason to accept: fair market value, a better lineup for them, or filling a need.</p>
+      <details class="faq-i" id="faq-trades"><summary>Trade suggestions and grades</summary><div class="faq-b"><p>TradeMetric looks at every deal from one-for-one up to three-for-two with each team, then keeps the ones that help you and that the other manager has a reason to accept: fair market value, a better lineup for them, or filling a need.</p><p>Find them under <b>Trade ideas</b> at the top of the Trades tab. <b>Open in builder</b> moves a deal to the <b>Trade builder</b> to grade or change.</p>
 <p>The shape fits each team's situation. A team with depth to spare gets offered a consolidation, two players for one better starter. A team with injured starters or holes in its lineup gets offered extra bodies. Trades that would force a team to cut a starter are left out.</p>
 <p>Your grade weighs points added each week, your playoff weeks (15 to 17 count extra), and the change in your playoff and title odds, minus injury and stacking risk. What counts most depends on where you stand: contenders care about the playoffs, teams on the bubble about winning now. Once any player in a deal has played this week, the grade counts from next week on, since this week's points can't change hands.</p><p><b>Realistic trades.</b> Every deal is also checked the way a real manager would see it:</p><ul>
 <li><b>Starting lineup, before and after:</b> each team's best starting lineup in points per week over the rest of the season, now and after the trade. Suggestions only show deals where both lineups get better or stay about even.</li>
@@ -331,7 +331,7 @@
 <script>
 /* Load the stats snapshot, then start the app */
 fetch('data/nfl.json',{cache:'no-cache'}).then(r=>r.json()).then(d=>{
-  window.NFL_DATA=d;const n=document.createElement('script');n.src='js/news.js?v=4';n.onload=n.onerror=()=>{const s=document.createElement('script');s.src='js/app.js?v=7';document.body.appendChild(s)};document.body.appendChild(n);
+  window.NFL_DATA=d;const n=document.createElement('script');n.src='js/news.js?v=5';n.onload=n.onerror=()=>{const s=document.createElement('script');s.src='js/app.js?v=8';document.body.appendChild(s)};document.body.appendChild(n);
 }).catch(()=>{document.body.insertAdjacentHTML('afterbegin','<p style="padding:20px;font-family:sans-serif">Could not load player data. Refresh to try again.</p>')});
 </script>
 </body>
