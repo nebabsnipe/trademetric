@@ -22,5 +22,6 @@
       "destination": "https://www.trademetric.app/:path*",
       "permanent": false
     }
-  ]
+  ],
+  "cleanUrls": true
 }
