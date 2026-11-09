@@ -1926,7 +1926,7 @@ function checkUsername(raw){const u=String(raw||'').trim().toLowerCase();clearTi
   UN_STATE={u,ok:null,text:'Checking...'};paintUn();
   UN_T=setTimeout(async()=>{const {data,error}=await SB.rpc('username_available',{p_username:u});if(!UN_STATE||UN_STATE.u!==u)return;
     UN_STATE=error?{u,ok:null,text:"Can't check that right now"}:{u,ok:data!==false,text:data===false?'Taken. Try another.':'Available'};paintUn()},350)}
-function enterApp(){stopConfirmWatch();document.body.classList.remove('signed-out');setTimeout(syncNow,300);AUTH_MODE='in';AUTH_MSG=null;PENDING=null;AUTH_VALS={};UN_STATE=null;
+function enterApp(){stopConfirmWatch();document.body.classList.remove('signed-out');setTimeout(syncNow,300);if(typeof tmnTopBanners==='function')setTimeout(()=>{tmnTopCatchUp();tmnTopBanners()},2000);AUTH_MODE='in';AUTH_MSG=null;PENDING=null;AUTH_VALS={};UN_STATE=null;
   let t=INTENDED&&TABS.includes(INTENDED.replace(/-.*/,''))&&INTENDED!=='signin'?INTENDED:'team';INTENDED=null;if(!S.onboarded)t='welcome';
   if(location.hash.slice(1)===t)go(t);else location.hash=t}
 function showSignin(){if(tab!=='signin'){if(location.hash==='#signin')go('signin');else location.hash='signin'}else renderSignin()}
@@ -2070,7 +2070,7 @@ document.addEventListener('submit',e=>{if(e.target.id!=='auth-form')return;e.pre
 initAccounts();
 
 /* ===== Highlights tab: results, clips (ESPN + NFL on YouTube) and news for your team and everyone you follow ===== */
-var FEED=null,FEED_AT=0,FEED_F='all',FEED_LOADING=false,REC_CACHE2={at:-1,list:[]},PV={key:'',map:{}},CLIPS=[],CV_OBS=null,CV_CUR=-1;
+var FEED=null,FEED_AT=0,FEED_F='all',FEED_LOADING=false,REC_CACHE2={at:-1,list:[]},PV={key:'',map:{}},CLIPS=[];
 const FEED_LS='tm-feed-cache3';
 const isFollowing=id=>(S.following||[]).includes(id);
 function followBtn(id,mini){const on=isFollowing(id);return mini?`<button class="star${on?' on':''}" data-follow="${id}" title="${on?'Following. Click to unfollow':'Follow this player in Highlights'}" aria-label="${on?'Unfollow':'Follow'}">${on?'★':'☆'}</button>`
@@ -2132,9 +2132,11 @@ function playerNews(p){if(!FEED||p.pos==='DST')return [];const full=norm(p.n);
 const chName=v=>v.src==='espn'?'ESPN':v.ch&&v.ch!=='NFL'?(NICK[v.ch]||v.ch):'NFL';
 const srcBadge=v=>`<span class="srcb ${v.src==='espn'?'espn':'youtube'}">${esc(chName(v))}</span>`;
 const nflUrl=p=>p.pos==='DST'?`https://www.nfl.com/teams/`:`https://www.nfl.com/players/${p.id}/`;
-function thumbHtml(v,size){const i=CLIPS.findIndex(c=>c.id===v.id);const p=v.player?byId[v.player]:null;
-  return `<button class="hthumb ${size||''}" data-clip="${i}" title="${esc(v.title)}"><span class="vimg${v.thumb?'':' noimg'}" style="${tcVars(p?p.t:(v.teams[0]||''))}">${v.thumb?`<img src="${esc(v.thumb)}" alt="" loading="lazy" decoding="async" onerror="this.remove()">`:''}<span class="vplay" aria-hidden="true"></span>${srcBadge(v)}${v.dur?`<span class="vdur">${Math.floor(v.dur/60)}:${String(v.dur%60).padStart(2,'0')}</span>`:''}</span>
-    ${size==='xs'?'':`<span class="vtitle">${v.game?'<span class="vtag">Game</span>':''}${esc(v.title)}</span><span class="note">${p&&size!=='lg'?esc(p.n)+' · ':''}Week ${v.week}${v.at?' · '+ago(v.at):''}</span>`}</button>`}
+/* Clips are never played on TradeMetric: every thumbnail is a link that opens the clip on ESPN or YouTube in a new tab. */
+const clipOut=v=>v.src==='espn'?'ESPN':'YouTube';
+function thumbHtml(v,size){const p=v.player?byId[v.player]:null,tag=v.url?'a':'span',attr=v.url?` href="${esc(v.url)}" target="_blank" rel="noopener"`:'';
+  return `<${tag} class="hthumb ${size||''}"${attr} title="${esc(v.title)}${v.url?' (opens on '+clipOut(v)+')':''}"><span class="vimg${v.thumb?'':' noimg'}" style="${tcVars(p?p.t:(v.teams[0]||''))}">${v.thumb?`<img src="${esc(v.thumb)}" alt="" loading="lazy" decoding="async" onerror="this.remove()">`:''}<span class="vplay" aria-hidden="true"></span>${srcBadge(v)}<span class="vout" aria-hidden="true">↗</span>${v.dur?`<span class="vdur">${Math.floor(v.dur/60)}:${String(v.dur%60).padStart(2,'0')}</span>`:''}</span>
+    ${size==='xs'?'':`<span class="vtitle">${v.game?'<span class="vtag">Game</span>':''}${esc(v.title)}</span><span class="note">${p&&size!=='lg'?esc(p.n)+' · ':''}Week ${v.week}${v.at?' · '+ago(v.at):''} · ${clipOut(v)} ↗</span>`}</${tag}>`}
 function buildClips(list){const own=[],games=[],seen=new Set();
   list.forEach(({id})=>playerVideos(byId[id]).forEach(v=>{if(seen.has(v.id))return;seen.add(v.id);(v.game?games:own).push({...v,player:v.game?null:id})}));
   own.sort((a,b)=>b.week-a.week||Date.parse(b.at||0)-Date.parse(a.at||0));games.sort((a,b)=>b.week-a.week||Date.parse(b.at||0)-Date.parse(a.at||0));
@@ -2155,8 +2157,8 @@ function renderFeed(){
     top.innerHTML=`<div class="card hl-feature"><div class="hl-feat-main">${thumbHtml(f,'lg')}</div>
       <div class="hl-feat-side"><div class="kicker">${CLIPS.length} clip${CLIPS.length>1?'s':''} · ${FEED_F==='mine'?'your team':FEED_F==='follow'?'players and teams you follow':'your team and follows'}</div>
         <h2>${fp?esc(fp.n):'Latest highlights'}</h2>
-        <div class="hl-upnext">${up.map(v=>`<button class="hl-up" data-clip="${CLIPS.indexOf(v)}"><span class="vimg${v.thumb?'':' noimg'}" style="${tcVars(v.player?byId[v.player].t:(v.teams[0]||''))}">${v.thumb?`<img src="${esc(v.thumb)}" alt="" loading="lazy" decoding="async" onerror="this.remove()">`:''}</span><span><b>${esc(v.title)}</b><span class="note">${v.player?esc(byId[v.player].n)+' · ':''}${v.src==='espn'?'ESPN':esc(chName(v))+' on YouTube'}</span></span></button>`).join('')}</div>
-        <button class="btn primary hl-watch" data-clip="0"><span class="play" aria-hidden="true"></span>Watch all clips</button></div></div>`}
+        <div class="hl-upnext">${up.map(v=>`<a class="hl-up" href="${esc(v.url||'#')}" target="_blank" rel="noopener"><span class="vimg${v.thumb?'':' noimg'}" style="${tcVars(v.player?byId[v.player].t:(v.teams[0]||''))}">${v.thumb?`<img src="${esc(v.thumb)}" alt="" loading="lazy" decoding="async" onerror="this.remove()">`:''}</span><span><b>${esc(v.title)}</b><span class="note">${v.player?esc(byId[v.player].n)+' · ':''}${v.src==='espn'?'ESPN':esc(chName(v))+' on YouTube'} ↗</span></span></a>`).join('')}</div>
+        <p class="note hl-out">Clips open on ESPN or YouTube in a new tab.</p></div></div>`}
   /* player rows */
   if(!list.length){$('feed-list').innerHTML=`<div class="card empty-card">${FEED_F==='follow'?`<h2>Follow players and teams</h2><p class="note">Pick teams and players in the Following tab.</p><button class="btn" data-ff="follow">Choose who to follow</button>`:'<p class="empty">No players here yet.</p>'}</div>`}
   else $('feed-list').innerHTML=list.map(({id,slot})=>{const p=byId[id],g=G[id],gm=feedGame(p),lv=liveOf(id),st=LIVEST[id];
@@ -2169,7 +2171,7 @@ function renderFeed(){
     return `<article class="hl-row"><div class="hl-head"><span class="fd-slot">${slot}</span>${av(p)}<div class="fd-who"><div class="fd-name"><button class="pname" data-open="${id}">${esc(p.n)}</button>${stHtml(id)}${OWN[id]!==S.me?followBtn(id,true):''}</div><div class="fd-meta"><span class="psub">${p.pos} · ${p.t}</span>${chip}</div></div><div class="fd-pts">${pts==null?'<b class="num">—</b>':`<b class="num">${f1(pts)}</b>`}<span class="note">${sub}</span></div></div>
       ${line?`<p class="hl-line">${esc(line)}</p>`:''}
       ${vids.length?`<div class="hl-clips">${vids.map(v=>thumbHtml(v,'sm')).join('')}</div>`:''}
-      <div class="hl-links"><a href="${nflUrl(p)}" target="_blank" rel="noopener">${p.pos==='DST'?'NFL.com':'NFL.com profile'} ↗</a>${vids.length?`<button class="linkish" data-pclips="${id}">Watch ${vids.length} clip${vids.length>1?'s':''}</button>`:''}</div>
+      <div class="hl-links"><a href="${nflUrl(p)}" target="_blank" rel="noopener">${p.pos==='DST'?'NFL.com':'NFL.com profile'} ↗</a></div>
       ${news?`<a class="hl-news1" href="${esc(news.url||'#')}" target="_blank" rel="noopener"><b>${esc(news.title)}</b>${news.at?`<span class="note"> · ${ago(news.at)}</span>`:''}</a>`:''}</article>`}).join('');
   /* side: follow tools on Following, news for everyone in view */
   const seenN=new Set(),allNews=[];list.forEach(({id})=>playerNews(byId[id]).forEach(a=>{if(!seenN.has(a.title)){seenN.add(a.title);allNews.push({...a,pid:id})}}));
@@ -2182,44 +2184,16 @@ function followPanelHtml(){const ft=S.followTeams||[],teams=Object.keys(NICK).so
       <select id="team-add" aria-label="Follow a team"><option value="">+ Follow a team</option>${teams.filter(t=>!ft.includes(t)).map(t=>`<option value="${t}">${esc(teamName(t))} (${t})</option>`).join('')}</select></div>
     <div class="card-h" style="margin-top:20px"><h2>Recommended</h2></div><p class="note" style="margin:-4px 0 10px">Most highlight clips the last two weeks.</p>
     ${!FEED?'<p class="note">Loading...</p>':rec.length?`<div class="rec-list">${rec.map(r=>{const p=byId[r.id];return `<div class="rec">${av(p,'sm')}<div class="rec-who"><button class="pname" data-open="${p.id}">${esc(p.n)}</button><span class="psub">${p.pos} · ${p.t} · ${r.n} clip${r.n>1?'s':''}</span></div>${followBtn(p.id,false).replace('follow-btn','follow-btn light')}</div>`}).join('')}</div>`:'<p class="note">No clips yet. Check back after the games.</p>'}</div>`}
-/* ===== Clip viewer: scroll through clips one at a time; only the clip on screen loads a player ===== */
-function posterHtml(v){return `<span class="vimg${v.thumb?'':' noimg'}" style="${tcVars(v.player?byId[v.player].t:(v.teams[0]||''))}">${v.thumb?`<img src="${esc(v.thumb)}" alt="" loading="lazy" decoding="async" onerror="this.remove()">`:''}<span class="vplay" aria-hidden="true"></span></span>`}
-function embedHtml(v){const src=v.src==='espn'?`https://www.espn.com/core/video/iframe/_/id/${encodeURIComponent(v.id)}/endcard/false`:`https://www.youtube-nocookie.com/embed/${encodeURIComponent(v.yt)}?autoplay=1&playsinline=1&rel=0&modestbranding=1`;
-  return `<iframe src="${src}" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen title="${esc(v.title)}"></iframe>`}
-function openViewer(start){if(!CLIPS.length)return;const el=$('clipview');el.hidden=false;document.body.style.overflow='hidden';CV_CUR=-1;
-  el.innerHTML=`<div class="cv-bar"><span class="cv-brand"><span class="play" aria-hidden="true"></span>Highlights</span><span class="cv-count" id="cv-count"></span><button class="cv-x" data-cvclose="1" aria-label="Close">×</button></div>
-    <div class="cv-scroll" id="cv-scroll">${CLIPS.map((v,i)=>{const p=v.player?byId[v.player]:null;return `<section class="cv-slide" data-i="${i}"><div class="cv-media" data-cvplay="${i}">${posterHtml(v)}</div>
-      <div class="cv-info">${srcBadge(v)}<h3>${esc(v.title)}</h3><p class="note">${p?`<b>${esc(p.n)}</b> · ${p.pos} · ${p.t} · `:v.teams.length?esc(v.teams.join(' vs '))+' · ':''}Week ${v.week}${v.at?' · '+ago(v.at):''}</p>
-      <span class="cv-links">${v.url?`<a href="${esc(v.url)}" target="_blank" rel="noopener">Open on ${v.src==='espn'?'ESPN':'YouTube'} ↗</a>`:''}${p?`<a href="${nflUrl(p)}" target="_blank" rel="noopener">${esc(p.n)} on NFL.com ↗</a>`:''}</span></div></section>`}).join('')}</div>
-    <div class="cv-nav"><button data-cvstep="-1" aria-label="Previous clip">▲</button><button data-cvstep="1" aria-label="Next clip">▼</button></div>`;
-  const sc=$('cv-scroll');CV_OBS=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting)activateClip(+e.target.dataset.i)}),{root:sc,threshold:.65});
-  sc.querySelectorAll('.cv-slide').forEach(x=>CV_OBS.observe(x));
-  requestAnimationFrame(()=>{sc.scrollTop=sc.children[start].offsetTop;activateClip(start)})}
-function activateClip(i){const sc=$('cv-scroll');if(!sc||i===CV_CUR||!CLIPS[i])return;
-  if(CV_CUR>=0&&sc.children[CV_CUR])sc.children[CV_CUR].querySelector('.cv-media').innerHTML=posterHtml(CLIPS[CV_CUR]);
-  CV_CUR=i;sc.children[i].querySelector('.cv-media').innerHTML=embedHtml(CLIPS[i]);$('cv-count').textContent=`${i+1} / ${CLIPS.length}`;
-  [i+1,i+2].forEach(j=>{const v=CLIPS[j];if(v&&v.thumb){const im=new Image();im.src=v.thumb}})}
-function stepClip(d){const sc=$('cv-scroll');if(!sc)return;const j=Math.max(0,Math.min(CLIPS.length-1,CV_CUR+d));sc.scrollTo({top:sc.children[j].offsetTop,behavior:'smooth'})}
-function closeViewer(){const el=$('clipview');if(el.hidden)return;if(CV_OBS)CV_OBS.disconnect();CV_OBS=null;CV_CUR=-1;el.hidden=true;el.innerHTML='';document.body.style.overflow=''}
 document.addEventListener('click',e=>{const t=e.target;if(!t.closest)return;
   const f=t.closest('[data-follow]');if(f){e.preventDefault();e.stopPropagation();toggleFollow(f.dataset.follow);if(openId&&!$('scrim').hidden)openCard(openId);return}
-  const cl=t.closest('[data-clip]');if(cl){openViewer(Math.max(0,+cl.dataset.clip));return}
-  const cp=t.closest('[data-cvplay]');if(cp){activateClip(+cp.dataset.cvplay);return}
-  const cs=t.closest('[data-cvstep]');if(cs){stepClip(+cs.dataset.cvstep);return}
-  if(t.closest('[data-cvclose]')){closeViewer();return}
   const gt=t.closest('[data-goto]');if(gt){location.hash=gt.dataset.goto;return}
   const fte=t.closest('[data-fteam]');if(fte){toggleTeam(fte.dataset.fteam);return}},true);
 document.addEventListener('change',e=>{if(e.target.id==='team-add'&&e.target.value)toggleTeam(e.target.value)});
-document.addEventListener('keydown',e=>{if($('clipview').hidden)return;if(e.key==='Escape')closeViewer();else if(e.key==='ArrowDown'||e.key==='j'){e.preventDefault();stepClip(1)}else if(e.key==='ArrowUp'||e.key==='k'){e.preventDefault();stepClip(-1)}});
 /* highlights on the player card */
 function cardHighlights(id){const p=byId[id];if(!FEED){loadFeed();return `<h4>Highlights</h4><p class="note">Loading clips...</p>`}
   const vids=playerVideos(p);
-  return `<h4>Highlights</h4>${vids.length?`<div class="hl-clips card-clips">${vids.map((v,i)=>`<button class="hthumb sm" data-pclip="${id}|${i}" title="${esc(v.title)}"><span class="vimg${v.thumb?'':' noimg'}" style="${tcVars(p.t)}">${v.thumb?`<img src="${esc(v.thumb)}" alt="" loading="lazy" decoding="async" onerror="this.remove()">`:''}<span class="vplay" aria-hidden="true"></span>${srcBadge(v)}</span><span class="vtitle">${v.game?'<span class="vtag">Game</span>':''}${esc(v.title)}</span><span class="note">Week ${v.week}${v.at?' · '+ago(v.at):''}</span></button>`).join('')}</div>`
+  return `<h4>Highlights</h4>${vids.length?`<div class="hl-clips card-clips">${vids.map((v,i)=>`<a class="hthumb sm" href="${esc(v.url||'#')}" target="_blank" rel="noopener" title="${esc(v.title)} (opens on ${clipOut(v)})"><span class="vimg${v.thumb?'':' noimg'}" style="${tcVars(p.t)}">${v.thumb?`<img src="${esc(v.thumb)}" alt="" loading="lazy" decoding="async" onerror="this.remove()">`:''}<span class="vplay" aria-hidden="true"></span>${srcBadge(v)}</span><span class="vtitle">${v.game?'<span class="vtag">Game</span>':''}${esc(v.title)}</span><span class="note">Week ${v.week}${v.at?' · '+ago(v.at):''} · ${clipOut(v)} ↗</span></a>`).join('')}</div>`
     :`<p class="note">No clips of his plays from this week or last week yet.</p>`}<p class="note" style="margin:8px 0 0"><a href="${nflUrl(p)}" target="_blank" rel="noopener">More on NFL.com ↗</a></p>`}
-function openPlayerClips(id,i){CLIPS=playerVideos(byId[id]).map(v=>({...v,player:v.game?null:id}));openViewer(Math.max(0,i||0))}
-document.addEventListener('click',e=>{const t=e.target;if(!t.closest)return;
-  const pc=t.closest('[data-pclip]');if(pc){const [id,i]=pc.dataset.pclip.split('|');openPlayerClips(id,+i);return}
-  const pcs=t.closest('[data-pclips]');if(pcs){openPlayerClips(pcs.dataset.pclips,0)}},true);
 setInterval(()=>{if(USER&&!document.hidden&&Date.now()-SYNC_AT>4*60e3)syncNow()},60e3);
 document.addEventListener('visibilitychange',()=>{if(!document.hidden&&USER&&Date.now()-SYNC_AT>2*60e3)syncNow()});
 /* ===== Following: pick teams and players (no clips here) ===== */

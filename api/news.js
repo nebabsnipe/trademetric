@@ -20,15 +20,26 @@ const SHARED = [
   { src: 'RotoBaller', kind: 'rss', url: 'https://www.rotoballer.com/category/nfl/feed' },
   { src: 'Pro Football Network', kind: 'rss', url: 'https://www.profootballnetwork.com/feed/' },
   { src: 'The Athletic', kind: 'rss', url: 'https://www.nytimes.com/athletic/rss/nfl/' },
+  { src: 'NFL Trade Rumors', kind: 'rss', url: 'https://nfltraderumors.co/feed/' },
 ];
-const perPlayer = (name, team) => [
-  { src: 'Google News', kind: 'rss', url: `https://news.google.com/rss/search?q=${encodeURIComponent(`"${name}" NFL when:14d`)}&hl=en-US&gl=US&ceid=US:en` },
+const FOCUS = {
+  inj: '(injury OR injured OR practice OR "ruled out" OR questionable OR doubtful OR status OR return)',
+  role: '(snaps OR role OR "depth chart" OR targets OR carries OR workload OR starter OR usage)',
+};
+const perPlayer = (name, team, focus) => [
+  { src: 'Google News', kind: 'rss', url: `https://news.google.com/rss/search?q=${encodeURIComponent(focus ? `"${name}" ${FOCUS[focus]} when:7d` : `"${name}" NFL when:14d`)}&hl=en-US&gl=US&ceid=US:en` },
   ...(ESPN_TEAM[team] ? [{ src: 'ESPN', kind: 'espn', url: `https://site.api.espn.com/apis/site/v2/sports/football/nfl/news?team=${ESPN_TEAM[team]}&limit=50` }] : []),
 ];
 
 const mem = new Map();
-async function getText(url, ttl) {
-  const c = mem.get(url); if (c && Date.now() - c.at < ttl) return c.v;
+const inflight = new Map();
+function getText(url, ttl) {
+  const c = mem.get(url); if (c && Date.now() - c.at < ttl) return Promise.resolve(c.v);
+  if (inflight.has(url)) return inflight.get(url);          // many players share one league-wide feed: fetch it once
+  const pr = fetchText(url).finally(() => inflight.delete(url));
+  inflight.set(url, pr); return pr;
+}
+async function fetchText(url) {
   const ctl = new AbortController(); const t = setTimeout(() => ctl.abort(), 6000);
   try {
     const r = await fetch(url, { headers: { 'User-Agent': url.includes('espn.com') ? 'TradeMetric/1.0' : UA, Accept: url.includes('espn.com') ? 'application/json' : 'application/rss+xml, application/xml, text/xml, */*' }, signal: ctl.signal });
@@ -48,12 +59,14 @@ function parseRSS(xml, src) {
   for (const m of xml.matchAll(/<item[\s>][\s\S]*?<\/item>/gi)) {
     const it = m[0]; let title = decode(tag(it, 'title')); let outlet = decode(tag(it, 'source')) || src;
     if (src === 'Google News') { const k = title.lastIndexOf(' - '); if (k > 20) { outlet = outlet === src ? title.slice(k + 3) : outlet; title = title.slice(0, k); } }
+    const rawBody = tag(it, 'content:encoded') + tag(it, 'description');
+    const img = (it.match(/<media:(?:content|thumbnail)[^>]*url="([^"]+)"/i) || it.match(/<enclosure[^>]*url="([^"]+\.(?:jpe?g|png|webp)[^"]*)"/i) || rawBody.match(/<img[^>]*src=["']([^"']+)["']/i) || rawBody.replace(/&lt;/g, '<').replace(/&quot;/g, '"').match(/<img[^>]*src=["']([^"']+)["']/i) || [])[1] || null;
     let desc = decode(tag(it, 'description') || tag(it, 'content:encoded'));
     if (src === 'Google News') desc = '';                       // Google's description just repeats the headline
     title = title.replace(/\s+[-|]\s+(NFL News|Fantasy Football|Fantasy).*$/i, '').trim();
     const link = decode(tag(it, 'link')) || (it.match(/<link[^>]*href="([^"]+)"/i) || [])[1] || '';
     const at = tag(it, 'pubDate') || tag(it, 'dc:date') || tag(it, 'updated');
-    out.push({ title, desc, url: link, at: at ? new Date(decode(at)).toISOString() : null, src, outlet });
+    out.push({ title, desc, url: link, at: at ? new Date(decode(at)).toISOString() : null, src, outlet, img: img && /^https?:/.test(img) ? img.replace(/&amp;/g, '&') : null });
   }
   return out;
 }
@@ -63,7 +76,7 @@ function parseESPN(txt) {
   return raw.map(a => ({
     title: decode(a.headline || a.title), desc: decode(a.story || a.description || ''), src: 'ESPN', outlet: 'ESPN',
     url: (a.links && ((a.links.web && a.links.web.href) || (a.links.mobile && a.links.mobile.href))) || '',
-    at: a.published || a.lastModified || null,
+    at: a.published || a.lastModified || null, img: (a.images && a.images[0] && a.images[0].url) || null, video: a.type === 'Media',
     athletes: (a.categories || []).filter(c => c.type === 'athlete').map(c => c.description || (c.athlete && c.athlete.displayName) || ''),
   }));
 }
@@ -81,13 +94,13 @@ function matches(item, name) {
   return hay.includes(' ' + full + ' ');
 }
 
-const RANK = { ESPN: 0, RotoBaller: 1, ProFootballTalk: 2, 'The Athletic': 2, 'CBS Sports': 2, 'Yahoo Sports': 2, 'Pro Football Network': 3, 'Google News': 4 };
+const RANK = { ESPN: 0, RotoBaller: 1, ProFootballTalk: 2, 'The Athletic': 2, 'CBS Sports': 2, 'Yahoo Sports': 2, 'NFL Trade Rumors': 2, 'Pro Football Network': 3, 'Google News': 4 };
 const FANTASY = /\b(injur|ruled out|out for|questionable|doubtful|practice|limited|ir\b|reserve|return|snap|target|carries|touches|role|depth chart|start|sit|waiver|pick ?up|week \d+|touchdown|td\b|yards|suspend|trade|released|signed|benched|concussion|hamstring|ankle|knee)/i;
 const FLUFF = /\b(costume|halloween|podcast|mailbag|power rankings|odds|betting|picks against|mock draft)/i;
 const score = i => (Date.parse(i.at || 0) / 864e5) + (i.desc ? 1.2 : 0) + (FANTASY.test(i.title + ' ' + i.desc) ? 1.5 : 0) - (FLUFF.test(i.title) ? 4 : 0) - (RANK[i.src] ?? 4) * .15;
 
-async function collect(name, team, probe, noGoogle) {
-  const list = [...SHARED.map(s => ({ ...s, ttl: 5 * 60e3 })), ...perPlayer(name, team).filter(s => !noGoogle || s.src !== 'Google News').map(s => ({ ...s, ttl: 20 * 60e3 }))];
+async function collect(name, team, probe, noGoogle, focus, days) {
+  const list = [...SHARED.map(s => ({ ...s, ttl: 5 * 60e3 })), ...perPlayer(name, team, focus).filter(s => !noGoogle || s.src !== 'Google News').map(s => ({ ...s, ttl: 20 * 60e3 }))];
   const report = [];
   const got = await Promise.all(list.map(async s => {
     try {
@@ -97,17 +110,17 @@ async function collect(name, team, probe, noGoogle) {
       return hit;
     } catch (e) { report.push({ src: s.src, url: s.url.slice(0, 90), ok: false, error: String(e.message || e).slice(0, 80) }); return []; }
   }));
-  const cutoff = Date.now() - 21 * 864e5;
+  const cutoff = Date.now() - (days || 21) * 864e5;
   // stories with real text first, so a duplicate keeps the version that has the article text
   const all = got.flat().filter(i => !i.at || Date.parse(i.at) > cutoff).sort((a, b) => (!!b.desc - !!a.desc) || ((RANK[a.src] ?? 5) - (RANK[b.src] ?? 5)));
   const out = [], skip = words(name);
   for (const i of all) {                                   // de-duplicate the same story from different outlets
     const d = out.find(o => similar(o.title, i.title, skip) || o.alts.some(t => similar(t, i.title, skip)));
-    if (d) { if (!d.also.includes(i.outlet) && d.outlet !== i.outlet) d.also.push(i.outlet); if (d.alts.length < 4 && !d.alts.includes(i.title) && i.title !== d.title) d.alts.push(i.title); if (i.at && (!d.at || i.at > d.at)) d.at = i.at; continue; }
+    if (d) { if (!d.img && i.img) d.img = i.img; if (!d.also.includes(i.outlet) && d.outlet !== i.outlet) d.also.push(i.outlet); if (d.alts.length < 4 && !d.alts.includes(i.title) && i.title !== d.title) d.alts.push(i.title); if (i.at && (!d.at || i.at > d.at)) d.at = i.at; continue; }
     out.push({ ...i, also: [], alts: [] });
   }
   out.sort((a, b) => score(b) - score(a));
-  return { items: out.slice(0, 7), report };
+  return { items: out.slice(0, focus ? 10 : 7), report };
 }
 
 function parseJSON(text) {
@@ -144,6 +157,20 @@ ${list}`;
   } catch (e) { LAST_ERR = String(e && e.message || e).slice(0, 150); return null; } finally { clearTimeout(t); }
 }
 
+/* What a story is about, for the News tab feed: an injury (status, practice, return) or the player's role
+   (snaps, targets, carries, depth chart). Anything else is left out of the feed. */
+const INJ_RE = /\b(injur(y|ies|ed)|hurt|ruled out|out (for|vs\.?|against|sunday|monday|thursday|this week|indefinitely|again)|questionable|doubtful|injured reserve|placed on (ir|reserve)|activated|designated (him |for )?(to )?return|return(s|ed|ing)? (to|from) (practice|injury|ir)|did not practice|dnp|limited (in )?practice|limited participant|full participant|practic(e|ed|ing)|game-time decision|week-to-week|day-to-day|setback|mri|surgery|concussion|protocol|hamstring|ankle|knee|groin|calf|quad|shoulder|elbow|wrist|thumb|foot|toe|hip|ribs?|sprain(ed)?|strain(ed)?|torn|tear|fracture[d]?|illness|sidelined|status for|health(y)?)\b/i;
+const ROLE_RE = /\b(depth chart|snaps?|snap (share|count)|target share|targets|carries|touches|workload|role|usage|starter|starting|backup|lead back|bell-?cow|committee|split|rb1|wr1|wr2|te1|promoted|benched|demoted|elevated|first-team|reps|opportunit(y|ies)|volume|red zone|rotation|expected to (start|play|see)|featured|pecking order|takes over|step(s)? in|fill(s)? in)\b/i;
+function kindOf(x) {
+  const t = x.title || '', d = x.desc || '';
+  if (FLUFF.test(t)) return null;
+  if (INJ_RE.test(t)) return 'inj';
+  if (ROLE_RE.test(t)) return 'role';
+  if (INJ_RE.test(d)) return 'inj';
+  if (ROLE_RE.test(d)) return 'role';
+  return null;
+}
+
 const clip = (s, n) => { s = String(s || ''); if (s.length <= n) return s; const c = s.slice(0, n); const k = Math.max(c.lastIndexOf('. '), c.lastIndexOf(' ')); return c.slice(0, k > n * .6 ? k + 1 : n).trim() + '…'; };
 const cache = new Map();
 
@@ -160,6 +187,32 @@ export default async function handler(req, res) {
     }));
     res.setHeader('Cache-Control', 'public, max-age=0, s-maxage=300');
     return res.status(200).json({ updated: new Date().toISOString(), items: out });
+  }
+  /* feed mode for the News tab: injury and role stories for everyone on your rosters, from every outlet above
+     plus a Google News search per player (which itself spans dozens of sites). No AI, so no cost.
+     GET /api/news?feed=Name|TEAM|POS|i;Name|TEAM|POS;...   (i = currently injured: search injury news for him) */
+  if (q.feed) {
+    const list = String(q.feed).split(';').map(x => x.split('|')).filter(x => x[0]).slice(0, 40)
+      .map(([n, t, p, f]) => ({ n: String(n).slice(0, 60), t: String(t || '').toUpperCase().slice(0, 4), inj: f === 'i' }));
+    const key = 'feed:' + list.map(x => norm(x.n) + (x.inj ? '!' : '')).sort().join(',');
+    const c = cache.get(key);
+    if (c && Date.now() - c.at < 10 * 60e3) { res.setHeader('Cache-Control', 'public, max-age=0, s-maxage=600'); return res.status(200).json(c.v); }
+    let healthy = 0;
+    const per = await Promise.all(list.map(async x => {
+      // every injured player gets his own injury search; the first 12 healthy ones get a role search
+      const google = x.inj || healthy++ < 12;
+      try {
+        const { items } = await collect(x.n, x.t, false, !google, x.inj ? 'inj' : 'role', 10);
+        return items.map(i => ({ ...i, kind: kindOf(i) })).filter(i => i.kind).slice(0, 5).map(i => ({
+          n: x.n, kind: i.kind, title: i.title, desc: clip(i.desc, 240), url: i.url, outlet: i.outlet, also: i.also.slice(0, 3),
+          at: i.at, img: i.img || null, video: !!i.video,
+        }));
+      } catch { return []; }
+    }));
+    const v = { updated: new Date().toISOString(), items: per.flat() };
+    cache.set(key, { at: Date.now(), v });
+    res.setHeader('Cache-Control', 'public, max-age=0, s-maxage=600');
+    return res.status(200).json(v);
   }
   if (!name) return res.status(400).json({ error: 'Missing name' });
   if (q.probe) {
