@@ -373,7 +373,7 @@ async function loadLive(){
   clearTimeout(LIVE_TIMER);let next=5*60e3;
   try{const r=await fetch('/api/live?week='+WEEK+'&b='+Math.floor(Date.now()/120000));if(r.ok){const j=await r.json();
     if(j&&j.games){await loadPlatform();LIVE=j;LIVEST={};(j.players||[]).forEach(x=>{const p=x.pos==='DST'?byId['dst-'+String(x.t).toLowerCase()]:findExact(x.n);if(p&&p.pos===x.pos)LIVEST[p.id]=x.s});
-      liveStatus();if(checkRollover()){setTimeout(loadLive,500);await loadPlatform()}recompute();if(Object.values(j.games).some(g=>g.state==='post'))loadProjNext();const a=document.activeElement;if(!(a&&/INPUT|TEXTAREA|SELECT/.test(a.tagName)))render();if(j.live||Object.values(j.games).some(g=>g.state==='pre'&&Date.parse(g.start)-Date.now()<30*60e3))next=2*60e3}}}catch(e){}
+      liveStatus();if(typeof tmnTick==='function'&&Object.values(j.games).every(g=>g.state==='post')){recompute();await tmnTick()}if(checkRollover()){setTimeout(loadLive,500);await loadPlatform()}recompute();if(Object.values(j.games).some(g=>g.state==='post'))loadProjNext();const a=document.activeElement;if(!(a&&/INPUT|TEXTAREA|SELECT/.test(a.tagName)))render();if(typeof tmnTick==='function')tmnTick();if(j.live||Object.values(j.games).some(g=>g.state==='pre'&&Date.parse(g.start)-Date.now()<30*60e3))next=2*60e3}}}catch(e){}
   LIVE_TIMER=setTimeout(()=>{if(document.hidden)document.addEventListener('visibilitychange',loadLive,{once:true});else loadLive()},next)}
 const liveOf=id=>G[id]&&G[id].live;
 /* ===== The week a player's number belongs to =====
@@ -1657,12 +1657,12 @@ function applyTheme(){if(themePref)document.documentElement.setAttribute('data-t
 $('theme-btn').addEventListener('click',()=>{themePref=isDark()?'light':'dark';try{localStorage.setItem('hashmark-theme',themePref)}catch(e){}applyTheme()});
 
 /* ===== Routing & events ===== */
-const TABS=['team','trade','rankings','hub','season','league','draft','help','welcome','signin','account'];let tab='team';
+const TABS=['team','news','trade','rankings','hub','season','league','draft','help','welcome','signin','account'];let tab='team';
 function howLink(k){return `<a class="how how-wrap" href="#help-${k}">How this works</a>`}
 const TAB_ALIAS={players:['rankings','rank'],waivers:['rankings','waiv'],values:['rankings','vals']};
 function go(t){let helpSec=null;if(t&&t.startsWith('help-')){helpSec=t.slice(5);t='help'}if(t&&t.startsWith('account-')){ACC_TAB=t.slice(8);t='account'}else if(t==='account')ACC_TAB='profile';if(t!==tab||t==='account'){ACC_EDIT=null;ACC_MSG=null}if(TAB_ALIAS[t]){plView=TAB_ALIAS[t][1];t=TAB_ALIAS[t][0]}if(t==='helper'){if(USER)openAI();t=TABS.includes(tab)?tab:'team';history.replaceState(null,'','#'+t)}if(!USER&&t!=='signin')t='signin';tab=TABS.includes(t)?t:'team';if(tab!=='welcome'&&S&&!S.onboarded){S.onboarded=true;save()}document.querySelectorAll('.nav button').forEach(b=>{if(b.dataset.tab===tab)b.setAttribute('aria-current','page');else b.removeAttribute('aria-current')});
   TABS.forEach(x=>$('v-'+x).hidden=x!==tab);render();window.scrollTo(0,0);if(tab==='help')openHelp(helpSec)}
-function render(){({team:renderTeam,rankings:renderPlayers,draft:renderDraft,help:()=>{},trade:renderTrade,hub:renderHub,season:renderSeason,welcome:renderWelcome,league:fillLeagueForm,signin:renderSignin,account:renderAccount})[tab]();renderAlerts();if(openId&&!$('scrim').hidden)openCard(openId);queueBalance()}
+function render(){({team:renderTeam,news:tmnRender,rankings:renderPlayers,draft:renderDraft,help:()=>{},trade:renderTrade,hub:renderHub,season:renderSeason,welcome:renderWelcome,league:fillLeagueForm,signin:renderSignin,account:renderAccount})[tab]();renderAlerts();if(openId&&!$('scrim').hidden)openCard(openId);queueBalance()}
 document.querySelectorAll('.nav button').forEach(b=>b.addEventListener('click',()=>{location.hash=b.dataset.hash||b.dataset.tab}));
 window.addEventListener('hashchange',()=>{closeCard();go(location.hash.slice(1))});
 function loadTrade(str){const [g,r]=str.split('|');TD.give=g?g.split(','):[];TD.get=r?r.split(','):[];closeCard();if(tab==='trade')renderTrade();else location.hash='trade';setTimeout(()=>$('rating').scrollIntoView({behavior:'smooth',block:'center'}),60)}
@@ -2292,7 +2292,8 @@ function renderAccount(){const el=$('account-body');if(!el)return;if(!USER){el.i
       <button class="btn acc-out" type="button" id="auth-out">Sign out</button></div></div>`;
   const nav=`<nav class="acc-nav" aria-label="Account sections">${ACC_TABS.map(([k,l])=>`<a href="#account-${k}" ${k===ACC_TAB?'aria-current="page"':''}>${accIc(k)}<span>${l}</span></a>`).join('')}</nav>`;
   el.innerHTML=head+`<div class="acc-shell">${nav}<div class="acc-main">${({profile:accProfile,leagues:accLeagues,plan:accPlan,security:accSecurity})[ACC_TAB]()}</div></div>`;
-  const f=el.querySelector('.acc-form input');if(f&&innerWidth>820)setTimeout(()=>f.focus(),0)}
+  const f=el.querySelector('.acc-form input');if(f&&innerWidth>820)setTimeout(()=>f.focus(),0);
+  if(typeof TMN!=='undefined'&&TMN.goNotif&&ACC_TAB==='leagues'){TMN.goNotif=false;const n=$('acc-notif');if(n)setTimeout(()=>n.scrollIntoView({behavior:'smooth',block:'start'}),60)}}
 function accProfile(){const un=PROFILE&&PROFILE.username,email=USER.email||'';
   const unForm=`<form class="acc-form" id="acc-form" data-kind="username" novalidate><label>New username<input type="text" id="acc-un" value="${esc(un||suggestUsername())}" autocapitalize="none" autocorrect="off" spellcheck="false" maxlength="20" required><span class="hint" id="un-hint" aria-live="polite"></span></label>${accMsg()}<div class="acc-form-act">${accBtn('Save username')}<button class="btn" type="button" data-acc-cancel>Cancel</button></div></form>`;
   return `<section class="card acc-sec"><header class="acc-sec-h"><h2>Profile</h2><p>How you show up on TradeMetric.</p></header>
@@ -2305,6 +2306,7 @@ function accLeagues(){const L=S.leagues||[],me=typeof myTeam==='function'&&S.tea
     :`<div class="acc-empty"><b>${esc(S.league&&S.league.name||'Sample League')}</b><p class="note">${S.example?"You're looking at the sample league. Bring in yours from Sleeper or ESPN.":'This is the league on this account.'}</p></div>`;
   return `<section class="card acc-sec"><header class="acc-sec-h"><h2>Leagues</h2><p>Saved to your account, so they follow you to any device.</p></header>
     ${list}<div class="acc-sec-f"><a class="btn primary" href="#hub">Manage leagues</a><a class="btn" href="#league">League settings</a></div></section>
+    ${typeof tmnNotifHtml==='function'?tmnNotifHtml():''}
     <section class="card acc-sec"><header class="acc-sec-h"><h2>Sync</h2></header>${accRow('Cloud save',sync)}</section>`}
 function accPlan(){const p=planOf();
   return `<section class="acc-plans">
@@ -2496,10 +2498,10 @@ function alertsList(){const me=S&&myTeam&&myTeam();if(!me||!V||!G)return [];cons
     if(g.tag==='sell')out.push({k:`sell-${WEEK}-${id}`,lvl:'info',t:`Sell-high window: ${p.n}`,d:g.sellWhy||'He is scoring above what his role supports.',open:id})});
   OPPS.filter(o=>!OWN[o.id]&&o.dp>=2).sort((a,b)=>b.dp-a.dp).slice(0,3).forEach(o=>out.push({k:`pick-${WEEK}-${o.id}`,lvl:'good',t:`Pickup: ${byId[o.id].n}`,d:oppTxtLine(o),open:o.id}));
   return out}
-function renderAlerts(){const b=$('alert-btn');if(!b)return;const L=USER?alertsList():[],seen=seenAlerts(),n=L.filter(a=>!seen.has(a.k)).length;
+function renderAlerts(){const b=$('alert-btn');if(!b)return;const L=USER?alertsList():[],seen=seenAlerts(),n=L.filter(a=>!seen.has(a.k)).length+(USER&&typeof tmnUnread==='function'&&tab!=='news'?tmnUnread():0);
   const c=$('alert-n');c.hidden=!n;c.textContent=n>9?'9+':n;b.setAttribute('aria-label',n?`Alerts, ${n} new`:'Alerts');
   const pop=$('alert-pop');if(!pop.hidden)paintAlerts(L,seen)}
-function paintAlerts(L,seen){$('alert-pop').innerHTML=`<div class="al-h"><b>Alerts</b><span class="note">Week ${WEEK}</span></div>${L.length?`<div class="al-list">${L.map(a=>`<button class="al-i ${a.lvl}${seen.has(a.k)?'':' new'}" data-open="${a.open}"><i></i><span><b>${esc(a.t)}</b><span>${esc(a.d)}</span></span></button>`).join('')}</div>`:'<p class="empty" style="margin:0">All clear. Nothing needs your attention right now.</p>'}`}
+function paintAlerts(L,seen){const nn=typeof tmnUnread==='function'?tmnUnread():0;$('alert-pop').innerHTML=`<div class="al-h"><b>Alerts</b><span class="note">Week ${WEEK}</span></div>${nn?`<a class="al-news" href="#news"><b>${nn} new in News</b><span>Big plays from your players →</span></a>`:''}${L.length?`<div class="al-list">${L.map(a=>`<button class="al-i ${a.lvl}${seen.has(a.k)?'':' new'}" data-open="${a.open}"><i></i><span><b>${esc(a.t)}</b><span>${esc(a.d)}</span></span></button>`).join('')}</div>`:'<p class="empty" style="margin:0">All clear. Nothing needs your attention right now.</p>'}`}
 function toggleAlerts(open){const pop=$('alert-pop'),b=$('alert-btn');open=open??pop.hidden;pop.hidden=!open;b.setAttribute('aria-expanded',open);
   if(open){const L=alertsList(),seen=seenAlerts();paintAlerts(L,seen);try{localStorage.setItem(ALERT_LS,JSON.stringify([...new Set([...seen,...L.map(a=>a.k)])].slice(-300)))}catch(e){}$('alert-n').hidden=true}}
 
