@@ -71,7 +71,7 @@
     <div id="pl-rank" class="pl-pane">
     <div class="toolbar">
       <div class="seg" id="pos-filter"><button data-pos="ALL" aria-pressed="true">All</button><button data-pos="QB">QB</button><button data-pos="RB">RB</button><button data-pos="WR">WR</button><button data-pos="TE">TE</button><button data-pos="K">K</button><button data-pos="DST">D/ST</button></div>
-      <div class="seg" id="own-filter"><button data-own="all" aria-pressed="true">Everyone</button><button data-own="free">Available</button><button data-own="buy">Buy low</button><button data-own="risk">Risks</button><button data-own="opp">Opportunities</button></div>
+      <div class="seg" id="own-filter"><button data-own="all" aria-pressed="true">Everyone</button><button data-own="free">Available</button><button data-own="buy">Buy low</button><button data-own="opp">Opportunities</button></div>
       <input type="search" id="rank-search" placeholder="Search players or NFL teams">
       
     </div>
@@ -94,11 +94,7 @@
 
   <!-- TRADES -->
   <section class="view" id="v-trade" hidden>
-    <div class="hero"><div><div class="kicker">Trade center</div><h1>Trades</h1><p>Deals built for your roster that the other manager has a reason to accept. <a class="how" href="#help-trades">How this works</a></p></div></div>
-    <div class="tr-sec">
-      <div class="tr-sec-h"><div><h2>Recommended trades</h2><span class="note" id="sug-note"></span></div><button class="btn" id="refresh-trades">New ideas</button></div>
-      <div class="grid3" id="suggestions"></div>
-    </div>
+    <div class="hero"><div><div class="kicker">Trade center</div><h1>Trades</h1><p>Build a deal and see it graded, or start from one of the recommended trades below. <a class="how" href="#help-trades">How this works</a></p></div></div>
     <div class="tr-sec">
       <div class="tr-sec-h"><div><h2>Trade builder</h2><span class="note">Offer players, ask for players, and watch the grade move.</span></div></div>
       <div class="grid2 grid-trade">
@@ -121,6 +117,10 @@
           <div class="scrollbox" data-fill><table class="tgt-table" id="tgt-table"><thead><tr><th data-sort data-first="asc">Player</th><th class="r" data-sort>Wk <span class="wk-num">9</span></th><th class="r" data-sort>Pts/G</th><th class="r" data-sort>Snap %</th><th data-sort data-first="asc">Team</th><th></th></tr></thead><tbody id="targets"></tbody></table></div>
         </div>
       </div>
+    </div>
+    <div class="tr-sec">
+      <div class="tr-sec-h"><div><h2>Recommended trades</h2><span class="note" id="sug-note"></span></div><button class="btn" id="refresh-trades">New ideas</button></div>
+      <div class="grid3" id="suggestions"></div>
     </div>
   </section>
 
@@ -237,7 +237,7 @@
 <p>Tiers group players with similar scores at each position. In keeper and dynasty leagues, long-term value is blended in.</p></div></details>
       <details class="faq-i" id="faq-trades"><summary>Trade suggestions and grades</summary><div class="faq-b"><p>TradeMetric looks at every deal from one-for-one up to three-for-two with each team, then keeps the ones that help you and that the other manager has a reason to accept: fair market value, a better lineup for them, or filling a need.</p>
 <p>The shape fits each team's situation. A team with depth to spare gets offered a consolidation, two players for one better starter. A team with injured starters or holes in its lineup gets offered extra bodies. Trades that would force a team to cut a starter are left out.</p>
-<p>Your grade weighs points added each week, your playoff weeks (15 to 17 count extra), and the change in your playoff and title odds, minus injury and stacking risk. What counts most depends on where you stand: contenders care about the playoffs, teams on the bubble about winning now.</p><p><b>Realistic trades.</b> Every deal is also checked the way a real manager would see it:</p><ul>
+<p>Your grade weighs points added each week, your playoff weeks (15 to 17 count extra), and the change in your playoff and title odds, minus injury and stacking risk. What counts most depends on where you stand: contenders care about the playoffs, teams on the bubble about winning now. Once any player in a deal has played this week, the grade counts from next week on, since this week's points can't change hands.</p><p><b>Realistic trades.</b> Every deal is also checked the way a real manager would see it:</p><ul>
 <li><b>Starting lineup, before and after:</b> each team's best starting lineup in points per week over the rest of the season, now and after the trade. Suggestions only show deals where both lineups get better or stay about even.</li>
 <li><b>True VAR:</b> a player's value is his points per game above a replacement-level starter at his position, raised to the 1.2 power, so one elite player is worth more than two lesser ones with the same total.</li>
 <li><b>Drop cost:</b> in a 2-for-1 or bigger, the team that ends up over the roster limit has to cut its least valuable bench player. That player's VAR counts against the deal.</li>

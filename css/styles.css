@@ -1471,3 +1471,10 @@ body.signed-out .alerts-wrap{display:none}
 /* trade partner's players float to the top of the target list */
 .tgt-table tr.pin td{background:color-mix(in srgb,var(--accent) 6%,transparent)}
 .tgt-table tr.pin-last td{border-bottom:2px solid color-mix(in srgb,var(--accent) 40%,var(--line))}
+/* Players to trade for: the whole row adds or removes the player; only the name opens his card */
+.tgt-table tr.tgt-row{cursor:pointer;transition:background .12s}
+.tgt-table tr.tgt-row:hover td{background:color-mix(in srgb,var(--accent) 7%,transparent)}
+.tgt-table tr.tgt-row:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+.tgt-table tr.tgt-row.added td{background:color-mix(in srgb,var(--good,var(--accent)) 10%,transparent)}
+.tgt-table .tgt-add{pointer-events:none;white-space:nowrap}
+.tgt-table tr.tgt-row.added .tgt-add{background:var(--accent);border-color:var(--accent);color:#fff}
