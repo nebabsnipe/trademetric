@@ -1738,6 +1738,14 @@ function friendly(m){m=String(m||'');
 const EYE='<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>';
 function pwField(id,label,ac,extra=''){return `<label>${label}<span class="pw-wrap"><input type="password" id="${id}" autocomplete="${ac}" required ${extra}><button type="button" class="pw-eye" data-pw-eye="${id}" aria-label="Show password" aria-pressed="false">${EYE}</button></span></label>`}
 function oauthHtml(){return `<div class="auth-social">${OAUTH.map(p=>{const off=PROVIDERS&&PROVIDERS[p.id]===false;return `<button type="button" class="auth-sso${off?' off':''}" data-oauth="${p.id}" ${AUTH_BUSY?'disabled':''} title="${off?esc(p.name)+' sign-in is coming soon':''}"><span class="sso-ic sso-${p.id}" aria-hidden="true">${p.name[0]}</span>${esc(p.name)}</button>`}).join('')}</div><div class="auth-or"><span>or with email</span></div>`}
+/* Six-slot code input. One real <input> sits invisibly on top of six painted slots, so typing, paste,
+   iOS/Android one-time-code autofill and backspace all behave natively. */
+var AUTH_SHAKE=false;
+function codeField(label){return `<label>${label}<span class="otp${AUTH_SHAKE?' bad shake':''}"><input type="text" id="auth-code" class="otp-in" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]*" maxlength="6" required spellcheck="false" value="${esc(AUTH_VALS['auth-code']||'')}"><span class="otp-slots" aria-hidden="true">${'<span class="otp-s"></span>'.repeat(6)}</span></span></label>`}
+function paintOtp(){const i=$('auth-code');if(!i)return;const v=i.value,box=i.parentNode;
+  box.querySelectorAll('.otp-s').forEach((s,k)=>{s.textContent=v[k]||'';s.classList.toggle('on',k<v.length);s.classList.toggle('cur',k===Math.min(v.length,5))})}
+/* A wrong or missing code: clear it, shake the slots and say why. */
+function codeFail(m){AUTH_VALS['auth-code']='';AUTH_SHAKE=true;authFail(m)}
 function renderSignin(){const el=$('signin-card');if(!el)return;
   const msg=AUTH_MSG?`<p class="auth-msg ${AUTH_MSG.bad?'bad':''}" role="${AUTH_MSG.bad?'alert':'status'}">${AUTH_MSG.html}</p>`:'';
   const btn=t=>`<button class="btn primary auth-go" type="submit" ${AUTH_BUSY?'disabled':''}>${AUTH_BUSY?'<span class="spin" aria-hidden="true"></span>One moment':t}</button>`;
@@ -1757,14 +1765,14 @@ function renderSignin(){const el=$('signin-card');if(!el)return;
      <p class="auth-foot">Already have an account? <button type="button" class="linkish strong" data-auth-mode="in">Sign in</button></p>`;
   else if(AUTH_MODE==='verify')h=`<div class="auth-ic" aria-hidden="true"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg></div><h1>Check your email</h1>
      <p class="auth-sub">We sent a code to ${pe}. Type it here, or tap the link in the email on any device and this page signs you in by itself.</p>
-     <form id="auth-form" data-mode="verify" novalidate><label>Confirmation code<input type="text" id="auth-code" class="code-in" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]*" maxlength="10" required placeholder="••••••"></label>${msg}${btn('Confirm email')}</form>
+     <form id="auth-form" data-mode="verify" novalidate>${codeField('Confirmation code')}${msg}${btn('Confirm email')}</form>
      <p class="auth-wait"><span class="pulse" aria-hidden="true"></span>Waiting for you to confirm</p>
      <p class="auth-foot">${resendBtn('Send a new code')} · <button type="button" class="linkish" data-auth-mode="up">Use a different email</button></p>`;
   else if(AUTH_MODE==='forgot')h=`<h1>Reset your password</h1><p class="auth-sub">Enter your account email. We'll send a code to set a new password, right here on this page.</p><form id="auth-form" data-mode="forgot" novalidate>
      <label>Email<input type="email" id="auth-email" autocomplete="email" autocapitalize="none" spellcheck="false" required></label>${msg}${btn('Send code')}</form>
      <p class="auth-foot"><button type="button" class="linkish" data-auth-mode="in">Back to sign in</button></p>`;
   else if(AUTH_MODE==='recover')h=`<h1>Set a new password</h1><p class="auth-sub">Enter the code we sent to ${pe} and pick a new password.</p><form id="auth-form" data-mode="recover" novalidate>
-     <label>Code from the email<input type="text" id="auth-code" class="code-in" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]*" maxlength="10" required placeholder="••••••"></label>
+     ${codeField('Code from the email')}
      ${pwField('auth-pw','New password','new-password','minlength="8" placeholder="At least 8 characters"')}${msg}${btn('Save and sign in')}</form>
      <p class="auth-foot">${resendBtn('Send a new code')} · <button type="button" class="linkish" data-auth-mode="in">Back to sign in</button></p>`;
   else if(AUTH_MODE==='reset')h=`<h1>Set a new password</h1><p class="auth-sub">You're signed in. Pick a new password to finish.</p><form id="auth-form" data-mode="reset" novalidate>
@@ -1779,9 +1787,11 @@ function renderSignin(){const el=$('signin-card');if(!el)return;
   ['auth-id','auth-user','auth-email'].forEach(k=>{const i=$(k);if(i&&AUTH_VALS[k])i.value=AUTH_VALS[k]});
   if(AUTH_MODE==='username'&&!AUTH_VALS['auth-user']){const i=$('auth-user');if(i){i.value=suggestUsername();if(i.value)checkUsername(i.value)}}
   if(UN_STATE&&$('un-hint'))paintUn();
+  paintOtp();AUTH_SHAKE=false;
   const f=[...el.querySelectorAll('input')].find(i=>!i.value);if(f&&innerWidth>820)setTimeout(()=>f.focus(),0)}
-function resendBtn(t){const left=Math.ceil((RESEND_AT-Date.now())/1000);return left>0?`<span class="note" data-resend-wait>${t} in ${left}s</span>`:`<button type="button" class="linkish" data-auth-resend>${t}</button>`}
-setInterval(()=>{const w=document.querySelector('[data-resend-wait]');if(w&&tab==='signin')renderSignin()},1000);
+function resendBtn(t){const left=Math.ceil((RESEND_AT-Date.now())/1000);return left>0?`<span class="note" data-resend-wait="${esc(t)}">${t} in ${left}s</span>`:`<button type="button" class="linkish" data-auth-resend>${t}</button>`}
+setInterval(()=>{const w=document.querySelector('[data-resend-wait]');if(!w||tab!=='signin')return;const t=w.dataset.resendWait,left=Math.ceil((RESEND_AT-Date.now())/1000);
+  if(left>0)w.textContent=t+' in '+left+'s';else w.outerHTML=`<button type="button" class="linkish" data-auth-resend>${esc(t)}</button>`},1000);
 function paintUn(){const h=$('un-hint');if(!h||!UN_STATE)return;h.className='hint '+(UN_STATE.ok===true?'ok':UN_STATE.ok===false?'bad':'');h.textContent=UN_STATE.text}
 function checkUsername(raw){const u=String(raw||'').trim().toLowerCase();clearTimeout(UN_T);
   if(!u){UN_STATE=null;const h=$('un-hint');if(h){h.textContent='';h.className='hint'}return}
@@ -1840,20 +1850,20 @@ async function authSubmit(mode){
       if(data&&data.user&&Array.isArray(data.user.identities)&&!data.user.identities.length){AUTH_MODE='in';AUTH_VALS['auth-id']=em;return authFail('An account with that email already exists. Sign in instead, or reset your password.')}
       if(data&&data.session){toast('Account created');adoptSession(data.session,true);return}
       PENDING={kind:'signup',email:em,pw,user:u,sentAt:Date.now()};RESEND_AT=Date.now()+60e3;AUTH_MODE='verify';AUTH_BUSY=false;AUTH_MSG=null;startConfirmWatch();renderSignin();return}
-    if(mode==='verify'){const code=v('auth-code').replace(/\D/g,'');if(need(code.length>=6,'Enter the code from the email.'))return;
+    if(mode==='verify'){const code=v('auth-code').replace(/\D/g,'');if(code.length<6)return codeFail('Enter the 6-digit code from the email.');
       if(need(PENDING&&PENDING.email,'Start again from Create account.'))return;
       AUTH_BUSY=true;AUTH_MSG=null;renderSignin();
       let r=await SB.auth.verifyOtp({email:PENDING.email,token:code,type:'signup'});
       if(r.error&&!/expired/i.test(r.error.message))r=await SB.auth.verifyOtp({email:PENDING.email,token:code,type:'email'});
-      if(r.error)return authFail(r.error.message);toast('Email confirmed. Welcome to TradeMetric.');if(r.data&&r.data.session)adoptSession(r.data.session,true);return}
+      if(r.error)return codeFail(r.error.message);toast('Email confirmed. Welcome to TradeMetric.');if(r.data&&r.data.session)adoptSession(r.data.session,true);return}
     if(mode==='forgot'){const em=v('auth-email');if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(em))return authFail('Enter the email on your account.');
       AUTH_BUSY=true;AUTH_MSG=null;renderSignin();
       const {error}=await SB.auth.resetPasswordForEmail(em,{redirectTo:location.origin+location.pathname});if(error)return authFail(error.message);
       PENDING={kind:'recovery',email:em,sentAt:Date.now()};RESEND_AT=Date.now()+60e3;AUTH_MODE='recover';return authNote(`If <b>${esc(em)}</b> has an account, the code is on its way.`)}
-    if(mode==='recover'){const code=v('auth-code').replace(/\D/g,''),pw=F['auth-pw'];if(need(code.length>=6,'Enter the code from the email.'))return;
+    if(mode==='recover'){const code=v('auth-code').replace(/\D/g,''),pw=F['auth-pw'];if(code.length<6)return codeFail('Enter the 6-digit code from the email.');
       if(need(pw.length>=8,'Use at least 8 characters for your new password.'))return;
       AUTH_BUSY=true;AUTH_MSG=null;renderSignin();
-      const r=await SB.auth.verifyOtp({email:PENDING.email,token:code,type:'recovery'});if(r.error)return authFail(r.error.message);
+      const r=await SB.auth.verifyOtp({email:PENDING.email,token:code,type:'recovery'});if(r.error)return codeFail(r.error.message);
       const {error}=await SB.auth.updateUser({password:pw});if(error)return authFail(error.message);
       AUTH_BUSY=false;AUTH_MODE='in';toast('Password updated. You are signed in.');if(USER)enterApp();else if(r.data&&r.data.session)adoptSession(r.data.session,true);return}
     if(mode==='reset'){const pw=F['auth-pw'];if(need(pw.length>=8,'Use at least 8 characters for your password.'))return;
@@ -1902,14 +1912,19 @@ document.addEventListener('click',e=>{const t=e.target;if(!t.closest)return;
   const o=t.closest('[data-oauth]');if(o){if(!AUTH_BUSY)startOAuth(o.dataset.oauth);return}
   const m=t.closest('[data-auth-mode]');if(m){const md=m.dataset.authMode;if(md==='up'&&AUTH_MODE==='verify'){stopConfirmWatch();PENDING=null}
     if(md==='forgot'&&AUTH_VALS['auth-id']&&AUTH_VALS['auth-id'].includes('@'))AUTH_VALS['auth-email']=AUTH_VALS['auth-id'];
-    const idv=$('auth-id');if(idv)AUTH_VALS['auth-id']=idv.value;AUTH_MODE=md;AUTH_MSG=null;UN_STATE=null;renderSignin();return}
+    const idv=$('auth-id');if(idv)AUTH_VALS['auth-id']=idv.value;delete AUTH_VALS['auth-code'];AUTH_MODE=md;AUTH_MSG=null;UN_STATE=null;renderSignin();return}
   if(t.closest('[data-auth-resend]')){if(!PENDING)return;(async()=>{const err=PENDING.kind==='recovery'?(await SB.auth.resetPasswordForEmail(PENDING.email,{redirectTo:location.origin+location.pathname})).error:await sendSignupCode(PENDING.email);
     if(err)return authFail(err.message);RESEND_AT=Date.now()+60e3;authNote('New code sent. Use the newest email.')})();return}
   if(t.closest('[data-auth-skip-un]')){if(USER)lsSet(SKIP_UN+USER.id,'1');enterApp();return}
   if(t.closest('[data-auth-continue]')){enterApp();return}});
 document.addEventListener('input',e=>{const t=e.target;
   if(t.id==='auth-user'||t.id==='acc-un')checkUsername(t.value);
-  if(t.id==='auth-code'&&tab==='signin'){t.value=t.value.replace(/\D/g,'');if((e.inputType==='insertFromPaste'||e.inputType==='insertReplacementText'||!e.inputType)&&t.value.length>=6&&!AUTH_BUSY)t.form.requestSubmit()}});
+  if(t.id==='auth-code'&&tab==='signin'){const v=t.value.replace(/\D/g,'').slice(0,6);if(t.value!==v)t.value=v;AUTH_VALS['auth-code']=v;
+    const box=t.parentNode;box.classList.remove('bad','shake');paintOtp();
+    /* All six digits in: confirm straight away. On the reset screen, go to the password unless it's already filled in. */
+    if(v.length===6&&!AUTH_BUSY){if(t.form.dataset.mode==='recover'){const pw=$('auth-pw');if(pw&&pw.value.length<8){pw.focus();return}}t.form.requestSubmit()}}});
+/* Keep the caret at the end so the highlighted slot is always where the next digit goes. */
+['focusin','click','keyup'].forEach(ev=>document.addEventListener(ev,e=>{const t=e.target;if(t&&t.id==='auth-code'){const n=t.value.length;if(t.selectionStart!==n||t.selectionEnd!==n)t.setSelectionRange(n,n)}}));
 document.addEventListener('submit',e=>{if(e.target.id!=='auth-form')return;e.preventDefault();if(!AUTH_BUSY)authSubmit(e.target.dataset.mode)});
 initAccounts();
 
