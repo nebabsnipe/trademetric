@@ -1018,7 +1018,8 @@ function sortTable(id){const tbl=document.getElementById(id);if(!tbl)return;cons
   rows.forEach(r=>tb.appendChild(r));pinTop()}
 
 /* ===== TRADES ===== */
-let tgtPos='ALL',sugSkip=0;
+let tgtPos='ALL',rosPos='ALL',sugSkip=0;
+const shortName=n=>{const w=n.split(' ');return w.length>1&&!/D\/ST$/.test(n)?w[0][0]+'. '+w.slice(1).join(' '):n};
 if(!window.__trade)window.__trade={give:[],get:[]};
 const TD=window.__trade;
 function renderTrade(){
@@ -1030,12 +1031,19 @@ function renderTrade(){
   $('sug-note').textContent=sug.length?`${sug.length} ideas for ${myTeam().name}`:'';
   const me=myTeam();TD.give=TD.give.filter(id=>me.players.includes(id));TD.get=TD.get.filter(id=>OWN[id]&&OWN[id]!==S.me);
   const card=(id,kind)=>{const p=byId[id],g=G[id];
-    return `<div class="tb-card ${kind}">${av(p,'md')}<div class="tb-meta"><span class="tb-name"><button class="pname" data-open="${id}">${esc(p.n)}</button>${tagHtml(id)}</span><span class="psub">${p.pos}${V.posRank[id]} · ${p.t} · ${oppHtml(id)}</span>
+    return `<div class="tb-card ${kind}${TD.fresh===id?' fresh':''}">${av(p,'md')}<div class="tb-meta"><span class="tb-name"><button class="pname" data-open="${id}">${esc(p.n)}</button>${tagHtml(id)}</span><span class="psub">${p.pos}${V.posRank[id]} · ${p.t} · ${oppHtml(id)}</span>
       <div class="tb-nums"><span><b>${(x=>x.k==='bye'?'Bye':f1(x.v))(nextWk(id))}</b>${wkLab(nextWk(id))}</span><span><b>${f1(V.pts[id])}</b>Pts/G</span><span><b>${f1(g.last3)}</b>Last 3</span></div></div>
       <button class="tb-x" ${kind==='give'?`data-give="${id}"`:`data-unget="${id}"`} aria-label="Remove ${esc(p.n)}">×</button></div>`};
   $('give-tray').innerHTML=TD.give.map(id=>card(id,'give')).join('')||'<div class="tb-empty">Pick from your roster</div>';
   $('get-tray').innerHTML=TD.get.map(id=>card(id,'get')).join('')||'<div class="tb-empty">Pick from Players to trade for</div>';
-  $('give-chips').innerHTML=me.players.slice().sort((a,b)=>tv(b)-tv(a)).map(id=>{const p=byId[id];return `<button class="chip" data-give="${id}" aria-pressed="${TD.give.includes(id)}">${av(p,'sm')}${esc(p.n)} <span class="v">${p.pos}</span></button>`}).join('')||'<p class="empty">Add players to your team first.</p>';
+  const POS_I=p=>POS.indexOf(p.pos),inPos=p=>rosPos==='ALL'||(rosPos==='KD'?p.pos==='K'||p.pos==='DST':p.pos===rosPos);
+  const ros=me.players.map(id=>byId[id]).filter(Boolean).sort((a,b)=>POS_I(a)-POS_I(b)||tv(b.id)-tv(a.id));
+  $('ros-count').textContent=ros.length?`${ros.length} players${TD.give.length?` · ${TD.give.length} in deal`:''}`:'';
+  const shown=ros.filter(inPos);
+  $('give-chips').innerHTML=!ros.length?'<p class="empty">Add players to your team first.</p>'
+    :shown.map(p=>{const on=TD.give.includes(p.id);
+      return `<button type="button" class="ros-row${on?' on':''}" data-give="${p.id}" aria-pressed="${on}" title="${esc(p.n)}: ${on?'remove from the deal':'add to the deal'}">${av(p,'sm')}<span class="ros-who"><b><span class="ros-full">${esc(p.n)}</span><span class="ros-short">${esc(shortName(p.n))}</span></b><small>${p.pos}${V.posRank[p.id]||''} · ${esc(p.t)}<span class="ros-sp"> · ${f1(V.pts[p.id])}</span></small></span><span class="ros-pts num">${f1(V.pts[p.id])}</span><span class="ros-ck" aria-hidden="true"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span></button>`}).join('')||'<p class="empty ros-none">No players at this position.</p>';
+  TD.fresh=null;
   const partner=TD.get.length?teamById(OWN[TD.get[0]]):null;
   $('get-hint').textContent=partner?`Trading with ${partner.name}`:'';
   const both=TD.give.length&&TD.get.length;
@@ -1690,8 +1698,9 @@ document.addEventListener('click',e=>{
   else if(t.id==='set-me'){S.me=hubSel;S.example=false;upsertLeague();bump();toast(teamById(S.me).name+' is now your team')}
   else if(d.assignMe){assign(d.assignMe,S.me);toast('Added '+byId[d.assignMe].n);render()}
   else if(d.unassign){const n=byId[d.unassign].n;assign(d.unassign,null);toast('Removed '+n);render()}
-  else if(d.give){TD.give=TD.give.includes(d.give)?TD.give.filter(x=>x!==d.give):[...TD.give,d.give];renderTrade()}
-  else if(d.get){if(TD.get.includes(d.get)){TD.get=TD.get.filter(x=>x!==d.get);renderTrade();return}if(TD.get.length&&OWN[TD.get[0]]!==OWN[d.get]){TD.get=[];toast('Started a new deal with '+teamById(OWN[d.get]).name)}TD.get.push(d.get);renderTrade();const sb=$('targets').closest('.scrollbox');if(sb)sb.scrollTop=0}
+  else if(d.give){if(TD.give.includes(d.give))TD.give=TD.give.filter(x=>x!==d.give);else{TD.give=[...TD.give,d.give];TD.fresh=d.give}renderTrade()}
+  else if(d.rpos){rosPos=d.rpos;t.parentNode.querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed',b===t));renderTrade()}
+  else if(d.get){if(TD.get.includes(d.get)){TD.get=TD.get.filter(x=>x!==d.get);renderTrade();return}if(TD.get.length&&OWN[TD.get[0]]!==OWN[d.get]){TD.get=[];toast('Started a new deal with '+teamById(OWN[d.get]).name)}TD.get.push(d.get);TD.fresh=d.get;renderTrade();const sb=$('targets').closest('.scrollbox');if(sb)sb.scrollTop=0}
   else if(d.unget){TD.get=TD.get.filter(x=>x!==d.unget);renderTrade()}
   else if(d.pos){rankPos=d.pos;t.parentNode.querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed',b===t));renderRankings()}
   else if(d.own){rankOwn=d.own;t.parentNode.querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed',b===t));renderRankings()}

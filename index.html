@@ -100,7 +100,10 @@
       <div class="grid2 grid-trade">
         <div class="stack">
           <div class="card tb"><div class="card-h"><h2>Trade table</h2><button class="btn small ghost" id="trade-reset">Clear</button></div>
-            <h4 class="tb-roster-h">Your roster</h4><div class="chips" id="give-chips"></div>
+            <div class="ros">
+              <div class="ros-h"><div class="ros-t"><h4>Your roster</h4><span class="ros-n" id="ros-count"></span></div>
+                <div class="seg ros-seg" id="ros-pos" role="group" aria-label="Filter your roster by position"><button data-rpos="ALL" aria-pressed="true">All</button><button data-rpos="QB" aria-pressed="false">QB</button><button data-rpos="RB" aria-pressed="false">RB</button><button data-rpos="WR" aria-pressed="false">WR</button><button data-rpos="TE" aria-pressed="false">TE</button><button data-rpos="KD" aria-pressed="false">K/DST</button></div></div>
+              <div class="ros-list" id="give-chips"></div></div>
             <div class="tb-grid">
               <div class="tb-side"><div class="tb-lab">You give</div><div class="tb-tray" id="give-tray"></div></div>
               <div class="tb-mid" aria-hidden="true"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h14M14 4l4 4-4 4M20 16H6M10 12l-4 4 4 4"/></svg></div>
