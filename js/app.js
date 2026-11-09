@@ -1883,18 +1883,33 @@ async function startOAuth(id){const p=OAUTH.find(x=>x.id===id);if(!p||!SB)return
   if(PROVIDERS&&PROVIDERS[id]===false){AUTH_MSG={bad:true,html:esc(p.name+' sign-in is coming soon. Use your email for now.')};renderSignin();return}
   AUTH_BUSY=true;AUTH_MSG=null;renderSignin();
   const {error}=await SB.auth.signInWithOAuth({provider:id,options:{redirectTo:location.origin+location.pathname}});if(error)authFail(error.message)}
+function identityFor(id){return USER&&USER.identities&&USER.identities.find(i=>i.provider===id)}
+async function linkOAuth(id){const p=OAUTH.find(x=>x.id===id);if(!p||!SB||ACC_BUSY)return;
+  if(PROVIDERS&&PROVIDERS[id]===false){ACC_MSG={bad:true,html:esc(p.name+' sign-in is coming soon.')};return renderAccount()}
+  try{sessionStorage.setItem('tm-link',id)}catch(e){}
+  ACC_BUSY=true;ACC_MSG=null;renderAccount();
+  const {error}=await (SB.auth.linkIdentity?SB.auth.linkIdentity({provider:id,options:{redirectTo:location.origin+location.pathname}}):Promise.resolve({error:{message:'Linking needs a newer sign-in library.'}}));
+  if(error){try{sessionStorage.removeItem('tm-link')}catch(e){}ACC_BUSY=false;return accFail(error.message)}}
+async function unlinkOAuth(id){const idy=identityFor(id);if(!idy||!SB||ACC_BUSY)return;
+  if(USER.identities.length<2)return accFail('Add a password or another sign-in first, so you can still get in.');
+  ACC_BUSY=true;ACC_MSG=null;renderAccount();
+  const {error}=await SB.auth.unlinkIdentity(idy);ACC_BUSY=false;
+  if(error)return accFail(error.message);
+  USER={...USER,identities:USER.identities.filter(i=>i.provider!==id)};toast((OAUTH.find(x=>x.id===id)||{}).name+' disconnected');renderAccount()}
 async function initAccounts(){
   acctUI();
   try{const {createClient}=await import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/+esm');
     SB=createClient(SUPA_URL,SUPA_KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:false,flowType:'implicit'}})}catch(e){SB_FAILED=true;renderSignin();return}
-  fetch(SUPA_URL+'/auth/v1/settings',{headers:{apikey:SUPA_KEY}}).then(r=>r.ok?r.json():null).then(j=>{if(j&&j.external){PROVIDERS=j.external;if(tab==='signin')renderSignin()}}).catch(()=>{});
-  let fromLink=false;
-  if(AUTH_HASH){const q=new URLSearchParams(AUTH_HASH),type=q.get('type');INTENDED='team';
+  fetch(SUPA_URL+'/auth/v1/settings',{headers:{apikey:SUPA_KEY}}).then(r=>r.ok?r.json():null).then(j=>{if(j&&j.external){PROVIDERS=j.external;if(tab==='signin')renderSignin();else if(tab==='account'&&!ACC_EDIT&&USER)renderAccount()}}).catch(()=>{});
+  let fromLink=false,linkId=null;try{linkId=sessionStorage.getItem('tm-link');if(linkId)sessionStorage.removeItem('tm-link')}catch(e){}
+  if(AUTH_HASH){const q=new URLSearchParams(AUTH_HASH),type=q.get('type');INTENDED=linkId?'account-security':'team';
     history.replaceState(null,'',location.pathname+location.search+'#signin');
     if(q.get('access_token')){const {error}=await SB.auth.setSession({access_token:q.get('access_token'),refresh_token:q.get('refresh_token')});
       if(error)AUTH_MSG={bad:true,html:'That link expired. Sign in, or ask for a new code.'};
-      else{fromLink=true;if(type==='recovery')AUTH_MODE='reset';else if(type==='signup'||type==='email'||type==='invite')AUTH_MODE='confirmed'}}
-    else if(q.get('error_description'))AUTH_MSG={bad:true,html:esc(friendly(q.get('error_description').replace(/\+/g,' ')))}}
+      else{fromLink=true;if(linkId){const p=OAUTH.find(x=>x.id===linkId);setTimeout(()=>toast((p?p.name:'Account')+' connected'),300)}
+        else if(type==='recovery')AUTH_MODE='reset';else if(type==='signup'||type==='email'||type==='invite')AUTH_MODE='confirmed'}}
+    else if(q.get('error_description')){const msg=friendly(q.get('error_description').replace(/\+/g,' '));
+      if(linkId)setTimeout(()=>toast(msg),300);else AUTH_MSG={bad:true,html:esc(msg)}}}
   const {data}=await SB.auth.getSession();const s=data&&data.session;
   if(s){USER=s.user;if(!(await checkExpiry()))await signedIn(s.user,fromLink)}else renderSignin();
   acctUI();
@@ -2224,8 +2239,13 @@ function accPlan(){const p=planOf();
 function accSecurity(){const until=lsGet(UNTIL_KEY),pw=hasPassword(),soc=socialName();
   const pwForm=`<form class="acc-form" id="acc-form" data-kind="password" novalidate>${pwField('acc-pw','New password','new-password','minlength="8" placeholder="At least 8 characters"')}${pwField('acc-pw2','Type it again','new-password','minlength="8"')}${accMsg()}<div class="acc-form-act">${accBtn(pw?'Change password':'Set password')}<button class="btn" type="button" data-acc-cancel>Cancel</button></div></form>`;
   const delForm=`<form class="acc-form" id="acc-form" data-kind="delete" novalidate><p class="note">This deletes your account and every league saved to it. It can't be undone.</p><label><span>Type <b>${esc(acctName()||'delete')}</b> to confirm</span><input type="text" id="acc-del" autocapitalize="none" autocorrect="off" spellcheck="false" autocomplete="off" required></label>${accMsg()}<div class="acc-form-act"><button class="btn danger" type="submit" ${ACC_BUSY?'disabled':''}>${ACC_BUSY?'Deleting...':'Delete my account'}</button><button class="btn" type="button" data-acc-cancel>Cancel</button></div></form>`;
+  const links=OAUTH.map(p=>{const idy=identityFor(p.id),off=PROVIDERS&&PROVIDERS[p.id]===false;
+    const v=idy?`<span class="pill-ok">Connected</span><span class="note">${esc(idy.identity_data&&(idy.identity_data.email||idy.identity_data.name)||'')}</span>`:off?'<span class="note">Coming soon</span>':'<span class="note">Not connected</span>';
+    const act=idy?`<button class="btn" type="button" data-unlink-oauth="${p.id}" ${ACC_BUSY?'disabled':''}>Disconnect</button>`:off?'':`<button class="btn" type="button" data-link-oauth="${p.id}" ${ACC_BUSY?'disabled':''}>Connect</button>`;
+    return accRow(p.name,v,act)}).join('');
   return `<section class="card acc-sec"><header class="acc-sec-h"><h2>Password</h2><p>${pw?'Used with your username or email.':`You sign in with ${esc(soc||'a linked account')}. Add a password to also sign in with your username.`}</p></header>
       ${ACC_EDIT==='password'?pwForm:accRow('Password',pw?'<span class="acc-dots">••••••••••</span>':'<span class="note">Not set</span>',`<button class="btn" type="button" data-acc-edit="password">${pw?'Change':'Set password'}</button>`)}</section>
+    <section class="card acc-sec"><header class="acc-sec-h"><h2>Linked accounts</h2><p>Connect Google or Discord so you can sign in with either one.</p></header>${links}</section>
     <section class="card acc-sec"><header class="acc-sec-h"><h2>Sessions</h2><p>You stay signed in for the whole season, then sign in once more.</p></header>
       ${accRow('This device',until?`Signed in until <b>${esc(fmtDate(+until))}</b>`:'Signed in')}
       <div class="acc-sec-f"><button class="btn" type="button" data-acc-out-all>Sign out everywhere</button></div></section>
@@ -2248,7 +2268,9 @@ document.addEventListener('click',e=>{const t=e.target;if(!t.closest)return;
   const ed=t.closest('[data-acc-edit]');if(ed){ACC_EDIT=ed.dataset.accEdit;ACC_MSG=null;UN_STATE=null;renderAccount();return}
   if(t.closest('[data-acc-cancel]')){ACC_EDIT=null;ACC_MSG=null;UN_STATE=null;renderAccount();return}
   if(t.closest('#auth-out')){SB.auth.signOut({scope:'local'}).then(()=>{lsDel(UNTIL_KEY);leaveApp();toast('Signed out. Your leagues are saved.')});return}
-  if(t.closest('[data-acc-out-all]')){SB.auth.signOut({scope:'global'}).then(({error})=>{if(error)return toast(friendly(error.message));lsDel(UNTIL_KEY);leaveApp();toast('Signed out on every device.')});return}});
+  if(t.closest('[data-acc-out-all]')){SB.auth.signOut({scope:'global'}).then(({error})=>{if(error)return toast(friendly(error.message));lsDel(UNTIL_KEY);leaveApp();toast('Signed out on every device.')});return}
+  const lk=t.closest('[data-link-oauth]');if(lk){linkOAuth(lk.dataset.linkOauth);return}
+  const ulk=t.closest('[data-unlink-oauth]');if(ulk){unlinkOAuth(ulk.dataset.unlinkOauth);return}});
 document.addEventListener('submit',e=>{if(e.target.id!=='acc-form')return;e.preventDefault();accSubmit(e.target.dataset.kind)});
 
 /* ===== AI Helper: floating button + slide-over panel on every page ===== */
