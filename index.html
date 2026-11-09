@@ -94,19 +94,19 @@
 
   <!-- TRADES -->
   <section class="view" id="v-trade" hidden>
-    <div class="hero"><div><div class="kicker">Trade center</div><h1>Trades</h1><p>Build a deal and see it graded, or start from one of the recommended trades below. <a class="how" href="#help-trades">How this works</a></p></div></div>
+    <div class="hero"><div><div class="kicker">Trade center</div><h1>Trades</h1><p><a class="how" href="#help-trades">How this works</a></p></div></div>
     <div class="tr-sec">
-      <div class="tr-sec-h"><div><h2>Trade builder</h2><span class="note">Offer players, ask for players, and watch the grade move.</span></div></div>
+      <div class="tr-sec-h"><div><h2>Trade builder</h2></div></div>
       <div class="grid2 grid-trade">
         <div class="stack">
           <div class="card tb"><div class="card-h"><h2>Trade table</h2><button class="btn small ghost" id="trade-reset">Clear</button></div>
+            <h4 class="tb-roster-h">Your roster</h4><div class="chips" id="give-chips"></div>
             <div class="tb-grid">
               <div class="tb-side"><div class="tb-lab">You give</div><div class="tb-tray" id="give-tray"></div></div>
               <div class="tb-mid" aria-hidden="true"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h14M14 4l4 4-4 4M20 16H6M10 12l-4 4 4 4"/></svg></div>
               <div class="tb-side"><div class="tb-lab get">You get</div><div class="tb-tray" id="get-tray"></div></div>
             </div>
             <div class="tb-foot" id="tb-foot"></div>
-            <h4>Your roster</h4><div class="chips" id="give-chips"></div>
             <p class="note" id="get-hint" style="margin:10px 0 0"></p></div>
           <div class="card" id="rating"></div>
         </div>
@@ -126,7 +126,7 @@
 
   <!-- HUB -->
   <section class="view" id="v-hub" hidden>
-    <div class="hero"><div><div class="kicker" id="hub-kicker"></div><h1>League Hub</h1><p>Every roster in your league, power rankings and your trade log.</p></div>
+    <div class="hero"><div><div class="kicker" id="hub-kicker"></div><h1>League Hub</h1></div>
       <div class="toolbar"><a class="btn primary" href="#league" id="lg-settings-btn">League settings</a><button class="btn" id="load-sample">Load sample league</button><button class="btn ghost" id="clear-league">Clear other rosters</button></div></div>
     <div class="card" id="import-card"></div>
     <div class="card lg-card" id="league-list"></div>
@@ -188,7 +188,7 @@
           <li><b>League Sync</b><span>Sleeper and ESPN</span></li>
           <li><b>AI Helper</b><span>Your weekly game plan</span></li>
         </ul>
-        <div class="auth-cta"><button type="button" class="auth-cta-btn" data-auth-mode="up">Create a free account</button><span>Takes about a minute</span></div>
+        <div class="auth-cta"><button type="button" class="auth-cta-btn" data-auth-mode="up">Create a free account</button></div>
       </aside>
       <div class="auth-card" id="signin-card"></div>
     </div>
@@ -215,7 +215,7 @@
 
   <!-- HELP -->
   <section class="view" id="v-help" hidden>
-    <div class="hero"><div><div class="kicker">Help</div><h1>How this works</h1><p>What every number on TradeMetric means and where it comes from.</p></div></div>
+    <div class="hero"><div><div class="kicker">Help</div><h1>How this works</h1></div></div>
     <div class="faq">
       <details class="faq-i" id="faq-team"><summary>My Team and your lineup</summary><div class="faq-b"><p>Your lineup is the highest-projected group of players that fits your league's roster slots. If you imported from Sleeper or ESPN, it shows the lineup you actually set there.</p>
 <p>Each projection starts from his points per game this season, blended with preseason expectations early in the year. It is then adjusted for this week's opponent, his team's expected points from the betting line, his injury status and the factors listed under Player values.</p>
@@ -262,7 +262,7 @@
 
   <!-- LEAGUE SETUP -->
   <section class="view" id="v-league" hidden>
-    <div class="hero"><div><div class="kicker"><a href="#hub" class="back-link">← League Hub</a></div><h1>League settings</h1><p>Scoring and roster rules. Everything updates as you edit.</p></div></div>
+    <div class="hero"><div><div class="kicker"><a href="#hub" class="back-link">← League Hub</a></div><h1>League settings</h1></div></div>
   <div class="card"><div class="card-h"><h3>Start from a preset</h3></div>
       <div class="presets" id="presets">
         <button class="btn" data-preset="std">Standard</button><button class="btn" data-preset="half">Half PPR</button><button class="btn" data-preset="ppr">Full PPR</button><button class="btn" data-preset="sf">Superflex + TE premium</button><button class="btn" data-preset="2qb">2QB, 6-pt pass TD</button>

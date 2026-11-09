@@ -1033,11 +1033,11 @@ function renderTrade(){
     return `<div class="tb-card ${kind}">${av(p,'md')}<div class="tb-meta"><span class="tb-name"><button class="pname" data-open="${id}">${esc(p.n)}</button>${tagHtml(id)}</span><span class="psub">${p.pos}${V.posRank[id]} · ${p.t} · ${oppHtml(id)}</span>
       <div class="tb-nums"><span><b>${(x=>x.k==='bye'?'Bye':f1(x.v))(nextWk(id))}</b>${wkLab(nextWk(id))}</span><span><b>${f1(V.pts[id])}</b>Pts/G</span><span><b>${f1(g.last3)}</b>Last 3</span></div></div>
       <button class="tb-x" ${kind==='give'?`data-give="${id}"`:`data-unget="${id}"`} aria-label="Remove ${esc(p.n)}">×</button></div>`};
-  $('give-tray').innerHTML=TD.give.map(id=>card(id,'give')).join('')||'<div class="tb-empty">Tap players on your roster below to offer them</div>';
-  $('get-tray').innerHTML=TD.get.map(id=>card(id,'get')).join('')||'<div class="tb-empty">Pick players from the list to ask for</div>';
+  $('give-tray').innerHTML=TD.give.map(id=>card(id,'give')).join('')||'<div class="tb-empty">Pick from your roster</div>';
+  $('get-tray').innerHTML=TD.get.map(id=>card(id,'get')).join('')||'<div class="tb-empty">Pick from Players to trade for</div>';
   $('give-chips').innerHTML=me.players.slice().sort((a,b)=>tv(b)-tv(a)).map(id=>{const p=byId[id];return `<button class="chip" data-give="${id}" aria-pressed="${TD.give.includes(id)}">${av(p,'sm')}${esc(p.n)} <span class="v">${p.pos}</span></button>`}).join('')||'<p class="empty">Add players to your team first.</p>';
   const partner=TD.get.length?teamById(OWN[TD.get[0]]):null;
-  $('get-hint').textContent=partner?`Trading with ${partner.name}. Picking a player from another team starts a new deal.`:'';
+  $('get-hint').textContent=partner?`Trading with ${partner.name}`:'';
   const both=TD.give.length&&TD.get.length;
   $('tb-foot').innerHTML=both?`<div class="tb-tot"><span><small>You send</small><b>${f1(sum(TD.give,id=>V.pts[id]))}</b> pts/G</span><span><small>You receive</small><b>${f1(sum(TD.get,id=>V.pts[id]))}</b> pts/G</span></div><button class="btn" data-compare="${TD.give.join(',')}|${TD.get.join(',')}">Compare players</button>`:'';
   renderTargets();
@@ -1063,7 +1063,7 @@ function weekStrip(before,after,skipNow){const PO=poWeeks(),ws=tmWeeks().filter(
   return `<div class="wst"><div class="lb-h"><span class="lab2">Points per week, after vs now</span><span class="note">Playoff weeks outlined</span></div><div class="wst-row">${ws.map(x=>`<div class="wst-i ${x.d>=0?'up':'down'}${PO.includes(x.w)?' po':''}"><span>Wk ${x.w}</span><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${x.d>=0?'M6 15l6-6 6 6':'M6 9l6 6 6-6'}"/></svg><b class="num">${sgn(x.d)}</b></div>`).join('')}</div></div>`}
 function renderRating(partner){
   const el=$('rating');
-  if(!TD.give.length||!TD.get.length){el.innerHTML=`<div class="card-h"><h2>Trade rating</h2></div><div class="rt-empty"><b>Build a deal to see it graded</b><p>Offer at least one player and ask for one. The grade, lineup changes and playoff odds update as you go.</p></div>`;return}
+  if(!TD.give.length||!TD.get.length){el.innerHTML=`<div class="card-h"><h2>Trade rating</h2></div><div class="rt-empty"><b>Build a deal to see it graded</b></div>`;return}
   const me=myTeam(),fr=fairness(TD.give,TD.get,partner.id),e=fr.e,hm=RATE_MODE==='hm',over=me.players.length-TD.give.length+TD.get.length-rosterSize();
   const cls=v=>v>=0?'up':'down',row=(l,v,note)=>`<tr><td>${l}${note?`<span class="note"> · ${note}</span>`:''}</td><td class="r num ${cls(v)}">${sgn(v)}</td></tr>`,P=e.parts,rl=realism(e,TD.give,TD.get);
   const gcard=(who,g,big,line,sub,mine)=>`<div class="gcard ${g}${mine?' mine':''}"><span class="gc-who">${who}</span><b class="gc-g">${big}</b><span class="gc-line">${line}</span><span class="gc-sub">${sub}</span></div>`;
@@ -1078,8 +1078,7 @@ function renderRating(partner){
    ${weekStrip(me.players,e.mine.after,e.skipNow)}
    ${e.skipNow?`<p class="note rt-note">Week ${WEEK} is left out of this rating: a player in the deal has already played this week, so it starts counting from Week ${WEEK+1}.</p>`:''}
    ${e.mine.fa||e.mine.drop||e.theirs.fa||e.theirs.drop?`<p class="note rt-note">${[e.mine.fa?`You'd pick up ${esc(byId[e.mine.fa].n)} with the open roster spot.`:'',e.mine.drop?`You'd drop ${esc([].concat(e.mine.drop).map(x=>byId[x].n).join(' and '))} to make room.`:'',e.theirs.drop?`${esc(partner.name)} would drop ${esc([].concat(e.theirs.drop).map(x=>byId[x].n).join(' and '))}.`:'',e.theirs.fa?`${esc(partner.name)} would pick up ${esc(byId[e.theirs.fa].n)}.`:''].filter(Boolean).join(' ')}</p>`:''}
-   ${over>0?`<p class="note rt-note">You would be ${over} over your roster limit and need to drop ${over>1?'players':'a player'}.</p>`:''}
-   <div class="rt-act"><button class="btn" data-compare="${TD.give.join(',')}|${TD.get.join(',')}">Compare players</button></div>`;
+   ${over>0?`<p class="note rt-note">You would be ${over} over your roster limit and need to drop ${over>1?'players':'a player'}.</p>`:''}`;
 }
 
 /* ===== HUB ===== */
@@ -1766,6 +1765,9 @@ var SIGNING=false,PENDING=null,PROVIDERS=null,CONF_T=null,RESEND_AT=0,UN_T=null,
 var UNTIL_KEY='tm-auth-until',SKIP_UN='tm-skip-username-';
 /* Social sign-in buttons. Each one also has to be switched on in Supabase (Authentication -> Providers). */
 var OAUTH=[{id:'google',name:'Google'},{id:'apple',name:'Apple'},{id:'discord',name:'Discord'}];
+/* provider marks from each brand's official logo; Apple keeps a letter until it's set up */
+var SSO_LOGO={google:'<svg viewBox="0 0 48 48" width="18" height="18"><path fill="#4285F4" d="M45.12 24.5c0-1.56-.14-3.06-.4-4.5H24v8.51h11.84c-.51 2.75-2.06 5.08-4.39 6.64v5.52h7.11c4.16-3.83 6.56-9.47 6.56-16.17z"/><path fill="#34A853" d="M24 46c5.94 0 10.92-1.97 14.56-5.33l-7.11-5.52c-1.97 1.32-4.49 2.1-7.45 2.1-5.73 0-10.58-3.87-12.31-9.07H4.34v5.7C7.96 41.07 15.4 46 24 46z"/><path fill="#FBBC05" d="M11.69 28.18C11.25 26.86 11 25.45 11 24s.25-2.86.69-4.18v-5.7H4.34C2.85 17.09 2 20.45 2 24s.85 6.91 2.34 9.88l7.35-5.7z"/><path fill="#EA4335" d="M24 10.75c3.23 0 6.13 1.11 8.41 3.29l6.31-6.31C34.91 4.18 29.93 2 24 2 15.4 2 7.96 6.93 4.34 14.12l7.35 5.7c1.73-5.2 6.58-9.07 12.31-9.07z"/></svg>',discord:'<svg viewBox="0 0 127.14 96.36" width="20" height="16"><path fill="#5865F2" d="M107.7,8.07A105.15,105.15,0,0,0,81.47,0a72.06,72.06,0,0,0-3.36,6.83A97.68,97.68,0,0,0,49,6.83,72.37,72.37,0,0,0,45.64,0,105.89,105.89,0,0,0,19.39,8.09C2.79,32.65-1.71,56.6.54,80.21h0A105.73,105.73,0,0,0,32.71,96.36,77.7,77.7,0,0,0,39.6,85.25a68.42,68.42,0,0,1-10.85-5.18c.91-.66,1.8-1.34,2.66-2a75.57,75.57,0,0,0,64.32,0c.87.71,1.76,1.39,2.66,2a68.68,68.68,0,0,1-10.87,5.19,77,77,0,0,0,6.89,11.1A105.25,105.25,0,0,0,126.6,80.22h0C129.24,52.84,122.09,29.11,107.7,8.07ZM42.45,65.69C36.18,65.69,31,60,31,53s5-12.74,11.43-12.74S54,46,53.89,53,48.84,65.69,42.45,65.69Zm42.24,0C78.41,65.69,73.25,60,73.25,53s5-12.74,11.44-12.74S96.23,46,96.12,53,91.08,65.69,84.69,65.69Z"/></svg>'};
+function ssoMark(p){return `<span class="sso-ic sso-${p.id}" aria-hidden="true">${SSO_LOGO[p.id]||p.name[0]}</span>`}
 function lsGet(k){try{return localStorage.getItem(k)}catch(e){return null}}
 function lsSet(k,v){try{localStorage.setItem(k,v)}catch(e){}}
 function lsDel(k){try{localStorage.removeItem(k)}catch(e){}}
@@ -1813,7 +1815,7 @@ function friendly(m){m=String(m||'');
   return m||'Something went wrong. Try again.'}
 const EYE='<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>';
 function pwField(id,label,ac,extra=''){return `<label>${label}<span class="pw-wrap"><input type="password" id="${id}" autocomplete="${ac}" required ${extra}><button type="button" class="pw-eye" data-pw-eye="${id}" aria-label="Show password" aria-pressed="false">${EYE}</button></span></label>`}
-function oauthHtml(){return `<div class="auth-social">${OAUTH.map(p=>{const off=PROVIDERS&&PROVIDERS[p.id]===false;return `<button type="button" class="auth-sso${off?' off':''}" data-oauth="${p.id}" ${AUTH_BUSY?'disabled':''} title="${off?esc(p.name)+' sign-in is coming soon':''}"><span class="sso-ic sso-${p.id}" aria-hidden="true">${p.name[0]}</span>${esc(p.name)}</button>`}).join('')}</div><div class="auth-or"><span>or with email</span></div>`}
+function oauthHtml(){return `<div class="auth-social">${OAUTH.map(p=>{const off=PROVIDERS&&PROVIDERS[p.id]===false;return `<button type="button" class="auth-sso${off?' off':''}" data-oauth="${p.id}" ${AUTH_BUSY?'disabled':''} title="${off?esc(p.name)+' sign-in is coming soon':''}">${ssoMark(p)}${esc(p.name)}</button>`}).join('')}</div><div class="auth-or"><span>or with email</span></div>`}
 /* Six-slot code input. One real <input> sits invisibly on top of six painted slots, so typing, paste,
    iOS/Android one-time-code autofill and backspace all behave natively. */
 var AUTH_SHAKE=false;
@@ -1830,11 +1832,11 @@ function renderSignin(){const el=$('signin-card');if(!el)return;
   if(USER&&!['reset','recover','username','confirmed'].includes(AUTH_MODE)){el.innerHTML='';setTimeout(()=>{if(tab==='signin'&&USER)enterApp()},0);return}
   const pe=PENDING&&PENDING.email?`<b>${esc(PENDING.email)}</b>`:'your email';
   let h='';
-  if(AUTH_MODE==='in')h=`<h1>Welcome back</h1><p class="auth-sub">Sign in to your leagues, trades and rankings.</p>${oauthHtml()}<form id="auth-form" data-mode="in" novalidate>
+  if(AUTH_MODE==='in')h=`<h1>Welcome back</h1>${oauthHtml()}<form id="auth-form" data-mode="in" novalidate>
      <label>Username or email<input type="text" id="auth-id" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" required></label>
      ${pwField('auth-pw','<span class="lab-row">Password<button type="button" class="linkish" data-auth-mode="forgot">Forgot?</button></span>','current-password')}${msg}${btn('Sign in')}</form>
      <p class="auth-foot">New to TradeMetric? <button type="button" class="linkish strong" data-auth-mode="up">Create an account</button></p>`;
-  else if(AUTH_MODE==='up')h=`<h1>Create your account</h1><p class="auth-sub">Free during the beta. Takes about a minute.</p>${oauthHtml()}<form id="auth-form" data-mode="up" novalidate>
+  else if(AUTH_MODE==='up')h=`<h1>Create your account</h1><p class="auth-sub">Free during the beta.</p>${oauthHtml()}<form id="auth-form" data-mode="up" novalidate>
      <label>Username<input type="text" id="auth-user" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" maxlength="20" required placeholder="3 to 20 letters, numbers or _"><span class="hint" id="un-hint" aria-live="polite"></span></label>
      <label>Email<input type="email" id="auth-email" autocomplete="email" autocapitalize="none" spellcheck="false" required></label>
      ${pwField('auth-pw','Password','new-password','minlength="8" placeholder="At least 8 characters"')}${msg}${btn('Create account')}</form>
@@ -2318,10 +2320,10 @@ function accSecurity(){const until=lsGet(UNTIL_KEY),pw=hasPassword(),soc=socialN
   const links=OAUTH.map(p=>{const idy=identityFor(p.id),off=PROVIDERS&&PROVIDERS[p.id]===false;
     const v=idy?`<span class="pill-ok">Connected</span><span class="note">${esc(idy.identity_data&&(idy.identity_data.email||idy.identity_data.name)||'')}</span>`:off?'<span class="note">Coming soon</span>':'<span class="note">Not connected</span>';
     const act=idy?`<button class="btn" type="button" data-unlink-oauth="${p.id}" ${ACC_BUSY?'disabled':''}>Disconnect</button>`:off?'':`<button class="btn" type="button" data-link-oauth="${p.id}" ${ACC_BUSY?'disabled':''}>Connect</button>`;
-    return accRow(p.name,v,act)}).join('');
+    return accRow(`<span class="acc-prov">${ssoMark(p)}${esc(p.name)}</span>`,v,act)}).join('');
   return `<section class="card acc-sec"><header class="acc-sec-h"><h2>Password</h2><p>${pw?'Used with your username or email.':`You sign in with ${esc(soc||'a linked account')}. Add a password to also sign in with your username.`}</p></header>
       ${ACC_EDIT==='password'?pwForm:accRow('Password',pw?'<span class="acc-dots">••••••••••</span>':'<span class="note">Not set</span>',`<button class="btn" type="button" data-acc-edit="password">${pw?'Change':'Set password'}</button>`)}</section>
-    <section class="card acc-sec"><header class="acc-sec-h"><h2>Linked accounts</h2><p>Connect Google or Discord so you can sign in with either one.</p></header>${links}</section>
+    <section class="card acc-sec"><header class="acc-sec-h"><h2>Linked accounts</h2></header>${links}</section>
     <section class="card acc-sec"><header class="acc-sec-h"><h2>Sessions</h2><p>You stay signed in for the whole season, then sign in once more.</p></header>
       ${accRow('This device',until?`Signed in until <b>${esc(fmtDate(+until))}</b>`:'Signed in')}
       <div class="acc-sec-f"><button class="btn" type="button" data-acc-out-all>Sign out everywhere</button></div></section>

@@ -584,10 +584,12 @@ label.btn.shot-btn{display:inline-flex;align-items:center;gap:8px;white-space:no
 @keyframes tm-blink{50%{opacity:0}}
 /* Social buttons */
 .auth-social{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.auth-card h1+.auth-social{margin-top:22px}
 .auth-sso{appearance:none;display:flex;align-items:center;justify-content:center;gap:8px;height:44px;padding:0 8px;border:1px solid var(--line);background:var(--surface);border-radius:10px;font-weight:600;font-size:13.5px;cursor:pointer;transition:border-color .12s,background .12s}
 .auth-sso:hover:not(:disabled):not(.off){border-color:color-mix(in srgb,var(--ink) 30%,var(--line));background:var(--surface-2)}
 .auth-sso.off{color:var(--muted);cursor:not-allowed}.auth-sso.off .sso-ic{opacity:.5}.auth-sso:disabled{cursor:default}
-.sso-ic{width:18px;height:18px;display:grid;place-items:center;font:800 15px/1 var(--f-body);color:var(--ink)}
+.sso-ic{width:20px;height:18px;display:grid;place-items:center;font:800 15px/1 var(--f-body);color:var(--ink)}.sso-ic svg{display:block}
+.acc-prov{display:inline-flex;align-items:center;gap:8px}
 .sso-google{color:#4285F4}.sso-discord{color:#5865F2}.sso-apple{color:var(--ink)}
 .auth-or{display:flex;align-items:center;gap:12px;margin:16px 0;color:color-mix(in srgb,var(--muted) 80%,transparent);font-size:11.5px;font-weight:500}
 .auth-or::before,.auth-or::after{content:"";flex:1;height:1px;background:color-mix(in srgb,var(--line) 75%,transparent)}
@@ -1349,7 +1351,8 @@ body.signed-out .alerts-wrap{display:none}
 .tb-foot:not(:empty){display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-top:12px;padding:10px 12px;border-radius:10px;background:var(--surface-2)}
 .tb-tot{display:flex;gap:18px;font-size:12.5px;color:var(--muted)}.tb-tot small{display:block;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase}.tb-tot b{font-family:var(--f-mono);color:var(--ink);font-size:15px}
 .tb h4{margin-top:18px}
-.tb .chips{max-height:132px;overflow:auto}
+.tb .tb-roster-h{margin-top:0}
+.tb #give-chips{margin-bottom:16px}
 
 /* rating */
 #rating{display:flex;flex-direction:column;gap:16px}
@@ -1395,7 +1398,6 @@ body.signed-out .alerts-wrap{display:none}
 .rt-more>summary{cursor:pointer;padding:12px 0;font-size:13px;font-weight:700;list-style-position:inside}
 .rt-more[open]>summary{border-bottom:1px solid var(--line);margin-bottom:4px}
 .rt-more .deal{margin-top:10px}.rt-more .formula{border-top:0;padding-top:4px;margin-bottom:12px}
-.rt-act{display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap}
 #rating>.note:last-child{margin-top:-10px!important}
 .tgt-card{position:sticky;top:76px}
 
