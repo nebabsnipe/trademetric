@@ -94,22 +94,32 @@
 
   <!-- TRADES -->
   <section class="view" id="v-trade" hidden>
-    <div class="hero"><div><div class="kicker">Trade center</div><h1>Trades</h1><p>Deals built for your roster that the other manager has a reason to accept. <a class="how" href="#help-trades">How this works</a></p></div>
-      <button class="btn" id="refresh-trades">New ideas</button></div>
-    <div class="grid3" id="suggestions"></div>
-    <div class="grid2 grid-trade">
-      <div class="stack">
-        <div class="card"><div class="card-h"><h2>Build a trade</h2><button class="btn small ghost" id="trade-reset">Clear</button></div>
-          <h4 style="margin-top:0">You give</h4><div class="chips" id="give-chips"></div>
-          <h4>You get</h4><div class="chips" id="get-chips"></div>
-          <p class="note" id="get-hint" style="margin:6px 0 0"></p></div>
-        <div class="card" id="rating"></div>
-      </div>
-      <div class="card"><div class="card-h"><h2>Players to trade for</h2><span class="note" id="tgt-count"></span></div>
-        <input type="search" id="tgt-search" placeholder="Search players, NFL teams or league teams" style="width:100%;margin-bottom:10px">
-        <div class="toolbar" style="margin-bottom:10px;justify-content:space-between"><div class="seg" id="tgt-pos"><button data-tpos="ALL" aria-pressed="true">All</button><button data-tpos="QB">QB</button><button data-tpos="RB">RB</button><button data-tpos="WR">WR</button><button data-tpos="TE">TE</button></div>
-          <div class="seg" id="tgt-sort" aria-label="Sort by"><button data-tsort="2" aria-pressed="true">Pts/G</button><button data-tsort="1">Wk <span class="wk-num">9</span> proj</button><button data-tsort="3">Snap %</button></div></div>
-        <div class="scrollbox" data-fill><table class="tgt-table" id="tgt-table"><thead><tr><th data-sort data-first="asc">Player</th><th class="r" data-sort>Wk <span class="wk-num">9</span></th><th class="r" data-sort>Pts/G</th><th class="r" data-sort>Snap %</th><th data-sort data-first="asc">Team</th><th></th></tr></thead><tbody id="targets"></tbody></table></div>
+    <div class="hero"><div><div class="kicker">Trade center</div><h1>Trades</h1><p>Deals built for your roster that the other manager has a reason to accept. <a class="how" href="#help-trades">How this works</a></p></div></div>
+    <div class="tr-sec">
+      <div class="tr-sec-h"><div><h2>Recommended trades</h2><span class="note" id="sug-note"></span></div><button class="btn" id="refresh-trades">New ideas</button></div>
+      <div class="grid3" id="suggestions"></div>
+    </div>
+    <div class="tr-sec">
+      <div class="tr-sec-h"><div><h2>Trade builder</h2><span class="note">Offer players, ask for players, and watch the grade move.</span></div></div>
+      <div class="grid2 grid-trade">
+        <div class="stack">
+          <div class="card tb"><div class="card-h"><h2>Trade table</h2><button class="btn small ghost" id="trade-reset">Clear</button></div>
+            <div class="tb-grid">
+              <div class="tb-side"><div class="tb-lab">You give</div><div class="tb-tray" id="give-tray"></div></div>
+              <div class="tb-mid" aria-hidden="true"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h14M14 4l4 4-4 4M20 16H6M10 12l-4 4 4 4"/></svg></div>
+              <div class="tb-side"><div class="tb-lab get">You get</div><div class="tb-tray" id="get-tray"></div></div>
+            </div>
+            <div class="tb-foot" id="tb-foot"></div>
+            <h4>Your roster</h4><div class="chips" id="give-chips"></div>
+            <p class="note" id="get-hint" style="margin:10px 0 0"></p></div>
+          <div class="card" id="rating"></div>
+        </div>
+        <div class="card tgt-card"><div class="card-h"><h2>Players to trade for</h2><span class="note" id="tgt-count"></span></div>
+          <input type="search" id="tgt-search" placeholder="Search players, NFL teams or league teams" style="width:100%;margin-bottom:10px">
+          <div class="toolbar" style="margin-bottom:10px;justify-content:space-between"><div class="seg" id="tgt-pos"><button data-tpos="ALL" aria-pressed="true">All</button><button data-tpos="QB">QB</button><button data-tpos="RB">RB</button><button data-tpos="WR">WR</button><button data-tpos="TE">TE</button></div>
+            <div class="seg" id="tgt-sort" aria-label="Sort by"><button data-tsort="2" aria-pressed="true">Pts/G</button><button data-tsort="1">Wk <span class="wk-num">9</span> proj</button><button data-tsort="3">Snap %</button></div></div>
+          <div class="scrollbox" data-fill><table class="tgt-table" id="tgt-table"><thead><tr><th data-sort data-first="asc">Player</th><th class="r" data-sort>Wk <span class="wk-num">9</span></th><th class="r" data-sort>Pts/G</th><th class="r" data-sort>Snap %</th><th data-sort data-first="asc">Team</th><th></th></tr></thead><tbody id="targets"></tbody></table></div>
+        </div>
       </div>
     </div>
   </section>
