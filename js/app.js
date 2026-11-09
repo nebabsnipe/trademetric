@@ -1732,7 +1732,8 @@ function friendly(m){m=String(m||'');
   if(/provider is not enabled|unsupported provider/i.test(m))return "That sign-in option isn't switched on yet. Use your email for now.";
   if(/different from the old|same as the old/i.test(m))return "Pick a password you haven't used here before.";
   if(/failed to fetch|network/i.test(m))return "Can't reach TradeMetric's sign-in. Check your connection and try again.";
-  if(/duplicate key|profiles_username_key/i.test(m))return 'That username is taken. Try another.';
+  if(/profiles_username_key|duplicate key value .*username/i.test(m))return 'That username is taken. Try another.';
+  if(/schema cache|does not exist|relation .* does not exist/i.test(m))return "Accounts aren't finished in the database yet, so usernames can't be saved. Run supabase/accounts.sql and then supabase/accounts_v2.sql in Supabase.";
   return m||'Something went wrong. Try again.'}
 const EYE='<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>';
 function pwField(id,label,ac,extra=''){return `<label>${label}<span class="pw-wrap"><input type="password" id="${id}" autocomplete="${ac}" required ${extra}><button type="button" class="pw-eye" data-pw-eye="${id}" aria-label="Show password" aria-pressed="false">${EYE}</button></span></label>`}
@@ -1788,7 +1789,7 @@ function checkUsername(raw){const u=String(raw||'').trim().toLowerCase();clearTi
   if(PROFILE&&PROFILE.username===u){UN_STATE={u,ok:null,text:"That's your current username"};paintUn();return}
   UN_STATE={u,ok:null,text:'Checking...'};paintUn();
   UN_T=setTimeout(async()=>{const {data,error}=await SB.rpc('username_available',{p_username:u});if(!UN_STATE||UN_STATE.u!==u)return;
-    UN_STATE=error?null:{u,ok:data!==false,text:data===false?'Taken. Try another.':'Available'};paintUn()},350)}
+    UN_STATE=error?{u,ok:null,text:"Can't check that right now"}:{u,ok:data!==false,text:data===false?'Taken. Try another.':'Available'};paintUn()},350)}
 function enterApp(){stopConfirmWatch();document.body.classList.remove('signed-out');setTimeout(syncNow,300);AUTH_MODE='in';AUTH_MSG=null;PENDING=null;AUTH_VALS={};UN_STATE=null;
   let t=INTENDED&&TABS.includes(INTENDED.replace(/-.*/,''))&&INTENDED!=='signin'?INTENDED:'team';INTENDED=null;if(!S.onboarded)t='welcome';
   if(location.hash.slice(1)===t)go(t);else location.hash=t}
@@ -1860,7 +1861,11 @@ async function authSubmit(mode){
     if(mode==='username'){const u=v('auth-user').toLowerCase();if(!/^[a-z0-9_]{3,20}$/.test(u))return authFail('Usernames are 3 to 20 letters, numbers or underscores.');
       AUTH_BUSY=true;AUTH_MSG=null;renderSignin();const err=await saveUsername(u);if(err)return authFail(err);AUTH_BUSY=false;toast('Welcome, '+u);enterApp();return}
   }catch(e){authFail(e&&e.message||'Something went wrong. Try again.')}}
-async function saveUsername(u){const av=await SB.rpc('username_available',{p_username:u});if(av.data===false)return 'That username is taken. Try another.';
+async function saveUsername(u){const av=await SB.rpc('username_available',{p_username:u});
+  if(av.data===false)return 'That username is taken. Try another.';
+  /* A failed check is not a free pass: writing anyway produces a confusing
+     error about something other than what actually went wrong. */
+  if(av.error)return friendly(av.error.message);
   const q=PROFILE?SB.from('profiles').update({username:u}).eq('id',USER.id).select().maybeSingle():SB.from('profiles').insert({id:USER.id,username:u}).select().maybeSingle();
   const {data,error}=await q;if(error)return friendly(/row-level security|permission/i.test(error.message)?"Usernames can't be saved yet. Run supabase/accounts_v2.sql in Supabase.":error.message);
   PROFILE=data||{...(PROFILE||{}),id:USER.id,username:u};SB.auth.updateUser({data:{username:u}}).catch(()=>{});acctUI();return null}

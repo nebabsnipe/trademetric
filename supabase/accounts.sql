@@ -28,7 +28,10 @@ create trigger on_auth_user_created after insert on auth.users
 -- Is a username free? (used on the sign-up form)
 create or replace function public.username_available(p_username text) returns boolean
 language sql security definer set search_path = public stable as $$
-  select not exists (select 1 from public.profiles where username = lower(p_username));
+  -- Your own username never counts as taken, or you could not re-save it.
+  select not exists (
+    select 1 from public.profiles
+    where username = lower(p_username) and (auth.uid() is null or id <> auth.uid()));
 $$;
 
 -- Sign in with a username: returns the account email only when the password is right.

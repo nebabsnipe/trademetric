@@ -26,3 +26,12 @@ begin
 end $$;
 revoke all on function public.delete_my_account() from public, anon;
 grant execute on function public.delete_my_account() to authenticated;
+
+-- Re-state the availability check so your own username never reads as taken.
+create or replace function public.username_available(p_username text) returns boolean
+language sql security definer set search_path = public stable as $$
+  -- Your own username never counts as taken, or you could not re-save it.
+  select not exists (
+    select 1 from public.profiles
+    where username = lower(p_username) and (auth.uid() is null or id <> auth.uid()));
+$$;
