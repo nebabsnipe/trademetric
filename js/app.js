@@ -138,6 +138,8 @@ function projPts(p,sc){if(p.pos==='DST')return dstPts(p,sc);if(p.pos==='K')retur
 function linePts(L,pos,sc){if(pos==='K')return kPts(L,sc);if(pos==='DST')return L.dsk*sc.dsk+L.dint*sc.dint+L.dfr*sc.dfr+L.dtd*sc.dtd+L.dsf*sc.dsf+paTier(L.pa,sc);return per(L.pyd,sc.pyd)+L.ptd*sc.ptd+L.int*sc.int+L.cmp*sc.cmp+(L.pyd>=300?sc.p300:0)+per(L.ryd,sc.ryd)+L.rtd*sc.rtd+L.ratt*sc.ratt+(L.ryd>=100?sc.r100:0)
   +L.rec*(sc['rec'+pos]||0)+per(L.recyd,sc.recyd)+L.rectd*sc.rectd+(L.recyd>=100?sc.rec100:0)+fdEst(L,pos)*sc.fd+L.fl*sc.fl}
 const avg=a=>a.length?a.reduce((x,y)=>x+y,0)/a.length:0;
+/* A rate stat on a tiny sample is noise, so these gate the share columns. */
+const QUAL={gp:3,snap:15,expGp:2};
 const sum=(a,f)=>a.reduce((x,y)=>x+f(y),0);
 
 const ECR={};Object.entries(DATA.ecr||{}).forEach(([k,v])=>ECR[k.startsWith('dst-')?k.toLowerCase():k]=v);
@@ -197,8 +199,19 @@ function derive(){
     const nx=OPP[p.t]&&OPP[p.t][WEEK];const projNext=nx?(p.pos==='DST'?(dstPts(p,S.league.sc,VEGAS[nx.opp]??p.pa)*(V.pts[p.id]/Math.max(.1,projPts(p,S.league.sc)))):V.tpts[p.id]*matchF(nx.opp,p.pos)*weekMult(p.id)*vegasF(p.t)):0;
     const tshare=p.pos==='QB'||p.pos==='DST'||p.pos==='K'?null:avg(games.map(x=>x.ts||0)),snaps=games.map(x=>x.snap).filter(x=>x>=0),snap=snaps.length?avg(snaps):null,rp=Math.max(1,V.repl[p.pos]);
     const oppg=p.pos==='QB'||p.pos==='DST'||p.pos==='K'||!games.length?null:avg(games.map(x=>x.ratt+x.tgt));
+    const skill=p.pos==='QB'||p.pos==='RB'||p.pos==='WR'||p.pos==='TE';
+    const qual=skill&&played.length>=QUAL.gp&&snap!==null&&snap>=QUAL.snap;
+    const tgtT=sum(games,x=>x.tgt||0),carT=sum(games,x=>x.ratt||0);
+    const ayshare=qual&&p.pos!=='QB'?avg(games.map(x=>x.ays||0)):null;
+    const cshare=qual&&p.pos!=='QB'?avg(games.map(x=>x.cs||0)):null;
+    const wopr=ayshare===null||tshare===null?null:(1.5*tshare+.7*ayshare)/100;
+    const EX=DATA.exp&&DATA.exp[p.id],RZ=DATA.rz&&DATA.rz[p.id],expOk=!!EX&&played.length>=QUAL.expGp;
     const trendPct=played.length>=4&&season>0?last3/season-1:null,cons=played.length?played.filter(x=>x>=rp).length/played.length:null,boom=played.length?played.filter(x=>x>=rp*1.75).length/played.length:null;
-    G[p.id]={log,pts,last3,season,ur,tag,trend,ros,po,cv,buy,risk,role,tshare,snap,trendPct,cons,boom,oppg,gp:played.length,mates,opp:OPPS.filter(o=>o.id===p.id),next:nx?{...nx,rank:defRank(nx.opp,p.pos)}:null,projNext,mkt:.55*proj+.45*(played.length?last3:proj)}});
+    G[p.id]={log,pts,last3,season,ur,tag,trend,ros,po,cv,buy,risk,role,tshare,snap,trendPct,cons,boom,oppg,gp:played.length,
+      oppT:skill?tgtT+carT:null,tgtT:skill?tgtT:null,carT:skill?carT:null,cshare,ayshare,wopr,
+      rz:RZ?RZ[0]:null,rz10:RZ?RZ[1]:null,fp:played.length?sum(played,x=>x):null,fpg:played.length?season:null,
+      td:expOk?EX[0]:null,xtd:expOk?EX[1]:null,xfp:expOk?EX[2]:null,fpoe:expOk?EX[3]:null,
+      xfpg:expOk&&played.length?EX[2]/played.length:null,tdoe:expOk?EX[0]-EX[1]:null,mates,opp:OPPS.filter(o=>o.id===p.id),next:nx?{...nx,rank:defRank(nx.opp,p.pos)}:null,projNext,mkt:.55*proj+.45*(played.length?last3:proj)}});
   outlookPass();
 }
 /* ===== Rest-of-season outlook =====
@@ -872,12 +885,24 @@ function renderRankings(){
   const cap=q||RANK_ALL?L.length:300,more=L.length-cap;L.length=Math.min(L.length,cap);
   setTimeout(()=>{const m=$('rank-more');if(m)m.innerHTML=more>0?`<button class="btn" id="rank-all">Show all ${(L.length+more).toLocaleString()} players</button>`:''},0);
   $('rank-body').innerHTML=L.map(p=>{const g=G[p.id],o=OWN[p.id];return `<tr><td class="r num">${V.rank[p.id]}</td><td data-v="${esc(p.n.toLowerCase())}"><div class="pl">${av(p,'sm')}<div class="meta"><span style="display:flex;gap:6px;align-items:center"><button class="pname" data-open="${p.id}">${esc(p.n)}</button>${o!==S.me?followBtn(p.id,true):''}${tagHtml(p.id)}${g.risk?'<span class="badge risk" title="Risk: open the player to see why">RISK</span>':''}${g.opp.length?'<span class="badge opp" title="More work with a teammate out">UP</span>':''}</span><span class="psub">${p.t} · ${oppHtml(p.id)}</span>${rankOwn==='buy'&&g.buy?`<span class="why-line">${esc(g.buy[0])}</span>`:rankOwn==='risk'&&g.risk?`<span class="why-line">${esc(g.risk[0])}</span>`:rankOwn==='opp'&&g.opp.length?`<span class="why-line">${esc(oppTxtLine(g.opp[0]))}</span>`:''}</div></div></td>
-    <td data-v="${p.pos}${String(V.posRank[p.id]).padStart(3,'0')}"><span class="pos ${p.pos}">${p.pos}${V.posRank[p.id]}</span></td><td class="r strong" data-v="${g.next?g.projNext.toFixed(2):-1}">${g.next?f1(g.projNext):'<span class="tag bye">Bye</span>'}</td><td class="r num">${f1(V.pts[p.id])}</td><td class="r num" data-v="${g.xr||999}">${g.xr?p.pos+g.xr:'<span class="muted">-</span>'}</td><td class="r" data-v="${g.trendPct===null?-9:g.trendPct.toFixed(3)}">${trendHtml(g.trendPct)}</td><td class="r num" data-v="${g.tshare===null?-1:g.tshare.toFixed(1)}">${g.tshare===null?'<span class="muted">-</span>':Math.round(g.tshare)+'%'}</td><td class="r num" data-v="${g.snap===null?-1:g.snap.toFixed(1)}">${g.snap===null?'<span class="muted">-</span>':Math.round(g.snap)+'%'}</td><td class="r num" data-v="${g.oppg===null?-1:g.oppg.toFixed(2)}">${g.oppg===null?'<span class="muted">-</span>':f1(g.oppg)}</td><td data-v="${o?esc(teamById(o).name.toLowerCase()):'zzzz'}">${ownerHtml(p.id)}</td></tr>`}).join('')||'<tr><td colspan="11" class="empty">No players match.</td></tr>';
-  sortTable('rank-table');
+    <td data-v="${p.pos}${String(V.posRank[p.id]).padStart(3,'0')}"><span class="pos ${p.pos}">${p.pos}${V.posRank[p.id]}</span></td><td class="r strong" data-v="${g.next?g.projNext.toFixed(2):-1}">${g.next?f1(g.projNext):'<span class="tag bye">Bye</span>'}</td><td class="r num">${f1(V.pts[p.id])}</td><td class="r num" data-v="${g.xr||999}">${g.xr?p.pos+g.xr:'<span class="muted">-</span>'}</td><td class="r" data-v="${g.trendPct===null?-9:g.trendPct.toFixed(3)}">${trendHtml(g.trendPct)}</td><td class="r num" data-v="${g.tshare===null?-1:g.tshare.toFixed(1)}">${g.tshare===null?'<span class="muted">-</span>':Math.round(g.tshare)+'%'}</td><td class="r num" data-v="${g.snap===null?-1:g.snap.toFixed(1)}">${g.snap===null?'<span class="muted">-</span>':Math.round(g.snap)+'%'}</td><td class="r num" data-v="${g.oppg===null?-1:g.oppg.toFixed(2)}">${g.oppg===null?'<span class="muted">-</span>':f1(g.oppg)}</td>${sgCells(g)}<td data-v="${o?esc(teamById(o).name.toLowerCase()):'zzzz'}">${ownerHtml(p.id)}</td></tr>`}).join('')||'<tr><td colspan="27" class="empty">No players match.</td></tr>';
+  applySG();sortTable('rank-table');
 }
+let SG=[];try{SG=JSON.parse(localStorage.getItem('tm_sg')||'[]')}catch(e){SG=[]}
+function applySG(){const t=$('rank-table');if(!t)return;
+  ['vol','use','exp'].forEach(g=>t.classList.toggle('sg-'+g,SG.includes(g)));
+  document.querySelectorAll('[data-sg]').forEach(b=>b.setAttribute('aria-pressed',SG.includes(b.dataset.sg)?'true':'false'))}
 
 /* ===== Table sorting ===== */
 const SORTS={'tgt-table':{col:2,dir:'desc'},'sim-table':{col:4,dir:'desc'}};
+const SG_COLS=g=>[['vol',g.oppT,'i'],['vol',g.tgtT,'i'],['vol',g.carT,'i'],['vol',g.cshare,'%'],['vol',g.rz,'i'],['vol',g.rz10,'i'],
+  ['use',g.ayshare,'%'],['use',g.wopr,'w'],
+  ['exp',g.fp,'1'],['exp',g.fpg,'1'],['exp',g.xfp,'1'],['exp',g.xfpg,'1'],['exp',g.fpoe,'s'],['exp',g.td,'i'],['exp',g.xtd,'1'],['exp',g.tdoe,'s']];
+function sgCells(g){return SG_COLS(g).map(([grp,v,f])=>{
+  if(v===null||v===undefined||!isFinite(v))return `<td class="r num sg c-${grp}" data-v="-9999"><span class="muted">-</span></td>`;
+  const t=f==='%'?Math.round(v)+'%':f==='w'?v.toFixed(2):f==='i'?String(Math.round(v)):f==='s'?(v>0?'+':'')+f1(v):f1(v);
+  const cls=f==='s'?(v>0?' up':v<0?' down':''):'';
+  return `<td class="r num sg c-${grp}${cls}" data-v="${v.toFixed(3)}">${t}</td>`}).join('')}
 function trendHtml(x){if(x===null)return '<span class="muted">-</span>';const v=Math.round(x*100);return `<span class="delta ${v>=10?'up':v<=-10?'down':'flat'}">${v>0?'▲':v<0?'▼':''}${Math.abs(v)}%</span>`}
 function sortTable(id){const tbl=document.getElementById(id);if(!tbl)return;const st=SORTS[id];
   [...tbl.querySelectorAll('thead th')].forEach((th,i)=>{const on=!!st&&st.col===i;th.classList.toggle('sorted',on);if(on)th.dataset.dir=st.dir;else delete th.dataset.dir});
@@ -2228,6 +2253,7 @@ document.addEventListener('click',e=>{const t=e.target.closest&&e.target.closest
   if(d.vpos){valPos=d.vpos;renderValues();return}
   if(t.id==='val-all'){VAL_ALL=true;renderValues();return}
   if(d.ssrm){SS=SS.filter(x=>x!==d.ssrm);renderStartSit();return}
+  if(d.sg){SG=SG.includes(d.sg)?SG.filter(x=>x!==d.sg):SG.concat(d.sg);try{localStorage.setItem('tm_sg',JSON.stringify(SG))}catch(e){}applySG();return}
   if(d.ssfa!==undefined){SS_FA=d.ssfa==='1';renderStartSit();const b=$('ss-add');if(b)b.focus();return}
   if(d.dr){drView=d.dr;clearTimeout(DR_TIMER);renderDraft();return}
   if(d.dpos){drPos=d.dpos;renderDraft();return}

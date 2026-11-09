@@ -969,6 +969,15 @@ a.btn{text-decoration:none;display:inline-flex;align-items:center}
 .ss-x:hover{color:var(--bad)}
 .ss-fa{font-style:normal;font-size:10px;font-weight:800;letter-spacing:.04em;padding:1px 5px;border-radius:4px;background:var(--accent-soft);color:var(--accent)}
 .ss-scope{font-size:12.5px;white-space:nowrap}
+.statbar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:0 0 10px}
+.statbar .sb-label{font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+#rank-table .sg{display:none}
+#rank-table.sg-vol .c-vol,#rank-table.sg-use .c-use,#rank-table.sg-exp .c-exp{display:table-cell}
+/* once the table is wider than the screen you lose track of whose row you are on */
+#rank-table th:nth-child(1),#rank-table td:nth-child(1){position:sticky;left:0;z-index:2;width:46px;min-width:46px;background:var(--surface)}
+#rank-table th:nth-child(2),#rank-table td:nth-child(2){position:sticky;left:46px;z-index:2;background:var(--surface);box-shadow:1px 0 0 var(--line)}
+#rank-table thead th:nth-child(1),#rank-table thead th:nth-child(2){z-index:3;background:var(--surface-2)}
+#rank-table tbody tr:hover td:nth-child(1),#rank-table tbody tr:hover td:nth-child(2){background:var(--surface-2)}
 .live-now{display:flex;align-items:baseline;flex-wrap:wrap;gap:8px}
 .live-now b{font-family:var(--f-display);font-style:italic;font-weight:700;font-size:34px;line-height:1}
 .live-now>span{font-size:13px;color:var(--muted)}
