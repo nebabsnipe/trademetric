@@ -51,6 +51,7 @@
           <div id="lineup"></div>
           <div class="total"><span id="lineup-total-lab">Projected total</span><span class="total-r"><b id="lineup-total">0.0</b><small id="lineup-total-sub"></small></span></div></div>
         <div class="card"><div class="card-h"><h2>Bench</h2></div><div id="bench"></div></div>
+        <div class="card" id="ir-card" hidden></div>
         <div class="card" data-float><div class="card-h"><h2>Roster strength</h2><span class="note">Pts/week vs league average</span></div><div class="strength" id="strength"></div></div>
         <div class="card" data-float><div class="card-h"><h3>Add a player</h3></div>
           <div class="addrow"><input type="text" id="add-player" list="dl-players" placeholder="Type a name, like Puka Nacua" autocomplete="off"><button class="btn primary" id="add-btn">Add</button></div>
@@ -221,6 +222,7 @@
     <div class="hero"><div><div class="kicker">Help</div><h1>How this works</h1></div></div>
     <div class="faq">
       <details class="faq-i" id="faq-team"><summary>My Team and your lineup</summary><div class="faq-b"><p>Your lineup is the highest-projected group of players that fits your league's roster slots. If you imported from Sleeper or ESPN, it shows the lineup you actually set there.</p>
+<p><b>Injured reserve:</b> if your league has IR slots, an <b>Injured reserve</b> card appears under Bench whenever someone is on IR or qualifies for it. Players who qualify get a <b>Move to IR</b> tag (Out or IR on ESPN; whatever your Sleeper league allows). A player still on IR after his designation clears is flagged <b>Activate</b>, because most apps block adds and trades until you move him off. IR players don't count against your roster limit, here or in trade grades.</p>
 <p>Each projection starts from his points per game this season, blended with preseason expectations early in the year. It is then adjusted for this week's opponent, his team's expected points from the betting line, his injury status and the factors listed under Player values.</p>
 <p>Roster strength compares your starters at each position with the league average. Weakest spot is the position furthest below it.</p></div></details>
       <details class="faq-i" id="faq-startsit"><summary>Start or sit</summary><div class="faq-b"><p>By default it compares the closest call in your lineup: the starter whose projection is nearest to a bench player who could replace him. You can pick any two or three of your players, or type in anyone.</p>

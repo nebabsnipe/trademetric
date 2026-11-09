@@ -1511,3 +1511,16 @@ body.signed-out .alerts-wrap{display:none}
 .tgt-table tr.tgt-row.added td{background:color-mix(in srgb,var(--good,var(--accent)) 10%,transparent)}
 .tgt-table .tgt-add{pointer-events:none;white-space:nowrap}
 .tgt-table tr.tgt-row.added .tgt-add{background:var(--accent);border-color:var(--accent);color:#fff}
+
+/* Injured reserve */
+.ir-pill{appearance:none;font:inherit;flex:none;display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:99px;font-size:10.5px;font-weight:700;letter-spacing:.02em;white-space:nowrap;border:1px solid color-mix(in srgb,var(--warn) 45%,transparent);background:var(--warn-soft);color:var(--warn);cursor:pointer;transition:background-color .15s}
+.ir-pill:hover{border-color:var(--warn)}
+.ir-pill::before{content:"";width:6px;height:6px;border-radius:50%;background:var(--warn)}
+.ir-pill.full{cursor:default;border-color:var(--line);background:var(--surface-2);color:var(--muted)}.ir-pill.full::before{background:var(--muted)}
+.ir-row .btn{flex:none}
+.ir-row.stale{background:var(--bad-soft);border-radius:10px}
+.ir-warn{color:var(--bad);font-weight:700}
+.ir-open .empty{font-size:12.5px}
+.ir-foot{margin:10px 0 0}
+.ir-mark{color:var(--bad);font-weight:700}
+.lrow .meta>span:has(.ir-pill){flex-wrap:wrap;row-gap:4px}

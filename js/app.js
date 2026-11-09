@@ -45,7 +45,7 @@ function genLog(p){
 /* ===== League settings ===== */
 const POS=['QB','RB','WR','TE','K','DST'],OFF=['QB','RB','WR','TE'],OFFK=['QB','RB','WR','TE','K'];
 const BASE_SC={pyd:25,ptd:4,int:-2,cmp:0,p300:0,ryd:10,rtd:6,ratt:0,r100:0,recRB:1,recWR:1,recTE:1,recyd:10,rectd:6,rec100:0,fd:0,fl:-2,k39:3,k49:4,k50:5,kmiss:-1,xpm:1,xpmiss:-1,dsk:1,dint:2,dfr:2,dtd:6,dsf:2,pa0:10,pa6:7,pa13:4,pa20:1,pa27:0,pa34:-1,pa35:-4};
-const BASE_SLOTS={QB:1,RB:2,WR:2,TE:1,FLEX:1,SFLEX:0,K:1,DST:1,BN:6};
+const BASE_SLOTS={QB:1,RB:2,WR:2,TE:1,FLEX:1,SFLEX:0,K:1,DST:1,BN:6,IR:1};
 const PRESETS={std:{sc:{...BASE_SC,recRB:0,recWR:0,recTE:0},slots:{...BASE_SLOTS}},half:{sc:{...BASE_SC,recRB:.5,recWR:.5,recTE:.5},slots:{...BASE_SLOTS}},ppr:{sc:{...BASE_SC},slots:{...BASE_SLOTS}},
   sf:{sc:{...BASE_SC,recTE:1.5},slots:{QB:1,RB:2,WR:3,TE:1,FLEX:2,SFLEX:1,K:1,DST:1,BN:6}},'2qb':{sc:{...BASE_SC,ptd:6},slots:{QB:2,RB:2,WR:3,TE:1,FLEX:1,SFLEX:0,K:1,DST:1,BN:6}}};
 const BASELINE={teams:12,sc:{...BASE_SC},slots:{...BASE_SLOTS}};
@@ -55,7 +55,7 @@ const SC_FIELDS=[['Passing',[['pyd','Passing yards per point',1,'25 = 1 pt per 2
  ['Other',[['fd','Rush or catch for a first down',.25],['fl','Fumble lost',.5]]],
  ['Kicking',[['k39','Field goal made, 0-39 yards',.5],['k49','Field goal made, 40-49 yards',.5],['k50','Field goal made, 50+ yards',.5],['kmiss','Field goal missed',.5],['xpm','Extra point made',.5],['xpmiss','Extra point missed',.5]]],
  ['Team defense',[['dsk','Sack',.5],['dint','Interception',.5],['dfr','Fumble recovery',.5],['dtd','Defensive or return TD',.5],['dsf','Safety',.5],['pa0','0 points allowed',1],['pa6','1-6 points allowed',1],['pa13','7-13 points allowed',1],['pa20','14-20 points allowed',1],['pa27','21-27 points allowed',1],['pa34','28-34 points allowed',1],['pa35','35+ points allowed',1]]]];
-const SLOT_FIELDS=[['teams','Teams',4,16],['QB','QB',0,3],['RB','RB',0,4],['WR','WR',0,5],['TE','TE',0,3],['FLEX','Flex',0,4],['SFLEX','Superflex',0,2],['K','K',0,2],['DST','D/ST',0,2],['BN','Bench',0,15]];
+const SLOT_FIELDS=[['teams','Teams',4,16],['QB','QB',0,3],['RB','RB',0,4],['WR','WR',0,5],['TE','TE',0,3],['FLEX','Flex',0,4],['SFLEX','Superflex',0,2],['K','K',0,2],['DST','D/ST',0,2],['BN','Bench',0,15],['IR','IR',0,6]];
 const TEAM_NAMES=['Monday Night Miracles','Fourth & Long','Red Zone Regulars','Blitz Brigade','Two-Point Conversion','Waiver Wire Kings','Pick Six Society','The Taxi Squad','Hail Mary Club','Sunday Scaries','End Zone Express','Goal Line Stand','Audible Alert','Play Action Pros','Trick Play Turnover'];
 const MY_EXAMPLE=['jalen-hurts','dak-prescott','bryce-young','zach-charbonnet','chase-brown','jaylen-warren','tony-pollard','rhamondre-stevenson','drake-london','tee-higgins','courtland-sutton','dj-moore','jakobi-meyers','jauan-jennings','hunter-henry','dallas-goedert'];
 
@@ -74,6 +74,17 @@ function setPool(){const base=(S.custom&&S.custom.length)?S.custom:BUILTIN,have=
 const ST_LABEL={Q:'Questionable',D:'Doubtful',O:'Out',IR:'Injured reserve',PUP:'Physically unable to perform',SUS:'Suspended'};
 const stOf=id=>{const s=String((byId[id]&&byId[id].status)||'').toUpperCase().trim();return ST_LABEL[s]?s:null};
 const LONG_OUT=['IR','PUP','SUS'],isOut=id=>{const s=stOf(id);return s==='O'||LONG_OUT.includes(s)};
+/* ===== Injured reserve. IR players don't count against the roster limit.
+   T.ir lists who sits in IR (synced from Sleeper/ESPN, or set here). S.league.irOk = statuses the league allows in IR. ===== */
+const irSlots=()=>+(S.league.slots.IR??BASE_SLOTS.IR)||0;
+const irOk=()=>S.league.irOk||['IR','PUP','O'];
+const irEligible=id=>irOk().includes(stOf(id));
+const irOf=T=>(T&&T.ir||[]).filter(id=>T.players.includes(id));
+const activeOf=T=>{const ir=irOf(T);return T.players.filter(id=>!ir.includes(id))};
+const irSet=()=>new Set(S.teams.flatMap(irOf));
+function irState(T){const ir=irOf(T),open=Math.max(0,irSlots()-ir.length),known=hasStatusData();
+  return {ir,open,cand:known?activeOf(T).filter(irEligible).sort((a,b)=>tv(b)-tv(a)):[],stale:known?ir.filter(id=>!irEligible(id)):[]}}
+const IR_WHY={IR:'on injured reserve',PUP:'on the PUP list',O:'ruled out',D:'doubtful',SUS:'suspended'};
 const grpOf=pos=>pos==='RB'?'RB':pos==='QB'?'QB':pos==='DST'?'DST':pos==='K'?'K':'REC';
 const volOf=p=>p.pos==='RB'?p.ratt+p.tgt:p.tgt;
 const hasStatusData=()=>POOL.some(p=>'status' in p);
@@ -431,10 +442,12 @@ async function loadEspnWeek(){const src=S.real&&S.real.src;if(!src||src.type!=='
    Runs when the site opens and every few minutes. Scoring settings, follows and everything else stay as they are. ===== */
 var SLP_IDS=null,SYNC_AT=0,POOL_DIRTY=false;
 async function sleeperIds(){if(SLP_IDS)return SLP_IDS;try{const r=await fetch('/api/players');if(r.ok)SLP_IDS=await r.json()}catch(e){}return SLP_IDS||{}}
+function irChanged(T,ids){const a=[...(T.ir||[])].sort().join(),b=[...new Set(ids)].sort().join();if(a===b)return false;T.ir=[...new Set(ids)];return true}
 function rosterChanged(T,ids){const a=[...T.players].sort().join(),b=[...ids].sort().join();if(a===b)return false;T.players=ids;return true}
-async function syncSleeper(){const src=S.real&&S.real.src;if(!src||src.type!=='sleeper')return false;
-  const [rosters,users]=await Promise.all([getJSON(`https://api.sleeper.app/v1/league/${src.league}/rosters`),getJSON(`https://api.sleeper.app/v1/league/${src.league}/users`)]);
-  let changed=false,ids=await sleeperIds();
+async function syncSleeper(){const src=S.real&&S.real.src;if(!src||src.type!=='sleeper')return false;let changed=false;
+  const [rosters,users,lg]=await Promise.all([getJSON(`https://api.sleeper.app/v1/league/${src.league}/rosters`),getJSON(`https://api.sleeper.app/v1/league/${src.league}/users`),getJSON(`https://api.sleeper.app/v1/league/${src.league}`).catch(()=>null)]);
+  if(lg&&lg.settings){const n=lg.settings.reserve_slots||0;if(S.league.slots.IR!==n){S.league.slots.IR=n;changed=true}S.league.irOk=sleeperIrOk(lg.settings)}
+  let ids=await sleeperIds();
   /* re-check saved Sleeper-to-player links against Sleeper's real names; drop any that were matched loosely */
   if(ids&&Object.keys(ids).length)for(const [pid,id] of Object.entries(src.pmap)){const x=ids[pid],q=byId[id];if(x&&(!q||norm(q.n)!==norm(x[0])))delete src.pmap[pid]}
   for(const r of rosters){const tid=src.rid[r.roster_id],T=tid&&teamById(tid);if(!T)continue;
@@ -442,14 +455,18 @@ async function syncSleeper(){const src=S.real&&S.real.src;if(!src||src.type!=='s
       if(!id){const x=ids&&ids[pid];const q=x&&findExact(x[0],x[1],x[2]);if(q&&q.pos===x[1]){id=q.id;src.pmap[pid]=id}else if(x&&OFFK.includes(x[1])){id=addExtraPlayer(x[0],x[1],x[2]);src.pmap[pid]=id;POOL_DIRTY=true}}
       if(id&&(byId[id]||POOL_DIRTY))out.push(id)}
     if(rosterChanged(T,[...new Set(out)]))changed=true;
+    if(irChanged(T,(r.reserve||[]).map(pid=>src.pmap[pid]||sleeperDst(pid)).filter(Boolean)))changed=true;
     const us=users.find(x=>x.user_id===r.owner_id),nm=(us&&us.metadata&&us.metadata.team_name)||(us&&us.display_name);if(nm&&nm!==T.name){T.name=nm;changed=true}
     const st=r.settings||{};S.real.rec[tid]={w:st.wins||0,l:st.losses||0,t:st.ties||0,pf:(st.fpts||0)+(st.fpts_decimal||0)/100}}
   syncPlayed();return changed}
 function syncEspnRosters(d){const src=S.real&&S.real.src;if(!d||!src||src.type!=='espn')return false;let changed=false;
+  const ls=d.settings&&d.settings.rosterSettings&&d.settings.rosterSettings.lineupSlotCounts;if(ls){const n=+ls[21]||0;if(S.league.slots.IR!==n){S.league.slots.IR=n;changed=true}S.league.irOk=['IR','PUP','O']}
   (d.teams||[]).forEach(t=>{const tid=src.rid[t.id],T=tid&&teamById(tid);if(!T)return;
     const EP={1:'QB',2:'RB',3:'WR',4:'TE',5:'K'};((t.roster&&t.roster.entries)||[]).forEach(e=>{const pl=e.playerPoolEntry&&e.playerPoolEntry.player;if(pl&&EP[pl.defaultPositionId]&&!findExact(pl.fullName,EP[pl.defaultPositionId])){addExtraPlayer(pl.fullName,EP[pl.defaultPositionId]);POOL_DIRTY=true}});if(POOL_DIRTY)setPool();
     const out=((t.roster&&t.roster.entries)||[]).map(e=>e.playerPoolEntry&&e.playerPoolEntry.player).filter(Boolean).map(pl=>{const q=pl.defaultPositionId===16?(byId['dst-'+String(pl.proTeamAbbreviation||'').toLowerCase()]||findExact(pl.fullName)):findExact(pl.fullName);return q&&q.id}).filter(Boolean);
     if(out.length&&rosterChanged(T,[...new Set(out)]))changed=true;
+    const irIds=((t.roster&&t.roster.entries)||[]).filter(e=>e.lineupSlotId===21).map(e=>{const pl=e.playerPoolEntry&&e.playerPoolEntry.player,q=pl&&findExact(pl.fullName);return q&&q.id}).filter(Boolean);
+    if(out.length&&irChanged(T,irIds))changed=true;
     const nm=t.name||[t.location,t.nickname].filter(Boolean).join(' ');if(nm&&nm!==T.name){T.name=nm;changed=true}
     const o=(t.record&&t.record.overall)||{};S.real.rec[tid]={w:o.wins||0,l:o.losses||0,t:o.ties||0,pf:o.pointsFor||0}});
   syncPlayed();return changed}
@@ -536,10 +553,12 @@ function weekTeam(players,w){const f=id=>ewk(id,w),lu=lineup(players,f);let ins=
   return {pts:lu.total,ins,lu}}
 /* roster after the deal: drop the least valuable bench player if over the limit, or add the best free agent with a freed spot */
 function rosterAfter(players,out,inn,taken){let after=players.filter(x=>!out.includes(x)).concat(inn),drop=null,fa=null;const lim=rosterSize();
-  while(after.length>Math.max(lim,players.length)){const st=new Set(lineup(after,id=>playerValue(id)).slots.filter(x=>x.p).map(x=>x.p.id));
-    const c=after.filter(id=>!st.has(id)&&!inn.includes(id)).sort((a,b)=>playerValue(a)-playerValue(b))[0];if(!c)break;drop=drop?[].concat(drop,c):c;after=after.filter(x=>x!==c)}
-  const over=after.length>Math.max(lim,players.length);
-  if(after.length<players.length){const best=POOL.filter(p=>!OWN[p.id]&&!taken.has(p.id)&&p.pos!=='DST'&&p.pos!=='K').map(p=>p.id).sort((a,b)=>playerValue(b)-playerValue(a))[0];if(best){fa=best;after=after.concat(best)}}
+  /* players who stay in an IR slot don't use a roster spot */
+  const irs=irSet(),hold=x=>irs.has(x)&&players.includes(x),act=a=>a.filter(x=>!hold(x)).length,base=act(players);
+  while(act(after)>Math.max(lim,base)){const st=new Set(lineup(after,id=>playerValue(id)).slots.filter(x=>x.p).map(x=>x.p.id));
+    const c=after.filter(id=>!st.has(id)&&!inn.includes(id)&&!hold(id)).sort((a,b)=>playerValue(a)-playerValue(b))[0];if(!c)break;drop=drop?[].concat(drop,c):c;after=after.filter(x=>x!==c)}
+  const over=act(after)>Math.max(lim,base);
+  if(act(after)<base){const best=POOL.filter(p=>!OWN[p.id]&&!taken.has(p.id)&&p.pos!=='DST'&&p.pos!=='K').map(p=>p.id).sort((a,b)=>playerValue(b)-playerValue(a))[0];if(best){fa=best;after=after.concat(best)}}
   return {after,drop,fa,over}}
 function teamImpact(before,after,skipNow){const W=tmWeeks().filter(w=>!skipNow||w>WEEK),PO=poWeeks(),RW=(S.real&&S.real.regWeeks)||14;let tot=0,po=0,poB=0,poA=0,reg=0,nReg=0,lpB=0,lpA=0;const weeks=[];
   W.forEach(w=>{const b=weekTeam(before,w),a=weekTeam(after,w),d=(a.pts+a.ins)-(b.pts+b.ins);tot+=d*wkWt(w);lpB+=b.pts;lpA+=a.pts;if(w<=RW){reg+=a.pts-b.pts;nReg++}
@@ -584,7 +603,7 @@ let SIT={v:-1,m:{}};
 function teamSit(teamId){if(SIT.v!==VER)SIT={v:VER,m:{}};if(SIT.m[teamId])return SIT.m[teamId];const r=teamStats().rows.find(x=>x.T.id===teamId);
   if(!r)return {hurt:0,empty:0,deep:0,space:0,thin:0,deepPos:null,hurtNames:[]};
   const st=r.lu.slots.filter(x=>x.p),hurtP=st.filter(x=>isOut(x.p.id)||stOf(x.p.id)==='D').map(x=>x.p),empty=r.lu.slots.filter(x=>!x.p).length;
-  const deep=sum(Object.values(r.depth),x=>x),space=rosterSize()-r.T.players.length;
+  const deep=sum(Object.values(r.depth),x=>x),space=rosterSize()-activeOf(r.T).length;
   return SIT.m[teamId]={hurt:hurtP.length,hurtNames:hurtP.map(p=>p.n),empty,deep,space,thin:hurtP.length+empty,deepPos:r.deep[0]||null}}
 /* how well a shape suits a team: getting more bodies helps a thin or banged-up roster, consolidating helps a deep one */
 function shapeFit(sit,inN,outN){const net=inN-outN;let f=0;
@@ -787,7 +806,7 @@ function findByName(v){const q=norm(v||'');if(!q)return null;const ex=findExact(
   if(parts.length===1){const m=POOL.filter(x=>norm(x.n).split(' ').includes(q));return m.length===1?m[0]:m.sort((a,b)=>V.rank[a.id]-V.rank[b.id])[0]||null}
   const last=parts[parts.length-1],fi=parts[0][0];
   return POOL.filter(x=>{const n=norm(x.n).split(' ');return n[n.length-1]===last&&n[0][0]===fi}).sort((a,b)=>V.rank[a.id]-V.rank[b.id])[0]||null}
-function assign(id,teamId){S.teams.forEach(T=>T.players=T.players.filter(x=>x!==id));if(teamId)teamById(teamId).players.push(id);S.example=false;save();recompute()}
+function assign(id,teamId){S.teams.forEach(T=>{T.players=T.players.filter(x=>x!==id);if(T.ir)T.ir=T.ir.filter(x=>x!==id)});if(teamId)teamById(teamId).players.push(id);S.example=false;save();recompute()}
 const bump=()=>{save();recompute();render()};
 
 /* ===== Demo league ===== */
@@ -807,9 +826,25 @@ function syncTeamCount(){const n=S.league.teams;while(S.teams.length<n)S.teams.p
   while(S.teams.length>n){const i=S.teams.map(T=>T.id).lastIndexOf(S.teams.filter(T=>T.id!==S.me).pop().id);S.teams.splice(i,1)}}
 
 /* ===== MY TEAM ===== */
+function irPill(id,IRS){if(!IRS.cand.includes(id))return '';const p=byId[id],why=IR_WHY[stOf(id)]||'injured';
+  return IRS.open?`<button class="ir-pill" data-ir-on="${id}" title="${esc(p.n)} is ${why}. Moving him to your open IR slot frees a roster spot.">Move to IR</button>`
+    :`<span class="ir-pill full" title="${esc(p.n)} is ${why}, but your IR slots are full.">IR eligible</span>`}
+function renderIR(me,IRS){const el=$('ir-card');if(!el)return;const n=irSlots();
+  el.hidden=!(n>0&&(IRS.ir.length||IRS.cand.length));if(el.hidden){el.innerHTML='';return}
+  const plat=S.real&&S.real.src?({sleeper:'Sleeper',espn:'ESPN'})[S.real.src.type]:null;
+  const row=id=>{const p=byId[id],s=stOf(id),stale=IRS.stale.includes(id);
+    return `<div class="lrow ir-row${stale?' stale':''}" data-open="${id}"><span class="slot">IR</span><div class="pl">${av(p)}<div class="meta"><span style="display:flex;gap:6px;align-items:center;min-width:0"><button class="pname" data-open="${id}">${esc(p.n)}</button>${stHtml(id)}</span><span class="psub">${p.pos}${V.posRank[id]} · ${p.t} · ${stale?'<b class="ir-warn">Healthy again. Activate him.</b>':esc(s?ST_LABEL[s]:'No designation')}</span></div></div><button class="btn small${stale?' accent':''}" data-ir-off="${id}">Activate</button></div>`};
+  const open=Array.from({length:IRS.open},()=>`<div class="lrow ir-open" style="cursor:default"><span class="slot">IR</span><span class="empty">${IRS.cand.length?`Open. ${esc(byId[IRS.cand[0]].n)} can go here.`:'Open slot'}</span><span></span></div>`).join('');
+  el.innerHTML=`<div class="card-h"><h2>Injured reserve</h2><span class="note">${IRS.ir.length} of ${n} slot${n===1?'':'s'} used</span></div>${IRS.ir.map(row).join('')}${open}
+    ${IRS.cand.length&&!IRS.open?`<p class="note ir-foot">${IRS.cand.map(id=>esc(byId[id].n)).join(', ')} ${IRS.cand.length===1?'is':'are'} IR eligible, but your IR is full.</p>`:''}${plat?`<p class="note ir-foot">Moves here update TradeMetric only. Make the same move in ${plat}; the next sync confirms it.</p>`:''}`}
+function moveIR(id,on){const T=myTeam();if(!T)return;const IRS=irState(T),p=byId[id];
+  if(on){if(!IRS.open){toast('Your IR slots are full');return}T.ir=[...new Set([...irOf(T),id])];toast(`${p.n} moved to IR`)}
+  else{T.ir=irOf(T).filter(x=>x!==id);toast(`${p.n} activated from IR`)}
+  save();recompute();render()}
 function renderTeam(){
   const me=myTeam(),st=teamStats(),mine=st.rows.find(r=>r.T.id===S.me),RL=realLineup(S.me);
-  const LU=RL?{slots:RL.slots,bench:me.players.filter(id=>!RL.slots.some(x=>x.p&&x.p.id===id)).sort((a,b)=>nextV(b)-nextV(a)),total:sum(RL.slots.filter(x=>x.p),x=>G[x.p.id].projNext),real:true}:lineup(me.players,nextV);
+  const IRS=irState(me),act=activeOf(me);
+  const LU=RL?{slots:RL.slots,bench:act.filter(id=>!RL.slots.some(x=>x.p&&x.p.id===id)).sort((a,b)=>nextV(b)-nextV(a)),total:sum(RL.slots.filter(x=>x.p),x=>G[x.p.id].projNext),real:true}:lineup(act,nextV);
   const started=LU.slots.filter(x=>x.p&&liveOf(x.p.id)),actual=sum(started,x=>liveOf(x.p.id).pts);
   $('team-example').hidden=!S.example;$('team-title').textContent=me.name;$('team-kicker').textContent=`${S.league.name||'My League'} · Week ${WEEK}`;
   const sim=simulate();const byes=me.players.filter(id=>!G[id].next).length,tags=me.players.filter(id=>G[id].tag).length;
@@ -819,12 +854,13 @@ function renderTeam(){
    <div class="tile"><div class="lab">Playoff odds</div><div class="val">${sim?pct(sim[S.me].playoff):'-'}</div><div class="sub">Record ${recTxt(S.me)} · power rank #${mine.rank}</div></div>
    <div class="tile"><div class="lab">Weakest spot</div><div class="val">${weak}</div><div class="sub">${sgn(mine.rel[weak])} pts/wk vs. league average</div></div>
    <div class="tile"><div class="lab">Byes and alerts</div><div class="val">${byes}<span class="muted" style="font-size:20px"> / ${tags}</span></div><div class="sub">Players on bye · buy/sell alerts</div></div>`;
-  const row=(label,p)=>p?`<div class="lrow" data-open="${p.id}"><span class="slot">${label}</span><div class="pl">${av(p)}<div class="meta"><span style="display:flex;gap:6px;align-items:center;min-width:0"><button class="pname" data-open="${p.id}">${esc(p.n)}</button>${tagHtml(p.id,label!=='BN')}</span><span class="psub">${p.pos}${V.posRank[p.id]} · ${liveOf(p.id)?liveTxt(p.id)+(liveOf(p.id).state==='post'?'':' live'):oppHtml(p.id)}</span></div></div>${lprojHtml(p.id)}</div>`
+  const row=(label,p)=>p?`<div class="lrow" data-open="${p.id}"><span class="slot">${label}</span><div class="pl">${av(p)}<div class="meta"><span style="display:flex;gap:6px;align-items:center;min-width:0"><button class="pname" data-open="${p.id}">${esc(p.n)}</button>${tagHtml(p.id,label!=='BN')}${irPill(p.id,IRS)}</span><span class="psub">${p.pos}${V.posRank[p.id]} · ${liveOf(p.id)?liveTxt(p.id)+(liveOf(p.id).state==='post'?'':' live'):oppHtml(p.id)}</span></div></div>${lprojHtml(p.id)}</div>`
     :`<div class="lrow" style="cursor:default"><span class="slot">${label}</span><span class="empty">Empty. Add a player who fits this slot.</span><span></span></div>`;
   $('lineup').innerHTML=LU.slots.map(s=>row(s.label,s.p)).join('');
   $('lineup-total').textContent=f1(started.length?actual:LU.total);$('lineup-total-lab').textContent=started.length?'Score so far':LU.real?'Projected total · your lineup':'Projected total';$('lineup-total-sub').textContent=started.length?'proj '+f1(LU.total):'';
   $('bench').innerHTML=LU.bench.length?LU.bench.map(id=>row('BN',byId[id])).join(''):'<p class="empty">No bench players yet.</p>';
-  $('roster-count').textContent=`${me.players.length} of ${rosterSize()} roster spots filled.`;
+  $('roster-count').textContent=`${act.length} of ${rosterSize()} roster spots filled${IRS.ir.length?`, plus ${IRS.ir.length} on IR`:''}.`;
+  renderIR(me,IRS);
   const mx=Math.max(4,...POS.map(x=>Math.abs(mine.rel[x])));
   $('strength').innerHTML=POS.map(x=>{const d=mine.rel[x],w=Math.abs(d)/mx*50;return `<div class="strow"><span class="lbl">${x}</span><div class="track"><i style="${d>=0?`left:50%;width:${w}%;background:var(--ink)`:`left:${50-w}%;width:${w}%;background:var(--accent)`}"></i></div><span class="v">${sgn(d)}</span></div>`}).join('');
   renderFix(mine);renderStartSit();renderMatchup();renderOppCard();
@@ -1042,7 +1078,7 @@ function renderTrade(){
   const shown=ros.filter(inPos);
   $('give-chips').innerHTML=!ros.length?'<p class="empty">Add players to your team first.</p>'
     :shown.map(p=>{const on=TD.give.includes(p.id);
-      return `<button type="button" class="ros-row${on?' on':''}" data-give="${p.id}" aria-pressed="${on}" title="${esc(p.n)}: ${on?'remove from the deal':'add to the deal'}">${av(p,'sm')}<span class="ros-who"><b><span class="ros-full">${esc(p.n)}</span><span class="ros-short">${esc(shortName(p.n))}</span></b><small>${p.pos}${V.posRank[p.id]||''} · ${esc(p.t)}<span class="ros-sp"> · ${f1(V.pts[p.id])}</span></small></span><span class="ros-pts num">${f1(V.pts[p.id])}</span><span class="ros-ck" aria-hidden="true"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span></button>`}).join('')||'<p class="empty ros-none">No players at this position.</p>';
+      return `<button type="button" class="ros-row${on?' on':''}" data-give="${p.id}" aria-pressed="${on}" title="${esc(p.n)}: ${on?'remove from the deal':'add to the deal'}">${av(p,'sm')}<span class="ros-who"><b><span class="ros-full">${esc(p.n)}</span><span class="ros-short">${esc(shortName(p.n))}</span></b><small>${p.pos}${V.posRank[p.id]||''} · ${esc(p.t)}${irOf(me).includes(p.id)?' · <b class="ir-mark">IR</b>':''}<span class="ros-sp"> · ${f1(V.pts[p.id])}</span></small></span><span class="ros-pts num">${f1(V.pts[p.id])}</span><span class="ros-ck" aria-hidden="true"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span></button>`}).join('')||'<p class="empty ros-none">No players at this position.</p>';
   TD.fresh=null;
   const partner=TD.get.length?teamById(OWN[TD.get[0]]):null;
   $('get-hint').textContent=partner?`Trading with ${partner.name}`:'';
@@ -1072,7 +1108,7 @@ function weekStrip(before,after,skipNow){const PO=poWeeks(),ws=tmWeeks().filter(
 function renderRating(partner){
   const el=$('rating');
   if(!TD.give.length||!TD.get.length){el.innerHTML=`<div class="card-h"><h2>Trade rating</h2></div><div class="rt-empty"><b>Build a deal to see it graded</b></div>`;return}
-  const me=myTeam(),fr=fairness(TD.give,TD.get,partner.id),e=fr.e,hm=RATE_MODE==='hm',over=me.players.length-TD.give.length+TD.get.length-rosterSize();
+  const me=myTeam(),fr=fairness(TD.give,TD.get,partner.id),e=fr.e,hm=RATE_MODE==='hm',over=activeOf(me).filter(x=>!TD.give.includes(x)).length+TD.get.length-rosterSize();
   const cls=v=>v>=0?'up':'down',row=(l,v,note)=>`<tr><td>${l}${note?`<span class="note"> · ${note}</span>`:''}</td><td class="r num ${cls(v)}">${sgn(v)}</td></tr>`,P=e.parts,rl=realism(e,TD.give,TD.get);
   const gcard=(who,g,big,line,sub,mine)=>`<div class="gcard ${g}${mine?' mine':''}"><span class="gc-who">${who}</span><b class="gc-g">${big}</b><span class="gc-line">${line}</span><span class="gc-sub">${sub}</span></div>`;
   const tile=(l,v,c,sub)=>`<div class="rt-tile"><span>${l}</span><b class="num ${c||''}">${v}</b>${sub?`<em>${sub}</em>`:''}</div>`;
@@ -1103,8 +1139,8 @@ function renderHub(){renderLeagueList();
    <input type="file" id="shot-file" accept="image/*" hidden>
    <div id="shot-result"></div>
    <div class="addrow" style="margin-top:12px" id="drop"><input type="text" id="hub-add" list="dl-players" placeholder="Add a player by name" autocomplete="off"><button class="btn primary" id="hub-add-btn">Add</button><label class="btn shot-btn" for="shot-file" title="The AI reads a roster screenshot and you review every player before saving"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="9" cy="9" r="2"/><path d="M21 15l-5-5L5 21"/></svg>Upload screenshot</label></div>
-   <p class="note" style="margin:8px 0 4px">${T.players.length} of ${rosterSize()} roster spots</p>
-   <div class="roster-scroll">${T.players.length?POS.filter(x=>byPos[x].length).map(x=>`<h4>${x}</h4>${byPos[x].map(id=>{const p=byId[id];return `<div class="rrow">${plCell(p,`${p.pos}${V.posRank[id]} · ${p.t} · ${f1(V.pts[id])} pts/G`)}${tagHtml(id)||'<span></span>'}<button class="x" data-unassign="${id}" aria-label="Remove ${esc(p.n)}">×</button></div>`}).join('')}`).join(''):'<p class="empty">No players yet. Upload a screenshot or add players by name.</p>'}</div>`;
+   <p class="note" style="margin:8px 0 4px">${activeOf(T).length} of ${rosterSize()} roster spots${irOf(T).length?` · ${irOf(T).length} on IR`:''}</p>
+   <div class="roster-scroll">${T.players.length?POS.filter(x=>byPos[x].length).map(x=>`<h4>${x}</h4>${byPos[x].map(id=>{const p=byId[id];return `<div class="rrow">${plCell(p,`${p.pos}${V.posRank[id]} · ${p.t} · ${f1(V.pts[id])} pts/G${irOf(T).includes(id)?' · <b class="ir-mark">IR</b>':''}`)}${tagHtml(id)||'<span></span>'}<button class="x" data-unassign="${id}" aria-label="Remove ${esc(p.n)}">×</button></div>`}).join('')}`).join(''):'<p class="empty">No players yet. Upload a screenshot or add players by name.</p>'}</div>`;
   renderShot();renderImport();
   $('trade-log').closest('.card').hidden=!(S.log||[]).length;$('trade-log').innerHTML=(S.log||[]).length?S.log.slice().reverse().map(l=>`<div class="logrow"><b>${esc(l.aName)}</b> sent ${l.give.map(id=>esc(byId[id]?byId[id].n:id)).join(', ')} to <b>${esc(l.bName)}</b> for ${l.get.map(id=>esc(byId[id]?byId[id].n:id)).join(', ')}<div class="note">${new Date(l.ts).toLocaleDateString(undefined,{month:'short',day:'numeric'})} · ${esc(l.label)}</div></div>`).join(''):'<p class="empty">No trades yet. Accepted trades from the Trades tab show up here.</p>';
   $('dna-list').innerHTML=dnaItems().map(([t,txt])=>`<li><span class="t">${t}</span><span>${txt}</span></li>`).join('');
@@ -1441,10 +1477,11 @@ async function sleeperImport(i){
     const ss=lg.scoring_settings||{},inv=v=>v?Math.round(1/v):0,rp=lg.roster_positions||[],cnt=k=>rp.filter(x=>x===k).length;
     const sc={pyd:inv(ss.pass_yd),ptd:ss.pass_td??4,int:ss.pass_int??-2,cmp:ss.pass_cmp||0,p300:ss.bonus_pass_yd_300||0,ryd:inv(ss.rush_yd),rtd:ss.rush_td??6,ratt:ss.rush_att||0,r100:ss.bonus_rush_yd_100||0,
       recRB:(ss.rec||0)+(ss.bonus_rec_rb||0),recWR:(ss.rec||0)+(ss.bonus_rec_wr||0),recTE:(ss.rec||0)+(ss.bonus_rec_te||0),recyd:inv(ss.rec_yd),rectd:ss.rec_td??6,rec100:ss.bonus_rec_yd_100||0,fd:ss.rush_fd||ss.rec_fd||0,fl:ss.fum_lost??-2};
-    const slots={QB:cnt('QB'),RB:cnt('RB'),WR:cnt('WR'),TE:cnt('TE'),FLEX:cnt('FLEX'),SFLEX:cnt('SUPER_FLEX'),K:cnt('K'),DST:cnt('DEF'),BN:cnt('BN')};
+    const slots={QB:cnt('QB'),RB:cnt('RB'),WR:cnt('WR'),TE:cnt('TE'),FLEX:cnt('FLEX'),SFLEX:cnt('SUPER_FLEX'),K:cnt('K'),DST:cnt('DEF'),BN:cnt('BN'),IR:(lg.settings&&lg.settings.reserve_slots)||0};
     Object.assign(sc,{k39:ss.fgm_30_39??ss.fgm_0_19??3,k49:ss.fgm_40_49??4,k50:ss.fgm_50p??ss.fgm_50_59??5,kmiss:ss.fgmiss??-1,xpm:ss.xpm??1,xpmiss:ss.xpmiss??-1,dsk:ss.sack??1,dint:ss.int??2,dfr:ss.fum_rec??2,dtd:ss.def_td??6,dsf:ss.safe??2,pa0:ss.pts_allow_0??10,pa6:ss.pts_allow_1_6??7,pa13:ss.pts_allow_7_13??4,pa20:ss.pts_allow_14_20??1,pa27:ss.pts_allow_21_27??0,pa34:ss.pts_allow_28_34??-1,pa35:ss.pts_allow_35p??-4});
+    const slpNames=L=>(L||[]).map(pid=>SLEEPER_PLAYERS[pid]||(NICK[pid==='LA'?'LAR':pid]?{position:'DEF',team:pid}:null)).filter(x=>x&&(OFFK.includes(x.position)||x.position==='DEF')).map(x=>x.position==='DEF'?(NICK[x.team==='LA'?'LAR':x.team]||x.team)+' D/ST':{n:x.full_name,pos:x.position,t:x.team==='LA'?'LAR':x.team});
     const teams=rosters.map(r=>{const us=users.find(x=>x.user_id===r.owner_id);return {name:(us&&us.metadata&&us.metadata.team_name)||(us&&us.display_name)||'Team '+r.roster_id,mine:r.owner_id===u.user_id,
-      names:(r.players||[]).map(pid=>SLEEPER_PLAYERS[pid]||(NICK[pid==='LA'?'LAR':pid]?{position:'DEF',team:pid}:null)).filter(x=>x&&(OFFK.includes(x.position)||x.position==='DEF')).map(x=>x.position==='DEF'?(NICK[x.team==='LA'?'LAR':x.team]||x.team)+' D/ST':{n:x.full_name,pos:x.position,t:x.team==='LA'?'LAR':x.team})}});
+      names:slpNames(r.players),ir:slpNames(r.reserve)}});
     const rw=Math.max(1,((lg.settings&&lg.settings.playoff_week_start)||15)-1),ix={};rosters.forEach((r,i)=>ix[r.roster_id]=i);
     const weeks=await Promise.all(Array.from({length:rw},(_,i)=>getJSON(`https://api.sleeper.app/v1/league/${lg.league_id}/matchups/${i+1}`).catch(()=>[])));
     const real={regWeeks:rw,playoffTeams:(lg.settings&&lg.settings.playoff_teams)||null,sched:{},scores:{},rec:{},played:0};
@@ -1456,9 +1493,11 @@ async function sleeperImport(i){
     /* same name: prefer the one on the same NFL team */
     const took=new Set();[true,false].forEach(sameTeam=>cands.forEach(([pid,sp])=>{const q=want.get(norm(sp.full_name));if(took.has(q.id)||(sameTeam&&sp.team!==q.t))return;pmap[pid]=q.id;took.add(q.id)}));rosters.forEach(r=>(r.players||[]).forEach(pid=>{const sp=SLEEPER_PLAYERS[pid];if(sp&&!pmap[pid]&&OFFK.includes(sp.position)){const q=findExact(sp.full_name,sp.position);if(q)pmap[pid]=q.id}}));
     real.src={type:'sleeper',league:lg.league_id,labels:rp.filter(x=>!['BN','IR','TAXI'].includes(x)),rid:Object.fromEntries(rosters.map((r,i)=>[r.roster_id,i])),pmap};
-    applyImport(lg.name,teams,sc,slots,'Sleeper',real,(()=>{const z=lg.settings||{};return {format:['redraft','keeper','dynasty'][z.type]||'redraft',waiver:z.waiver_type===2?'faab':'priority',budget:z.waiver_budget||100}})())}
+    applyImport(lg.name,teams,sc,slots,'Sleeper',real,(()=>{const z=lg.settings||{};return {irOk:sleeperIrOk(z),format:['redraft','keeper','dynasty'][z.type]||'redraft',waiver:z.waiver_type===2?'faab':'priority',budget:z.waiver_budget||100}})())}
   catch(e){impMsg(e.blocked?BLOCKED_MSG:`<p class="note" style="color:var(--bad)">Import failed (${esc(e.message)}). Try again.</p>`)}
 }
+/* which injury designations a Sleeper league allows in IR */
+function sleeperIrOk(z){z=z||{};return ['IR','PUP'].concat(z.reserve_allow_out?['O']:[],z.reserve_allow_doubtful?['D']:[],z.reserve_allow_sus?['SUS']:[])}
 const ESPN_KEY='tm-espn-login';
 function espnSaved(){try{return JSON.parse(localStorage.getItem(ESPN_KEY)||'null')}catch(e){return null}}
 async function espnFetch(id,creds,sp){
@@ -1490,11 +1529,12 @@ async function espnImport(id,creds){
 
     const st=d.settings||{},items=(st.scoringSettings&&st.scoringSettings.scoringItems)||[],pt=sid=>{const x=items.find(i=>i.statId===sid);return x?x.points:0};
     const sc={...BASE_SC,pyd:pt(3)?Math.round(1/pt(3)):25,ptd:pt(4)||4,int:pt(20)||-2,ryd:pt(24)?Math.round(1/pt(24)):10,rtd:pt(25)||6,recyd:pt(42)?Math.round(1/pt(42)):10,rectd:pt(43)||6,k39:pt(80)||3,k49:pt(77)||4,k50:pt(74)||5,kmiss:pt(85)||-1,xpm:pt(86)||1,xpmiss:pt(88)||-1,recRB:pt(53),recWR:pt(53),recTE:pt(53),fl:pt(72)||-2};
-    const ls=(st.rosterSettings&&st.rosterSettings.lineupSlotCounts)||{},slots={QB:ls[0]||1,RB:ls[2]||2,WR:ls[4]||2,TE:ls[6]||1,FLEX:ls[23]||0,SFLEX:ls[7]||0,K:ls[17]||0,DST:ls[16]||0,BN:ls[20]||6};
+    const ls=(st.rosterSettings&&st.rosterSettings.lineupSlotCounts)||{},slots={QB:ls[0]||1,RB:ls[2]||2,WR:ls[4]||2,TE:ls[6]||1,FLEX:ls[23]||0,SFLEX:ls[7]||0,K:ls[17]||0,DST:ls[16]||0,BN:ls[20]||6,IR:ls[21]||0};
     const POSID={1:'QB',2:'RB',3:'WR',4:'TE',5:'K',16:'DST'};
+    const espnNames=E=>E.map(e=>e.playerPoolEntry&&e.playerPoolEntry.player).filter(x=>x&&POSID[x.defaultPositionId]).map(x=>POSID[x.defaultPositionId]==='DST'?x.fullName:{n:x.fullName,pos:POSID[x.defaultPositionId]});
     const myId=creds&&creds.swid?('{'+creds.swid.replace(/[{}]/g,'')+'}').toUpperCase():null;
     const teams=(d.teams||[]).map(t=>({name:t.name||[t.location,t.nickname].filter(Boolean).join(' ')||'Team '+t.id,mine:!!myId&&[t.primaryOwner,...(t.owners||[])].some(o=>String(o||'').toUpperCase()===myId),
-      names:((t.roster&&t.roster.entries)||[]).map(e=>e.playerPoolEntry&&e.playerPoolEntry.player).filter(x=>x&&POSID[x.defaultPositionId]).map(x=>POSID[x.defaultPositionId]==='DST'?x.fullName:{n:x.fullName,pos:POSID[x.defaultPositionId]})}));
+      names:espnNames((t.roster&&t.roster.entries)||[]),ir:espnNames(((t.roster&&t.roster.entries)||[]).filter(e=>e.lineupSlotId===21))}));
     const ix={},ss=st.scheduleSettings||{},rw=ss.matchupPeriodCount||14;(d.teams||[]).forEach((t,i)=>ix[t.id]=i);
     const real={regWeeks:rw,playoffTeams:ss.playoffTeamCount||null,sched:{},scores:{},rec:{},played:0};
     (d.schedule||[]).forEach(m=>{const w=m.matchupPeriodId;if(!w||w>rw||!m.home||ix[m.home.teamId]==null)return;const a=ix[m.home.teamId],b=m.away&&ix[m.away.teamId]!=null?ix[m.away.teamId]:null;
@@ -1506,14 +1546,15 @@ async function espnImport(id,creds){
     (d.teams||[]).forEach((t,i)=>{const L=((t.roster&&t.roster.entries)||[]).filter(e=>ESPN_SLOT[e.lineupSlotId]).map(e=>{const pl=e.playerPoolEntry&&e.playerPoolEntry.player,q=pl&&findExact(pl.fullName);return {label:ESPN_SLOT[e.lineupSlotId],id:q?q.id:null}});
       L.sort((a,b)=>SLOT_ORDER.indexOf(a.label)-SLOT_ORDER.indexOf(b.label));if(L.length)real.lineups[i]=L});
     real.src={type:'espn',league:String(id),priv:!!creds,rid:Object.fromEntries((d.teams||[]).map((t,i)=>[t.id,i]))};if(creds)IMP.espnCreds=creds;
-    applyImport((st.name)||'ESPN League',teams,sc,slots,'ESPN',real,(()=>{const a=st.acquisitionSettings||{},dr=st.draftSettings||{};return {format:dr.keeperCount>0?'keeper':'redraft',waiver:a.isUsingAcquisitionBudget?'faab':'priority',budget:a.acquisitionBudget||100}})());readEspnWeek(d)}
+    applyImport((st.name)||'ESPN League',teams,sc,slots,'ESPN',real,(()=>{const a=st.acquisitionSettings||{},dr=st.draftSettings||{};return {irOk:['IR','PUP','O'],format:dr.keeperCount>0?'keeper':'redraft',waiver:a.isUsingAcquisitionBudget?'faab':'priority',budget:a.acquisitionBudget||100}})());readEspnWeek(d)}
   catch(e){impMsg(`<p class="note" style="color:var(--bad)">Couldn't read that ESPN league (${esc(e.message)}).</p>`)}
 }
 function applyImport(name,teams,sc,slots,src,real,extra){
   saveCurrentLeague();const key=real&&real.src?real.src.type+':'+real.src.league:'import:'+name,prev=(S.leagues||[]).find(x=>x.key===key);
-  let miss=0;S.league={...S.league,name,sc:{...BASE_SC,...((prev&&prev.snap.league.sc)||{}),...sc},slots:{...BASE_SLOTS,...slots}};S.league.teams=teams.length;if(extra){S.league.format=extra.format;S.league.waiver=extra.waiver;S.league.budget=extra.budget}
+  let miss=0;S.league={...S.league,name,sc:{...BASE_SC,...((prev&&prev.snap.league.sc)||{}),...sc},slots:{...BASE_SLOTS,...slots}};S.league.teams=teams.length;if(extra){S.league.irOk=extra.irOk||null;S.league.format=extra.format;S.league.waiver=extra.waiver;S.league.budget=extra.budget}
   teams.forEach(t=>t.names.forEach(x=>{if(typeof x==='object'&&!findExact(x.n,x.pos))addExtraPlayer(x.n,x.pos,x.t)}));setPool();
-  S.teams=teams.map((t,i)=>({id:'t'+(i+1),name:t.name,players:[...new Set(t.names.map(x=>{const p=typeof x==='object'?findExact(x.n,x.pos,x.t):findExact(x);if(!p)miss++;return p&&p.id}).filter(Boolean))]}));
+  const res=x=>{const p=typeof x==='object'?findExact(x.n,x.pos,x.t):findExact(x);return p&&p.id};
+  S.teams=teams.map((t,i)=>({id:'t'+(i+1),name:t.name,players:[...new Set(t.names.map(x=>{const id=res(x);if(!id)miss++;return id}).filter(Boolean))],ir:[...new Set((t.ir||[]).map(res).filter(Boolean))]}));
   if(real){const tid=i=>S.teams[i]&&S.teams[i].id,mapW=o=>{const r={};for(const w in o)r[w]=o[w].map(([a,b])=>[tid(a),b==null?null:tid(b)]);return r},mapT=o=>{const r={};for(const k in o)r[tid(+k)]=o[k];return r};
     const scores={};for(const w in real.scores)scores[w]=mapT(real.scores[w]);
     const src=real.src?{...real.src,rid:Object.fromEntries(Object.entries(real.src.rid).map(([rid,i])=>[rid,tid(i)]))}:null;
@@ -1643,7 +1684,7 @@ function buildLeagueForm(){
   $('slots-form').innerHTML=SLOT_FIELDS.map(([k,l,mn,mx])=>`<div class="field"><label for="sl-${k}">${l}</label><input type="number" id="sl-${k}" data-slot="${k}" min="${mn}" max="${mx}" step="1"></div>`).join('');
 }
 function fillLeagueForm(){const L=S.league;document.querySelectorAll('[data-sc]').forEach(i=>{if(document.activeElement!==i)i.value=L.sc[i.dataset.sc]});
-  document.querySelectorAll('[data-slot]').forEach(i=>{if(document.activeElement!==i)i.value=i.dataset.slot==='teams'?L.teams:L.slots[i.dataset.slot]});
+  document.querySelectorAll('[data-slot]').forEach(i=>{if(document.activeElement!==i)i.value=i.dataset.slot==='teams'?L.teams:(L.slots[i.dataset.slot]??BASE_SLOTS[i.dataset.slot]??0)});
   if(document.activeElement!==$('lg-name'))$('lg-name').value=L.name||'';
   $('lg-format').value=fmtOf();$('lg-waiver').value=L.waiver||'faab';if(document.activeElement!==$('lg-budget'))$('lg-budget').value=L.budget??100;$('lg-budget-f').hidden=(L.waiver||'faab')!=='faab';
   $('proj-source').textContent=S.custom?`Using your imported projections (${S.custom.length} players).`:`Using real 2026 stats through Week ${PLAYED}, blended with preseason expectations, for ${BUILTIN.length} players.`}
@@ -1698,6 +1739,8 @@ document.addEventListener('click',e=>{
   else if(t.id==='set-me'){S.me=hubSel;S.example=false;upsertLeague();bump();toast(teamById(S.me).name+' is now your team')}
   else if(d.assignMe){assign(d.assignMe,S.me);toast('Added '+byId[d.assignMe].n);render()}
   else if(d.unassign){const n=byId[d.unassign].n;assign(d.unassign,null);toast('Removed '+n);render()}
+  else if(d.irOn){moveIR(d.irOn,true)}
+  else if(d.irOff){moveIR(d.irOff,false)}
   else if(d.give){if(TD.give.includes(d.give))TD.give=TD.give.filter(x=>x!==d.give);else{TD.give=[...TD.give,d.give];TD.fresh=d.give}renderTrade()}
   else if(d.rpos){rosPos=d.rpos;t.parentNode.querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed',b===t));renderTrade()}
   else if(d.get){if(TD.get.includes(d.get)){TD.get=TD.get.filter(x=>x!==d.get);renderTrade();return}if(TD.get.length&&OWN[TD.get[0]]!==OWN[d.get]){TD.get=[];toast('Started a new deal with '+teamById(OWN[d.get]).name)}TD.get.push(d.get);TD.fresh=d.get;renderTrade();const sb=$('targets').closest('.scrollbox');if(sb)sb.scrollTop=0}
@@ -2503,6 +2546,9 @@ function alertsList(){const me=S&&myTeam&&myTeam();if(!me||!V||!G)return [];cons
     else if(st.has(id)&&s==='Q')out.push({k:`q-${WEEK}-${id}`,lvl:'warn',t:`${p.n} is questionable`,d:'Check his status before kickoff and have a backup ready.',open:id});
     if(st.has(id)&&!g.next)out.push({k:`bye-${WEEK}-${id}`,lvl:'warn',t:`${p.n} is on bye in Week ${WEEK}`,d:RL?'He is in your starting lineup. Start someone else.':'One of your usual starters. Your lineup on My Team already works around him.',open:id});
     if(g.tag==='sell')out.push({k:`sell-${WEEK}-${id}`,lvl:'info',t:`Sell-high window: ${p.n}`,d:g.sellWhy||'He is scoring above what his role supports.',open:id})});
+  const IRS=irState(me);
+  if(IRS.open)IRS.cand.slice(0,IRS.open).forEach(id=>out.push({k:`ir-${id}-${stOf(id)}`,lvl:'warn',t:`Move ${byId[id].n} to IR`,d:`He is ${IR_WHY[stOf(id)]||'injured'} and you have an open IR slot. Moving him frees a roster spot.`,open:id}));
+  IRS.stale.forEach(id=>out.push({k:`iract-${WEEK}-${id}`,lvl:'bad',t:`Activate ${byId[id].n} from IR`,d:'He no longer has an IR-eligible designation. Most apps block adds and trades until you move him off IR.',open:id}));
   OPPS.filter(o=>!OWN[o.id]&&o.dp>=2).sort((a,b)=>b.dp-a.dp).slice(0,3).forEach(o=>out.push({k:`pick-${WEEK}-${o.id}`,lvl:'good',t:`Pickup: ${byId[o.id].n}`,d:oppTxtLine(o),open:o.id}));
   return out}
 function renderAlerts(){const b=$('alert-btn');if(!b)return;const L=USER?alertsList():[],seen=seenAlerts(),n=L.filter(a=>!seen.has(a.k)).length;
