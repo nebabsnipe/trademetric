@@ -11,9 +11,11 @@ Fantasy football trades, rankings and lineup advice built on your league's exact
 | `index.html` | Page layout: the top bar, tabs and every section |
 | `css/styles.css` | All colors, fonts and spacing. Colors are variables at the top (`--accent` is the orange) |
 | `js/app.js` | Everything the site does: scoring, projections, the Trade Score, Season Sim, rankings, imports |
+| `js/news.js` | The News tab, big-play banners and per-league notification switches. Trigger rules (yardage, touchdowns, big games, crunch-time swings, clinchers) are in `TMN_R` at the top |
 | `data/nfl.json` | The stats snapshot the site reads. Rebuilt every morning by GitHub |
 | `data/preseason.json` | Preseason expectations blended into projections. Replace each summer |
 | `api/ai.js` | Server function for the AI Helper, scouting reports and screenshot reading |
+| `api/plays.js` | Play-by-play for the News tab: touchdowns and 20+ yard runs and catches from ESPN's game summaries, cached 1 minute during games. If it fails, the page falls back to comparing live stat totals |
 | `api/live.js` | Live game-day data: scores, game clocks, player stats so far, injury news (cached 2 min during games, 10 min otherwise) |
 | `api/feed.js` | Highlights tab: clips from the NFL's and all 32 teams' official YouTube channels (this week and last), game results and news headlines, cached 5 minutes. Optional `YOUTUBE_API_KEY` env var reads 50 uploads per channel instead of 15 |
 | `scripts/market.py` | Daily redraft market snapshot (FantasyCalc, KeepTradeCut) saved to `data/market.json` for the trade model |

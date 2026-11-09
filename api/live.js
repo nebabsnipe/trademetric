@@ -76,7 +76,7 @@ function gameInfo(board) {
     const teams = (c.competitors || []).map(x => ({ t: fix(x.team && x.team.abbreviation), score: +x.score || 0, home: x.homeAway === 'home' }));
     for (const a of teams) {
       const b = teams.find(x => x !== a) || {};
-      games[a.t] = { state, rem: +rem.toFixed(3), detail: st.shortDetail || st.detail || '', start: ev.date, score: a.score, opp: b.t, oppScore: b.score || 0, home: a.home, implied: odds ? odds[a.t] ?? null : null, total: odds ? odds.total : null, line: odds ? odds.line : '' };
+      games[a.t] = { id: String(ev.id), state, rem: +rem.toFixed(3), detail: st.shortDetail || st.detail || '', start: ev.date, score: a.score, opp: b.t, oppScore: b.score || 0, home: a.home, implied: odds ? odds[a.t] ?? null : null, total: odds ? odds.total : null, line: odds ? odds.line : '' };
     }
   }
   return games;
