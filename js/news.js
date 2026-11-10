@@ -293,7 +293,14 @@ function tmnTopSave(){const T=tmnTop();T.done=T.done.slice(-8);T.done2=(T.done2|
 const tmnPosN=pos=>pos==='DST'?'defense':pos==='K'?'kicker':pos||'';
 /* the #1 stays up from the moment the week ends (Monday night) until the very start of Thursday, in the viewer's own
    time zone: pinned at the top of the Feed and as a corner chip on every page. Then it moves into the timeline. */
-function tmnTopUntil(e){const d=new Date(e.at||Date.now());d.setHours(0,0,0,0);do d.setDate(d.getDate()+1);while(d.getDay()!==4);return d.getTime()}
+function tmnTopUntil(e){const d=new Date(e.at||Date.now());d.setHours(0,0,0,0);do d.setDate(d.getDate()+1);while(d.getDay()!==4);
+  const w=tmnWeekThu(e.week);return w?Math.min(d.getTime(),w):d.getTime()}
+/* the Thursday that starts week w+1 (midnight, local), from this week's kickoff dates. Used as a hard cap so a #1 saved
+   with a late timestamp (older builds stamped when the browser noticed it, not when the week ended) can't outlive its week */
+function tmnWeekThu(w){if(!w||typeof KICK==='undefined'||typeof DATA==='undefined')return 0;
+  const ds=Object.values(KICK).map(k=>k&&k[1]).filter(Boolean).sort();if(!ds.length)return 0;
+  const d=new Date(ds[0]+'T00:00:00');if(isNaN(d))return 0;while(d.getDay()!==4)d.setDate(d.getDate()-1);
+  d.setDate(d.getDate()+7*(w+1-DATA.week));return d.getTime()}
 const tmnTopLive=e=>e&&e.type==='top'&&Date.now()<tmnTopUntil(e);
 /* closing the #1 banner or chip (or tapping through to it) keeps it off the corner until Thursday; it stays pinned in News */
 function tmnTopDismiss(k){const e=tmnTop().items.find(x=>x.k===k&&x.type==='top');if(e&&!e.dis){e.dis=true;tmnTopSave()}}
