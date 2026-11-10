@@ -393,6 +393,11 @@ const TMN_STOP=new Set(['the','and','for','with','his','her','from','after','bef
 const tmnWords=(s,skip)=>{const o=new Set();String(s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/['’.]/g,'').replace(/[^a-z0-9]+/g,' ').split(' ').forEach(w=>{if(w.length>2&&!TMN_STOP.has(w)&&!(skip&&skip.has(w)))o.add(w.endsWith('s')&&w.length>4?w.slice(0,-1):w)});return o};
 function tmnSimT(a,b,skip,same){const A=tmnWords(a,skip),B=tmnWords(b,skip);if(A.size<2||B.size<2)return false;let n=0;A.forEach(w=>B.has(w)&&n++);
   const r=n/Math.min(A.size,B.size);return same?(n>=2&&r>=.5):(n>=3&&r>=.6)}
+/* subscriber-only stories (The Athletic, ESPN+, newspaper paywalls): no link, since the reader can't open them. The card's
+   own title and points carry the news, and only the important ones get in: moves, and injury news with a real status */
+const TMN_BIG_INJ=/\b(ruled out|out (for|vs\.?|against|sunday|monday|thursday|this week|indefinitely)|doubtful|injured reserve|placed on (ir|reserve)|to ir\b|activated|designated (him |for )?(to )?return|surgery|torn|tear|fracture[d]?|ruptured|season-ending|week-to-week|weeks? to (heal|recover)|out (\d+|several|multiple) (weeks|games)|concussion protocol|mri|setback|will (not )?play|expected to (play|return)|game-time decision)\b/i;
+function tmnPayOK(x){if(!x.pay)return true;if(x.type==='trade'||x.type==='lg')return true;return x.kind==='inj'&&TMN_BIG_INJ.test((x.title||'')+' '+String(x.desc||'').slice(0,300))}
+const tmnPayNote=x=>`<span class="tmn-src"><b>${esc(x.outlet||'Subscriber story')}</b> · subscribers only, so the key facts are here</span>`;
 function tmnSameStory(a,b){if(!a||!b)return false;if(a.url&&a.url===b.url)return true;
   const same=a.pid&&a.pid===b.pid,pa=a.pid&&byId[a.pid],pb=b.pid&&byId[b.pid];
   /* a trade card and a story about that player's trade are the same news */
@@ -404,20 +409,24 @@ function tmnSameStory(a,b){if(!a||!b)return false;if(a.url&&a.url===b.url)return
   if(a.at&&b.at&&Math.abs(a.at-b.at)>4*864e5)return false;
   return ta.some(x=>tb.some(y=>tmnSimT(x,y,skip,same)))}
 /* keeps the first of every group of matching stories (call with the list in priority order) */
-function tmnDedupe(list){const keep=[];list.forEach(x=>{if(!keep.some(k=>tmnSameStory(k,x)))keep.push(x)});return keep}
+function tmnDedupe(list){const keep=[];list.forEach(x=>{const i=keep.findIndex(k=>tmnSameStory(k,x));if(i<0)keep.push(x);
+    else if(keep[i].pay&&!x.pay&&keep[i].type===x.type)keep[i]=x});return keep}
 
 /* every story and video about your players (league filter applied), newest first */
 function tmnStories(Ls){const ids=[];Ls.forEach(c=>{if(TMN.lg!=='all'&&c.key!==TMN.lg)return;c.roster.forEach(id=>{const p=byId[id];if(p&&p.pos!=='DST'&&!ids.includes(id))ids.push(id)})});
   const byName={},names=ids.map(id=>{const n=norm(byId[id].n);byName[n]=id;return [n,id]});
   const who=(t,ath)=>{if(ath&&ath.length){const a=ath.map(norm).find(x=>byName[x]);if(a)return byName[a]}const h=normT(t);const hit=names.find(([n])=>wordIn(h,n));return hit?hit[1]:null};
   const cut=Date.now()-10*864e5,out=[],seen=new Set();
-  const add=x=>{if(!x.pid||!x.kind||!x.at||x.at<cut||!x.url)return;const tk=norm(x.title).slice(0,70);if(seen.has(x.url)||seen.has(tk))return;seen.add(x.url);seen.add(tk);
+  const add=x=>{if(!x.pid||!x.kind||!x.at||x.at<cut||!x.url||!tmnPayOK(x))return;const tk=norm(x.title).slice(0,70);if(seen.has(x.url)||seen.has(tk))return;seen.add(x.url);seen.add(tk);
     /* basically the same story as one already in: keep the first, credit the second outlet on it */
-    const d=out.find(o=>tmnSameStory(o,x));if(d){if(x.outlet&&d.outlet!==x.outlet&&!(d.also||[]).includes(x.outlet))d.also=[...(d.also||[]),x.outlet];if(!d.img&&x.img)d.img=x.img;return}
+    const d=out.find(o=>tmnSameStory(o,x));if(d){
+      /* the free version of a subscriber-only story takes its place */
+      if(d.pay&&!x.pay){const o=d.outlet;Object.assign(d,{url:x.url,outlet:x.outlet,title:x.title,desc:x.desc||d.desc,img:x.img||d.img,pay:false,type:x.type});if(o&&!(d.also||[]).includes(o))d.also=[...(d.also||[]),o];return}
+      if(x.outlet&&d.outlet!==x.outlet&&!(d.also||[]).includes(x.outlet))d.also=[...(d.also||[]),x.outlet];if(!d.img&&x.img)d.img=x.img;return}
     out.push(x)};
-  (TMN.art&&TMN.art.items||[]).forEach(a=>add({type:a.video?'vid':'art',kind:a.kind,pid:byName[norm(a.n)],title:a.title,desc:a.desc,url:a.url,outlet:a.outlet,also:a.also||[],img:a.img,at:Date.parse(a.at||0)}));
+  (TMN.art&&TMN.art.items||[]).forEach(a=>add({type:a.video?'vid':'art',kind:a.kind,pid:byName[norm(a.n)],title:a.title,desc:a.desc,url:a.url,outlet:a.outlet,also:a.also||[],img:a.img,at:Date.parse(a.at||0),pay:!!a.pay}));
   if(typeof FEED!=='undefined'&&FEED){
-    (FEED.news||[]).forEach(a=>{const pid=who(a.title+' '+(a.desc||''),a.athletes);add({type:a.type==='Media'?'vid':'art',kind:tmnKind(a.title,a.desc),pid,title:a.title,desc:a.desc&&a.desc!==a.title?a.desc.slice(0,700):'',url:a.url,outlet:'ESPN',also:[],img:a.img,at:Date.parse(a.at||0)})});
+    (FEED.news||[]).forEach(a=>{const pid=who(a.title+' '+(a.desc||''),a.athletes);add({type:a.type==='Media'?'vid':'art',kind:tmnKind(a.title,a.desc),pid,title:a.title,desc:a.desc&&a.desc!==a.title?a.desc.slice(0,700):'',url:a.url,outlet:a.pay?'ESPN+':'ESPN',also:[],img:a.img,at:Date.parse(a.at||0),pay:!!a.pay})});
     /* injury and role videos: coach and team updates on the NFL's and teams' channels, ESPN segments (not play clips) */
     (FEED.videos||[]).forEach(v=>{const pid=who(v.title,v.athletes);if(!pid)return;const k=tmnKind(v.title,'');if(!k)return;
       add({type:'vid',kind:k,pid,title:v.title,desc:'',url:v.url,outlet:v.src==='espn'?'ESPN':chName(v)+' on YouTube',also:[],img:v.thumb,at:Date.parse(v.at||0),dur:v.dur})})}
@@ -545,7 +554,7 @@ async function tmnLoadRecaps(list){const R=tmnRecaps();TMN.rcTried=TMN.rcTried||
   const todo=list.filter(x=>(x.type==='art'||x.type==='lg'||x.type==='trade')&&x.url&&!R[x.url]&&!TMN.rcTried.has(x.url)).slice(0,30);if(!todo.length||TMN.rcBusy)return;
   TMN.rcBusy=true;todo.forEach(x=>TMN.rcTried.add(x.url));
   try{const r=await fetch('/api/news?recap=1',{method:'POST',headers:{'content-type':'application/json'},
-      body:JSON.stringify({items:todo.map(x=>{const p=byId[x.pid];return {u:x.url,n:p&&p.n,pos:p&&p.pos,t:p&&p.t,title:x.title,desc:x.desc||'',outlet:x.outlet,...(x.type==='trade'||x.kind==='trade'?{f:'trade',from:x.from||'',to:x.to||''}:{})}})})});
+      body:JSON.stringify({items:todo.map(x=>{const p=byId[x.pid];return {u:x.url,n:p&&p.n,pos:p&&p.pos,t:p&&p.t,title:x.title,desc:x.desc||'',outlet:x.outlet,pay:!!x.pay,...(x.type==='trade'||x.kind==='trade'?{f:'trade',from:x.from||'',to:x.to||''}:{})}})})});
     const j=r.ok?await r.json():null;
     if(j&&j.items&&Object.keys(j.items).length){Object.assign(R,j.items);
       const keys=Object.keys(R);if(keys.length>400)keys.slice(0,keys.length-400).forEach(k=>delete R[k]);
@@ -573,7 +582,7 @@ function tmnLeagueNews(Ls,picked){const raw=TMN.lgn&&TMN.lgn.items;if(!raw||!raw
     if(!pid){const h=normT(a.title);const hit=L.filter(([n])=>wordIn(h,n)).sort((x,y)=>rk(x[1])-rk(y[1]))[0];if(hit)pid=hit[1]}
     if(!pid){const h=normT(String(a.desc||'').slice(0,220));const hit=L.filter(([n])=>wordIn(h,n)).sort((x,y)=>rk(x[1])-rk(y[1]))[0];if(hit)pid=hit[1]}
     if(!pid||(a.kind==='inj'&&rk(pid)>150)||(a.kind!=='trade'&&rk(pid)>220)||out.some(o=>o.pid===pid&&o.kind===a.kind))return;
-    const x={type:'lg',k:'lg:'+a.url,kind:a.kind,pid,yours:mine.has(pid),title:a.title,desc:a.desc,url:a.url,outlet:a.outlet,img:a.img,at,leagues:[]};
+    const x={type:'lg',k:'lg:'+a.url,kind:a.kind,pid,yours:mine.has(pid),title:a.title,desc:a.desc,url:a.url,outlet:a.outlet,img:a.img,at,leagues:[],pay:!!a.pay};
     if((picked||[]).some(o=>tmnSameStory(o,x))||out.some(o=>tmnSameStory(o,x)))return;
     seen.add(a.url);out.push(x)});
   const tr=out.filter(x=>x.kind==='trade'),rest=out.filter(x=>x.kind!=='trade').sort((a,b)=>b.at-a.at).slice(0,14);
@@ -594,10 +603,10 @@ async function tmnLoadTradeArts(list){const need=list.filter(x=>!x.url&&!(TMN.tr
 function tmnTrades(Ls,lg){const rk=id=>(typeof V!=='undefined'&&V&&V.rank&&V.rank[id])||999,mine=new Set();Ls.forEach(c=>c.roster.forEach(id=>mine.add(id)));
   const cut=Date.now()-14*864e5,by={},D=window.NFL_DATA;
   ((D&&D.moves)||[]).forEach(([id,from,to,day])=>{const p=byId[id],at=Date.parse(day+'T12:00:00');if(!p||rk(id)>TMN_TRADE_TOP||!at||at<cut)return;by[id]={from,to,at}});
-  (lg||[]).filter(x=>x.kind==='trade').forEach(x=>{const m=by[x.pid]||(by[x.pid]={from:'',to:byId[x.pid].t,at:x.at});if(!m.url){m.url=x.url;m.title=x.title;m.desc=x.desc;m.outlet=x.outlet;m.img=x.img;m.at=Math.min(m.at,x.at)}});
+  (lg||[]).filter(x=>x.kind==='trade').forEach(x=>{const m=by[x.pid]||(by[x.pid]={from:'',to:byId[x.pid].t,at:x.at});if(!m.url||(m.pay&&!x.pay)){m.url=x.url;m.title=x.title;m.desc=x.desc;m.outlet=x.outlet;m.img=x.img;m.pay=!!x.pay;m.at=Math.min(m.at,x.at)}});
   const out=Object.entries(by).map(([pid,m])=>{let a=m.url?null:TMN.tra&&TMN.tra.items&&TMN.tra.items[pid]&&TMN.tra.items[pid].a;
     if(a&&Date.parse(a.at||0)<m.at-5*864e5)a=null;    /* a story from long before the move is about something else */
-    const x={type:'trade',kind:'trade',k:'tr:'+pid,pid,from:m.from,to:m.to||byId[pid].t,yours:mine.has(pid),at:m.at,leagues:[],url:m.url||(a&&a.url)||'',title:m.title||(a&&a.title)||'',desc:m.desc||(a&&a.desc)||'',outlet:m.outlet||(a&&a.outlet)||'',img:m.img||(a&&a.img)||null};
+    const x={type:'trade',kind:'trade',k:'tr:'+pid,pid,from:m.from,to:m.to||byId[pid].t,yours:mine.has(pid),at:m.at,leagues:[],url:m.url||(a&&a.url)||'',title:m.title||(a&&a.title)||'',desc:m.desc||(a&&a.desc)||'',outlet:m.outlet||(a&&a.outlet)||'',img:m.img||(a&&a.img)||null,pay:m.url?!!m.pay:!!(a&&a.pay)};
     if(a&&a.at){const t=Date.parse(a.at);if(t&&t<x.at)x.at=t}return x}).sort((a,b)=>b.at-a.at).slice(0,20);
   tmnLoadTradeArts(out);return out}
 /* a story's title, always about the player on the card: when the headline doesn't name him, lead with his name */
@@ -614,31 +623,35 @@ function tmnTradeCard(x){const p=byId[x.pid];if(!p)return '';const rc=x.url&&tmn
     <div class="tmn-ev-card"><div class="tmn-ev-top"><span class="tmn-lbl accent">Trade</span><span class="tmn-who">${av(p,'sm')}${esc(p.n)}<small>${p.pos}</small></span>${route}${own}</div>
       <div class="tmn-ev-main tmn-story-m"><div class="tmn-ev-txt"><h3>${esc(head)}</h3>${body}</div>
         ${x.img?`<span class="tmn-sthumb"><img src="${esc(x.img)}" alt="" loading="lazy" decoding="async" onerror="this.parentNode.remove()"></span>`:''}</div>
-      <div class="tmn-ev-f">${x.url?`<span class="tmn-src"><b>${esc(src)}</b></span><span class="tmn-go">Read about the trade ↗</span>`:'<span class="tmn-src">Team change in the latest NFL data</span><span class="tmn-go">Player card →</span>'}</div></div>`;
-  return x.url?`<a class="tmn-ev tmn-story tmn-trade tone-accent${rc?' recap':''}" href="${esc(x.url)}" target="_blank" rel="noopener" data-nkf="${esc(x.k)}" title="${esc(x.title)}">${inner}</a>`
-    :`<article class="tmn-ev tmn-trade tone-accent tap" data-ncard="${p.id}" data-nkf="${esc(x.k)}" tabindex="0">${inner}</article>`}
+      <div class="tmn-ev-f">${x.url&&x.pay?`${tmnPayNote(x)}<span class="tmn-go">Player card →</span>`:x.url?`<span class="tmn-src"><b>${esc(src)}</b></span><span class="tmn-go">Read about the trade ↗</span>`:'<span class="tmn-src">Team change in the latest NFL data</span><span class="tmn-go">Player card →</span>'}</div></div>`;
+  return x.url&&!x.pay?`<a class="tmn-ev tmn-story tmn-trade tone-accent${rc?' recap':''}" href="${esc(x.url)}" target="_blank" rel="noopener" data-nkf="${esc(x.k)}" title="${esc(x.title)}">${inner}</a>`
+    :`<article class="tmn-ev tmn-trade tone-accent tap${x.pay?' pay':''}${rc?' recap':''}" data-ncard="${p.id}" data-nkf="${esc(x.k)}" tabindex="0">${inner}</article>`}
 function tmnLeagueCard(x){const p=byId[x.pid],[lbl,tone]=TMN_LGK[x.kind]||['League news','muted'],rc=tmnRecaps()[x.url];
   const host=(()=>{try{return new URL(x.url).hostname.replace(/^www\./,'')}catch(e){return ''}})(),src=x.outlet&&x.outlet!=='Google News'?x.outlet:host;
   const ow=x.yours?'mine':typeof OWN==='undefined'||OWN[x.pid]==null?'fa':OWN[x.pid]===S.me?'mine':'other';
   const T=ow==='other'&&S.teams&&S.teams.find(t=>t.id===OWN[x.pid]);
   const own=ow==='mine'?'<span class="tmn-own mine">Your team</span>':ow==='fa'?'<span class="tmn-own fa" data-go-waivers="1">Free agent ↗</span>':`<span class="tmn-own">${esc(T?T.name:'Rostered')}</span>`;
-  return `<a class="tmn-ev tmn-story tmn-lgn tone-${tone}${rc?' recap':''}" href="${esc(x.url)}" target="_blank" rel="noopener" data-nkf="${esc(x.k)}"${rc?` title="${esc(x.title)}"`:''}>
+  const open=x.pay?`<article class="tmn-ev tmn-story tmn-lgn tap pay tone-${tone}${rc?' recap':''}" data-ncard="${p.id}" data-nkf="${esc(x.k)}" tabindex="0">`
+    :`<a class="tmn-ev tmn-story tmn-lgn tone-${tone}${rc?' recap':''}" href="${esc(x.url)}" target="_blank" rel="noopener" data-nkf="${esc(x.k)}"${rc?` title="${esc(x.title)}"`:''}>`;
+  return `${open}
     ${tmnRail(x.at)}
     <div class="tmn-ev-card"><div class="tmn-ev-top"><span class="tmn-lbl ${tone}">${lbl}</span><span class="tmn-who">${av(p,'sm')}${esc(p.n)}<small>${p.pos} · ${p.t}</small></span>${own}</div>
       <div class="tmn-ev-main tmn-story-m"><div class="tmn-ev-txt">${rc?`<h3>${esc(tmnTitleFor(p,rc.t))}</h3>${rc.pts.length?`<ul class="tmn-pts">${rc.pts.map(t=>`<li>${esc(t)}</li>`).join('')}</ul>`:''}`:`<h3>${esc(tmnTitleFor(p,x.title))}</h3>${x.desc&&x.desc!==x.title?`<p class="tmn-clamp">${esc(x.desc)}</p>`:''}`}</div>
         ${x.img?`<span class="tmn-sthumb"><img src="${esc(x.img)}" alt="" loading="lazy" decoding="async" onerror="this.parentNode.remove()"></span>`:''}</div>
-      <div class="tmn-ev-f"><span class="tmn-src"><b>${esc(src)}</b></span><span class="tmn-go">Read ↗</span></div></div></a>`}
+      <div class="tmn-ev-f">${x.pay?`${tmnPayNote(x)}<span class="tmn-go">Player card →</span>`:`<span class="tmn-src"><b>${esc(src)}</b></span><span class="tmn-go">Read ↗</span>`}</div></div>${x.pay?'</article>':'</a>'}`}
 /* a story or a video: the whole card is the link */
 function tmnStoryCard(x){const p=byId[x.pid],inj=x.kind==='inj',vid=x.type==='vid',tone=inj?'warn':'muted',rc=tmnRecaps()[x.url];
   const lbl=vid?(inj?'Injury video':'Video'):inj?(stOf(x.pid)?'Injury update':'Health'):'Role & usage';
   const host=(()=>{try{return new URL(x.url).hostname.replace(/^www\./,'')}catch(e){return ''}})();
   const src=x.outlet&&x.outlet!=='Google News'?x.outlet:host;
-  return `<a class="tmn-ev tmn-story tone-${tone}${vid?' vid':''}${rc?' recap':''}" href="${esc(x.url)}" target="_blank" rel="noopener" data-nkf="${esc(x.k||'')}"${rc?` title="${esc(x.title)}"`:''}>
+  const pay=x.pay&&!vid,open=pay?`<article class="tmn-ev tmn-story tap pay tone-${tone}${rc?' recap':''}" data-ncard="${p.id}" data-nkf="${esc(x.k||'')}" tabindex="0">`
+    :`<a class="tmn-ev tmn-story tone-${tone}${vid?' vid':''}${rc?' recap':''}" href="${esc(x.url)}" target="_blank" rel="noopener" data-nkf="${esc(x.k||'')}"${rc?` title="${esc(x.title)}"`:''}>`;
+  return `${open}
     ${tmnRail(x.at)}
     <div class="tmn-ev-card"><div class="tmn-ev-top"><span class="tmn-lbl ${tone}">${lbl}</span><span class="tmn-who">${av(p,'sm')}${esc(p.n)}<small>${p.pos} · ${p.t}${stOf(x.pid)?` · <i class="tmn-st">${esc(ST_LABEL[stOf(x.pid)]||stOf(x.pid))}</i>`:''}</small></span></div>
       <div class="tmn-ev-main tmn-story-m"><div class="tmn-ev-txt">${rc?`<h3>${esc(tmnTitleFor(p,rc.t))}</h3>${rc.pts.length?`<ul class="tmn-pts">${rc.pts.map(t=>`<li>${esc(t)}</li>`).join('')}</ul>`:''}`:`<h3>${esc(tmnTitleFor(p,x.title))}</h3>${x.desc?`<p class="tmn-clamp">${esc(x.desc)}</p>`:''}`}</div>
         ${x.img?`<span class="tmn-sthumb${vid?' vid':''}"><img src="${esc(x.img)}" alt="" loading="lazy" decoding="async" onerror="this.parentNode.remove()">${vid?'<span class="vplay" aria-hidden="true"></span>':''}</span>`:''}</div>
-      <div class="tmn-ev-f"><span class="tmn-src"><b>${esc(src)}</b>${x.also&&x.also.length?` · also ${esc(x.also.join(', '))}`:''}</span><span class="tmn-go">${vid?'Watch':'Read'} ↗</span></div></div></a>`}
+      <div class="tmn-ev-f">${pay?`${tmnPayNote(x)}<span class="tmn-go">Player card →</span>`:`<span class="tmn-src"><b>${esc(src)}</b>${x.also&&x.also.length?` · also ${esc(x.also.join(', '))}`:''}</span><span class="tmn-go">${vid?'Watch':'Read'} ↗</span>`}</div></div>${pay?'</article>':'</a>'}`}
 /* the clip that shows a play: a link out to ESPN or YouTube */
 function tmnClipThumb(v){return `<span class="tmn-vid-l">Watch the play ↗</span>${thumbHtml(v,'xs')}`}
 function tmnClipsGrid(list,CM){if(!list.length)return '';const playOf={};CM.map.forEach((v,k)=>playOf[v.id]=TMN.items.find(e=>e.k===k));
@@ -652,7 +665,7 @@ function tmnInjCard(x,arts){const p=byId[x.id],n=NOTES[x.id],sev=tmnSev(x.s),out
   const what=p.inj&&!(n&&n.note&&n.note.includes(p.inj))?p.inj:'';
   const when=gm&&gm.start&&gm.state==='pre'?`Kicks off ${new Date(gm.start).toLocaleString([], {weekday:'short',hour:'numeric',minute:'2-digit'})} ${tmnVs(gm)}`:'';
   const scored=gm&&gm.state!=='pre'&&LIVEST[x.id]?`${f1(tmnPts(x.id,x.L[0].c.sc))} pts ${gm.state==='post'?'final':'so far'}`:'';
-  const stories=(arts&&arts.length?arts.map(a=>({title:a.title,url:a.url,at:a.at,outlet:a.outlet})):typeof playerNews==='function'?playerNews(p).map(a=>({...a,outlet:'ESPN'})):[]).slice(0,2);
+  const stories=(arts&&arts.length?arts.map(a=>({title:(tmnRecaps()[a.url]||{}).t||a.title,url:a.pay?'':a.url,at:a.at,outlet:a.pay?a.outlet+' (subscribers)':a.outlet})):typeof playerNews==='function'?playerNews(p).map(a=>({...a,outlet:'ESPN'})):[]).slice(0,2);
   const op=typeof OPPS!=='undefined'?OPPS.filter(o=>o.from===x.id).sort((a,b)=>b.dp-a.dp)[0]:null;
   return `<article class="tmn-ev tone-${tone} flat tmn-inj tap" data-ncard="${p.id}"><div class="tmn-ev-card"><div class="tmn-ev-top"><span class="tmn-lbl ${tone}">${esc(ST_LABEL[x.s]||x.s)}</span>${n&&n.at?`<span class="tmn-upd">Updated ${tmnWhen(Date.parse(n.at))}</span>`:''}</div>
     <div class="tmn-ev-main"><div class="tmn-b-av">${av(p)}</div><div class="tmn-ev-txt"><h3>${esc(head)}</h3>${what?`<p>${esc(what)}</p>`:''}${n&&n.note?`<p class="tmn-note">${esc(n.note)}</p>`:''}${when||scored?`<p>${esc(scored||when)}</p>`:''}

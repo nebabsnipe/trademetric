@@ -48,6 +48,7 @@ function articleOf(a) {
     title: a.headline || a.title || '', desc: a.description || a.story || '', at: pick(a.published, a.lastModified) || null,
     url: pick(links.web && links.web.href, links.mobile && links.mobile.href) || null,
     img: img(a) || null, athletes: names(a.categories), type: a.type || null,
+    pay: !!(a.premium || a.isPremium),   // ESPN+ story: the reader needs a subscription
   };
 }
 

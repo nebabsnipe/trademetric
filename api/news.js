@@ -32,6 +32,20 @@ const perPlayer = (name, team, focus) => [
   ...(ESPN_TEAM[team] ? [{ src: 'ESPN', kind: 'espn', url: `https://site.api.espn.com/apis/site/v2/sports/football/nfl/news?team=${ESPN_TEAM[team]}&limit=50` }] : []),
 ];
 
+/* Subscriber-only outlets. These stories get no link (the reader can't open them): the card's own title and points
+   carry the news, and only the important ones are kept (trades, signings and releases, real injury news, new starters). */
+const PAY_OUTLET = /^(the athletic|espn\+|new york times|the new york times|nytimes|wall street journal|the wall street journal|wsj|washington post|the washington post|boston globe|the boston globe|los angeles times|la times|bloomberg|financial times|san francisco chronicle|sf chronicle|houston chronicle|dallas morning news|the dallas morning news|star tribune|philadelphia inquirer|the philadelphia inquirer|seattle times|the seattle times|denver post|the denver post|chicago tribune|baltimore sun|the baltimore sun|baltimore banner|the baltimore banner|pittsburgh post-gazette|buffalo news|the buffalo news|newsday|tampa bay times|the boston herald|boston herald|sports business journal|footballguys|pff\+|the information)$/i;
+const PAY_HOST = /(^|\.)(theathletic\.com|wsj\.com|washingtonpost\.com|bostonglobe\.com|latimes\.com|bloomberg\.com|ft\.com|sfchronicle\.com|houstonchronicle\.com|dallasnews\.com|startribune\.com|inquirer\.com|seattletimes\.com|denverpost\.com|chicagotribune\.com|baltimoresun\.com|thebaltimorebanner\.com|post-gazette\.com|buffalonews\.com|newsday\.com|tampabay\.com|bostonherald\.com|sportsbusinessjournal\.com|footballguys\.com)$/i;
+function payOf(i) {
+  if (i.pay) return true;
+  if (PAY_OUTLET.test(String(i.outlet || '').trim())) return true;
+  let h = ''; try { const u = new URL(i.url); h = u.hostname.replace(/^www\./, ''); if (h === 'nytimes.com') return true; if (u.pathname.includes('/insider/')) return true; } catch { }
+  return PAY_HOST.test(h);
+}
+/* worth a subscriber-only card: a move, or injury news with a real status in it (not a role or usage piece) */
+const BIG_INJ = /\b(ruled out|out (for|vs\.?|against|sunday|monday|thursday|this week|indefinitely)|doubtful|injured reserve|placed on (ir|reserve)|to ir\b|activated|designated (him |for )?(to )?return|surgery|torn|tear|fracture[d]?|ruptured|season-ending|week-to-week|weeks? to (heal|recover)|out (\d+|several|multiple) (weeks|games)|concussion protocol|mri|setback|will (not )?play|expected to (play|return)|game-time decision)\b/i;
+function payWorth(i) { const t = (i.title || '') + ' ' + String(i.desc || '').slice(0, 300); return !RUMOR.test(i.title || '') && !!(moveOf(t) || BIG_INJ.test(t)); }
+
 const mem = new Map();
 const inflight = new Map();
 function getText(url, ttl) {
@@ -67,7 +81,8 @@ function parseRSS(xml, src) {
     title = title.replace(/\s+[-|]\s+(NFL News|Fantasy Football|Fantasy).*$/i, '').trim();
     const link = decode(tag(it, 'link')) || (it.match(/<link[^>]*href="([^"]+)"/i) || [])[1] || '';
     const at = tag(it, 'pubDate') || tag(it, 'dc:date') || tag(it, 'updated');
-    out.push({ title, desc, url: link, at: at ? new Date(decode(at)).toISOString() : null, src, outlet, img: img && /^https?:/.test(img) ? img.replace(/&amp;/g, '&') : null });
+    const o = { title, desc, url: link, at: at ? new Date(decode(at)).toISOString() : null, src, outlet, img: img && /^https?:/.test(img) ? img.replace(/&amp;/g, '&') : null };
+    o.pay = payOf(o); out.push(o);
   }
   return out;
 }
@@ -79,7 +94,8 @@ function parseESPN(txt) {
     url: (a.links && ((a.links.web && a.links.web.href) || (a.links.mobile && a.links.mobile.href))) || '',
     at: a.published || a.lastModified || null, img: (a.images && a.images[0] && a.images[0].url) || null, video: a.type === 'Media',
     athletes: (a.categories || []).filter(c => c.type === 'athlete').map(c => c.description || (c.athlete && c.athlete.displayName) || ''),
-  }));
+    pay: !!(a.premium || a.isPremium),
+  })).map(o => (o.pay = payOf(o), o));
 }
 
 const norm = s => String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/['’.]/g, '').replace(/\b(jr|sr|ii|iii|iv)\b/g, '').replace(/[^a-z0-9]+/g, ' ').trim();
@@ -113,7 +129,7 @@ async function collect(name, team, probe, noGoogle, focus, days) {
   }));
   const cutoff = Date.now() - (days || 21) * 864e5;
   // stories with real text first, so a duplicate keeps the version that has the article text
-  const all = got.flat().filter(i => !i.at || Date.parse(i.at) > cutoff).sort((a, b) => (!!b.desc - !!a.desc) || ((RANK[a.src] ?? 5) - (RANK[b.src] ?? 5)));
+  const all = got.flat().filter(i => (!i.at || Date.parse(i.at) > cutoff) && (!i.pay || payWorth(i))).sort((a, b) => (!!a.pay - !!b.pay) || (!!b.desc - !!a.desc) || ((RANK[a.src] ?? 5) - (RANK[b.src] ?? 5)));
   const out = [], skip = words(name);
   for (const i of all) {                                   // de-duplicate the same story from different outlets
     const d = out.find(o => similar(o.title, i.title, skip) || o.alts.some(t => similar(t, i.title, skip)));
@@ -134,12 +150,13 @@ function parseJSON(text) {
 let LAST_ERR = null;
 async function summarize(name, team, pos, items) {
   if (!API_KEY || !items.length) return null;
-  const list = items.map((x, i) => `[${i}] ${x.outlet}, ${x.at ? x.at.slice(0, 10) : 'date unknown'}\nHeadline: ${x.title}${x.alts.length ? '\nOther outlets\' headlines for the same story: ' + x.alts.join(' | ') : ''}\nText: ${(x.desc || '(headline only)').slice(0, 1200)}`).join('\n\n');
+  const list = items.map((x, i) => `[${i}] ${x.outlet}, ${x.at ? x.at.slice(0, 10) : 'date unknown'}${x.pay ? ' · SUBSCRIBER-ONLY' : ''}\nHeadline: ${x.title}${x.alts.length ? '\nOther outlets\' headlines for the same story: ' + x.alts.join(' | ') : ''}\nText: ${(x.desc || '(headline only)').slice(0, 1200)}`).join('\n\n');
   const prompt = `You write the news section of a fantasy football app. Player: ${name} (${pos}, ${team}).
 
 For each story below, write:
 - "title": a plain statement of what happened, under 70 characters, written from the facts (for example "Ruled out Sunday with a hamstring injury" or "Played 82% of snaps in Week 8 win"). No clickbait, no questions, no outlet names.
 - "summary": one to three short sentences giving the actual information in the story: what happened, any numbers, injury details and timelines, who is affected and what it means for his role. Use only facts in the headline and text. Never comment on what other outlets did or did not say. If the story only has a headline, write one short sentence and do not add anything the headline does not say.
+- A story marked SUBSCRIBER-ONLY gets no link, so its title and summary must carry all of the news in it on their own (still using only the facts given).
 - "relevant": false if the story is not really about ${name} (he is only mentioned in passing) or has nothing useful for fantasy football (costumes, off-field fluff, general opinion pieces with no new facts); otherwise true.
 
 Reply with only a JSON array like [{"i":0,"title":"...","summary":"...","relevant":true}].
@@ -186,11 +203,13 @@ function kindOf(x) {
    reading without clicking through. One Claude call per batch of up to 12 stories, cached per story URL. */
 const RECAPS = new Map();
 async function recapBatch(list) {
-  const body = list.map((x, i) => `[${i}] Player: ${x.n} (${x.pos || '?'}, ${x.t || '?'}) · ${x.outlet || 'unknown outlet'}${x.f === 'trade' ? ' · TRADE' + (x.from && x.to ? ` (${x.from} to ${x.to})` : '') : ''}\nHeadline: ${x.title}\nText: ${x.desc || '(headline only)'}`).join('\n\n');
+  const body = list.map((x, i) => `[${i}] Player: ${x.n} (${x.pos || '?'}, ${x.t || '?'}) · ${x.outlet || 'unknown outlet'}${x.f === 'trade' ? ' · TRADE' + (x.from && x.to ? ` (${x.from} to ${x.to})` : '') : ''}${x.pay ? ' · SUBSCRIBER-ONLY' : ''}\nHeadline: ${x.title}\nText: ${x.desc || '(headline only)'}`).join('\n\n');
   const prompt = `You write the news feed of a fantasy football app. For each story below, write a recap so a fantasy manager gets the news at face value without opening the article.
 
 - "title": the single biggest takeaway for the named player as a plain statement, under 85 characters. It must start with the player's name (full name, or last name if the full title would run long) and say what is happening to him, even when the original headline is about someone else, a team or a coach (for example "Achane ruled out Sunday with a high ankle sprain; Week 12 return possible" or "Jeanty out-snapped Mitchell 41-22 and got 9 of 11 red-zone touches" or "Pittman traded from the Colts to the Steelers for a 2027 3rd"). When a story is marked as a trade, the title says who he was traded from and to, and the points cover what was sent back and how his role changes. No clickbait, no questions, no outlet names.
 - "points": 1 to 3 short bullet points, each under 95 characters, with the other key facts: numbers, injury details, practice status, timelines, who is affected. The last point may be the fantasy takeaway, but only when it follows directly from the facts given. If the story is only a headline with no text, return just one point or an empty array; never add anything the headline and text do not say.
+
+A story marked SUBSCRIBER-ONLY can't be opened by the reader (it's behind a paywall), so its title and points are all they get: put every key fact from the headline and text into them, and give 2 or 3 points whenever the text has that much.
 
 Use only facts in the headline and text. Reply with only a JSON array like [{"i":0,"title":"...","points":["...","..."]}].
 
@@ -236,7 +255,7 @@ export default async function handler(req, res) {
     const items = raw.slice(0, 30).filter(x => x && typeof x.u === 'string' && /^https?:/.test(x.u) && x.title).map(x => ({
       u: x.u.slice(0, 600), n: cleanLine(x.n, 60), pos: cleanLine(x.pos, 4), t: cleanLine(x.t, 4),
       title: cleanLine(x.title, 220), desc: cleanLine(x.desc, 900), outlet: cleanLine(x.outlet, 60),
-      f: x.f === 'trade' ? 'trade' : '', from: cleanLine(x.from, 4), to: cleanLine(x.to, 4) }));
+      pay: !!x.pay, f: x.f === 'trade' ? 'trade' : '', from: cleanLine(x.from, 4), to: cleanLine(x.to, 4) }));
     const v = await recapAll(items);
     return res.status(200).json({ ai: true, items: v, err: Object.keys(v).length < items.length ? LAST_ERR : undefined });
   }
@@ -269,7 +288,7 @@ export default async function handler(req, res) {
         const { items } = await collect(x.n, x.t, false, !google, x.inj ? 'inj' : 'role', 10);
         return items.map(i => ({ ...i, kind: kindOf(i) })).filter(i => i.kind).slice(0, 5).map(i => ({
           n: x.n, kind: i.kind, title: i.title, desc: clip(i.desc, 700), url: i.url, outlet: i.outlet, also: i.also.slice(0, 3),
-          at: i.at, img: i.img || null, video: !!i.video,
+          at: i.at, img: i.img || null, video: !!i.video, pay: !!i.pay,
         }));
       } catch { return []; }
     }));
@@ -293,10 +312,10 @@ export default async function handler(req, res) {
         const { items } = await collect(x.n, x.to || x.from, false, false, 'trade', 21);
         const last = norm(x.n).split(' ').pop();
         const good = items.filter(i => !RUMOR.test(i.title) && !FLUFF.test(i.title) && (moveOf(i.title) === 'trade' || moveOf((i.desc || '').slice(0, 300)) === 'trade'))
-          .map(i => ({ i, s: (norm(i.title).includes(last) ? 2 : 0) + (moveOf(i.title) === 'trade' ? 2 : 0) + (i.desc ? 1 : 0) + Date.parse(i.at || 0) / 864e5 / 100 }))
+          .map(i => ({ i, s: (i.pay ? -3 : 0) + (norm(i.title).includes(last) ? 2 : 0) + (moveOf(i.title) === 'trade' ? 2 : 0) + (i.desc ? 1 : 0) + Date.parse(i.at || 0) / 864e5 / 100 }))
           .sort((a, b) => b.s - a.s);
         const b = good[0] && good[0].i;
-        if (b) out[x.n] = { title: b.title, desc: clip(b.desc, 700), url: b.url, outlet: b.outlet, at: b.at, img: b.img || null };
+        if (b) out[x.n] = { title: b.title, desc: clip(b.desc, 700), url: b.url, outlet: b.outlet, at: b.at, img: b.img || null, pay: !!b.pay };
       } catch { }
     }));
     const v = { updated: new Date().toISOString(), items: out };
@@ -314,11 +333,11 @@ export default async function handler(req, res) {
       try { const txt = await getText(s.url, 5 * 60e3); return s.kind === 'espn' ? parseESPN(txt) : parseRSS(txt, s.src); } catch { return []; }
     }));
     const cutoff = Date.now() - 7 * 864e5, out = [];
-    for (const i of got.flat().sort((a, b) => (!!b.desc - !!a.desc) || ((RANK[a.src] ?? 5) - (RANK[b.src] ?? 5)))) {
-      if (!i.title || !i.url || (i.at && Date.parse(i.at) < cutoff) || FLUFF.test(i.title) || RUMOR.test(i.title)) continue;
+    for (const i of got.flat().sort((a, b) => (!!a.pay - !!b.pay) || (!!b.desc - !!a.desc) || ((RANK[a.src] ?? 5) - (RANK[b.src] ?? 5)))) {
+      if (!i.title || !i.url || (i.at && Date.parse(i.at) < cutoff) || FLUFF.test(i.title) || RUMOR.test(i.title) || (i.pay && !payWorth(i))) continue;
       const kind = moveOf(i.title) || moveOf(i.desc.slice(0, 260)); if (!kind) continue;
       if (out.some(o => similar(o.title, i.title, new Set()))) continue;
-      out.push({ kind, title: i.title, desc: clip(i.desc, 700), url: i.url, outlet: i.outlet, at: i.at, img: i.img || null, athletes: i.athletes || [] });
+      out.push({ kind, title: i.title, desc: clip(i.desc, 700), url: i.url, outlet: i.outlet, at: i.at, img: i.img || null, athletes: i.athletes || [], pay: !!i.pay });
     }
     out.sort((a, b) => Date.parse(b.at || 0) - Date.parse(a.at || 0));
     const v = { updated: new Date().toISOString(), items: out.slice(0, 80) };
@@ -338,7 +357,7 @@ export default async function handler(req, res) {
   const ai = await summarize(name, team, pos, items);
   let out = items.map((x, i) => {
     const a = ai && ai.find(z => z && z.i === i);
-    return { title: (a && a.title) || x.title, summary: (a && a.summary) || clip(x.desc, 260), headline: x.title, outlet: x.outlet, also: x.also.slice(0, 3), url: x.url, at: x.at, relevant: a ? a.relevant !== false : true, ai: !!a };
+    return { title: (a && a.title) || x.title, summary: (a && a.summary) || clip(x.desc, 260), headline: x.title, outlet: x.outlet, also: x.also.slice(0, 3), url: x.pay ? null : x.url, pay: !!x.pay, at: x.at, relevant: a ? a.relevant !== false : true, ai: !!a };
   }).filter(x => x.relevant);
   const v = { name, updated: new Date().toISOString(), ai: !!ai, items: out.slice(0, 4) };
   if (!ai && items.length) { v.aiError = LAST_ERR; }

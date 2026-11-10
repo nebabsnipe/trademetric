@@ -2416,7 +2416,7 @@ function newsHtml(id){const n=NEWS[id];
   if(n.error)return `<p class="note">News couldn't load right now. <button class="linkish" data-news-retry="${id}">Try again</button></p>`;
   if(!n.items.length)return `<p class="note">No recent news stories about ${esc(byId[id].n)} in the last three weeks.</p>`;
   return `<div class="nws">${n.items.slice(0,4).map(x=>`<article class="nw"><h5>${esc(x.title)}</h5>${x.summary?`<p>${esc(x.summary)}</p>`:''}
-    <div class="nw-meta"><span>${esc(x.outlet)}${x.also&&x.also.length?` <span class="note">+ ${x.also.length} more</span>`:''}</span>${x.at?`<span>${ago(x.at)}</span>`:''}${x.url?`<a href="${esc(x.url)}" target="_blank" rel="noopener">Read story ↗</a>`:''}</div></article>`).join('')}</div>
+    <div class="nw-meta"><span>${esc(x.outlet)}${x.also&&x.also.length?` <span class="note">+ ${x.also.length} more</span>`:''}</span>${x.at?`<span>${ago(x.at)}</span>`:''}${x.url?`<a href="${esc(x.url)}" target="_blank" rel="noopener">Read story ↗</a>`:x.pay?'<span class="note">Subscribers only, so the key facts are here</span>':''}</div></article>`).join('')}</div>
     ${howLink('news')}`}
 async function loadNews(id){const p=byId[id];if(!p||p.pos==='DST')return;const c=NEWS[id];if(c&&!c.error&&(c.loading||Date.now()-c.at<20*60e3))return;
   NEWS[id]={loading:true};const paint=()=>{if(openId===id){const el=$('card-news');if(el)el.innerHTML=newsHtml(id)}};paint();
