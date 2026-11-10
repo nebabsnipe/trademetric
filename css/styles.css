@@ -1787,3 +1787,49 @@ a.tmn-own.fa{background:var(--accent-soft);color:var(--accent)}a.tmn-own.fa:hove
   .tmn-ev-rail time{font-size:10.5px}
 }
 @media (prefers-reduced-motion:reduce){.tmn-rays,.tmn-top::after,.tmn-conf{animation:none!important;display:none}.tmn-medal,.tmn-ban.top.in .tmn-top-av{animation:none!important}}
+/* ---- News round 3 ---- */
+:root{--silver:#7D8590;--silver-soft:#EEF0F3;--silver-line:#D2D7DD;--silver-hi:#FFFFFF}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--silver:#AEB6BF;--silver-soft:#181B1F;--silver-line:#2F343A;--silver-hi:#2A2F35}}
+:root[data-theme="dark"]{--silver:#AEB6BF;--silver-soft:#181B1F;--silver-line:#2F343A;--silver-hi:#2A2F35}
+/* the pinned #1 card: compact, so it sits on the page instead of taking it over */
+.tmn-top{gap:16px;padding:14px 20px 14px 16px;border-radius:16px;box-shadow:0 12px 30px -16px rgba(255,80,10,.65),inset 0 0 0 1px rgba(255,255,255,.18)}
+.tmn-top-av{width:62px;height:62px}.tmn-top-av .av.lg{width:54px;height:54px}
+.tmn-top .tmn-rays{inset:-22px}
+.tmn-top .tmn-medal{width:26px;height:26px;font-size:11px;right:-6px;bottom:-5px}
+.tmn-top-glow{left:-50px;width:180px;height:180px;margin-top:-90px}
+.tmn-top-k{font-size:10px;padding:3px 8px}
+.tmn-top h3{margin:6px 0 3px;font-size:19px}
+.tmn-top p{font-size:12.5px}
+.tmn-top .tmn-lgs{margin-top:6px}
+.tmn-top-pts b{font-size:32px}.tmn-top-pts small{font-size:10px}
+.tmn-tops{gap:10px}
+@media (max-width:600px){
+  .tmn-top{grid-template-columns:auto minmax(0,1fr);gap:12px;padding:12px 14px}
+  .tmn-top-av{width:52px;height:52px}.tmn-top-av .av.lg{width:46px;height:46px}.tmn-top .tmn-rays{inset:-18px}
+  .tmn-top h3{font-size:16px}.tmn-top-pts b{font-size:24px}
+}
+/* #1 and #2 in the timeline */
+.tone-silver{--tone:var(--silver);--tone-soft:var(--silver-soft)}
+.tmn-lbl.silver{background:linear-gradient(90deg,var(--silver-soft),var(--silver-hi));color:var(--silver);box-shadow:inset 0 0 0 1px var(--silver-line)}
+.tmn-rank.tmn-n2 .tmn-ev-card{border-color:var(--silver-line);background:linear-gradient(125deg,var(--silver-soft) 0%,var(--surface) 55%)}
+.tmn-rank.tmn-n2 .tmn-ev-card::before{background:linear-gradient(180deg,#C9CFD6,#8C949E)}
+.tmn-rank.tmn-n1 .tmn-ev-card{border-color:color-mix(in srgb,#FF5A14 30%,var(--line));background:linear-gradient(125deg,color-mix(in srgb,#FF5A14 9%,var(--surface)) 0%,var(--surface) 55%)}
+.tmn-rank.tmn-n1 .tmn-ev-card::before{background:linear-gradient(180deg,#FF9A1F,#E5430C)}
+.tmn-rank-av{position:relative}
+.tmn-rmedal{position:absolute;right:-6px;bottom:-4px;display:grid;place-items:center;width:20px;height:20px;border-radius:50%;font:italic 900 10.5px var(--f-display);box-shadow:0 0 0 2px var(--surface)}
+.tmn-rank.tmn-n2 .tmn-rmedal{background:linear-gradient(135deg,#F5F7F9,#AEB6BF);color:#3F4650}
+.tmn-rank.tmn-n1 .tmn-rmedal{background:linear-gradient(135deg,#FFB238,#FF5A14);color:#fff}
+.tmn-rank.tmn-n2 .tmn-ev-pts{color:var(--silver)}
+/* big plays and achievements: a tinted edge, a ring and a bolt, nothing louder */
+.tmn-ev.is-play .tmn-ev-card{border-color:color-mix(in srgb,var(--tone) 24%,var(--line));background:linear-gradient(100deg,color-mix(in srgb,var(--tone) 6%,var(--surface)) 0%,var(--surface) 42%)}
+.tmn-ev.is-play .tmn-ev-card::before{width:4px}
+.tmn-ev.is-play .tmn-b-av{position:relative}
+.tmn-ev.is-play .tmn-b-av .av{box-shadow:0 0 0 2px var(--surface),0 0 0 3.5px color-mix(in srgb,var(--tone) 60%,transparent)}
+.tmn-bolt{position:absolute;right:-5px;bottom:-4px;display:grid;place-items:center;width:18px;height:18px;border-radius:50%;background:var(--tone);color:#fff;box-shadow:0 0 0 2px var(--surface)}
+.tmn-bolt svg{width:11px;height:11px;fill:currentColor}
+.tmn-ev.is-play .tmn-ev-rail::after{box-shadow:0 0 0 3px var(--bg),0 0 0 5px var(--tone-soft)}
+/* story recaps */
+.tmn-pts{margin:6px 0 0;padding:0;list-style:none;display:flex;flex-direction:column;gap:4px}
+.tmn-pts li{position:relative;padding-left:14px;font-size:13px;line-height:1.4;color:var(--ink);opacity:.86}
+.tmn-pts li::before{content:"";position:absolute;left:2px;top:.55em;width:5px;height:5px;border-radius:50%;background:var(--tone,var(--muted))}
+.tmn-story.recap h3{font-size:15.5px}

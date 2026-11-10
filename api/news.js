@@ -171,11 +171,63 @@ function kindOf(x) {
   return null;
 }
 
+/* Recaps for the News tab: the story's biggest takeaway as the title, plus a few key points, so the card is worth
+   reading without clicking through. One Claude call per batch of up to 12 stories, cached per story URL. */
+const RECAPS = new Map();
+async function recapBatch(list) {
+  const body = list.map((x, i) => `[${i}] Player: ${x.n} (${x.pos || '?'}, ${x.t || '?'}) · ${x.outlet || 'unknown outlet'}\nHeadline: ${x.title}\nText: ${x.desc || '(headline only)'}`).join('\n\n');
+  const prompt = `You write the news feed of a fantasy football app. For each story below, write a recap so a fantasy manager gets the news at face value without opening the article.
+
+- "title": the single biggest takeaway as a plain statement, under 80 characters (for example "Ruled out Sunday with a high ankle sprain; Week 12 return possible" or "Out-snapped Johnson 41-22 and got 9 of 11 red-zone touches"). No clickbait, no questions, no outlet names.
+- "points": 1 to 3 short bullet points, each under 95 characters, with the other key facts: numbers, injury details, practice status, timelines, who is affected. The last point may be the fantasy takeaway, but only when it follows directly from the facts given. If the story is only a headline with no text, return just one point or an empty array; never add anything the headline and text do not say.
+
+Use only facts in the headline and text. Reply with only a JSON array like [{"i":0,"title":"...","points":["...","..."]}].
+
+${body}`;
+  const ctl = new AbortController(); const t = setTimeout(() => ctl.abort(), 25000);
+  try {
+    const r = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST', signal: ctl.signal,
+      headers: { 'content-type': 'application/json', 'x-api-key': API_KEY, 'anthropic-version': '2023-06-01' },
+      body: JSON.stringify({ model: MODEL, max_tokens: 2500, thinking: { type: 'disabled' }, messages: [{ role: 'user', content: prompt }] }),
+    });
+    if (!r.ok) { LAST_ERR = 'HTTP ' + r.status; return null; }
+    const j = await r.json(); const arr = parseJSON((j.content || []).map(c => c.text || '').join(''));
+    return Array.isArray(arr) ? arr : null;
+  } catch (e) { LAST_ERR = String(e && e.message || e).slice(0, 150); return null; } finally { clearTimeout(t); }
+}
+const cleanLine = (s, n) => String(s || '').replace(/\s+/g, ' ').trim().slice(0, n);
+async function recapAll(items) {
+  const out = {}, todo = [];
+  items.forEach(x => { const c = RECAPS.get(x.u); if (c && Date.now() - c.at < 7 * 864e5) out[x.u] = c.v; else todo.push(x); });
+  if (todo.length && API_KEY) {
+    const chunks = []; for (let i = 0; i < todo.length; i += 12) chunks.push(todo.slice(i, i + 12));
+    await Promise.all(chunks.map(async ch => {
+      const arr = await recapBatch(ch); if (!arr) return;
+      arr.forEach(a => { const x = a && ch[a.i]; if (!x || !a.title) return;
+        const v = { t: cleanLine(a.title, 110), pts: (Array.isArray(a.points) ? a.points : []).map(p => cleanLine(p, 140)).filter(Boolean).slice(0, 3) };
+        RECAPS.set(x.u, { at: Date.now(), v }); out[x.u] = v; });
+    }));
+    if (RECAPS.size > 3000) [...RECAPS.keys()].slice(0, 1000).forEach(k => RECAPS.delete(k));
+  }
+  return out;
+}
+
 const clip = (s, n) => { s = String(s || ''); if (s.length <= n) return s; const c = s.slice(0, n); const k = Math.max(c.lastIndexOf('. '), c.lastIndexOf(' ')); return c.slice(0, k > n * .6 ? k + 1 : n).trim() + '…'; };
 const cache = new Map();
 
 export default async function handler(req, res) {
   const q = req.query || {};
+  /* recap mode for the News tab: POST {items:[{u,n,pos,t,title,desc,outlet}]} -> {items:{[url]:{t,pts}}} */
+  if (req.method === 'POST' && q.recap) {
+    if (!API_KEY) return res.status(200).json({ ai: false, items: {} });
+    const raw = (req.body && Array.isArray(req.body.items)) ? req.body.items : [];
+    const items = raw.slice(0, 30).filter(x => x && typeof x.u === 'string' && /^https?:/.test(x.u) && x.title).map(x => ({
+      u: x.u.slice(0, 600), n: cleanLine(x.n, 60), pos: cleanLine(x.pos, 4), t: cleanLine(x.t, 4),
+      title: cleanLine(x.title, 220), desc: cleanLine(x.desc, 900), outlet: cleanLine(x.outlet, 60) }));
+    const v = await recapAll(items);
+    return res.status(200).json({ ai: true, items: v, err: Object.keys(v).length < items.length ? LAST_ERR : undefined });
+  }
   const name = String(q.name || '').slice(0, 60), team = String(q.team || '').toUpperCase().slice(0, 4), pos = String(q.pos || '').slice(0, 4);
   /* batch mode for the AI Helper: raw headlines for many players at once, no AI summaries (so no cost).
      GET /api/news?batch=Name|TEAM;Name|TEAM  (first 6 also search Google News) */
@@ -204,7 +256,7 @@ export default async function handler(req, res) {
       try {
         const { items } = await collect(x.n, x.t, false, !google, x.inj ? 'inj' : 'role', 10);
         return items.map(i => ({ ...i, kind: kindOf(i) })).filter(i => i.kind).slice(0, 5).map(i => ({
-          n: x.n, kind: i.kind, title: i.title, desc: clip(i.desc, 240), url: i.url, outlet: i.outlet, also: i.also.slice(0, 3),
+          n: x.n, kind: i.kind, title: i.title, desc: clip(i.desc, 700), url: i.url, outlet: i.outlet, also: i.also.slice(0, 3),
           at: i.at, img: i.img || null, video: !!i.video,
         }));
       } catch { return []; }

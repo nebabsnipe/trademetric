@@ -110,11 +110,12 @@ const TMN_COPY={
   opp:['{opp}\'s {last} rips off {y}. Hang in there.','Their {p} hits one for {y}.','{last} just gained {y} for {opp}.'],
   oppTd:['{opp}\'s {p} scores. Time to answer.','Touchdown against you. {p} for {opp}.','{last} finds the end zone for {opp}.'],
   top:['{p} was the best {posn} in football in Week {w}.','Nobody at {posn} outscored {last} in Week {w}.','The #1 {posn} of Week {w} is on your team: {p}.','{last} topped every {posn} in the NFL with {pts} points.','Week {w}\'s top {posn}? {p}. {pts} points.'],
+  second:['{p} finished second among every {posn} in football in Week {w}.','Only one {posn} outscored {last} in Week {w}.','#2 {posn} in the NFL in Week {w}: {p}, {pts} points.','{last} was the second-best {posn} of Week {w} with {pts}.'],
   topAll:['{p} outscored everyone in the NFL in Week {w}.','The top scorer in all of football in Week {w}: {p}, with {pts}.','No one in the league touched {last} in Week {w}. {pts} points, #1 overall.'],
 };
 const TMN_LBL={clinch:['Clincher','gold'],clinch0:['Clincher','gold'],swing:['Lead change','good'],longtd:['Long touchdown','good'],td:['Touchdown','good'],td2:['Second TD','good'],td3:['Hat trick','good'],tdN:['Touchdown','good'],
   bigrun:['Breakaway','accent'],run:['Big run','accent'],catch:['Deep ball','accent'],game:['Going off','accent'],gameX:['Going off','accent'],oinj:['Opponent hurt','warn'],myinj:['New injury','bad'],myworse:['Downgraded','bad'],mybetter:['Upgraded','good'],myclear:['Cleared','good'],opp:['Against you','muted'],oppTd:['Against you','muted'],
-  top:['#1 at his position','top'],topAll:['#1 in the NFL','top'],res:['Final','muted']};
+  top:['#1 at his position','top'],second:['#2 at his position','silver'],topAll:['#1 in the NFL','top'],res:['Final','muted']};
 function tmnHash(s){let h=0;for(let i=0;i<s.length;i++)h=(h*31+s.charCodeAt(i))|0;return Math.abs(h)}
 const TMN_Q=['','in the 1st','in the 2nd','in the 3rd','in the 4th','in overtime'];
 /* pick a template this play has every detail for, skipping ones used recently for this type */
@@ -288,41 +289,59 @@ function tmnResults(Ls,fresh,at){Ls.forEach(c=>{const o=c.opp;if(!o||!o.final)re
    gets it on their next visit (fetched from /api/live for last week). */
 const TMN_TOP_LS='tm-news-top-v1';
 function tmnTop(){if(TMN.top)return TMN.top;try{TMN.top=JSON.parse(localStorage.getItem(TMN_TOP_LS)||'null')}catch(e){}TMN.top=TMN.top||{done:[],items:[]};return TMN.top}
-function tmnTopSave(){const T=tmnTop();T.done=T.done.slice(-8);T.items=T.items.slice(0,12);try{localStorage.setItem(TMN_TOP_LS,JSON.stringify(T))}catch(e){}}
+function tmnTopSave(){const T=tmnTop();T.done=T.done.slice(-8);T.done2=(T.done2||[]).slice(-8);T.items=T.items.slice(0,30);try{localStorage.setItem(TMN_TOP_LS,JSON.stringify(T))}catch(e){}}
 const tmnPosN=pos=>pos==='DST'?'defense':pos==='K'?'kicker':pos||'';
-function tmnTopFind(week,stats,games,Ls,fresh,live){const T=tmnTop();if(T.done.includes(week)||!Ls.length||(typeof USER!=='undefined'&&!USER))return;
+const TMN_TOP_HOLD=48*3600e3;   /* the #1 card stays pinned at the top of the Feed this long, then scrolls with the rest */
+const TMN_SEC_POS=['QB','RB','WR','TE'];
+function tmnTopFind(week,stats,games,Ls,fresh,live){const T=tmnTop();T.done2=T.done2||[];
+  const do1=!T.done.includes(week),do2=!T.done2.includes(week);
+  if((!do1&&!do2)||!Ls.length||(typeof USER!=='undefined'&&!USER))return;
   const gs=Object.values(games||{});if(!gs.length||!gs.every(g=>g.state==='post'))return;
-  const found={};
+  const found={},sec={};
   Ls.forEach(c=>{const by={};Object.keys(stats||{}).forEach(id=>{const p=byId[id];if(!p||!stats[id])return;let pts=0;try{pts=linePts(stats[id],p.pos,c.sc)}catch(e){}(by[p.pos]=by[p.pos]||[]).push({id,pts})});
     let best=null;
     Object.entries(by).forEach(([pos,L])=>{L.sort((a,b)=>b.pts-a.pts);const a=L[0],b=L[1];if(!a||a.pts<=0)return;if(!best||a.pts>best.pts)best={...a,pos};
+      const lg={key:c.key,name:c.name,st:live?c.starters.has(a.id):true,bench:false};
+      /* #2 at QB, RB, WR or TE on one of your rosters: a silver card in the Feed, no banner */
+      if(b&&b.pts>0&&TMN_SEC_POS.includes(pos)&&c.roster.has(b.id)){const y=sec[b.id]=sec[b.id]||{id:b.id,pos,pts:b.pts,first:a.id,gap:a.pts-b.pts,leagues:[]};
+        y.leagues.push({...lg,st:live?c.starters.has(b.id):true,bench:live?!c.starters.has(b.id):false})}
       if(!c.roster.has(a.id))return;
       const x=found[a.id]=found[a.id]||{id:a.id,pos,pts:a.pts,second:b?b.id:null,gap:b?a.pts-b.pts:a.pts,leagues:[],overall:false};
-      x.leagues.push({key:c.key,name:c.name,st:live?c.starters.has(a.id):true,bench:live?!c.starters.has(a.id):false})});
+      x.leagues.push({...lg,bench:live?!c.starters.has(a.id):false})});
     if(best&&found[best.id]&&found[best.id].leagues.some(l=>l.key===c.key))found[best.id].overall=true});
-  T.done.push(week);const at=Date.now();
+  /* when the week ended: the last kickoff plus a game's length (never in the future) */
+  const lastKick=Math.max(0,...gs.map(g=>Date.parse(g.start||g.date||0)||0)),at=lastKick?Math.min(Date.now(),lastKick+3.4*3600e3):Date.now();
   /* a banner while it's news: right after the week ends, or before the next week's games start */
   const quiet=!live&&LIVE&&LIVE.week===WEEK&&Object.values(LIVE.games||{}).some(g=>g.state!=='pre');
-  Object.values(found).forEach(x=>{const p=byId[x.id],k='top:'+week+':'+x.id,cls=x.overall?'topAll':'top',sec=x.second&&byId[x.second];
-    const ev={k,type:'top',cls,pid:x.id,pos:x.pos,pts:x.pts,gap:x.gap,second:x.second,overall:x.overall,week,leagues:x.leagues,at,quiet,
-      sub:[sec?`${f1(x.gap)} ahead of ${sec.n}`:'',statLineTxt(x.pos,stats[x.id])].filter(Boolean).join(' · '),
-      head:tmnHead(cls,k,tmnVars(p,null,{posn:tmnPosN(x.pos),w:week,pts:tmnN(x.pts),...(x.pos==='DST'?{last:p.n}:{})}))};
-    if(!T.items.some(e=>e.k===k))T.items.unshift(ev)});
-  tmnTopSave();tmnTopBanners()}
+  if(do1){T.done.push(week);
+    Object.values(found).forEach(x=>{const p=byId[x.id],k='top:'+week+':'+x.id,cls=x.overall?'topAll':'top',sec=x.second&&byId[x.second];
+      const ev={k,type:'top',cls,pid:x.id,pos:x.pos,pts:x.pts,gap:x.gap,second:x.second,overall:x.overall,week,leagues:x.leagues,at,quiet,
+        sub:[sec?`${f1(x.gap)} ahead of ${sec.n}`:'',statLineTxt(x.pos,stats[x.id])].filter(Boolean).join(' · '),
+        head:tmnHead(cls,k,tmnVars(p,null,{posn:tmnPosN(x.pos),w:week,pts:tmnN(x.pts),...(x.pos==='DST'?{last:p.n}:{})}))};
+      if(!T.items.some(e=>e.k===k))T.items.unshift(ev)})}
+  if(do2){T.done2.push(week);
+    Object.values(sec).forEach(x=>{const p=byId[x.id],k='second:'+week+':'+x.id,one=byId[x.first];
+      const ev={k,type:'second',cls:'second',pid:x.id,pos:x.pos,pts:x.pts,gap:x.gap,first:x.first,week,leagues:x.leagues,at,shown:true,quiet:true,
+        sub:[one?`${f1(x.gap)} behind ${one.n}`:'',statLineTxt(x.pos,stats[x.id])].filter(Boolean).join(' · '),
+        head:tmnHead('second',k,tmnVars(p,null,{posn:tmnPosN(x.pos),w:week,pts:tmnN(x.pts)}))};
+      if(!T.items.some(e=>e.k===k))T.items.unshift(ev)})}
+  tmnTopSave();if(do1)tmnTopBanners();else if(tab==='news'&&$('tmn-feed'))tmnRenderBody()}
 /* pop each #1 banner once, as soon as someone is signed in to see it (the week can end before sign-in finishes loading) */
 function tmnTopBanners(){if(typeof USER!=='undefined'&&!USER)return;const T=tmnTop();
   /* one big banner (the overall #1, else the biggest score); any other #1s that week go straight to corner chips */
-  const L=T.items.filter(e=>!e.shown).sort((a,b)=>(b.overall-a.overall)||(b.pts-a.pts)),n=L.length;
+  const L=T.items.filter(e=>!e.shown&&e.type==='top').sort((a,b)=>(b.overall-a.overall)||(b.pts-a.pts)),n=L.length;
   L.forEach((e,i)=>{e.shown=true;if(e.quiet||e.week<WEEK-1||!tmnShould(e))return;if(i===0)tmnQueue(e,true);else{TMN.unread++;tmnChip(e)}});
   if(n){tmnTopSave();tmnPump();if(typeof renderAlerts==='function')renderAlerts();if(tab==='news'&&$('tmn-feed'))tmnRenderBody()}}
-async function tmnTopCatchUp(Ls){const w=WEEK-1,T=tmnTop();if((typeof USER!=='undefined'&&!USER)||w<1||T.done.includes(w)||TMN.topBusy||Date.now()-(TMN.topAt||0)<10*60e3)return;
+async function tmnTopCatchUp(Ls){const w=WEEK-1,T=tmnTop();if((typeof USER!=='undefined'&&!USER)||w<1||(T.done.includes(w)&&(T.done2||[]).includes(w))||TMN.topBusy||Date.now()-(TMN.topAt||0)<10*60e3)return;
   Ls=Ls||tmnLeagues();if(!Ls.length)return;TMN.topBusy=true;TMN.topAt=Date.now();
   try{const r=await fetch('/api/live?week='+w+'&b='+Math.floor(Date.now()/600000));const j=r.ok?await r.json():null;
     if(j&&j.week===w&&j.games&&Array.isArray(j.players)){const st={};j.players.forEach(x=>{const p=x.pos==='DST'?byId['dst-'+String(x.t).toLowerCase()]:findExact(x.n);if(p&&p.pos===x.pos)st[p.id]=x.s});
       tmnTopFind(w,st,j.games,Ls,null,false)}}catch(e){}
   TMN.topBusy=false}
 /* the most recent week anyone of yours topped his position */
-function tmnTopNow(){const T=tmnTop();const wk=Math.max(0,...T.items.map(e=>e.week));return wk>=WEEK-1?T.items.filter(e=>e.week===wk):[]}
+function tmnTopNow(){return tmnTop().items.filter(e=>e.type==='top'&&Date.now()-(e.at||0)<TMN_TOP_HOLD)}
+/* older #1s and every #2 sit in the timeline with everything else (last 10 days) */
+function tmnRankFeed(){const cut=Date.now()-10*864e5;return tmnTop().items.filter(e=>(e.type==='second'||(e.type==='top'&&Date.now()-(e.at||0)>=TMN_TOP_HOLD))&&(e.at||0)>cut)}
 function tmnConfetti(){return `<span class="tmn-conf" aria-hidden="true">${Array.from({length:18},(_,i)=>`<i style="--i:${i}"></i>`).join('')}</span>`}
 
 /* ---------- articles and videos about your players ----------
@@ -353,7 +372,7 @@ function tmnStories(Ls){const ids=[];Ls.forEach(c=>{if(TMN.lg!=='all'&&c.key!==T
   const add=x=>{if(!x.pid||!x.kind||!x.at||x.at<cut||!x.url)return;const tk=norm(x.title).slice(0,70);if(seen.has(x.url)||seen.has(tk))return;seen.add(x.url);seen.add(tk);out.push(x)};
   (TMN.art&&TMN.art.items||[]).forEach(a=>add({type:a.video?'vid':'art',kind:a.kind,pid:byName[norm(a.n)],title:a.title,desc:a.desc,url:a.url,outlet:a.outlet,also:a.also||[],img:a.img,at:Date.parse(a.at||0)}));
   if(typeof FEED!=='undefined'&&FEED){
-    (FEED.news||[]).forEach(a=>{const pid=who(a.title+' '+(a.desc||''),a.athletes);add({type:a.type==='Media'?'vid':'art',kind:tmnKind(a.title,a.desc),pid,title:a.title,desc:a.desc&&a.desc!==a.title?a.desc.slice(0,240):'',url:a.url,outlet:'ESPN',also:[],img:a.img,at:Date.parse(a.at||0)})});
+    (FEED.news||[]).forEach(a=>{const pid=who(a.title+' '+(a.desc||''),a.athletes);add({type:a.type==='Media'?'vid':'art',kind:tmnKind(a.title,a.desc),pid,title:a.title,desc:a.desc&&a.desc!==a.title?a.desc.slice(0,700):'',url:a.url,outlet:'ESPN',also:[],img:a.img,at:Date.parse(a.at||0)})});
     /* injury and role videos: coach and team updates on the NFL's and teams' channels, ESPN segments (not play clips) */
     (FEED.videos||[]).forEach(v=>{const pid=who(v.title,v.athletes);if(!pid)return;const k=tmnKind(v.title,'');if(!k)return;
       add({type:'vid',kind:k,pid,title:v.title,desc:'',url:v.url,outlet:v.src==='espn'?'ESPN':chName(v)+' on YouTube',also:[],img:v.thumb,at:Date.parse(v.at||0),dur:v.dur})})}
@@ -414,7 +433,7 @@ function tmnRenderBody(Ls){const el=$('tmn-feed');if(!el)return;Ls=Ls||tmnLeague
   const cnt={all:0,big:evs.length,inj:injList.length,clips:clipsAll.length};
   const seg=$('tmn-seg');if(seg)seg.innerHTML=TMN_F.map(([k,l])=>`<button type="button" data-nf="${k}" aria-pressed="${f===k}">${l}${cnt[k]?` <span class="tmn-n">${cnt[k]}</span>`:''}</button>`).join('');
   const sec=(id,title,note,html)=>html?`<section class="tmn-sec" data-sec="${id}"><div class="tmn-sec-h"><h2>${title}</h2>${note?`<span class="note">${note}</span>`:''}</div>${html}</section>`:'';
-  const card=e=>e.type==='res'?tmnResultCard(e):e.type==='art'||e.type==='vid'?tmnStoryCard(e):tmnEvCard(e,CM.map.get(e.k));
+  const card=e=>e.type==='second'||e.type==='top'?tmnRankCard(e):e.type==='res'?tmnResultCard(e):e.type==='art'||e.type==='vid'?tmnStoryCard(e):tmnEvCard(e,CM.map.get(e.k));
   const tl=list=>list.length?`<ol class="tmn-tl">${tmnGroups(list).map(g=>`<li class="tmn-day"><span>${g.label}</span></li>${g.items.map(e=>`<li>${card(e)}</li>`).join('')}`).join('')}</ol>`:'';
   let html='';
   if(f==='big')html=sec('big','Big plays',evs.length?'Newest first':'',tl(evs));
@@ -423,7 +442,7 @@ function tmnRenderBody(Ls){const el=$('tmn-feed');if(!el)return;Ls=Ls||tmnLeague
       +sec('inj','Your injured players',injList.length?'Every league, starters and bench':'',injList.length?`<div class="tmn-injg">${injList.map(x=>tmnInjCard(x,tmnStoriesFor(x.id,arts))).join('')}</div>`:'')
       +sec('opp','Injury opportunities',opps.length?`Who gets the work while they're out${Ls.length>1?` · ownership in ${esc(S.league&&S.league.name||'this league')}`:''}`:'',opps.length?`<div class="tmn-opg">${opps.map(x=>tmnOppCard(x,Ls)).join('')}</div>`:'')}
   else if(f==='clips')html=sec('clips','Clips',clipsAll.length?`${CM.map.size} matched to a play · opens on ESPN or YouTube`:'',tmnClipsGrid(clipsAll,CM));
-  else{const all=[...evs,...injUp,...res,...picked].sort((a,b)=>tmnAt(b)-tmnAt(a));
+  else{const all=[...evs,...injUp,...res,...picked,...tmnRankFeed().filter(e=>inLg(e.leagues))].sort((a,b)=>tmnAt(b)-tmnAt(a));tmnLoadRecaps(picked);
     /* the biggest #1 gets the full card; any others this week sit in a row of smaller orange cards under it */
     const tp=[...tops].sort((a,b)=>(b.overall-a.overall)||(b.pts-a.pts));
     html=(tp.length?`<div class="tmn-tops">${tmnTopCard(tp[0])}${tp.length>1?`<div class="tmn-tops-more">${tp.slice(1).map(tmnTopMini).join('')}</div>`:''}</div>`:'')+tl(all)
@@ -456,20 +475,42 @@ function tmnEvCard(e,clip,old){const [lbl,tone]=TMN_LBL[e.cls]||['News','accent'
     const rest=!old&&LIVEST[e.pid]?[statLineTxt(p.pos,LIVEST[e.pid]),tmnVs(gm)].filter(Boolean).join(' · '):sub.replace(/^Scored [\d.]+ over projected( · )?/,'');
     sub=[pr!=null?tmnOver(pts,pr):'',rest].filter(Boolean).join(' · ')}
   const ptsShow=big&&now!=null&&now>e.pts?now:e.pts;
-  return `<article class="tmn-ev tone-${tone}${e.type==='opp'?' their':''}${e.type==='clinch'?' clinch':''}${v?' has-vid':''}${p?' tap':''}" data-nkf="${esc(e.k)}"${p?` data-ncard="${p.id}"`:e.type==='clinch'||e.type==='swing'?` data-nres="${esc(e.lkey||'')}"`:''}>
+  return `<article class="tmn-ev tone-${tone}${e.type==='play'?' is-play':''}${e.type==='opp'?' their':''}${e.type==='clinch'?' clinch':''}${v?' has-vid':''}${p?' tap':''}" data-nkf="${esc(e.k)}"${p?` data-ncard="${p.id}"`:e.type==='clinch'||e.type==='swing'?` data-nres="${esc(e.lkey||'')}"`:''}>
     ${tmnRail(tmnAt(e),e.q?`Q${e.q}${e.sub&&/Q\d (\S+)/.test(e.sub)?' '+e.sub.match(/Q\d (\S+)/)[1]:''}`:'')}
     <div class="tmn-ev-card"><div class="tmn-ev-top"><span class="tmn-lbl ${tone}">${lbl}</span>${showPts?`<b class="tmn-ev-pts num">${big?'':'+'}${f1(ptsShow)}<small>${big?' pts total':' pts'}</small></b>`:''}</div>
-      <div class="tmn-ev-main"><div class="tmn-b-av">${p?av(p):`<span class="tmn-seal">W</span>`}</div><div class="tmn-ev-txt"><h3>${esc(e.head)}</h3>${sub?`<p>${esc(sub)}</p>`:''}${lg?`<div class="tmn-lgs">${lg}</div>`:''}</div>${v}</div>
+      <div class="tmn-ev-main"><div class="tmn-b-av">${p?av(p):`<span class="tmn-seal">W</span>`}${e.type==='play'?TMN_BOLT:''}</div><div class="tmn-ev-txt"><h3>${esc(e.head)}</h3>${sub?`<p>${esc(sub)}</p>`:''}${lg?`<div class="tmn-lgs">${lg}</div>`:''}</div>${v}</div>
       <div class="tmn-ev-f">${totH}${p?`<span class="tmn-go">Player card →</span>`:''}${e.txt?`<span class="tmn-txt" title="${esc(e.txt)}">${esc(e.txt)}</span>`:''}</div></div></article>`}
+const TMN_BOLT='<i class="tmn-bolt" aria-hidden="true"><svg viewBox="0 0 16 16"><path d="M9.6 1 3.5 9.1h3.9L6.4 15l6.1-8.1H8.6z"/></svg></i>';
+/* #1 (after its 48 hours pinned) and #2 at a position, in the timeline: orange for #1, silver for #2 */
+function tmnRankCard(e){const p=byId[e.pid];if(!p)return '';const one=e.type==='top',posn=tmnPosN(e.pos);
+  const lbl=one?(e.overall?'#1 in the NFL':`#1 ${posn}`):`#2 ${posn}`;
+  return `<article class="tmn-ev tmn-rank ${one?'tmn-n1 tone-top':'tmn-n2 tone-silver'} tap" data-ncard="${p.id}" data-nkf="${esc(e.k)}" tabindex="0">${tmnRail(tmnAt(e),'Week '+e.week)}
+    <div class="tmn-ev-card"><div class="tmn-ev-top"><span class="tmn-lbl ${one?'top':'silver'}">${esc(lbl)} · Week ${e.week}</span><b class="tmn-ev-pts num">${f1(e.pts)}<small> pts</small></b></div>
+      <div class="tmn-ev-main"><div class="tmn-b-av tmn-rank-av">${av(p)}<span class="tmn-rmedal">${one?1:2}</span></div><div class="tmn-ev-txt"><h3>${esc(e.head)}</h3>${e.sub?`<p>${esc(e.sub)}</p>`:''}
+        <div class="tmn-lgs">${(e.leagues||[]).map(l=>`<span class="tmn-lchip${l.bench?' bench':''}">${esc(l.name)}${l.bench?' · bench':''}</span>`).join('')}</div></div></div>
+      <div class="tmn-ev-f"><span class="tmn-go">Player card →</span></div></div></article>`}
+/* recaps: each story's biggest takeaway as its title plus a few key points, written once per story by /api/news */
+const TMN_RC_LS='tm-news-recap-v1';
+function tmnRecaps(){if(TMN.rc)return TMN.rc;try{TMN.rc=JSON.parse(localStorage.getItem(TMN_RC_LS)||'null')}catch(e){}TMN.rc=TMN.rc||{};return TMN.rc}
+async function tmnLoadRecaps(list){const R=tmnRecaps();TMN.rcTried=TMN.rcTried||new Set();
+  const todo=list.filter(x=>x.type==='art'&&x.url&&!R[x.url]&&!TMN.rcTried.has(x.url)).slice(0,30);if(!todo.length||TMN.rcBusy)return;
+  TMN.rcBusy=true;todo.forEach(x=>TMN.rcTried.add(x.url));
+  try{const r=await fetch('/api/news?recap=1',{method:'POST',headers:{'content-type':'application/json'},
+      body:JSON.stringify({items:todo.map(x=>{const p=byId[x.pid];return {u:x.url,n:p&&p.n,pos:p&&p.pos,t:p&&p.t,title:x.title,desc:x.desc||'',outlet:x.outlet}})})});
+    const j=r.ok?await r.json():null;
+    if(j&&j.items&&Object.keys(j.items).length){Object.assign(R,j.items);
+      const keys=Object.keys(R);if(keys.length>400)keys.slice(0,keys.length-400).forEach(k=>delete R[k]);
+      try{localStorage.setItem(TMN_RC_LS,JSON.stringify(R))}catch(e){}}}catch(e){}
+  TMN.rcBusy=false;if(tab==='news'&&$('tmn-feed'))tmnRenderBody()}
 /* a story or a video: the whole card is the link */
-function tmnStoryCard(x){const p=byId[x.pid],inj=x.kind==='inj',vid=x.type==='vid',tone=inj?'warn':'muted';
+function tmnStoryCard(x){const p=byId[x.pid],inj=x.kind==='inj',vid=x.type==='vid',tone=inj?'warn':'muted',rc=tmnRecaps()[x.url];
   const lbl=vid?(inj?'Injury video':'Video'):inj?(stOf(x.pid)?'Injury update':'Health'):'Role & usage';
   const host=(()=>{try{return new URL(x.url).hostname.replace(/^www\./,'')}catch(e){return ''}})();
   const src=x.outlet&&x.outlet!=='Google News'?x.outlet:host;
-  return `<a class="tmn-ev tmn-story tone-${tone}${vid?' vid':''}" href="${esc(x.url)}" target="_blank" rel="noopener" data-nkf="${esc(x.k||'')}">
+  return `<a class="tmn-ev tmn-story tone-${tone}${vid?' vid':''}${rc?' recap':''}" href="${esc(x.url)}" target="_blank" rel="noopener" data-nkf="${esc(x.k||'')}"${rc?` title="${esc(x.title)}"`:''}>
     ${tmnRail(x.at)}
     <div class="tmn-ev-card"><div class="tmn-ev-top"><span class="tmn-lbl ${tone}">${lbl}</span><span class="tmn-who">${av(p,'sm')}${esc(p.n)}<small>${p.pos} · ${p.t}${stOf(x.pid)?` · <i class="tmn-st">${esc(ST_LABEL[stOf(x.pid)]||stOf(x.pid))}</i>`:''}</small></span></div>
-      <div class="tmn-ev-main tmn-story-m"><div class="tmn-ev-txt"><h3>${esc(x.title)}</h3>${x.desc?`<p class="tmn-clamp">${esc(x.desc)}</p>`:''}</div>
+      <div class="tmn-ev-main tmn-story-m"><div class="tmn-ev-txt">${rc?`<h3>${esc(rc.t)}</h3>${rc.pts.length?`<ul class="tmn-pts">${rc.pts.map(t=>`<li>${esc(t)}</li>`).join('')}</ul>`:''}`:`<h3>${esc(x.title)}</h3>${x.desc?`<p class="tmn-clamp">${esc(x.desc)}</p>`:''}`}</div>
         ${x.img?`<span class="tmn-sthumb${vid?' vid':''}"><img src="${esc(x.img)}" alt="" loading="lazy" decoding="async" onerror="this.parentNode.remove()">${vid?'<span class="vplay" aria-hidden="true"></span>':''}</span>`:''}</div>
       <div class="tmn-ev-f"><span class="tmn-src"><b>${esc(src)}</b>${x.also&&x.also.length?` · also ${esc(x.also.join(', '))}`:''}</span><span class="tmn-go">${vid?'Watch':'Read'} ↗</span></div></div></a>`}
 /* the clip that shows a play: a link out to ESPN or YouTube */
