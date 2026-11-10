@@ -161,6 +161,16 @@ ${list}`;
    (snaps, targets, carries, depth chart). Anything else is left out of the feed. */
 const INJ_RE = /\b(injur(y|ies|ed)|hurt|ruled out|out (for|vs\.?|against|sunday|monday|thursday|this week|indefinitely|again)|questionable|doubtful|injured reserve|placed on (ir|reserve)|activated|designated (him |for )?(to )?return|return(s|ed|ing)? (to|from) (practice|injury|ir)|did not practice|dnp|limited (in )?practice|limited participant|full participant|practic(e|ed|ing)|game-time decision|week-to-week|day-to-day|setback|mri|surgery|concussion|protocol|hamstring|ankle|knee|groin|calf|quad|shoulder|elbow|wrist|thumb|foot|toe|hip|ribs?|sprain(ed)?|strain(ed)?|torn|tear|fracture[d]?|illness|sidelined|status for|health(y)?)\b/i;
 const ROLE_RE = /\b(depth chart|snaps?|snap (share|count)|target share|targets|carries|touches|workload|role|usage|starter|starting|backup|lead back|bell-?cow|committee|split|rb1|wr1|wr2|te1|promoted|benched|demoted|elevated|first-team|reps|opportunit(y|ies)|volume|red zone|rotation|expected to (start|play|see)|featured|pecking order|takes over|step(s)? in|fill(s)? in)\b/i;
+/* League news: the moves that change who scores fantasy points. Order matters: a trade story that mentions an
+   injury is still a trade. Rumors ("could", "interest in", "would") stay out: only things that happened. */
+const MOVE = [
+  ['trade', /\b(traded|trade (for|sends|lands|brings)|trades? (him|for)|acquired?s?|acquiring|deal sends|sent to|dealt|in a trade|blockbuster)\b/i],
+  ['inj', /\b(season-ending|out for the (season|year)|torn (acl|achilles)|tears? (his )?(acl|achilles)|(places?|placed|placing|puts?|lands?|goes|going) [\w'. -]{0,40}?on (injured reserve|ir)\b|to (injured reserve|ir)\b|out (\d+|several|multiple) (weeks|games)|weeks? to (heal|recover)|ruptured)\b/i],
+  ['move', /\b(signs?|signed|signing|re-signs?|released|releases|waived|waives|claimed|claims .* off waivers|cut by|cuts|suspended|suspension|reinstated|activated from|retires?|retirement)\b/i],
+  ['role', /\b(names? [\w'. -]{2,40} (the |as )?(starting \w+|starter)|named (the )?starter|new starter|will start|to start (at|for|week)|benched|takes over (as|at)|starting (qb|quarterback|job)|demoted|promoted to|depth chart change)\b/i],
+];
+const RUMOR = /\b(could|might|would|interest(ed)? in|rumou?rs?|potential|candidates?|should|predict|trade targets?|ideas|deadline (buyers|sellers)|what if|mock)\b/i;
+function moveOf(t) { for (const [k, re] of MOVE) if (re.test(t || '')) return k; return null; }
 function kindOf(x) {
   const t = x.title || '', d = x.desc || '';
   if (FLUFF.test(t)) return null;
@@ -263,6 +273,28 @@ export default async function handler(req, res) {
     }));
     const v = { updated: new Date().toISOString(), items: per.flat() };
     cache.set(key, { at: Date.now(), v });
+    res.setHeader('Cache-Control', 'public, max-age=0, s-maxage=600');
+    return res.status(200).json(v);
+  }
+  /* league mode for the News tab's Activity: league-wide moves a fantasy manager cares about (trades, signings,
+     releases, season-ending injuries, new starters) from the shared outlets. No AI, no player list: the client
+     matches the stories to fantasy-relevant players and decides what to show. GET /api/news?league=1 */
+  if (q.league) {
+    const c = cache.get('league');
+    if (c && Date.now() - c.at < 10 * 60e3) { res.setHeader('Cache-Control', 'public, max-age=0, s-maxage=600'); return res.status(200).json(c.v); }
+    const got = await Promise.all(SHARED.map(async s => {
+      try { const txt = await getText(s.url, 5 * 60e3); return s.kind === 'espn' ? parseESPN(txt) : parseRSS(txt, s.src); } catch { return []; }
+    }));
+    const cutoff = Date.now() - 7 * 864e5, out = [];
+    for (const i of got.flat().sort((a, b) => (!!b.desc - !!a.desc) || ((RANK[a.src] ?? 5) - (RANK[b.src] ?? 5)))) {
+      if (!i.title || !i.url || (i.at && Date.parse(i.at) < cutoff) || FLUFF.test(i.title) || RUMOR.test(i.title)) continue;
+      const kind = moveOf(i.title) || moveOf(i.desc.slice(0, 260)); if (!kind) continue;
+      if (out.some(o => similar(o.title, i.title, new Set()))) continue;
+      out.push({ kind, title: i.title, desc: clip(i.desc, 700), url: i.url, outlet: i.outlet, at: i.at, img: i.img || null, athletes: i.athletes || [] });
+    }
+    out.sort((a, b) => Date.parse(b.at || 0) - Date.parse(a.at || 0));
+    const v = { updated: new Date().toISOString(), items: out.slice(0, 80) };
+    cache.set('league', { at: Date.now(), v });
     res.setHeader('Cache-Control', 'public, max-age=0, s-maxage=600');
     return res.status(200).json(v);
   }
