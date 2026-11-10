@@ -229,14 +229,14 @@ ${body}`;
 const cleanLine = (s, n) => String(s || '').replace(/\s+/g, ' ').trim().slice(0, n);
 async function recapAll(items) {
   const out = {}, todo = [];
-  items.forEach(x => { const c = RECAPS.get('v2|' + x.u); if (c && Date.now() - c.at < 7 * 864e5) out[x.u] = c.v; else todo.push(x); });
+  items.forEach(x => { const c = RECAPS.get((x.pay ? 'v3p|' : 'v2|') + x.u); if (c && Date.now() - c.at < 7 * 864e5) out[x.u] = c.v; else todo.push(x); });
   if (todo.length && API_KEY) {
     const chunks = []; for (let i = 0; i < todo.length; i += 12) chunks.push(todo.slice(i, i + 12));
     await Promise.all(chunks.map(async ch => {
       const arr = await recapBatch(ch); if (!arr) return;
       arr.forEach(a => { const x = a && ch[a.i]; if (!x || !a.title) return;
         const v = { t: cleanLine(a.title, 110), pts: (Array.isArray(a.points) ? a.points : []).map(p => cleanLine(p, 140)).filter(Boolean).slice(0, 3) };
-        RECAPS.set('v2|' + x.u, { at: Date.now(), v }); out[x.u] = v; });
+        RECAPS.set((x.pay ? 'v3p|' : 'v2|') + x.u, { at: Date.now(), v }); out[x.u] = v; });
     }));
     if (RECAPS.size > 3000) [...RECAPS.keys()].slice(0, 1000).forEach(k => RECAPS.delete(k));
   }
