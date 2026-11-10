@@ -220,7 +220,7 @@ function tmnInjured(Ls){const inj={};Ls.forEach(c=>{if(TMN.lg!=='all'&&c.key!==T
   (inj[id]=inj[id]||{id,s,L:[]}).L.push({c,st:c.starters.has(id)})})});
   return Object.values(inj).sort((a,b)=>tmnSev(b.s)-tmnSev(a.s)||(b.L.some(l=>l.st)?1:0)-(a.L.some(l=>l.st)?1:0))}
 
-/* ---------- banners: arrive big, hold, shrink to a chip that stays 5 minutes ---------- */
+/* ---------- banners: arrive big, hold, shrink to a chip that stays 5 minutes (a #1 chip stays until Thursday) ---------- */
 function tmnStage(){let s=$('tmn-stage');if(!s){document.body.insertAdjacentHTML('beforeend','<div class="tmn-stage" id="tmn-stage" aria-live="polite"></div><div class="tmn-chips" id="tmn-chips"></div>');s=$('tmn-stage')}return s}
 function tmnQueue(ev,hold){TMN.unread++;TMN.queue.push(ev);if(!hold)tmnPump()}
 function tmnPump(){clearTimeout(TMN.timer);if(TMN.showing||!TMN.queue.length)return;
@@ -245,17 +245,17 @@ function tmnShow(ev){const s=tmnStage(),tone=(TMN_LBL[ev.cls]||[])[1]||'accent',
   s.innerHTML=`<div class="tmn-ban tone-${tone} ${ev.type==='clinch'?'clinch':''}${ev.type==='top'?' top'+(ev.overall?' all':''):''}" role="status" data-nk="${esc(ev.k)}" tabindex="0">${ev.type==='top'?tmnConfetti():''}${tmnBody(ev,true)}<button class="tmn-x" type="button" data-nx="1" aria-label="Dismiss">×</button><i class="tmn-timer" style="animation-duration:${hold}ms"></i></div>`;
   const b=s.firstElementChild;requestAnimationFrame(()=>b.classList.add('in'));
   TMN.hideT=setTimeout(()=>tmnMin(),hold)}
-function tmnMin(dismiss){clearTimeout(TMN.hideT);const s=$('tmn-stage'),b=s&&s.firstElementChild,ev=TMN.showing;TMN.showing=null;
+function tmnMin(dismiss){clearTimeout(TMN.hideT);const s=$('tmn-stage'),b=s&&s.firstElementChild,ev=TMN.showing;TMN.showing=null;if(ev&&dismiss)tmnTopDismiss(ev.k);
   if(b){b.classList.remove('in');b.classList.add(dismiss?'out':'min');setTimeout(()=>{if(b.parentNode)b.remove()},420)}
   if(ev&&!dismiss)setTimeout(()=>tmnChip(ev),260);setTimeout(tmnPump,500)}
-function tmnChip(ev){const box=$('tmn-chips')||(tmnStage(),$('tmn-chips'));TMN.chips=TMN.chips.filter(c=>c.k!==ev.k);TMN.chips.push({k:ev.k,until:Date.now()+TMN_R.chipLife});tmnPaintChips()}
+function tmnChip(ev){const box=$('tmn-chips')||(tmnStage(),$('tmn-chips'));TMN.chips=TMN.chips.filter(c=>c.k!==ev.k);TMN.chips.push({k:ev.k,until:ev.type==='top'?tmnTopUntil(ev):Date.now()+TMN_R.chipLife});tmnPaintChips()}
 function tmnPaintChips(){const box=$('tmn-chips');if(!box)return;TMN.chips=TMN.chips.filter(c=>c.until>Date.now());const show=TMN.chips.slice(-4).reverse(),more=TMN.chips.length-show.length;
   box.innerHTML=show.map(c=>{const ev=TMN.items.find(x=>x.k===c.k)||tmnTop().items.find(x=>x.k===c.k);if(!ev)return '';const p=ev.pid&&byId[ev.pid],tone=(TMN_LBL[ev.cls]||[])[1]||'accent';
     return `<div class="tmn-chip tone-${tone}${ev.type==='top'?' top':''}" data-nk="${esc(ev.k)}" role="button" tabindex="0"><i></i><span>${p?esc(p.pos==='DST'?p.n:tmnShort(p.n)):'Your week'}</span>${ev.type==='top'?`<b>#1 ${esc(ev.overall?'overall':tmnPosN(ev.pos))}</b>`:ev.pts!=null&&ev.type==='play'?`<b class="num">${ev.cls==='game'||ev.cls==='gameX'?'':'+'}${f1(ev.pts)}</b>`:`<b>${esc((TMN_LBL[ev.cls]||['News'])[0])}</b>`}<button type="button" data-nxc="${esc(ev.k)}" aria-label="Dismiss">×</button></div>`}).join('')
     +(more>0?`<a class="tmn-chip more" href="#news">+${more} more</a>`:'');
   clearTimeout(TMN.chipT);if(TMN.chips.length)TMN.chipT=setTimeout(tmnPaintChips,15e3)}
 function tmnUnread(){return TMN.unread||0}
-function tmnOpen(k){TMN.focus=k;TMN.chips=TMN.chips.filter(c=>c.k!==k);tmnPaintChips();if(TMN.showing&&TMN.showing.k===k)tmnMin(true);
+function tmnOpen(k){TMN.focus=k;tmnTopDismiss(k);TMN.chips=TMN.chips.filter(c=>c.k!==k);tmnPaintChips();if(TMN.showing&&TMN.showing.k===k)tmnMin(true);
   if(location.hash==='#news'){TMN.f='all';TMN.lg='all';tmnRender()}else location.hash='news'}
 
 /* ---------- clips → the play they show ----------
@@ -291,7 +291,12 @@ const TMN_TOP_LS='tm-news-top-v1';
 function tmnTop(){if(TMN.top)return TMN.top;try{TMN.top=JSON.parse(localStorage.getItem(TMN_TOP_LS)||'null')}catch(e){}TMN.top=TMN.top||{done:[],items:[]};return TMN.top}
 function tmnTopSave(){const T=tmnTop();T.done=T.done.slice(-8);T.done2=(T.done2||[]).slice(-8);T.items=T.items.slice(0,30);try{localStorage.setItem(TMN_TOP_LS,JSON.stringify(T))}catch(e){}}
 const tmnPosN=pos=>pos==='DST'?'defense':pos==='K'?'kicker':pos||'';
-const TMN_TOP_HOLD=50*3600e3;   /* the #1 card stays pinned at the top of the Feed for 50 hours, then moves into the timeline */
+/* the #1 stays up from the moment the week ends (Monday night) until the very start of Thursday, in the viewer's own
+   time zone: pinned at the top of the Feed and as a corner chip on every page. Then it moves into the timeline. */
+function tmnTopUntil(e){const d=new Date(e.at||Date.now());d.setHours(0,0,0,0);do d.setDate(d.getDate()+1);while(d.getDay()!==4);return d.getTime()}
+const tmnTopLive=e=>e&&e.type==='top'&&Date.now()<tmnTopUntil(e);
+/* closing the #1 banner or chip (or tapping through to it) keeps it off the corner until Thursday; it stays pinned in News */
+function tmnTopDismiss(k){const e=tmnTop().items.find(x=>x.k===k&&x.type==='top');if(e&&!e.dis){e.dis=true;tmnTopSave()}}
 const TMN_SEC_POS=['QB','RB','WR','TE'];
 /* the week is over only when every team with a game that week (from the schedule, so Monday night counts even
    before ESPN lists it) has a final, and the last of those games kicked off on Monday or later */
@@ -336,7 +341,10 @@ function tmnTopFind(week,stats,games,Ls,fresh,live){const T=tmnTop();T.done2=T.d
 function tmnTopBanners(){if(typeof USER!=='undefined'&&!USER)return;const T=tmnTop();
   /* one big banner (the overall #1, else the biggest score); any other #1s that week go straight to corner chips */
   const L=T.items.filter(e=>!e.shown&&e.type==='top').sort((a,b)=>(b.overall-a.overall)||(b.pts-a.pts)),n=L.length;
-  L.forEach((e,i)=>{e.shown=true;if(e.quiet||e.week<WEEK-1||!tmnShould(e))return;if(i===0)tmnQueue(e,true);else{TMN.unread++;tmnChip(e)}});
+  L.forEach((e,i)=>{e.shown=true;if(e.quiet||e.week<WEEK-1||!tmnTopLive(e)||!tmnShould(e))return;if(i===0)tmnQueue(e,true);else{TMN.unread++;tmnChip(e)}});
+  /* already seen, not closed and still before Thursday: back in the corner on every visit */
+  T.items.forEach(e=>{if(!e.shown||e.dis||e.quiet||!tmnTopLive(e)||!tmnShould(e))return;
+    if(TMN.chips.some(c=>c.k===e.k)||(TMN.showing&&TMN.showing.k===e.k)||TMN.queue.some(q=>q.k===e.k))return;tmnChip(e)});
   if(n){tmnTopSave();tmnPump();if(typeof renderAlerts==='function')renderAlerts();if(tab==='news'&&$('tmn-feed'))tmnRenderBody()}}
 async function tmnTopCatchUp(Ls){const w=WEEK-1,T=tmnTop();if((typeof USER!=='undefined'&&!USER)||w<1||(T.done.includes(w)&&(T.done2||[]).includes(w))||TMN.topBusy||Date.now()-(TMN.topAt||0)<10*60e3)return;
   Ls=Ls||tmnLeagues();if(!Ls.length)return;TMN.topBusy=true;TMN.topAt=Date.now();
@@ -345,9 +353,9 @@ async function tmnTopCatchUp(Ls){const w=WEEK-1,T=tmnTop();if((typeof USER!=='un
       tmnTopFind(w,st,j.games,Ls,null,false)}}catch(e){}
   TMN.topBusy=false}
 /* the most recent week anyone of yours topped his position */
-function tmnTopNow(){return tmnTop().items.filter(e=>e.type==='top'&&Date.now()-(e.at||0)<TMN_TOP_HOLD)}
+function tmnTopNow(){return tmnTop().items.filter(tmnTopLive)}
 /* older #1s and every #2 sit in the timeline with everything else (last 10 days) */
-function tmnRankFeed(){const cut=Date.now()-10*864e5;return tmnTop().items.filter(e=>(e.type==='second'||(e.type==='top'&&Date.now()-(e.at||0)>=TMN_TOP_HOLD))&&(e.at||0)>cut)}
+function tmnRankFeed(){const cut=Date.now()-10*864e5;return tmnTop().items.filter(e=>(e.type==='second'||(e.type==='top'&&!tmnTopLive(e)))&&(e.at||0)>cut)}
 function tmnConfetti(){return `<span class="tmn-conf" aria-hidden="true">${Array.from({length:18},(_,i)=>`<i style="--i:${i}"></i>`).join('')}</span>`}
 
 /* ---------- articles and videos about your players ----------
@@ -370,12 +378,36 @@ async function tmnLoadArt(Ls){const L=tmnArtPlayers(Ls);if(!L.length||TMN.artBus
   try{const r=await fetch('/api/news?feed='+encodeURIComponent(q)+'&b='+Math.floor(Date.now()/600000));const j=r.ok?await r.json():null;
     if(j&&Array.isArray(j.items)){TMN.art={key:q,at:Date.now(),items:j.items};try{localStorage.setItem(TMN_ART_LS,JSON.stringify(TMN.art))}catch(e){}}}catch(e){}
   TMN.artBusy=false;if(tab==='news')tmnRenderBody()}
+/* ---------- same story, different outlet ----------
+   Two headlines are the same story when most of their meaningful words match (the player's name and filler words
+   don't count). Also compares the AI recap titles, since two outlets' different headlines often recap the same way.
+   Used everywhere the Feed merges sources, so only one card per story ever shows. */
+const TMN_STOP=new Set(['the','and','for','with','his','her','from','after','before','week','nfl','fantasy','football','game','games','vs','will','has','have','had','are','was','but','not','this','that','what','why','how','its','into','out','over','about','says','said','report','reports','update','news','latest','could','should','would','may','set','gets','get']);
+const tmnWords=(s,skip)=>{const o=new Set();String(s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/['’.]/g,'').replace(/[^a-z0-9]+/g,' ').split(' ').forEach(w=>{if(w.length>2&&!TMN_STOP.has(w)&&!(skip&&skip.has(w)))o.add(w.endsWith('s')&&w.length>4?w.slice(0,-1):w)});return o};
+function tmnSimT(a,b,skip,same){const A=tmnWords(a,skip),B=tmnWords(b,skip);if(A.size<2||B.size<2)return false;let n=0;A.forEach(w=>B.has(w)&&n++);
+  const r=n/Math.min(A.size,B.size);return same?(n>=2&&r>=.5):(n>=3&&r>=.6)}
+function tmnSameStory(a,b){if(!a||!b)return false;if(a.url&&a.url===b.url)return true;
+  const same=a.pid&&a.pid===b.pid,pa=a.pid&&byId[a.pid],pb=b.pid&&byId[b.pid];
+  /* a trade card and a story about that player's trade are the same news */
+  if(same&&(a.kind==='trade'||a.type==='trade')&&(b.kind==='trade'||b.type==='trade'))return true;
+  const skip=new Set([...(pa?tmnWords(pa.n):[]),...(pb?tmnWords(pb.n):[])]);
+  const R=tmnRecaps(),ta=[a.title,R[a.url]&&R[a.url].t].filter(Boolean),tb=[b.title,R[b.url]&&R[b.url].t].filter(Boolean);
+  if(!ta.length||!tb.length)return false;
+  /* far apart in time is a new development, not a repeat */
+  if(a.at&&b.at&&Math.abs(a.at-b.at)>4*864e5)return false;
+  return ta.some(x=>tb.some(y=>tmnSimT(x,y,skip,same)))}
+/* keeps the first of every group of matching stories (call with the list in priority order) */
+function tmnDedupe(list){const keep=[];list.forEach(x=>{if(!keep.some(k=>tmnSameStory(k,x)))keep.push(x)});return keep}
+
 /* every story and video about your players (league filter applied), newest first */
 function tmnStories(Ls){const ids=[];Ls.forEach(c=>{if(TMN.lg!=='all'&&c.key!==TMN.lg)return;c.roster.forEach(id=>{const p=byId[id];if(p&&p.pos!=='DST'&&!ids.includes(id))ids.push(id)})});
   const byName={},names=ids.map(id=>{const n=norm(byId[id].n);byName[n]=id;return [n,id]});
   const who=(t,ath)=>{if(ath&&ath.length){const a=ath.map(norm).find(x=>byName[x]);if(a)return byName[a]}const h=normT(t);const hit=names.find(([n])=>wordIn(h,n));return hit?hit[1]:null};
   const cut=Date.now()-10*864e5,out=[],seen=new Set();
-  const add=x=>{if(!x.pid||!x.kind||!x.at||x.at<cut||!x.url)return;const tk=norm(x.title).slice(0,70);if(seen.has(x.url)||seen.has(tk))return;seen.add(x.url);seen.add(tk);out.push(x)};
+  const add=x=>{if(!x.pid||!x.kind||!x.at||x.at<cut||!x.url)return;const tk=norm(x.title).slice(0,70);if(seen.has(x.url)||seen.has(tk))return;seen.add(x.url);seen.add(tk);
+    /* basically the same story as one already in: keep the first, credit the second outlet on it */
+    const d=out.find(o=>tmnSameStory(o,x));if(d){if(x.outlet&&d.outlet!==x.outlet&&!(d.also||[]).includes(x.outlet))d.also=[...(d.also||[]),x.outlet];if(!d.img&&x.img)d.img=x.img;return}
+    out.push(x)};
   (TMN.art&&TMN.art.items||[]).forEach(a=>add({type:a.video?'vid':'art',kind:a.kind,pid:byName[norm(a.n)],title:a.title,desc:a.desc,url:a.url,outlet:a.outlet,also:a.also||[],img:a.img,at:Date.parse(a.at||0)}));
   if(typeof FEED!=='undefined'&&FEED){
     (FEED.news||[]).forEach(a=>{const pid=who(a.title+' '+(a.desc||''),a.athletes);add({type:a.type==='Media'?'vid':'art',kind:tmnKind(a.title,a.desc),pid,title:a.title,desc:a.desc&&a.desc!==a.title?a.desc.slice(0,700):'',url:a.url,outlet:'ESPN',also:[],img:a.img,at:Date.parse(a.at||0)})});
@@ -451,7 +483,8 @@ function tmnRenderBody(Ls){const el=$('tmn-feed');if(!el)return;Ls=Ls||tmnLeague
   else{/* Your team: everything about your players. Feed: the same plus league news a fantasy manager cares about,
        with every card about your team flagged on the rail so the two are easy to tell apart. */
     const act=f==='all',lgAll=tmnLeagueNews(Ls,picked),trades=tmnTrades(Ls,lgAll).filter(x=>act||x.yours),lgNews=act?lgAll.filter(x=>x.kind!=='trade'):[];
-    const all=[...evs,...injUp,...res,...picked,...tmnRankFeed().filter(e=>inLg(e.leagues)),...lgNews,...trades].sort((a,b)=>tmnAt(b)-tmnAt(a));tmnLoadRecaps([...picked,...lgNews,...trades]);
+    const news=tmnDedupe([...trades,...picked,...lgNews]);
+    const all=[...evs,...injUp,...res,...news,...tmnRankFeed().filter(e=>inLg(e.leagues))].sort((a,b)=>tmnAt(b)-tmnAt(a));tmnLoadRecaps([...picked,...lgNews,...trades]);
     /* the biggest #1 gets the full card; any others this week sit in a row of smaller orange cards under it */
     const tp=[...tops].sort((a,b)=>(b.overall-a.overall)||(b.pts-a.pts));
     html=(tp.length?`<div class="tmn-tops">${tmnTopCard(tp[0])}${tp.length>1?`<div class="tmn-tops-more">${tp.slice(1).map(tmnTopMini).join('')}</div>`:''}</div>`:'')+tl(all,act)
@@ -490,7 +523,7 @@ function tmnEvCard(e,clip,old){const [lbl,tone]=TMN_LBL[e.cls]||['News','accent'
       <div class="tmn-ev-main"><div class="tmn-b-av">${p?av(p):`<span class="tmn-seal">W</span>`}${e.type==='play'?TMN_BOLT:''}</div><div class="tmn-ev-txt"><h3>${esc(e.head)}</h3>${sub?`<p>${esc(sub)}</p>`:''}${lg?`<div class="tmn-lgs">${lg}</div>`:''}</div>${v}</div>
       <div class="tmn-ev-f">${totH}${p?`<span class="tmn-go">Player card →</span>`:''}${e.txt?`<span class="tmn-txt" title="${esc(e.txt)}">${esc(e.txt)}</span>`:''}</div></div></article>`}
 const TMN_BOLT='<i class="tmn-bolt" aria-hidden="true"><svg viewBox="0 0 16 16"><path d="M9.6 1 3.5 9.1h3.9L6.4 15l6.1-8.1H8.6z"/></svg></i>';
-/* #1 (after its 48 hours pinned) and #2 at a position, in the timeline: orange for #1, silver for #2 */
+/* #1 (once Thursday starts) and #2 at a position, in the timeline: orange for #1, silver for #2 */
 function tmnRankCard(e){const p=byId[e.pid];if(!p)return '';const one=e.type==='top',posn=tmnPosN(e.pos);
   const lbl=one?(e.overall?'#1 in the NFL':`#1 ${posn}`):`#2 ${posn}`;
   return `<article class="tmn-ev tmn-rank ${one?'tmn-n1 tone-top':'tmn-n2 tone-silver'} tap" data-ncard="${p.id}" data-nkf="${esc(e.k)}" tabindex="0">${tmnRail(tmnAt(e),'Week '+e.week)}
@@ -524,7 +557,7 @@ async function tmnLoadLeague(){if(TMN.lgBusy||(TMN.lgn&&Date.now()-TMN.lgn.at<10
 const TMN_LGK={trade:['Trade','accent'],inj:['Injury','bad'],move:['Roster move','muted'],role:['Depth chart','warn']};
 function tmnLeagueNews(Ls,picked){const raw=TMN.lgn&&TMN.lgn.items;if(!raw||!raw.length)return [];
   const rk=id=>(typeof V!=='undefined'&&V&&V.rank&&V.rank[id])||999;
-  if(!TMN.lgIdx||TMN.lgIdx.n!==POOL.length){const L=POOL.filter(p=>p.pos!=='DST'&&p.pos!=='K'&&rk(p.id)<=300).map(p=>[norm(p.n),p.id]).filter(x=>x[0].includes(' '));
+  if(!TMN.lgIdx||TMN.lgIdx.n!==POOL.length){const L=POOL.filter(p=>p.pos!=='DST'&&p.pos!=='K'&&rk(p.id)<=TMN_TRADE_TOP).map(p=>[norm(p.n),p.id]).filter(x=>x[0].includes(' '));
     TMN.lgIdx={n:POOL.length,L,by:Object.fromEntries(L)}}
   const {L,by}=TMN.lgIdx,mine=new Set();Ls.forEach(c=>c.roster.forEach(id=>mine.add(id)));
   const seen=new Set((picked||[]).map(x=>x.url)),cut=Date.now()-7*864e5,out=[];
@@ -533,13 +566,16 @@ function tmnLeagueNews(Ls,picked){const raw=TMN.lgn&&TMN.lgn.items;if(!raw||!raw
     if(!pid){const h=normT(a.title);const hit=L.filter(([n])=>wordIn(h,n)).sort((x,y)=>rk(x[1])-rk(y[1]))[0];if(hit)pid=hit[1]}
     if(!pid){const h=normT(String(a.desc||'').slice(0,220));const hit=L.filter(([n])=>wordIn(h,n)).sort((x,y)=>rk(x[1])-rk(y[1]))[0];if(hit)pid=hit[1]}
     if(!pid||(a.kind==='inj'&&rk(pid)>150)||(a.kind!=='trade'&&rk(pid)>220)||out.some(o=>o.pid===pid&&o.kind===a.kind))return;
-    seen.add(a.url);out.push({type:'lg',k:'lg:'+a.url,kind:a.kind,pid,yours:mine.has(pid),title:a.title,desc:a.desc,url:a.url,outlet:a.outlet,img:a.img,at,leagues:[]})});
+    const x={type:'lg',k:'lg:'+a.url,kind:a.kind,pid,yours:mine.has(pid),title:a.title,desc:a.desc,url:a.url,outlet:a.outlet,img:a.img,at,leagues:[]};
+    if((picked||[]).some(o=>tmnSameStory(o,x))||out.some(o=>tmnSameStory(o,x)))return;
+    seen.add(a.url);out.push(x)});
   const tr=out.filter(x=>x.kind==='trade'),rest=out.filter(x=>x.kind!=='trade').sort((a,b)=>b.at-a.at).slice(0,14);
   return [...rest,...tr].sort((a,b)=>b.at-a.at)}
-/* Trades of top-300 players. Two sources: team changes the nightly data update saw (DATA.moves: [id, from, to, day]),
+/* Trades of top-500 players (overall fantasy rank, kickers and defenses aside). Two sources: team changes the nightly data update saw (DATA.moves: [id, from, to, day]),
    and trade stories from the outlets. Each trade gets one card. It carries a story about that trade when there is a
    good one (from the shared outlets, else /api/news?trades= searches for it); with none it still shows, without a link. */
 const TMN_TR_LS='tm-news-trades-v1';
+const TMN_TRADE_TOP=500;   /* trade cards for anyone ranked inside this */
 try{const c=JSON.parse(localStorage.getItem(TMN_TR_LS)||'null');if(c&&c.items)TMN.tra=c}catch(e){}
 async function tmnLoadTradeArts(list){const need=list.filter(x=>!x.url&&!(TMN.tra&&TMN.tra.items&&TMN.tra.items[x.pid]&&Date.now()-TMN.tra.items[x.pid].at<30*60e3));
   if(!need.length||TMN.traBusy)return;TMN.traBusy=true;
@@ -550,12 +586,12 @@ async function tmnLoadTradeArts(list){const need=list.filter(x=>!x.url&&!(TMN.tr
   TMN.traBusy=false;if(tab==='news'&&$('tmn-feed'))tmnRenderBody()}
 function tmnTrades(Ls,lg){const rk=id=>(typeof V!=='undefined'&&V&&V.rank&&V.rank[id])||999,mine=new Set();Ls.forEach(c=>c.roster.forEach(id=>mine.add(id)));
   const cut=Date.now()-14*864e5,by={},D=window.NFL_DATA;
-  ((D&&D.moves)||[]).forEach(([id,from,to,day])=>{const p=byId[id],at=Date.parse(day+'T12:00:00');if(!p||rk(id)>300||!at||at<cut)return;by[id]={from,to,at}});
+  ((D&&D.moves)||[]).forEach(([id,from,to,day])=>{const p=byId[id],at=Date.parse(day+'T12:00:00');if(!p||rk(id)>TMN_TRADE_TOP||!at||at<cut)return;by[id]={from,to,at}});
   (lg||[]).filter(x=>x.kind==='trade').forEach(x=>{const m=by[x.pid]||(by[x.pid]={from:'',to:byId[x.pid].t,at:x.at});if(!m.url){m.url=x.url;m.title=x.title;m.desc=x.desc;m.outlet=x.outlet;m.img=x.img;m.at=Math.min(m.at,x.at)}});
   const out=Object.entries(by).map(([pid,m])=>{let a=m.url?null:TMN.tra&&TMN.tra.items&&TMN.tra.items[pid]&&TMN.tra.items[pid].a;
     if(a&&Date.parse(a.at||0)<m.at-5*864e5)a=null;    /* a story from long before the move is about something else */
     const x={type:'trade',kind:'trade',k:'tr:'+pid,pid,from:m.from,to:m.to||byId[pid].t,yours:mine.has(pid),at:m.at,leagues:[],url:m.url||(a&&a.url)||'',title:m.title||(a&&a.title)||'',desc:m.desc||(a&&a.desc)||'',outlet:m.outlet||(a&&a.outlet)||'',img:m.img||(a&&a.img)||null};
-    if(a&&a.at){const t=Date.parse(a.at);if(t&&t<x.at)x.at=t}return x}).sort((a,b)=>b.at-a.at).slice(0,10);
+    if(a&&a.at){const t=Date.parse(a.at);if(t&&t<x.at)x.at=t}return x}).sort((a,b)=>b.at-a.at).slice(0,20);
   tmnLoadTradeArts(out);return out}
 /* a story's title, always about the player on the card: when the headline doesn't name him, lead with his name */
 function tmnTitleFor(p,t){if(!p||!t)return t||'';const last=norm(p.n).split(' ').filter(w=>w.length>1).pop()||'';return last&&wordIn(normT(t),last)?t:`${p.n}: ${t}`}
@@ -646,7 +682,7 @@ function tmnNotifHtml(){const L=S.leagues&&S.leagues.length?S.leagues:[{key:S.le
 /* ---------- events ---------- */
 document.addEventListener('click',e=>{const t=e.target;if(!t.closest)return;
   if(t.closest('[data-nx]')){e.stopPropagation();tmnMin(true);return}
-  const xc=t.closest('[data-nxc]');if(xc){e.stopPropagation();TMN.chips=TMN.chips.filter(c=>c.k!==xc.dataset.nxc);tmnPaintChips();return}
+  const xc=t.closest('[data-nxc]');if(xc){e.stopPropagation();tmnTopDismiss(xc.dataset.nxc);TMN.chips=TMN.chips.filter(c=>c.k!==xc.dataset.nxc);tmnPaintChips();return}
   const nk=t.closest('.tmn-ban[data-nk],.tmn-chip[data-nk]');if(nk){tmnOpen(nk.dataset.nk);return}
   const nr=t.closest('[data-nres]');if(nr&&!t.closest('a,button')){const k=nr.dataset.nres;if(k&&k!==S.leagueKey&&typeof switchLeague==='function')switchLeague(k);location.hash='team';return}
   const nc=t.closest('[data-ncard]');if(nc&&!t.closest('a,button,select,input')&&typeof openCard==='function'){openCard(nc.dataset.ncard);return}

@@ -2505,34 +2505,96 @@ function ssPool(){if(SS_FA)return V.list.filter(q=>!OWN[q.id]&&G[q.id]).slice(0,
   const me=myTeam();return me?me.players.map(id=>byId[id]).filter(Boolean):[]}
 function ssFind(v){const q=norm(v||'');if(!q)return null;const L=ssPool();
   return L.find(x=>norm(x.n)===q)||L.find(x=>norm(x.n).startsWith(q))||L.find(x=>norm(x.n).includes(q))||null}
-function ssPick(){const L=ssPool();
-  const chips=SS.map(id=>{const p=byId[id];return `<span class="ss-chip">${av(p,'sm')}<span>${esc(p.n)}</span>${OWN[id]?'':'<em class="ss-fa">FA</em>'}<button class="ss-x" data-ssrm="${id}" aria-label="Remove ${esc(p.n)}">&times;</button></span>`}).join('');
-  if(SS.length>=3)return `<div class="ss-pick">${chips}</div>`;
-  return `<div class="ss-pick">${chips}<input type="text" id="ss-add" list="dl-ss" placeholder="${SS_FA?'Add a free agent':'Add from your team'}" autocomplete="off">
+/* the add box under your lineup: anyone on your team by name, or a free agent */
+function ssAddRow(){const L=ssPool();
+  return `<div class="ss-pick"><input type="text" id="ss-add" list="dl-ss" placeholder="${SS_FA?'Add a free agent':'Or type a name from your team'}" autocomplete="off">
     <datalist id="dl-ss">${L.map(x=>`<option value="${esc(x.n)}">${x.pos} · ${x.t}</option>`).join('')}</datalist>
     <button class="linkish ss-scope" data-ssfa="${SS_FA?0:1}">${SS_FA?'Back to my team':'Compare a free agent'}</button></div>`}
 function ssAdd(){const el=$('ss-add');if(!el||!el.value.trim())return;const p=ssFind(el.value);
   if(!p){toast(SS_FA?'No free agent found with that name':'He is not on your team. Use "Compare a free agent" to look wider.');return}
-  SS=(SS||[]).filter(x=>x!==p.id);SS=SS.length>=3?SS.slice(0,2).concat(p.id):SS.concat(p.id);renderStartSit()}
+  ssPut(p.id,null)}
+/* put a player in the board: into slot i (taking that spot, or swapping if he's already in), else the next open slot */
+function ssPut(id,i){SS=(SS||[]).slice();const at=SS.indexOf(id);
+  if(i==null||i>=SS.length){if(at>=0)return;if(SS.length>=3)SS[2]=id;else SS.push(id)}
+  else if(at>=0){[SS[i],SS[at]]=[SS[at],SS[i]]}else SS[i]=id;
+  renderStartSit()}
+function ssRemove(id){SS=(SS||[]).filter(x=>x!==id);renderStartSit()}
+/* your lineup to drag from: the real one from your league when we have it, else the best lineup by this week's projections */
+function ssLineup(){const me=myTeam(),RL=typeof realLineup==='function'?realLineup(S.me):null,lu=RL||lineup(me.players,nextV);
+  const st=lu.slots.filter(x=>x.p&&me.players.includes(x.p.id)).map(x=>({id:x.p.id,slot:x.label}));
+  const on=new Set(st.map(x=>x.id)),bench=me.players.filter(id=>!on.has(id)&&byId[id]&&G[id]).sort((a,b)=>(nextV(b)||0)-(nextV(a)||0)).map(id=>({id,slot:'BN'}));
+  return {st:st.filter(x=>G[x.id]),bench}}
+function ssTile(x){const p=byId[x.id],g=G[x.id],inB=SS.includes(x.id),s=stOf(x.id);
+  return `<button type="button" class="ss-tile${inB?' in':''}" data-ssdrag="${p.id}" data-sstap="${p.id}" aria-pressed="${inB}" title="${esc(p.n)}: ${inB?'tap to take him off the board':'drag onto the board, or tap to add'}">
+    <span class="ss-slot">${esc(x.slot)}</span>${av(p,'sm')}<span class="ss-tn"><b>${esc(p.pos==='DST'?p.n:typeof tmnShort==='function'?tmnShort(p.n):p.n)}</b><small>${p.pos} · ${g.next?`${g.next.home?'vs':'@'} ${g.next.opp}`:'Bye'}${s?` · <em class="st-${s}">${s}</em>`:''}</small></span><span class="ss-tp num">${g.next?f1(g.projNext):'–'}</span></button>`}
 function renderStartSit(){const el=$('startsit');if(!el)return;const me=myTeam();if(!me||me.players.length<2){el.innerHTML='';return}
-  if(!SS)SS=ssDefault();SS=SS.filter(id=>byId[id]);if(!SS.length)SS=ssDefault();
-  if(SS.length<2){el.innerHTML=`<div class="card-h"><h2>Start or sit</h2><span class="note">Week ${WEEK}</span></div>${ssPick()}<p class="note">Add another player to compare.</p>`;return}
-  const st=SS.map(id=>({id,...ssStats(id)})),ord2=[...st].sort((a,b)=>b.proj-a.proj),win=ord2[0],run=ord2[1],diff=win.proj-run.proj;
-  const conf=diff>=3?'Clear call':diff>=1?'Lean':'Coin flip',why=[];
-  const wg=G[win.id],rg=G[run.id];
-  if(!wg.next)why.push(`${byId[win.id].n} is on bye.`);
-  if(wg.next&&rg.next){const a=wg.next.rank,b=rg.next.rank;if(a-b>=6)why.push(`Better matchup: ${wg.next.opp} ranks ${ord(a)} against ${byId[win.id].pos}s, ${rg.next.opp} ranks ${ord(b)}.`);
-    if(VEGAS[byId[win.id].t]&&VEGAS[byId[run.id].t]&&VEGAS[byId[win.id].t]-VEGAS[byId[run.id].t]>=3)why.push(`His team is expected to score more (${VEGAS[byId[win.id].t]} vs ${VEGAS[byId[run.id].t]}).`)}
-  if(stOf(run.id))why.push(`${byId[run.id].n} is ${ST_LABEL[stOf(run.id)].toLowerCase()}.`);
-  if(run.ceil>win.ceil+1)why.push(`${byId[run.id].n} has the higher ceiling if you need a big week.`);
-  el.innerHTML=`<div class="card-h"><h2>Start or sit</h2><span class="note">Week ${WEEK} · compare up to three</span></div>
-   ${ssPick()}
-   <div class="ss-verdict"><span class="ss-conf ${diff>=3?'clear':diff>=1?'lean':'flip'}">${conf}</span><b>Start ${esc(byId[win.id].n)}</b><span>${f1(win.proj)} vs ${f1(run.proj)} projected${why.length?'. '+esc(why[0]):''}</span></div>
-   <div class="ss-grid n${st.length}">${st.map(x=>{const p=byId[x.id],g=G[x.id],w=x.id===win.id;return `<div class="ss-col${w?' win':''}">${w?'<span class="ss-start">Start</span>':''}
+  if(!SS)SS=ssDefault();SS=SS.filter(id=>byId[id]&&G[id]).slice(0,3);
+  const LU=ssLineup(),st=SS.map(id=>({id,...ssStats(id)})),ord2=[...st].sort((a,b)=>b.proj-a.proj),win=ord2[0],run=ord2[1];
+  let verdict='<div class="ss-verdict ss-wait"><b>Drag in two players</b><span>Grab anyone from your lineup below and drop him on the board. Starters and bench both work, up to three at once.</span></div>';
+  if(st.length>=2){const diff=win.proj-run.proj,conf=diff>=3?'Clear call':diff>=1?'Lean':'Coin flip',why=[];
+    const wg=G[win.id],rg=G[run.id];
+    if(!wg.next)why.push(`${byId[win.id].n} is on bye.`);
+    if(wg.next&&rg.next){const a=wg.next.rank,b=rg.next.rank;if(a-b>=6)why.push(`Better matchup: ${wg.next.opp} ranks ${ord(a)} against ${byId[win.id].pos}s, ${rg.next.opp} ranks ${ord(b)}.`);
+      if(VEGAS[byId[win.id].t]&&VEGAS[byId[run.id].t]&&VEGAS[byId[win.id].t]-VEGAS[byId[run.id].t]>=3)why.push(`His team is expected to score more (${VEGAS[byId[win.id].t]} vs ${VEGAS[byId[run.id].t]}).`)}
+    if(stOf(run.id))why.push(`${byId[run.id].n} is ${ST_LABEL[stOf(run.id)].toLowerCase()}.`);
+    if(run.ceil>win.ceil+1)why.push(`${byId[run.id].n} has the higher ceiling if you need a big week.`);
+    verdict=`<div class="ss-verdict"><span class="ss-conf ${diff>=3?'clear':diff>=1?'lean':'flip'}">${conf}</span><b>Start ${esc(byId[win.id].n)}</b><span>${f1(win.proj)} vs ${f1(run.proj)} projected${why.length?'. '+esc(why[0]):''}</span></div>`}
+  const n=Math.min(3,Math.max(2,st.length+1));
+  const col=i=>{const x=st[i];if(!x)return `<div class="ss-col ss-empty" data-ssdrop="${i}"><span class="ss-plus" aria-hidden="true">+</span><b>Drop a player here</b><small>${i===2?'Optional third player':'From your lineup below'}</small></div>`;
+    const p=byId[x.id],g=G[x.id],w=st.length>=2&&x.id===win.id,tag=st.length<2?'':w?'<span class="ss-start">Start</span>':'<span class="ss-start sit">Sit</span>';
+    return `<div class="ss-col${w?' win':st.length>=2?' sit':''}" data-ssdrop="${i}" data-ssdrag="${p.id}" data-ssfrom="${i}">${tag}
+     <button class="ss-x" type="button" data-ssrm="${p.id}" aria-label="Take ${esc(p.n)} off the board">&times;</button>
      <div class="ss-pl">${av(p,'sm')}<div class="meta"><button class="pname" data-open="${p.id}">${esc(p.n)}</button><span class="psub">${p.pos}${V.posRank[p.id]} · ${p.t}${OWN[p.id]?'':' · free agent'}${stOf(p.id)?' · '+stHtml(p.id):''}</span></div></div>
      <div class="ss-proj"><b class="num">${f1(x.proj)}</b><span>projected</span></div>
      <dl class="ss-dl"><dt>Matchup</dt><dd>${g.next?`${g.next.home?'vs':'at'} ${g.next.opp} <span class="drk ${g.next.rank>=24?'easy':g.next.rank<=8?'hard':''}">${ord(g.next.rank)}</span>`:'Bye'}</dd><dt>Range</dt><dd>${f1(x.floor)}&ndash;${f1(x.ceil)}</dd><dt>Last 3</dt><dd>${f1(g.last3)}</dd><dt>Risk</dt><dd>${riskHtml(p.id)}</dd></dl>
-     </div>`}).join('')}</div>`}
+     </div>`};
+  el.innerHTML=`<div class="card-h"><h2>Start or sit</h2><span class="note">Week ${WEEK} · drag up to three</span></div>
+   ${verdict}
+   <div class="ss-grid ss-board n${n}" id="ss-board">${Array.from({length:n},(_,i)=>col(i)).join('')}</div>
+   <div class="ss-lu" data-ssdrop="lu"><div class="ss-lu-h"><b>Your lineup</b><span class="note">Drag a player onto the board, or tap him. Drag him back here to take him off.</span></div>
+     <div class="ss-lu-g"><span class="ss-lu-k">Starters</span><div class="ss-tiles">${LU.st.map(ssTile).join('')}</div></div>
+     ${LU.bench.length?`<div class="ss-lu-g"><span class="ss-lu-k">Bench</span><div class="ss-tiles">${LU.bench.map(ssTile).join('')}</div></div>`:''}
+     ${ssAddRow()}</div>`}
+
+/* ---- dragging players onto the board. Pointer events so it works the same with a mouse, a pen or a finger:
+   a mouse drags as soon as it moves; a finger presses and holds for a beat first, so swiping still scrolls the page. ---- */
+var SSD=null,SSD_EAT=0;
+function ssDropAt(x,y){const el=document.elementFromPoint(x,y);return el&&el.closest?el.closest('#startsit [data-ssdrop]'):null}
+function ssDragStart(){const d=SSD;if(!d||d.on)return;d.on=true;const r=d.src.getBoundingClientRect(),g=d.src.cloneNode(true);
+  g.classList.add('ss-ghost');g.removeAttribute('id');g.style.width=r.width+'px';g.style.height=r.height+'px';d.ox=d.x-r.left;d.oy=d.y-r.top;
+  document.body.appendChild(g);d.ghost=g;d.src.classList.add('ss-lift');$('startsit').classList.add('ss-dragging');ssDragMove(d.x,d.y);
+  if(navigator.vibrate&&d.touch)try{navigator.vibrate(12)}catch(e){}}
+function ssDragMove(x,y){const d=SSD;if(!d||!d.ghost)return;d.x=x;d.y=y;d.ghost.style.transform=`translate(${x-d.ox}px,${y-d.oy}px) rotate(-2deg)`;
+  const z=ssDropAt(x,y);if(z!==d.over){if(d.over)d.over.classList.remove('ss-over');d.over=z;if(z&&!(z.dataset.ssdrop==='lu'&&d.from==null))z.classList.add('ss-over')}
+  /* near the top or bottom of the screen: scroll so a board above or below the lineup can be reached */
+  const m=80,h=innerHeight;if(y<m)scrollBy(0,-Math.ceil((m-y)/m*22));else if(y>h-m)scrollBy(0,Math.ceil((y-(h-m))/m*22))}
+function ssDragEnd(cancel){const d=SSD;SSD=null;if(!d)return;clearTimeout(d.lp);document.removeEventListener('touchmove',ssNoScroll);
+  if(!d.on)return;SSD_EAT=Date.now();if(d.ghost)d.ghost.remove();d.src.classList.remove('ss-lift');if(d.over)d.over.classList.remove('ss-over');
+  const box=$('startsit');if(box)box.classList.remove('ss-dragging');if(cancel||!d.over)return;
+  const to=d.over.dataset.ssdrop;
+  if(to==='lu'){if(d.from!=null)ssRemove(d.id);return}
+  const i=+to;if(d.from!=null&&+d.from===i)return;ssPut(d.id,i)}
+function ssNoScroll(e){if(SSD&&SSD.on)e.preventDefault()}
+document.addEventListener('pointerdown',e=>{SSD_EAT=0;const s=e.target.closest&&e.target.closest('#startsit [data-ssdrag]');if(!s||(e.pointerType==='mouse'&&e.button!==0))return;
+  if(e.target.closest('.ss-x,input,a'))return;
+  SSD={id:s.dataset.ssdrag,from:s.dataset.ssfrom,src:s,x:e.clientX,y:e.clientY,sx:e.clientX,sy:e.clientY,touch:e.pointerType!=='mouse',on:false};
+  if(SSD.touch){document.addEventListener('touchmove',ssNoScroll,{passive:false});SSD.lp=setTimeout(ssDragStart,280)}});
+document.addEventListener('pointermove',e=>{const d=SSD;if(!d)return;
+  if(!d.on){const far=Math.hypot(e.clientX-d.sx,e.clientY-d.sy)>7;if(!far)return;
+    if(d.touch){ssDragEnd(true);return}   /* a finger that moves before the hold is scrolling, not dragging */
+    d.x=e.clientX;d.y=e.clientY;ssDragStart();return}
+  e.preventDefault();ssDragMove(e.clientX,e.clientY)});
+document.addEventListener('pointerup',e=>{if(SSD&&SSD.on){SSD.x=e.clientX;SSD.y=e.clientY;SSD.over=ssDropAt(e.clientX,e.clientY)||null}ssDragEnd(false)});
+document.addEventListener('pointercancel',()=>ssDragEnd(true));
+/* headshots are images: stop the browser's own image drag from stealing the gesture */
+document.addEventListener('dragstart',e=>{if(e.target.closest&&e.target.closest('#startsit'))e.preventDefault()});
+document.addEventListener('contextmenu',e=>{if(e.target.closest&&e.target.closest('#startsit [data-ssdrag]')&&(SSD||Date.now()-SSD_EAT<600))e.preventDefault()});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&SSD&&SSD.on)ssDragEnd(true)});
+/* a tap (or Enter/Space) on a lineup tile adds or removes him; the click that ends a drag is swallowed */
+document.addEventListener('click',e=>{const t=e.target.closest&&e.target.closest('#startsit [data-sstap]');if(!t)return;
+  if(SSD_EAT){SSD_EAT=0;e.preventDefault();e.stopPropagation();return}
+  const id=t.dataset.sstap;if(SS.includes(id))ssRemove(id);else ssPut(id,null)},true);
+document.addEventListener('click',e=>{if(SSD_EAT&&e.target.closest&&e.target.closest('#startsit .ss-col')){SSD_EAT=0;e.preventDefault();e.stopPropagation()}},true);
 
 /* ===== Alerts (bell in the top bar) ===== */
 const ALERT_LS='tm-alerts-seen';
