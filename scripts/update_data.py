@@ -409,6 +409,19 @@ except Exception as e:print('dynasty values skipped',e,file=sys.stderr)
 if dyn:d['dyn']=dyn
 elif PREV.get('dyn'):d['dyn']=PREV['dyn']
 print(len(dyn),'dynasty values',file=sys.stderr)
+# team changes (trades): any player whose NFL team differs from the last run, with the day it was first seen.
+# The News tab's Feed shows these for fantasy-relevant players, with a story about the trade when one exists.
+# [player key, from team, to team, ISO date]; kept 30 days.
+moves=[m for m in (PREV.get('moves') or []) if m[3]>=(datetime.date.today()-datetime.timedelta(days=30)).isoformat()]
+try:
+    _was={p[0]:p[3] for p in (PREV.get('players') or [])}
+    _NFL=set(d['sched'].keys())
+    for p in d['players']:
+        a,b=_was.get(p[0]),p[3]
+        if a and b and a!=b and a in _NFL and b in _NFL and not any(m[0]==p[0] and m[2]==b for m in moves):
+            moves.append([p[0],a,b,datetime.date.today().isoformat()])
+except Exception as e:print('moves skipped',e,file=sys.stderr)
+d['moves']=moves;print(len(moves),'team changes in the last 30 days',file=sys.stderr)
 
 json.dump(d,open(OUT,'w'),separators=(',',':'))
 print('wrote',OUT,file=sys.stderr)

@@ -25,6 +25,7 @@ const SHARED = [
 const FOCUS = {
   inj: '(injury OR injured OR practice OR "ruled out" OR questionable OR doubtful OR status OR return)',
   role: '(snaps OR role OR "depth chart" OR targets OR carries OR workload OR starter OR usage)',
+  trade: '(traded OR trade OR acquire OR acquired OR acquires OR deal)',
 };
 const perPlayer = (name, team, focus) => [
   { src: 'Google News', kind: 'rss', url: `https://news.google.com/rss/search?q=${encodeURIComponent(focus ? `"${name}" ${FOCUS[focus]} when:7d` : `"${name}" NFL when:14d`)}&hl=en-US&gl=US&ceid=US:en` },
@@ -185,10 +186,10 @@ function kindOf(x) {
    reading without clicking through. One Claude call per batch of up to 12 stories, cached per story URL. */
 const RECAPS = new Map();
 async function recapBatch(list) {
-  const body = list.map((x, i) => `[${i}] Player: ${x.n} (${x.pos || '?'}, ${x.t || '?'}) · ${x.outlet || 'unknown outlet'}\nHeadline: ${x.title}\nText: ${x.desc || '(headline only)'}`).join('\n\n');
+  const body = list.map((x, i) => `[${i}] Player: ${x.n} (${x.pos || '?'}, ${x.t || '?'}) · ${x.outlet || 'unknown outlet'}${x.f === 'trade' ? ' · TRADE' + (x.from && x.to ? ` (${x.from} to ${x.to})` : '') : ''}\nHeadline: ${x.title}\nText: ${x.desc || '(headline only)'}`).join('\n\n');
   const prompt = `You write the news feed of a fantasy football app. For each story below, write a recap so a fantasy manager gets the news at face value without opening the article.
 
-- "title": the single biggest takeaway as a plain statement, under 80 characters (for example "Ruled out Sunday with a high ankle sprain; Week 12 return possible" or "Out-snapped Johnson 41-22 and got 9 of 11 red-zone touches"). No clickbait, no questions, no outlet names.
+- "title": the single biggest takeaway for the named player as a plain statement, under 85 characters. It must start with the player's name (full name, or last name if the full title would run long) and say what is happening to him, even when the original headline is about someone else, a team or a coach (for example "Achane ruled out Sunday with a high ankle sprain; Week 12 return possible" or "Jeanty out-snapped Mitchell 41-22 and got 9 of 11 red-zone touches" or "Pittman traded from the Colts to the Steelers for a 2027 3rd"). When a story is marked as a trade, the title says who he was traded from and to, and the points cover what was sent back and how his role changes. No clickbait, no questions, no outlet names.
 - "points": 1 to 3 short bullet points, each under 95 characters, with the other key facts: numbers, injury details, practice status, timelines, who is affected. The last point may be the fantasy takeaway, but only when it follows directly from the facts given. If the story is only a headline with no text, return just one point or an empty array; never add anything the headline and text do not say.
 
 Use only facts in the headline and text. Reply with only a JSON array like [{"i":0,"title":"...","points":["...","..."]}].
@@ -209,14 +210,14 @@ ${body}`;
 const cleanLine = (s, n) => String(s || '').replace(/\s+/g, ' ').trim().slice(0, n);
 async function recapAll(items) {
   const out = {}, todo = [];
-  items.forEach(x => { const c = RECAPS.get(x.u); if (c && Date.now() - c.at < 7 * 864e5) out[x.u] = c.v; else todo.push(x); });
+  items.forEach(x => { const c = RECAPS.get('v2|' + x.u); if (c && Date.now() - c.at < 7 * 864e5) out[x.u] = c.v; else todo.push(x); });
   if (todo.length && API_KEY) {
     const chunks = []; for (let i = 0; i < todo.length; i += 12) chunks.push(todo.slice(i, i + 12));
     await Promise.all(chunks.map(async ch => {
       const arr = await recapBatch(ch); if (!arr) return;
       arr.forEach(a => { const x = a && ch[a.i]; if (!x || !a.title) return;
         const v = { t: cleanLine(a.title, 110), pts: (Array.isArray(a.points) ? a.points : []).map(p => cleanLine(p, 140)).filter(Boolean).slice(0, 3) };
-        RECAPS.set(x.u, { at: Date.now(), v }); out[x.u] = v; });
+        RECAPS.set('v2|' + x.u, { at: Date.now(), v }); out[x.u] = v; });
     }));
     if (RECAPS.size > 3000) [...RECAPS.keys()].slice(0, 1000).forEach(k => RECAPS.delete(k));
   }
@@ -234,7 +235,8 @@ export default async function handler(req, res) {
     const raw = (req.body && Array.isArray(req.body.items)) ? req.body.items : [];
     const items = raw.slice(0, 30).filter(x => x && typeof x.u === 'string' && /^https?:/.test(x.u) && x.title).map(x => ({
       u: x.u.slice(0, 600), n: cleanLine(x.n, 60), pos: cleanLine(x.pos, 4), t: cleanLine(x.t, 4),
-      title: cleanLine(x.title, 220), desc: cleanLine(x.desc, 900), outlet: cleanLine(x.outlet, 60) }));
+      title: cleanLine(x.title, 220), desc: cleanLine(x.desc, 900), outlet: cleanLine(x.outlet, 60),
+      f: x.f === 'trade' ? 'trade' : '', from: cleanLine(x.from, 4), to: cleanLine(x.to, 4) }));
     const v = await recapAll(items);
     return res.status(200).json({ ai: true, items: v, err: Object.keys(v).length < items.length ? LAST_ERR : undefined });
   }
@@ -276,7 +278,33 @@ export default async function handler(req, res) {
     res.setHeader('Cache-Control', 'public, max-age=0, s-maxage=600');
     return res.status(200).json(v);
   }
-  /* league mode for the News tab's Activity: league-wide moves a fantasy manager cares about (trades, signings,
+  /* trade mode for the News tab's Feed: the best story about each fantasy-relevant player who just changed teams,
+     so the trade card can carry an article about that trade. No AI. GET /api/news?trades=Name|FROM|TO;...
+     -> {items:{[name]:{title,desc,url,outlet,at,img}}}; a player with no good story is simply left out. */
+  if (q.trades) {
+    const list = String(q.trades).split(';').map(x => x.split('|')).filter(x => x[0]).slice(0, 12)
+      .map(([n, f, t]) => ({ n: String(n).slice(0, 60), from: String(f || '').toUpperCase().slice(0, 4), to: String(t || '').toUpperCase().slice(0, 4) }));
+    const key = 'trades:' + list.map(x => norm(x.n) + x.to).sort().join(',');
+    const c = cache.get(key);
+    if (c && Date.now() - c.at < 20 * 60e3) { res.setHeader('Cache-Control', 'public, max-age=0, s-maxage=1200'); return res.status(200).json(c.v); }
+    const out = {};
+    await Promise.all(list.map(async x => {
+      try {
+        const { items } = await collect(x.n, x.to || x.from, false, false, 'trade', 21);
+        const last = norm(x.n).split(' ').pop();
+        const good = items.filter(i => !RUMOR.test(i.title) && !FLUFF.test(i.title) && (moveOf(i.title) === 'trade' || moveOf((i.desc || '').slice(0, 300)) === 'trade'))
+          .map(i => ({ i, s: (norm(i.title).includes(last) ? 2 : 0) + (moveOf(i.title) === 'trade' ? 2 : 0) + (i.desc ? 1 : 0) + Date.parse(i.at || 0) / 864e5 / 100 }))
+          .sort((a, b) => b.s - a.s);
+        const b = good[0] && good[0].i;
+        if (b) out[x.n] = { title: b.title, desc: clip(b.desc, 700), url: b.url, outlet: b.outlet, at: b.at, img: b.img || null };
+      } catch { }
+    }));
+    const v = { updated: new Date().toISOString(), items: out };
+    cache.set(key, { at: Date.now(), v });
+    res.setHeader('Cache-Control', 'public, max-age=0, s-maxage=1200');
+    return res.status(200).json(v);
+  }
+  /* league mode for the News tab's Feed: league-wide moves a fantasy manager cares about (trades, signings,
      releases, season-ending injuries, new starters) from the shared outlets. No AI, no player list: the client
      matches the stories to fantasy-relevant players and decides what to show. GET /api/news?league=1 */
   if (q.league) {

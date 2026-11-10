@@ -175,7 +175,7 @@ async function tmnTick(){try{
   tmnMyInj(Ls,fresh,at);
   /* 5. finished matchups go into the Feed; 6. once the whole week is final, anyone of yours who topped his position */
   tmnResults(Ls,fresh,at);
-  if(gs.length&&gs.every(g=>g.state==='post'))tmnTopFind(WEEK,LIVEST,LIVE.games,Ls,null,true);
+  if(tmnWeekOver(WEEK,LIVE.games))tmnTopFind(WEEK,LIVEST,LIVE.games,Ls,null,true);
   /* remember this check for the next one */
   TMN.prevOpp=TMN.prevOpp||{};Ls.forEach(c=>{if(c.opp){TMN.prev[c.key]={...(TMN.prev[c.key]||{}),mu:c.opp.m-c.opp.om,wp:c.opp.wp};TMN.prevOpp[c.key]=[...new Set([...c.oppStarters,...(TMN.prevOpp[c.key]||[])])].filter(id=>{const p=byId[id],g=p&&LIVE.games[p.t];return c.oppStarters.has(id)||(g&&g.state!=='pre')})}});
   TMN.prevSt=JSON.parse(JSON.stringify(LIVEST||{}));Ls.forEach(c=>(TMN.prevOpp[c.key]||[]).forEach(id=>TMN.prevStat[id]=stOf(id)||''));Object.keys(own).forEach(id=>TMN.prevStat[id]=stOf(id)||'');
@@ -291,12 +291,18 @@ const TMN_TOP_LS='tm-news-top-v1';
 function tmnTop(){if(TMN.top)return TMN.top;try{TMN.top=JSON.parse(localStorage.getItem(TMN_TOP_LS)||'null')}catch(e){}TMN.top=TMN.top||{done:[],items:[]};return TMN.top}
 function tmnTopSave(){const T=tmnTop();T.done=T.done.slice(-8);T.done2=(T.done2||[]).slice(-8);T.items=T.items.slice(0,30);try{localStorage.setItem(TMN_TOP_LS,JSON.stringify(T))}catch(e){}}
 const tmnPosN=pos=>pos==='DST'?'defense':pos==='K'?'kicker':pos||'';
-const TMN_TOP_HOLD=48*3600e3;   /* the #1 card stays pinned at the top of the Feed this long, then scrolls with the rest */
+const TMN_TOP_HOLD=50*3600e3;   /* the #1 card stays pinned at the top of the Feed for 50 hours, then moves into the timeline */
 const TMN_SEC_POS=['QB','RB','WR','TE'];
+/* the week is over only when every team with a game that week (from the schedule, so Monday night counts even
+   before ESPN lists it) has a final, and the last of those games kicked off on Monday or later */
+function tmnWeekOver(week,games){const gs=Object.values(games||{});if(!gs.length||!gs.every(g=>g.state==='post'))return false;
+  const D=window.NFL_DATA,sch=D&&D.sched;if(sch){const need=Object.keys(sch).filter(t=>sch[t]&&sch[t][week-1]);if(need.some(t=>!games[t]||games[t].state!=='post'))return false}
+  const last=Math.max(0,...gs.map(g=>Date.parse(g.start||0)||0));if(!last)return true;
+  const day=new Date(last).toLocaleDateString('en-US',{weekday:'short',timeZone:'America/New_York'});return day==='Mon'||day==='Tue'}
 function tmnTopFind(week,stats,games,Ls,fresh,live){const T=tmnTop();T.done2=T.done2||[];
   const do1=!T.done.includes(week),do2=!T.done2.includes(week);
   if((!do1&&!do2)||!Ls.length||(typeof USER!=='undefined'&&!USER))return;
-  const gs=Object.values(games||{});if(!gs.length||!gs.every(g=>g.state==='post'))return;
+  const gs=Object.values(games||{});if(!tmnWeekOver(week,games))return;
   const found={},sec={};
   Ls.forEach(c=>{const by={};Object.keys(stats||{}).forEach(id=>{const p=byId[id];if(!p||!stats[id])return;let pts=0;try{pts=linePts(stats[id],p.pos,c.sc)}catch(e){}(by[p.pos]=by[p.pos]||[]).push({id,pts})});
     let best=null;
@@ -404,7 +410,7 @@ function tmnOppCard(x,Ls){const f=byId[x.from],s=stOf(x.from),mine=Ls.some(c=>c.
     <ul class="tmn-op-l">${x.rows.map(row).join('')}</ul></article>`}
 
 /* ---------- the News tab ---------- */
-const TMN_F=[['all','Activity'],['team','Your team'],['inj','Injuries'],['clips','Clips']];
+const TMN_F=[['all','Feed'],['team','Your team'],['inj','Injuries'],['clips','Clips']];
 function tmnMood(){const gs=LIVE&&LIVE.week===WEEK?Object.values(LIVE.games||{}):[];if(gs.some(g=>g.state==='in'))return 'live';if(gs.some(g=>g.state==='post'))return 'after';return 'quiet'}
 /* 8-tooth gear, drawn on the same 24px grid and stroke as the other line icons */
 const TMN_GEAR='<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" aria-hidden="true"><path d="M10.15 4.84L10.18 2.17A10 10 0 0 1 13.82 2.17L13.85 4.84A7.4 7.4 0 0 1 15.76 5.62L17.66 3.76A10 10 0 0 1 20.24 6.34L18.38 8.24A7.4 7.4 0 0 1 19.16 10.15L21.83 10.18A10 10 0 0 1 21.83 13.82L19.16 13.85A7.4 7.4 0 0 1 18.38 15.76L20.24 17.66A10 10 0 0 1 17.66 20.24L15.76 18.38A7.4 7.4 0 0 1 13.85 19.16L13.82 21.83A10 10 0 0 1 10.18 21.83L10.15 19.16A7.4 7.4 0 0 1 8.24 18.38L6.34 20.24A10 10 0 0 1 3.76 17.66L5.62 15.76A7.4 7.4 0 0 1 4.84 13.85L2.17 13.82A10 10 0 0 1 2.17 10.18L4.84 10.15A7.4 7.4 0 0 1 5.62 8.24L3.76 6.34A10 10 0 0 1 6.34 3.76L8.24 5.62A7.4 7.4 0 0 1 10.15 4.84Z"/><circle cx="12" cy="12" r="3.1"/></svg>';
@@ -433,8 +439,8 @@ function tmnRenderBody(Ls){const el=$('tmn-feed');if(!el)return;Ls=Ls||tmnLeague
   const cnt={all:0,team:evs.length,inj:injList.length,clips:clipsAll.length};
   const seg=$('tmn-seg');if(seg)seg.innerHTML=TMN_F.map(([k,l])=>`<button type="button" data-nf="${k}" aria-pressed="${f===k}">${l}${cnt[k]?` <span class="tmn-n">${cnt[k]}</span>`:''}</button>`).join('');
   const sec=(id,title,note,html)=>html?`<section class="tmn-sec" data-sec="${id}"><div class="tmn-sec-h"><h2>${title}</h2>${note?`<span class="note">${note}</span>`:''}</div>${html}</section>`:'';
-  const card=e=>e.type==='second'||e.type==='top'?tmnRankCard(e):e.type==='res'?tmnResultCard(e):e.type==='lg'?tmnLeagueCard(e):e.type==='art'||e.type==='vid'?tmnStoryCard(e):tmnEvCard(e,CM.map.get(e.k));
-  const whose=e=>e.type==='lg'?(e.yours?'mine lg':'lg'):e.type==='opp'||e.type==='oinj'?'opp':'mine';
+  const card=e=>e.type==='second'||e.type==='top'?tmnRankCard(e):e.type==='res'?tmnResultCard(e):e.type==='trade'?tmnTradeCard(e):e.type==='lg'?tmnLeagueCard(e):e.type==='art'||e.type==='vid'?tmnStoryCard(e):tmnEvCard(e,CM.map.get(e.k));
+  const whose=e=>e.type==='lg'||e.type==='trade'?(e.yours?'mine lg':'lg'):e.type==='opp'||e.type==='oinj'?'opp':'mine';
   const tl=(list,act)=>list.length?`<ol class="tmn-tl${act?' act':''}">${tmnGroups(list).map(g=>`<li class="tmn-day"><span>${g.label}</span></li>${g.items.map(e=>`<li class="${act?whose(e):''}">${card(e)}</li>`).join('')}`).join('')}</ol>`:'';
   let html='';
   if(f==='inj'){const arts=stories.filter(x=>x.kind==='inj'&&stOf(x.pid));
@@ -442,10 +448,10 @@ function tmnRenderBody(Ls){const el=$('tmn-feed');if(!el)return;Ls=Ls||tmnLeague
       +sec('inj','Your injured players',injList.length?'Every league, starters and bench':'',injList.length?`<div class="tmn-injg">${injList.map(x=>tmnInjCard(x,tmnStoriesFor(x.id,arts))).join('')}</div>`:'')
       +sec('opp','Injury opportunities',opps.length?`Who gets the work while they're out${Ls.length>1?` · ownership in ${esc(S.league&&S.league.name||'this league')}`:''}`:'',opps.length?`<div class="tmn-opg">${opps.map(x=>tmnOppCard(x,Ls)).join('')}</div>`:'')}
   else if(f==='clips')html=sec('clips','Clips',clipsAll.length?`${CM.map.size} matched to a play · opens on ESPN or YouTube`:'',tmnClipsGrid(clipsAll,CM));
-  else{/* Your team: everything about your players. Activity: the same plus league news a fantasy manager cares about,
+  else{/* Your team: everything about your players. Feed: the same plus league news a fantasy manager cares about,
        with every card about your team flagged on the rail so the two are easy to tell apart. */
-    const act=f==='all',lgNews=act?tmnLeagueNews(Ls,picked):[];
-    const all=[...evs,...injUp,...res,...picked,...tmnRankFeed().filter(e=>inLg(e.leagues)),...lgNews].sort((a,b)=>tmnAt(b)-tmnAt(a));tmnLoadRecaps([...picked,...lgNews]);
+    const act=f==='all',lgAll=tmnLeagueNews(Ls,picked),trades=tmnTrades(Ls,lgAll).filter(x=>act||x.yours),lgNews=act?lgAll.filter(x=>x.kind!=='trade'):[];
+    const all=[...evs,...injUp,...res,...picked,...tmnRankFeed().filter(e=>inLg(e.leagues)),...lgNews,...trades].sort((a,b)=>tmnAt(b)-tmnAt(a));tmnLoadRecaps([...picked,...lgNews,...trades]);
     /* the biggest #1 gets the full card; any others this week sit in a row of smaller orange cards under it */
     const tp=[...tops].sort((a,b)=>(b.overall-a.overall)||(b.pts-a.pts));
     html=(tp.length?`<div class="tmn-tops">${tmnTopCard(tp[0])}${tp.length>1?`<div class="tmn-tops-more">${tp.slice(1).map(tmnTopMini).join('')}</div>`:''}</div>`:'')+tl(all,act)
@@ -493,19 +499,19 @@ function tmnRankCard(e){const p=byId[e.pid];if(!p)return '';const one=e.type==='
         <div class="tmn-lgs">${(e.leagues||[]).map(l=>`<span class="tmn-lchip${l.bench?' bench':''}">${esc(l.name)}${l.bench?' · bench':''}</span>`).join('')}</div></div></div>
       <div class="tmn-ev-f"><span class="tmn-go">Player card →</span></div></div></article>`}
 /* recaps: each story's biggest takeaway as its title plus a few key points, written once per story by /api/news */
-const TMN_RC_LS='tm-news-recap-v1';
+const TMN_RC_LS='tm-news-recap-v2';
 function tmnRecaps(){if(TMN.rc)return TMN.rc;try{TMN.rc=JSON.parse(localStorage.getItem(TMN_RC_LS)||'null')}catch(e){}TMN.rc=TMN.rc||{};return TMN.rc}
 async function tmnLoadRecaps(list){const R=tmnRecaps();TMN.rcTried=TMN.rcTried||new Set();
-  const todo=list.filter(x=>x.type==='art'&&x.url&&!R[x.url]&&!TMN.rcTried.has(x.url)).slice(0,30);if(!todo.length||TMN.rcBusy)return;
+  const todo=list.filter(x=>(x.type==='art'||x.type==='lg'||x.type==='trade')&&x.url&&!R[x.url]&&!TMN.rcTried.has(x.url)).slice(0,30);if(!todo.length||TMN.rcBusy)return;
   TMN.rcBusy=true;todo.forEach(x=>TMN.rcTried.add(x.url));
   try{const r=await fetch('/api/news?recap=1',{method:'POST',headers:{'content-type':'application/json'},
-      body:JSON.stringify({items:todo.map(x=>{const p=byId[x.pid];return {u:x.url,n:p&&p.n,pos:p&&p.pos,t:p&&p.t,title:x.title,desc:x.desc||'',outlet:x.outlet}})})});
+      body:JSON.stringify({items:todo.map(x=>{const p=byId[x.pid];return {u:x.url,n:p&&p.n,pos:p&&p.pos,t:p&&p.t,title:x.title,desc:x.desc||'',outlet:x.outlet,...(x.type==='trade'||x.kind==='trade'?{f:'trade',from:x.from||'',to:x.to||''}:{})}})})});
     const j=r.ok?await r.json():null;
     if(j&&j.items&&Object.keys(j.items).length){Object.assign(R,j.items);
       const keys=Object.keys(R);if(keys.length>400)keys.slice(0,keys.length-400).forEach(k=>delete R[k]);
       try{localStorage.setItem(TMN_RC_LS,JSON.stringify(R))}catch(e){}}}catch(e){}
   TMN.rcBusy=false;if(tab==='news'&&$('tmn-feed'))tmnRenderBody()}
-/* ---------- league news for Activity ----------
+/* ---------- league news and trades for the Feed ----------
    /api/news?league=1 returns this week's trades, signings, releases, season-ending injuries and new starters from
    the shared outlets. Only stories about fantasy-relevant players are kept (ranked inside the top 220, top 150 for
    injuries), each tagged with who has him in the league on screen: you, another team, or nobody (a waiver add). */
@@ -514,11 +520,11 @@ try{const c=JSON.parse(localStorage.getItem(TMN_LG_LS)||'null');if(c&&c.items&&D
 async function tmnLoadLeague(){if(TMN.lgBusy||(TMN.lgn&&Date.now()-TMN.lgn.at<10*60e3))return;TMN.lgBusy=true;
   try{const r=await fetch('/api/news?league=1&b='+Math.floor(Date.now()/600000));const j=r.ok?await r.json():null;
     if(j&&Array.isArray(j.items)){TMN.lgn={at:Date.now(),items:j.items};try{localStorage.setItem(TMN_LG_LS,JSON.stringify(TMN.lgn))}catch(e){}}}catch(e){}
-  TMN.lgBusy=false;if(tab==='news'&&TMN.f==='all'&&$('tmn-feed'))tmnRenderBody()}
+  TMN.lgBusy=false;if(tab==='news'&&(TMN.f==='all'||TMN.f==='team')&&$('tmn-feed'))tmnRenderBody()}
 const TMN_LGK={trade:['Trade','accent'],inj:['Injury','bad'],move:['Roster move','muted'],role:['Depth chart','warn']};
 function tmnLeagueNews(Ls,picked){const raw=TMN.lgn&&TMN.lgn.items;if(!raw||!raw.length)return [];
   const rk=id=>(typeof V!=='undefined'&&V&&V.rank&&V.rank[id])||999;
-  if(!TMN.lgIdx||TMN.lgIdx.n!==POOL.length){const L=POOL.filter(p=>p.pos!=='DST'&&p.pos!=='K'&&rk(p.id)<=220).map(p=>[norm(p.n),p.id]).filter(x=>x[0].includes(' '));
+  if(!TMN.lgIdx||TMN.lgIdx.n!==POOL.length){const L=POOL.filter(p=>p.pos!=='DST'&&p.pos!=='K'&&rk(p.id)<=300).map(p=>[norm(p.n),p.id]).filter(x=>x[0].includes(' '));
     TMN.lgIdx={n:POOL.length,L,by:Object.fromEntries(L)}}
   const {L,by}=TMN.lgIdx,mine=new Set();Ls.forEach(c=>c.roster.forEach(id=>mine.add(id)));
   const seen=new Set((picked||[]).map(x=>x.url)),cut=Date.now()-7*864e5,out=[];
@@ -526,9 +532,48 @@ function tmnLeagueNews(Ls,picked){const raw=TMN.lgn&&TMN.lgn.items;if(!raw||!raw
     let pid=null;const ath=(a.athletes||[]).map(norm).find(n=>by[n]);if(ath)pid=by[ath];
     if(!pid){const h=normT(a.title);const hit=L.filter(([n])=>wordIn(h,n)).sort((x,y)=>rk(x[1])-rk(y[1]))[0];if(hit)pid=hit[1]}
     if(!pid){const h=normT(String(a.desc||'').slice(0,220));const hit=L.filter(([n])=>wordIn(h,n)).sort((x,y)=>rk(x[1])-rk(y[1]))[0];if(hit)pid=hit[1]}
-    if(!pid||(a.kind==='inj'&&rk(pid)>150)||out.some(o=>o.pid===pid&&o.kind===a.kind))return;
+    if(!pid||(a.kind==='inj'&&rk(pid)>150)||(a.kind!=='trade'&&rk(pid)>220)||out.some(o=>o.pid===pid&&o.kind===a.kind))return;
     seen.add(a.url);out.push({type:'lg',k:'lg:'+a.url,kind:a.kind,pid,yours:mine.has(pid),title:a.title,desc:a.desc,url:a.url,outlet:a.outlet,img:a.img,at,leagues:[]})});
-  return out.sort((a,b)=>(b.at-a.at)).slice(0,14)}
+  const tr=out.filter(x=>x.kind==='trade'),rest=out.filter(x=>x.kind!=='trade').sort((a,b)=>b.at-a.at).slice(0,14);
+  return [...rest,...tr].sort((a,b)=>b.at-a.at)}
+/* Trades of top-300 players. Two sources: team changes the nightly data update saw (DATA.moves: [id, from, to, day]),
+   and trade stories from the outlets. Each trade gets one card. It carries a story about that trade when there is a
+   good one (from the shared outlets, else /api/news?trades= searches for it); with none it still shows, without a link. */
+const TMN_TR_LS='tm-news-trades-v1';
+try{const c=JSON.parse(localStorage.getItem(TMN_TR_LS)||'null');if(c&&c.items)TMN.tra=c}catch(e){}
+async function tmnLoadTradeArts(list){const need=list.filter(x=>!x.url&&!(TMN.tra&&TMN.tra.items&&TMN.tra.items[x.pid]&&Date.now()-TMN.tra.items[x.pid].at<30*60e3));
+  if(!need.length||TMN.traBusy)return;TMN.traBusy=true;
+  const q=need.slice(0,12).map(x=>[byId[x.pid].n,x.from||'',x.to||''].join('|')).join(';');
+  try{const r=await fetch('/api/news?trades='+encodeURIComponent(q)+'&b='+Math.floor(Date.now()/1200000));const j=r.ok?await r.json():null;
+    if(j&&j.items){TMN.tra=TMN.tra||{items:{}};need.slice(0,12).forEach(x=>{TMN.tra.items[x.pid]={at:Date.now(),a:j.items[byId[x.pid].n]||null}});
+      try{localStorage.setItem(TMN_TR_LS,JSON.stringify(TMN.tra))}catch(e){}}}catch(e){}
+  TMN.traBusy=false;if(tab==='news'&&$('tmn-feed'))tmnRenderBody()}
+function tmnTrades(Ls,lg){const rk=id=>(typeof V!=='undefined'&&V&&V.rank&&V.rank[id])||999,mine=new Set();Ls.forEach(c=>c.roster.forEach(id=>mine.add(id)));
+  const cut=Date.now()-14*864e5,by={},D=window.NFL_DATA;
+  ((D&&D.moves)||[]).forEach(([id,from,to,day])=>{const p=byId[id],at=Date.parse(day+'T12:00:00');if(!p||rk(id)>300||!at||at<cut)return;by[id]={from,to,at}});
+  (lg||[]).filter(x=>x.kind==='trade').forEach(x=>{const m=by[x.pid]||(by[x.pid]={from:'',to:byId[x.pid].t,at:x.at});if(!m.url){m.url=x.url;m.title=x.title;m.desc=x.desc;m.outlet=x.outlet;m.img=x.img;m.at=Math.min(m.at,x.at)}});
+  const out=Object.entries(by).map(([pid,m])=>{let a=m.url?null:TMN.tra&&TMN.tra.items&&TMN.tra.items[pid]&&TMN.tra.items[pid].a;
+    if(a&&Date.parse(a.at||0)<m.at-5*864e5)a=null;    /* a story from long before the move is about something else */
+    const x={type:'trade',kind:'trade',k:'tr:'+pid,pid,from:m.from,to:m.to||byId[pid].t,yours:mine.has(pid),at:m.at,leagues:[],url:m.url||(a&&a.url)||'',title:m.title||(a&&a.title)||'',desc:m.desc||(a&&a.desc)||'',outlet:m.outlet||(a&&a.outlet)||'',img:m.img||(a&&a.img)||null};
+    if(a&&a.at){const t=Date.parse(a.at);if(t&&t<x.at)x.at=t}return x}).sort((a,b)=>b.at-a.at).slice(0,10);
+  tmnLoadTradeArts(out);return out}
+/* a story's title, always about the player on the card: when the headline doesn't name him, lead with his name */
+function tmnTitleFor(p,t){if(!p||!t)return t||'';const last=norm(p.n).split(' ').filter(w=>w.length>1).pop()||'';return last&&wordIn(normT(t),last)?t:`${p.n}: ${t}`}
+function tmnTradeCard(x){const p=byId[x.pid];if(!p)return '';const rc=x.url&&tmnRecaps()[x.url];
+  const ow=x.yours?'mine':typeof OWN==='undefined'||OWN[x.pid]==null?'fa':OWN[x.pid]===S.me?'mine':'other';
+  const T=ow==='other'&&S.teams&&S.teams.find(t=>t.id===OWN[x.pid]);
+  const own=ow==='mine'?'<span class="tmn-own mine">Your team</span>':ow==='fa'?'<span class="tmn-own fa" data-go-waivers="1">Free agent ↗</span>':`<span class="tmn-own">${esc(T?T.name:'Rostered')}</span>`;
+  const route=`<span class="tmn-tr-route">${x.from?`<b>${esc(x.from)}</b><i aria-hidden="true">→</i>`:'<i aria-hidden="true">→</i>'}<b>${esc(x.to)}</b></span>`;
+  const host=(()=>{try{return new URL(x.url).hostname.replace(/^www\./,'')}catch(e){return ''}})(),src=x.outlet&&x.outlet!=='Google News'?x.outlet:host;
+  const head=rc?tmnTitleFor(p,rc.t):x.title?tmnTitleFor(p,x.title):`${p.n} traded${x.from?' from '+x.from:''} to ${x.to}`;
+  const body=rc?(rc.pts.length?`<ul class="tmn-pts">${rc.pts.map(t=>`<li>${esc(t)}</li>`).join('')}</ul>`:''):x.desc&&x.desc!==x.title?`<p class="tmn-clamp">${esc(x.desc)}</p>`:!x.url?`<p>${esc(p.pos)} · now with ${esc(x.to)}. No story about this trade yet.</p>`:'';
+  const inner=`${tmnRail(x.at)}
+    <div class="tmn-ev-card"><div class="tmn-ev-top"><span class="tmn-lbl accent">Trade</span><span class="tmn-who">${av(p,'sm')}${esc(p.n)}<small>${p.pos}</small></span>${route}${own}</div>
+      <div class="tmn-ev-main tmn-story-m"><div class="tmn-ev-txt"><h3>${esc(head)}</h3>${body}</div>
+        ${x.img?`<span class="tmn-sthumb"><img src="${esc(x.img)}" alt="" loading="lazy" decoding="async" onerror="this.parentNode.remove()"></span>`:''}</div>
+      <div class="tmn-ev-f">${x.url?`<span class="tmn-src"><b>${esc(src)}</b></span><span class="tmn-go">Read about the trade ↗</span>`:'<span class="tmn-src">Team change in the latest NFL data</span><span class="tmn-go">Player card →</span>'}</div></div>`;
+  return x.url?`<a class="tmn-ev tmn-story tmn-trade tone-accent${rc?' recap':''}" href="${esc(x.url)}" target="_blank" rel="noopener" data-nkf="${esc(x.k)}" title="${esc(x.title)}">${inner}</a>`
+    :`<article class="tmn-ev tmn-trade tone-accent tap" data-ncard="${p.id}" data-nkf="${esc(x.k)}" tabindex="0">${inner}</article>`}
 function tmnLeagueCard(x){const p=byId[x.pid],[lbl,tone]=TMN_LGK[x.kind]||['League news','muted'],rc=tmnRecaps()[x.url];
   const host=(()=>{try{return new URL(x.url).hostname.replace(/^www\./,'')}catch(e){return ''}})(),src=x.outlet&&x.outlet!=='Google News'?x.outlet:host;
   const ow=x.yours?'mine':typeof OWN==='undefined'||OWN[x.pid]==null?'fa':OWN[x.pid]===S.me?'mine':'other';
@@ -537,7 +582,7 @@ function tmnLeagueCard(x){const p=byId[x.pid],[lbl,tone]=TMN_LGK[x.kind]||['Leag
   return `<a class="tmn-ev tmn-story tmn-lgn tone-${tone}${rc?' recap':''}" href="${esc(x.url)}" target="_blank" rel="noopener" data-nkf="${esc(x.k)}"${rc?` title="${esc(x.title)}"`:''}>
     ${tmnRail(x.at)}
     <div class="tmn-ev-card"><div class="tmn-ev-top"><span class="tmn-lbl ${tone}">${lbl}</span><span class="tmn-who">${av(p,'sm')}${esc(p.n)}<small>${p.pos} · ${p.t}</small></span>${own}</div>
-      <div class="tmn-ev-main tmn-story-m"><div class="tmn-ev-txt">${rc?`<h3>${esc(rc.t)}</h3>${rc.pts.length?`<ul class="tmn-pts">${rc.pts.map(t=>`<li>${esc(t)}</li>`).join('')}</ul>`:''}`:`<h3>${esc(x.title)}</h3>${x.desc&&x.desc!==x.title?`<p class="tmn-clamp">${esc(x.desc)}</p>`:''}`}</div>
+      <div class="tmn-ev-main tmn-story-m"><div class="tmn-ev-txt">${rc?`<h3>${esc(tmnTitleFor(p,rc.t))}</h3>${rc.pts.length?`<ul class="tmn-pts">${rc.pts.map(t=>`<li>${esc(t)}</li>`).join('')}</ul>`:''}`:`<h3>${esc(tmnTitleFor(p,x.title))}</h3>${x.desc&&x.desc!==x.title?`<p class="tmn-clamp">${esc(x.desc)}</p>`:''}`}</div>
         ${x.img?`<span class="tmn-sthumb"><img src="${esc(x.img)}" alt="" loading="lazy" decoding="async" onerror="this.parentNode.remove()"></span>`:''}</div>
       <div class="tmn-ev-f"><span class="tmn-src"><b>${esc(src)}</b></span><span class="tmn-go">Read ↗</span></div></div></a>`}
 /* a story or a video: the whole card is the link */
@@ -548,7 +593,7 @@ function tmnStoryCard(x){const p=byId[x.pid],inj=x.kind==='inj',vid=x.type==='vi
   return `<a class="tmn-ev tmn-story tone-${tone}${vid?' vid':''}${rc?' recap':''}" href="${esc(x.url)}" target="_blank" rel="noopener" data-nkf="${esc(x.k||'')}"${rc?` title="${esc(x.title)}"`:''}>
     ${tmnRail(x.at)}
     <div class="tmn-ev-card"><div class="tmn-ev-top"><span class="tmn-lbl ${tone}">${lbl}</span><span class="tmn-who">${av(p,'sm')}${esc(p.n)}<small>${p.pos} · ${p.t}${stOf(x.pid)?` · <i class="tmn-st">${esc(ST_LABEL[stOf(x.pid)]||stOf(x.pid))}</i>`:''}</small></span></div>
-      <div class="tmn-ev-main tmn-story-m"><div class="tmn-ev-txt">${rc?`<h3>${esc(rc.t)}</h3>${rc.pts.length?`<ul class="tmn-pts">${rc.pts.map(t=>`<li>${esc(t)}</li>`).join('')}</ul>`:''}`:`<h3>${esc(x.title)}</h3>${x.desc?`<p class="tmn-clamp">${esc(x.desc)}</p>`:''}`}</div>
+      <div class="tmn-ev-main tmn-story-m"><div class="tmn-ev-txt">${rc?`<h3>${esc(tmnTitleFor(p,rc.t))}</h3>${rc.pts.length?`<ul class="tmn-pts">${rc.pts.map(t=>`<li>${esc(t)}</li>`).join('')}</ul>`:''}`:`<h3>${esc(tmnTitleFor(p,x.title))}</h3>${x.desc?`<p class="tmn-clamp">${esc(x.desc)}</p>`:''}`}</div>
         ${x.img?`<span class="tmn-sthumb${vid?' vid':''}"><img src="${esc(x.img)}" alt="" loading="lazy" decoding="async" onerror="this.parentNode.remove()">${vid?'<span class="vplay" aria-hidden="true"></span>':''}</span>`:''}</div>
       <div class="tmn-ev-f"><span class="tmn-src"><b>${esc(src)}</b>${x.also&&x.also.length?` · also ${esc(x.also.join(', '))}`:''}</span><span class="tmn-go">${vid?'Watch':'Read'} ↗</span></div></div></a>`}
 /* the clip that shows a play: a link out to ESPN or YouTube */

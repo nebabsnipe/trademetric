@@ -1865,3 +1865,17 @@ a.tmn-own.fa{background:var(--accent-soft);color:var(--accent)}a.tmn-own.fa:hove
 .tmn-rank.tmn-n2 .tmn-ev-rail::after{background:linear-gradient(135deg,#E6EAEE,#8F98A2);box-shadow:0 0 0 4px var(--bg),0 0 0 6px var(--silver-soft)}
 .tmn-rank.tmn-n2 .tmn-lchip{background:color-mix(in srgb,var(--surface) 55%,transparent);color:var(--silver-ink)}
 @media (prefers-reduced-motion:reduce){.tmn-rank.tmn-n2 .tmn-ev-card::after{animation:none!important;display:none}}
+
+/* News Feed: day dividers stand out a little more (a bolder date with a rule running across) */
+.tmn-tl .tmn-day{display:flex;align-items:center;gap:10px;margin:18px 0 8px}
+.tmn-tl .tmn-day:first-child{margin-top:2px}
+.tmn-tl .tmn-day span{font-size:13px;font-weight:800;color:var(--ink);text-transform:none;letter-spacing:0;background:var(--bg);padding:3px 10px 3px 0;white-space:nowrap}
+.tmn-tl .tmn-day::after{content:"";flex:1;height:1px;background:color-mix(in srgb,var(--ink) 18%,var(--line))}
+/* trades */
+.tmn-trade .tmn-ev-card{border-left:3px solid var(--accent)}
+.tmn-tr-route{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-family:var(--mono,ui-monospace,monospace)}
+.tmn-tr-route b{padding:1px 6px;border-radius:5px;background:var(--surface-2);border:1px solid var(--line);color:var(--ink)}
+.tmn-tr-route i{font-style:normal;color:var(--accent);font-weight:800}
+.tmn-trade .tmn-ev-top{flex-wrap:wrap;justify-content:flex-start;gap:6px 10px}
+.tmn-trade .tmn-ev-top .tmn-who{flex:none;max-width:none}
+.tmn-trade .tmn-ev-top .tmn-own{margin-left:auto}
