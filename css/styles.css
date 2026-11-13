@@ -2013,3 +2013,18 @@ a.tmn-own.fa{background:var(--accent-soft);color:var(--accent)}a.tmn-own.fa:hove
 .tmn-trade .tmn-ev-top{justify-content:space-between}
 .tmn-tl.act li.mine .tmn-ev:not(.tmn-rank):not(.tmn-mytr) .tmn-ev-card{box-shadow:0 0 0 1px color-mix(in srgb,var(--accent) 12%,transparent),var(--shadow)}
 :root{--gold-c:#FFC08F}
+/* ---- News round 7: bundled stories, one pop-up at a time ---- */
+.tmn-more{list-style:none;margin:8px 0 0;padding:8px 0 0;border-top:1px solid color-mix(in srgb,var(--line) 70%,transparent);display:flex;flex-direction:column;gap:4px}
+.tmn-more li{font-size:12.5px;line-height:1.35;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--muted)}
+.tmn-more a,.tmn-more span{color:var(--muted);text-decoration:none}
+.tmn-more a:hover{color:var(--accent)}
+.tmn-more b{color:var(--ink);font-weight:700;margin-right:6px}
+.tmn-more i{font-style:normal;font-size:10.5px;text-transform:uppercase;letter-spacing:.06em;margin-left:4px}
+.tmn-more .tmn-more-n{font-weight:600;font-size:11.5px}
+a.tmn-hl{color:inherit;text-decoration:none}a.tmn-hl:hover{color:var(--accent);text-decoration:underline}
+.tmn-ev.tap:hover h3 a.tmn-hl{color:inherit}.tmn-ev.tap h3 a.tmn-hl:hover{color:var(--accent)}
+.tmn-ev-txt p.tmn-clamp{-webkit-line-clamp:2}
+/* the corner: one pop-up, the rest behind a count, and none while you're on News */
+body[data-tab="news"] .tmn-chips{display:none}
+.tmn-chips{flex-direction:row;align-items:center;gap:6px}
+.tmn-chip.more{padding:6px 11px;font:700 12px var(--f-body);color:var(--ink);text-decoration:none}
