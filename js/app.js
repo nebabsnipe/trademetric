@@ -2609,11 +2609,16 @@ function alertsList(){const me=S&&myTeam&&myTeam();if(!me||!V||!G)return [];cons
   if(IRS.open)IRS.cand.slice(0,IRS.open).forEach(id=>out.push({k:`ir-${id}-${stOf(id)}`,lvl:'warn',t:`Move ${byId[id].n} to IR`,d:`He is ${IR_WHY[stOf(id)]||'injured'} and you have an open IR slot. Move him there in ${irApp()} to free a roster spot.`,open:id}));
   IRS.stale.forEach(id=>out.push({k:`iract-${WEEK}-${id}`,lvl:'bad',t:`Activate ${byId[id].n} from IR`,d:`He no longer has an IR-eligible designation. Activate him in ${irApp()}; most apps block adds and trades until you do.`,open:id}));
   OPPS.filter(o=>!OWN[o.id]&&o.dp>=2).sort((a,b)=>b.dp-a.dp).slice(0,3).forEach(o=>out.push({k:`pick-${WEEK}-${o.id}`,lvl:'good',t:`Pickup: ${byId[o.id].n}`,d:oppTxtLine(o),open:o.id}));
-  return out}
+  /* from News: your players traded (top of the list), and this week's #1 / #2 finishes */
+  const top=[];
+  if(typeof tmnMyTrades==='function')tmnMyTrades().forEach(x=>{const p=byId[x.pid];if(p)top.push({k:`trade-${x.pid}-${x.to}`,lvl:'trade',t:`${p.n} was traded to the ${teamName(x.to)}`,d:`${x.from?x.from+' → ':''}${x.to}. Still on your roster; his role and matchups change with the new team.`,open:x.pid})});
+  if(typeof tmnTop==='function'){const cut=Date.now()-5*864e5;tmnTop().items.filter(e=>(e.type==='top'||e.type==='second')&&(e.at||0)>cut&&byId[e.pid]).sort((a,b)=>(a.type==='top'?0:1)-(b.type==='top'?0:1)||b.pts-a.pts).slice(0,3)
+    .forEach(e=>{const one=e.type==='top';top.push({k:`rank-${e.k}`,lvl:one?'n1':'n2',m:one?1:2,t:e.head,d:`${one?(e.overall?'#1 scorer in the NFL':'#1 '+(e.pos||'')+' in the NFL'):'#2 '+(e.pos||'')+' in the NFL'} · Week ${e.week} · ${f1(e.pts)} pts`,open:e.pid})})}
+  return [...top,...out]}
 function renderAlerts(){const b=$('alert-btn');if(!b)return;const L=USER?alertsList():[],seen=seenAlerts(),n=L.filter(a=>!seen.has(a.k)).length+(USER&&typeof tmnUnread==='function'&&tab!=='news'?tmnUnread():0);
   const c=$('alert-n');c.hidden=!n;c.textContent=n>9?'9+':n;b.setAttribute('aria-label',n?`Alerts, ${n} new`:'Alerts');
   const pop=$('alert-pop');if(!pop.hidden)paintAlerts(L,seen)}
-function paintAlerts(L,seen){const nn=typeof tmnUnread==='function'?tmnUnread():0;$('alert-pop').innerHTML=`<div class="al-h"><b>Alerts</b><span class="note">Week ${WEEK}</span></div>${nn?`<a class="al-news" href="#news"><b>${nn} new in News</b><span>Big plays from your players →</span></a>`:''}${L.length?`<div class="al-list">${L.map(a=>`<button class="al-i ${a.lvl}${seen.has(a.k)?'':' new'}" data-open="${a.open}"><i></i><span><b>${esc(a.t)}</b><span>${esc(a.d)}</span></span></button>`).join('')}</div>`:'<p class="empty" style="margin:0">All clear. Nothing needs your attention right now.</p>'}`}
+function paintAlerts(L,seen){const nn=typeof tmnUnread==='function'?tmnUnread():0;$('alert-pop').innerHTML=`<div class="al-h"><b>Alerts</b><span class="note">Week ${WEEK}</span></div>${nn?`<a class="al-news" href="#news"><b>${nn} new in News</b><span>Big plays from your players →</span></a>`:''}${L.length?`<div class="al-list">${L.map(a=>`<button class="al-i ${a.lvl}${seen.has(a.k)?'':' new'}" data-open="${a.open}"><i>${a.m?a.m:''}</i><span><b>${esc(a.t)}</b><span>${esc(a.d)}</span></span></button>`).join('')}</div>`:'<p class="empty" style="margin:0">All clear. Nothing needs your attention right now.</p>'}`}
 function toggleAlerts(open){const pop=$('alert-pop'),b=$('alert-btn');open=open??pop.hidden;pop.hidden=!open;b.setAttribute('aria-expanded',open);
   if(open){const L=alertsList(),seen=seenAlerts();paintAlerts(L,seen);try{localStorage.setItem(ALERT_LS,JSON.stringify([...new Set([...seen,...L.map(a=>a.k)])].slice(-300)))}catch(e){}$('alert-n').hidden=true}}
 

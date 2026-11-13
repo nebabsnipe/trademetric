@@ -1924,3 +1924,92 @@ a.tmn-own.fa{background:var(--accent-soft);color:var(--accent)}a.tmn-own.fa:hove
 .tmn-trade .tmn-ev-top{flex-wrap:wrap;justify-content:flex-start;gap:6px 10px}
 .tmn-trade .tmn-ev-top .tmn-who{flex:none;max-width:none}
 .tmn-trade .tmn-ev-top .tmn-own{margin-left:auto}
+
+/* ---- News round 6: less on every card, sleeker times, a louder trade for your players, brushed #1 ---- */
+/* rail: one quiet time, a dot on the line. Your cards get a filled dot in their colour, league news a hollow one */
+.tmn-tl{gap:8px}
+.tmn-tl.act li .tmn-ev-rail::before{content:none!important;display:none}
+.tmn-ev-rail{padding-top:14px}
+.tmn-ev-rail time{font:600 11px/1 var(--f-body);font-variant-numeric:tabular-nums;letter-spacing:.02em;color:var(--muted);opacity:1;white-space:nowrap;cursor:default}
+.tmn-ev-rail::after{width:9px;height:9px;left:80.5px;top:15px;box-shadow:0 0 0 3px var(--bg)}
+.tmn-tl.act li.lg:not(.mine) .tmn-ev-rail::after{width:9px;height:9px;left:80.5px;top:15px;background:var(--bg);box-shadow:inset 0 0 0 2px color-mix(in srgb,var(--muted) 70%,transparent),0 0 0 3px var(--bg)}
+/* day dividers: the day in bold, the date beside it, and "newest first" once at the top */
+.tmn-tl .tmn-day{margin:16px 0 4px}
+.tmn-tl .tmn-day span{display:inline-flex;align-items:baseline;gap:7px;font-size:13px}
+.tmn-tl .tmn-day span small{font:600 11px var(--f-body);color:var(--muted);letter-spacing:.02em}
+.tmn-newest{order:3;display:inline-flex;align-items:center;gap:5px;font:600 10.5px var(--f-body);font-style:normal;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);white-space:nowrap;background:var(--bg);padding-left:6px}
+.tmn-newest b{font-weight:700;color:var(--accent)}
+.tmn-key{display:inline-flex;align-items:center;gap:5px;margin-right:12px;text-transform:none;letter-spacing:0;font-size:11.5px}
+.tmn-key i{width:8px;height:8px;border-radius:50%;box-shadow:inset 0 0 0 2px color-mix(in srgb,var(--muted) 70%,transparent);margin-left:2px}
+.tmn-key i.y{background:var(--accent);box-shadow:none;margin-left:0}
+/* cards: no edge stripe, the kind as plain coloured text, no footer row */
+.tmn-ev-card{padding:12px 16px}
+.tmn-ev-card::before{display:none}
+.tmn-ev-top{margin-bottom:6px;min-height:20px}
+.tmn-ev:not(.tmn-rank):not(.tmn-mytr) .tmn-ev-top .tmn-lbl{background:none;padding:0;border-radius:0;font-size:10.5px;letter-spacing:.09em}
+.tmn-ev:not(.tmn-rank) .tmn-lbl.muted{color:var(--muted)}
+.tmn-kick{display:inline-flex;align-items:baseline;gap:8px;min-width:0}
+.tmn-kick .tmn-src{font-size:11.5px;color:var(--muted);font-weight:500}
+.tmn-kick .tmn-src::before{content:"·";margin-right:8px;opacity:.6}
+.tmn-kick .tmn-src i{font-style:normal;opacity:.7}
+.tmn-right{display:inline-flex;align-items:center;gap:8px;flex:none}
+.tmn-stb{font:700 10.5px var(--f-body);letter-spacing:.05em;text-transform:uppercase;color:var(--bad);white-space:nowrap}
+.tmn-ev-txt h3{font-size:15.5px;margin-bottom:2px}
+.tmn-ev-txt p{font-size:12.5px}
+.tmn-ev-main{gap:12px;align-items:center}
+.tmn-ev-main:has(.tmn-pts,.tmn-clamp){align-items:start}
+.tmn-ev-f{margin-top:6px;padding-top:0;border-top:0}
+.tmn-ev-txt .tmn-lgs{margin-top:6px}
+.tmn-ev.is-play .tmn-ev-card::before{display:none}
+.tmn-trade .tmn-ev-card{border-left:1px solid var(--line)}
+.tmn-tl.act li.lg:not(.mine) .tmn-ev-card{border-color:transparent}
+.tmn-ev.tap:hover .tmn-ev-card,.tmn-story:hover .tmn-ev-card{transform:none}
+.tmn-ev.tap:hover h3,.tmn-story:hover h3{color:var(--accent)}
+/* your player traded: the one trade card that should stop you scrolling */
+.tmn-mytr .tmn-ev-card{border:1px solid color-mix(in srgb,var(--accent) 45%,var(--line));background:linear-gradient(110deg,color-mix(in srgb,var(--accent) 11%,var(--surface)) 0%,var(--surface) 60%);box-shadow:0 10px 26px -18px color-mix(in srgb,var(--accent) 80%,transparent),var(--shadow)}
+.tmn-mytr .tmn-lbl{background:var(--accent);color:#fff}
+.tmn-mytr .tmn-tr-route{font-size:13px}.tmn-mytr .tmn-tr-route b{background:var(--surface);font-weight:700}
+.tmn-mytr .tmn-tr-route b:last-child{background:var(--accent);border-color:var(--accent);color:#fff}
+.tmn-mytr-n{margin-top:4px!important;color:var(--ink)!important;font-weight:600}
+.tmn-tl li.mine .tmn-mytr .tmn-ev-rail::after{background:var(--accent);box-shadow:0 0 0 3px var(--bg),0 0 0 5px var(--accent-soft)}
+.tmn-ban .tmn-tr-route{margin-right:4px}
+/* #1 in the timeline: brushed orange-gold, built the same way as the silver #2 */
+:root{--gold-a:#FFF4E8;--gold-b:#FFD6B0;--gold-c:#FFB27A;--gold-ink:#9A3412;--gold-ring:#FF8A3D}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--gold-a:#3A2516;--gold-b:#5E3416;--gold-c:#2A1A0F;--gold-ink:#FFC79A;--gold-ring:#FF8A3D}}
+:root[data-theme="dark"]{--gold-a:#3A2516;--gold-b:#5E3416;--gold-c:#2A1A0F;--gold-ink:#FFC79A;--gold-ring:#FF8A3D}
+.tmn-rank.tmn-n1 .tmn-ev-card{border-color:color-mix(in srgb,#FF5A14 28%,var(--line));background:linear-gradient(115deg,var(--gold-a) 0%,var(--gold-b) 34%,var(--gold-a) 52%,var(--gold-c) 100%);box-shadow:0 12px 26px -16px rgba(255,90,20,.6),inset 0 1px 0 rgba(255,255,255,.55),var(--shadow)}
+.tmn-rank.tmn-n1 .tmn-ev-card::after{content:"";position:absolute;inset:0;pointer-events:none;background:linear-gradient(105deg,transparent 35%,rgba(255,255,255,.6) 48%,transparent 60%);transform:translateX(-120%);animation:tmnSheen 3.4s ease-in-out .4s 2}
+.tmn-rank.tmn-n1:hover .tmn-ev-card::after{animation:tmnSheen 1.1s ease-in-out 1}
+.tmn-rank.tmn-n1 .tmn-ev-pts{color:var(--gold-ink)}
+.tmn-rank.tmn-n1 .tmn-ev-pts small,.tmn-rank.tmn-n1 .tmn-ev-txt p{color:color-mix(in srgb,var(--gold-ink) 78%,transparent)}
+.tmn-rank.tmn-n1 .tmn-ev-txt h3{font-weight:800}
+.tmn-rank.tmn-n1 .tmn-rank-av .av{box-shadow:0 0 0 2px var(--gold-a),0 0 0 4px var(--gold-ring)}
+.tmn-rank.tmn-n1 .tmn-rmedal{width:22px;height:22px;right:-11px;bottom:-9px;font-size:12px;background:radial-gradient(circle at 32% 28%,#FFF6C8 0%,#FFC23D 38%,#F26A12 100%);color:#5A1F00;box-shadow:0 0 0 2px var(--gold-a),0 3px 8px -2px rgba(150,50,0,.55)}
+.tmn-rank.tmn-n1 .tmn-ev-rail::after{background:linear-gradient(135deg,#FFD27A,#F2550F);box-shadow:0 0 0 3px var(--bg),0 0 0 5px color-mix(in srgb,#FF5A14 25%,transparent)}
+.tmn-rank.tmn-n1 .tmn-lchip{background:color-mix(in srgb,var(--surface) 55%,transparent);color:var(--gold-ink)}
+.tmn-rank.tmn-n2 .tmn-ev-rail::after{box-shadow:0 0 0 3px var(--bg),0 0 0 5px var(--silver-soft)}
+.tmn-rank .tmn-ev-main{align-items:center}
+@media (prefers-reduced-motion:reduce){.tmn-rank.tmn-n1 .tmn-ev-card::after{animation:none!important;display:none}}
+/* the bell: trades and #1/#2 finishes */
+.al-i.trade i{background:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+.al-i.n1,.al-i.n2{margin:2px 0;border:1px solid var(--line)}
+.al-i.n1{background:linear-gradient(115deg,var(--gold-a),var(--gold-b) 40%,var(--gold-a) 60%,var(--gold-c));border-color:color-mix(in srgb,#FF5A14 25%,var(--line))}
+.al-i.n2{background:linear-gradient(115deg,var(--silver-a),var(--silver-b) 40%,var(--silver-a) 60%,var(--silver-c))}
+.al-i.n1:hover,.al-i.n2:hover{filter:brightness(1.03)}
+.al-i.n1,.al-i.n2{grid-template-columns:20px minmax(0,1fr)}
+.al-i.n1 i,.al-i.n2 i{width:20px;height:20px;margin-top:1px;display:grid;place-items:center;font:italic 900 11px var(--f-display);font-style:italic}
+.al-i.n1 i{background:radial-gradient(circle at 32% 28%,#FFF6C8 0%,#FFC23D 38%,#F26A12 100%);color:#5A1F00}
+.al-i.n2 i{background:radial-gradient(circle at 32% 28%,#FFFFFF 0%,#E3E7EB 35%,#9BA3AD 100%);color:#3A414A}
+.al-i.n1 span span{color:color-mix(in srgb,var(--gold-ink) 80%,transparent)}.al-i.n1 b{color:var(--gold-ink)}
+.al-i.n2 span span{color:color-mix(in srgb,var(--silver-ink) 80%,transparent)}.al-i.n2 b{color:var(--silver-ink)}
+@media (max-width:600px){
+  .tmn-ev-rail{padding:0 2px}.tmn-ev-rail time{font-size:10.5px}
+  .tmn-newest .tmn-key{display:none}
+  .tmn-ev-top{flex-wrap:wrap;row-gap:6px}
+  .tmn-ev-main{grid-template-columns:auto minmax(0,1fr)}
+  .tmn-ev-main .tmn-sthumb{grid-column:2;width:100%;max-width:220px}
+}
+.tmn-rank .tmn-ev-main{gap:20px}
+.tmn-trade .tmn-ev-top{justify-content:space-between}
+.tmn-tl.act li.mine .tmn-ev:not(.tmn-rank):not(.tmn-mytr) .tmn-ev-card{box-shadow:0 0 0 1px color-mix(in srgb,var(--accent) 12%,transparent),var(--shadow)}
+:root{--gold-c:#FFC08F}
