@@ -205,7 +205,17 @@ function tmnShould(ev){if(typeof USER!=='undefined'&&!USER)return false;if(ev.ty
    still lands in the feed the next time you open it. Players you just added don't count as new injuries. */
 const TMN_SEV=['','Q','D','O','SUS','PUP','IR'],TMN_ST_LS='tm-news-st-v1';
 const tmnSev=s=>Math.max(0,TMN_SEV.indexOf(s||''));
-function tmnMyInj(Ls,fresh,at){let snap=null;try{snap=JSON.parse(localStorage.getItem(TMN_ST_LS)||'null')}catch(e){}
+/* a status that flips one way and straight back (two feeds disagreeing, or a feed's own blip) isn't news: both go */
+const TMN_FLIP=6*3600e3;
+function tmnFlipClean(){const L=TMN.items,drop=new Set();L.forEach((a,i)=>{if(a.type!=='minj'||drop.has(a))return;
+  const b=L.find((x,j)=>j!==i&&!drop.has(x)&&x.type==='minj'&&x.pid===a.pid&&(x.was||'')===(a.st||'')&&(x.st||'')===(a.was||'')&&Math.abs((x.at||0)-(a.at||0))<TMN_FLIP);if(b){drop.add(a);drop.add(b)}});
+  if(drop.size){TMN.items=L.filter(e=>!drop.has(e));TMN.queue=TMN.queue.filter(e=>!drop.has(e));TMN.chips=TMN.chips.filter(c=>![...drop].some(e=>e.k===c.k));tmnPaintChips();tmnSave()}return drop.size}
+function tmnMyInj(Ls,fresh,at){tmnFlipClean();
+  /* only once the live feed has set every status (see liveStatus in app.js): the nightly data is a placeholder, and
+     comparing it with the live feed is what made a player "hurt" and "off the report" at the same moment */
+  if(typeof STATUS==='undefined'||!STATUS.live)return;
+  let snap=null;try{snap=JSON.parse(localStorage.getItem(TMN_ST_LS)||'null')}catch(e){}
+  if(snap&&snap.src!==STATUS.src)snap=null;   /* switched feeds (say, an ESPN-only user added a Sleeper league): start over quietly */
   const now={},mine={};Ls.forEach(c=>c.roster.forEach(id=>{if(!byId[id]||byId[id].pos==='DST')return;now[id]=stOf(id)||'';(mine[id]=mine[id]||[]).push({c,st:c.starters.has(id)})}));
   if(snap&&snap.st)Object.keys(now).forEach(id=>{const was=snap.st[id],s=now[id];if(was===undefined||was===s)return;const p=byId[id];
     const cls=!was?'myinj':!s?'myclear':tmnSev(s)>tmnSev(was)?'myworse':'mybetter',lbl=x=>(ST_LABEL[x]||x).toLowerCase();
@@ -214,7 +224,7 @@ function tmnMyInj(Ls,fresh,at){let snap=null;try{snap=JSON.parse(localStorage.ge
     const n=NOTES[id],note=n&&n.note?n.note:p.inj||'';
     tmnAdd({k:`minj:${id}:${was}>${s}:${WEEK}`,type:'minj',cls,pid:id,st:s,was,at,head,sub:[was?`Was ${lbl(was)}`:'',note].filter(Boolean).join(' · '),
       leagues:mine[id].map(o=>({key:o.c.key,name:o.c.name,st:o.st,bench:!o.st}))},fresh)});
-  try{localStorage.setItem(TMN_ST_LS,JSON.stringify({st:now,at}))}catch(e){}}
+  tmnFlipClean();try{localStorage.setItem(TMN_ST_LS,JSON.stringify({st:now,at,src:STATUS.src}))}catch(e){}}
 /* every hurt player on your rosters, any league, starter or bench */
 function tmnInjured(Ls){const inj={};Ls.forEach(c=>{if(TMN.lg!=='all'&&c.key!==TMN.lg)return;c.roster.forEach(id=>{const s=stOf(id),p=byId[id];if(!s||!p||p.pos==='DST')return;
   (inj[id]=inj[id]||{id,s,L:[]}).L.push({c,st:c.starters.has(id)})})});
@@ -250,7 +260,7 @@ function tmnShow(ev){const s=tmnStage(),tone=(TMN_LBL[ev.cls]||[])[1]||'accent',
 function tmnMin(dismiss){clearTimeout(TMN.hideT);const s=$('tmn-stage'),b=s&&s.firstElementChild,ev=TMN.showing;TMN.showing=null;if(ev&&dismiss)tmnTopDismiss(ev.k);
   if(b){b.classList.remove('in');b.classList.add(dismiss?'out':'min');setTimeout(()=>{if(b.parentNode)b.remove()},420)}
   if(ev&&!dismiss)setTimeout(()=>tmnChip(ev),260);setTimeout(tmnPump,500)}
-function tmnChip(ev){const box=$('tmn-chips')||(tmnStage(),$('tmn-chips'));TMN.chips=TMN.chips.filter(c=>c.k!==ev.k);TMN.chips.push({k:ev.k,until:ev.type==='top'?tmnTopUntil(ev):Date.now()+TMN_R.chipLife});tmnPaintChips()}
+function tmnChip(ev){const box=$('tmn-chips')||(tmnStage(),$('tmn-chips'));TMN.chips=TMN.chips.filter(c=>c.k!==ev.k);TMN.chips.push({k:ev.k,until:ev.type==='top'||ev.type==='mytrade'?(ev.at||Date.now())+TMN_POP:Date.now()+TMN_R.chipLife});tmnPaintChips()}
 function tmnPaintChips(){const box=$('tmn-chips');if(!box)return;TMN.chips=TMN.chips.filter(c=>c.until>Date.now());const show=TMN.chips.slice(-4).reverse(),more=TMN.chips.length-show.length;
   box.innerHTML=show.map(c=>{const ev=TMN.items.find(x=>x.k===c.k)||tmnTop().items.find(x=>x.k===c.k);if(!ev)return '';const p=ev.pid&&byId[ev.pid],tone=(TMN_LBL[ev.cls]||[])[1]||'accent';
     return `<div class="tmn-chip tone-${tone}${ev.type==='top'?' top':''}" data-nk="${esc(ev.k)}" role="button" tabindex="0"><i></i><span>${p?esc(p.pos==='DST'?p.n:tmnShort(p.n)):'Your week'}</span>${ev.type==='top'?`<b>#1 ${esc(ev.overall?'overall':tmnPosN(ev.pos))}</b>`:ev.pts!=null&&ev.type==='play'?`<b class="num">${ev.cls==='game'||ev.cls==='gameX'?'':'+'}${f1(ev.pts)}</b>`:`<b>${esc((TMN_LBL[ev.cls]||['News'])[0])}</b>`}<button type="button" data-nxc="${esc(ev.k)}" aria-label="Dismiss">×</button></div>`}).join('')
@@ -305,7 +315,7 @@ function tmnWeekThu(w){if(!w||typeof KICK==='undefined'||typeof DATA==='undefine
   d.setDate(d.getDate()+7*(w+1-DATA.week));return d.getTime()}
 const tmnTopLive=e=>e&&e.type==='top'&&Date.now()<tmnTopUntil(e);
 /* closing the #1 banner or chip (or tapping through to it) keeps it off the corner until Thursday; it stays pinned in News */
-function tmnTopDismiss(k){const e=tmnTop().items.find(x=>x.k===k&&x.type==='top');if(e&&!e.dis){e.dis=true;tmnTopSave()}}
+function tmnTopDismiss(k){const e=tmnTop().items.find(x=>x.k===k&&(x.type==='top'||x.type==='mytrade'));if(e&&!e.dis){e.dis=true;tmnTopSave()}}
 const TMN_SEC_POS=['QB','RB','WR','TE'];
 /* the week is over only when every team with a game that week (from the schedule, so Monday night counts even
    before ESPN lists it) has a final, and the last of those games kicked off on Monday or later */
@@ -332,7 +342,7 @@ function tmnTopFind(week,stats,games,Ls,fresh,live){const T=tmnTop();T.done2=T.d
   /* when the week ended: the last kickoff plus a game's length (never in the future) */
   const lastKick=Math.max(0,...gs.map(g=>Date.parse(g.start||g.date||0)||0)),at=lastKick?Math.min(Date.now(),lastKick+3.4*3600e3):Date.now();
   /* a banner while it's news: right after the week ends, or before the next week's games start */
-  const quiet=!live&&LIVE&&LIVE.week===WEEK&&Object.values(LIVE.games||{}).some(g=>g.state!=='pre');
+  const quiet=false;
   if(do1){T.done.push(week);
     Object.values(found).forEach(x=>{const p=byId[x.id],k='top:'+week+':'+x.id,cls=x.overall?'topAll':'top',sec=x.second&&byId[x.second];
       const ev={k,type:'top',cls,pid:x.id,pos:x.pos,pts:x.pts,gap:x.gap,second:x.second,overall:x.overall,week,leagues:x.leagues,at,quiet,
@@ -351,20 +361,25 @@ function tmnTopFind(week,stats,games,Ls,fresh,live){const T=tmnTop();T.done2=T.d
    Any player on one of your rosters who changed NFL teams in the last 7 days: one banner (or a corner chip if a
    bigger one is up), a row in the bell, and a louder card in the Feed. Each trade alerts once. */
 function tmnMyTrades(){try{const Ls=tmnLeagues();return tmnTrades(Ls,tmnLeagueNews(Ls,[])).filter(x=>x.yours&&x.at>Date.now()-7*864e5)}catch(e){return []}}
-function tmnTradeAlerts(){if(typeof USER!=='undefined'&&!USER)return;tmnWeek();const Ls=tmnLeagues(),fresh=[];
-  tmnMyTrades().forEach(x=>{const p=byId[x.pid],k='mytr:'+x.pid+':'+x.to;if(!p||TMN.fired.has(k))return;
+function tmnTradeAlerts(){if(typeof USER!=='undefined'&&!USER)return;const T=tmnTop(),Ls=tmnLeagues();T.trd=T.trd||[];let n=0;
+  tmnMyTrades().forEach(x=>{const p=byId[x.pid],k='mytr:'+x.pid+':'+x.to;if(!p||T.trd.includes(k))return;T.trd.push(k);n++;
     const L=Ls.filter(c=>c.roster.has(x.pid)).map(c=>({key:c.key,name:c.name,st:c.starters.has(x.pid)}));
-    tmnAdd({k,type:'mytrade',cls:'mytrade',pid:x.pid,from:x.from,to:x.to,leagues:L,at:Date.now(),
-      head:`${p.n} was traded to ${typeof teamName==='function'?'the '+teamName(x.to):x.to}`,sub:L.length>1?`Still on your roster in ${L.length} leagues`:'Still on your roster'},fresh)});
-  if(!fresh.length)return;tmnSave();fresh.filter(tmnShould).forEach(e=>tmnQueue(e,true));tmnPump();if(typeof renderAlerts==='function')renderAlerts()}
+    /* builds before this one alerted from the weekly store: those were already seen */
+    T.items.unshift({k,type:'mytrade',cls:'mytrade',pid:x.pid,from:x.from,to:x.to,leagues:L,at:x.at,shown:TMN.fired.has(k),
+      head:`${p.n} was traded to ${typeof teamName==='function'?'the '+teamName(x.to):x.to}`,sub:L.length>1?`Still on your roster in ${L.length} leagues`:'Still on your roster'})});
+  if(n){T.trd=T.trd.slice(-60);tmnTopSave()}}
+/* #1 finishes and your players' trades pop up the first time you're on the site after they happen (even if that's days
+   later), then sit in the corner on every visit until you close them or 7 days have passed since it happened */
+const TMN_POP=7*864e5;
+const tmnPopOK=e=>(e.type==='top'||e.type==='mytrade')&&Date.now()-(e.at||0)<TMN_POP&&tmnShould({...e,quiet:false});
 function tmnTopBanners(){if(typeof USER!=='undefined'&&!USER)return;tmnTradeAlerts();const T=tmnTop();
-  /* one big banner (the overall #1, else the biggest score); any other #1s that week go straight to corner chips */
-  const L=T.items.filter(e=>!e.shown&&e.type==='top').sort((a,b)=>(b.overall-a.overall)||(b.pts-a.pts)),n=L.length;
-  L.forEach((e,i)=>{e.shown=true;if(e.quiet||e.week<WEEK-1||!tmnTopLive(e)||!tmnShould(e))return;if(i===0)tmnQueue(e,true);else{TMN.unread++;tmnChip(e)}});
-  /* already seen, not closed and still before Thursday: back in the corner on every visit */
-  T.items.forEach(e=>{if(!e.shown||e.dis||e.quiet||!tmnTopLive(e)||!tmnShould(e))return;
-    if(TMN.chips.some(c=>c.k===e.k)||(TMN.showing&&TMN.showing.k===e.k)||TMN.queue.some(q=>q.k===e.k))return;tmnChip(e)});
-  if(n){tmnTopSave();tmnPump();if(typeof renderAlerts==='function')renderAlerts();if(tab==='news'&&$('tmn-feed'))tmnRenderBody()}}
+  const pops=T.items.filter(tmnPopOK),fresh=pops.filter(e=>!e.shown).sort((a,b)=>(a.type==='top'?0:1)-(b.type==='top'?0:1)||(b.overall-a.overall)||((b.pts||0)-(a.pts||0))||(b.at-a.at));
+  let n=0;T.items.forEach(e=>{if(!e.shown&&(e.type==='top'||e.type==='mytrade')){e.shown=true;n++}});
+  /* one #1 banner (the overall #1, else the biggest score; other #1s go to chips); every new trade of yours gets one too */
+  let one=false;fresh.forEach(e=>{if(e.type==='top'&&one){TMN.unread++;tmnChip(e);return}if(e.type==='top')one=true;tmnQueue(e,true)});
+  /* seen before, not closed, still inside 7 days: back in the corner */
+  pops.forEach(e=>{if(e.dis||fresh.includes(e))return;if(TMN.chips.some(c=>c.k===e.k)||(TMN.showing&&TMN.showing.k===e.k)||TMN.queue.some(q=>q.k===e.k))return;tmnChip(e)});
+  if(n)tmnTopSave();if(fresh.length){tmnPump();if(typeof renderAlerts==='function')renderAlerts()}if(n&&tab==='news'&&$('tmn-feed'))tmnRenderBody()}
 async function tmnTopCatchUp(Ls){const w=WEEK-1,T=tmnTop();if((typeof USER!=='undefined'&&!USER)||w<1||(T.done.includes(w)&&(T.done2||[]).includes(w))||TMN.topBusy||Date.now()-(TMN.topAt||0)<10*60e3)return;
   Ls=Ls||tmnLeagues();if(!Ls.length)return;TMN.topBusy=true;TMN.topAt=Date.now();
   try{const r=await fetch('/api/live?week='+w+'&b='+Math.floor(Date.now()/600000));const j=r.ok?await r.json():null;

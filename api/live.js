@@ -21,9 +21,11 @@ async function injuries() {
   const out = [];
   for (const p of Object.values(all)) {
     if (!['QB', 'RB', 'WR', 'TE', 'K'].includes(p.position) || !p.team) continue;
-    if (!(p.search_rank > 0 && p.search_rank <= 600)) continue;
     let st = p.injury_status ? (INJ[p.injury_status] ?? '') : '';
     if (!st && p.status === 'Injured Reserve') st = 'IR';
+    // healthy players inside the top 800, and every player with a designation whatever his rank
+    // (Sleeper ranks long-term IR players near the bottom), so a player missing from this list is healthy
+    if (!st && !(p.search_rank > 0 && p.search_rank <= 800)) continue;
     out.push([p.full_name || `${p.first_name} ${p.last_name}`, fix(p.team), st, st ? (p.injury_body_part || '') : '', p.number != null && p.number !== '' ? +p.number : null]);
   }
   injCache = { at: Date.now(), data: out };
@@ -129,7 +131,7 @@ export default async function handler(req, res) {
     const live = Object.values(games).some(g => g.state === 'in');
     // The page adds a 2-minute time bucket to the URL (&b=...), so a cached copy is never older than that.
     res.setHeader('Cache-Control', `public, max-age=0, s-maxage=${live ? 120 : 240}`);
-    return res.status(200).json({ season, week, nflWeek: state.week, updated: new Date().toISOString(), live, games, players, injuries: inj, notes: note });
+    return res.status(200).json({ season, week, nflWeek: state.week, updated: new Date().toISOString(), live, games, players, injuries: inj, injAll: !!inj, notes: note });
   } catch (e) {
     res.setHeader('Cache-Control', 'public, s-maxage=60');
     return res.status(502).json({ error: 'Live data unavailable' });

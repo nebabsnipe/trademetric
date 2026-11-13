@@ -66,7 +66,7 @@ const AUTH_HASH=/access_token=|error_description=/.test(location.hash)?location.
 function save(){S.savedAt=Date.now();if(S.leagues&&S.leagueKey&&typeof upsertLeague==='function'&&S.teams&&S.teams.length)upsertLeague();try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}if(typeof cloudSave==='function')cloudSave()}
 let POOL=BUILTIN,byId={};
 function setPool(){const base=(S.custom&&S.custom.length)?S.custom:BUILTIN,have=new Set(base.map(p=>p.id));
-  POOL=base.concat((S.extraPlayers||[]).filter(x=>!have.has(x.id)).map(x=>({...Z,...KZ,fl:0,id:x.id,n:x.n,pos:x.pos,t:x.t||'FA',status:'',extra:true})));byId={};POOL.forEach(p=>byId[p.id]=p);
+  POOL=base.concat((S.extraPlayers||[]).filter(x=>!have.has(x.id)).map(x=>({...Z,...KZ,fl:0,id:x.id,n:x.n,pos:x.pos,t:x.t||'FA',status:'',extra:true})));byId={};POOL.forEach(p=>byId[p.id]=p);statusFromCache();
   document.getElementById('dl-players').innerHTML=POOL.map(p=>`<option value="${esc(p.n)}">${p.pos} · ${p.t}</option>`).join('');
   if(S.teams)S.teams.forEach(T=>T.players=T.players.filter(id=>byId[id]))}
 
@@ -373,9 +373,32 @@ function applyLive(){
       const projStat=p.dsk*sc.dsk+p.dint*sc.dint+p.dfr*sc.dfr+p.dtd*sc.dtd+p.dsf*sc.dsf,estPA=gm.state==='post'?pa:pa+(VEGAS[gm.opp]??p.pa)*gm.rem;
       const pp=PLAT&&PLAT.pts[p.id];g.live={pts:pp!=null?pp:gm.state==='post'?stat+paTier(pa,sc):stat,state:gm.state,detail:gm.detail,rem:gm.rem,src:pp!=null?PLAT.src:null};g.projNext=pp!=null&&gm.state==='post'?pp:stat+projStat*gm.rem+paTier(Math.round(estPA),sc);return}
     const pp=PLAT&&PLAT.pts[p.id],pts=pp!=null?pp:st?linePts(st,p.pos,sc):0;g.live={pts,state:gm.state,detail:gm.detail,rem:gm.rem,src:pp!=null?PLAT.src:null};g.projNext=gm.state==='post'?pts:pts+g.projNext*gm.rem})}
-function liveStatus(){if(!LIVE||!LIVE.injuries)return;const keep=['IR','PUP','SUS'];
-  LIVE.injuries.forEach(([n,t,st,body,num])=>{const p=findExact(n);if(!p||p.pos==='DST'||(p.t!==t&&norm(p.n)!==norm(n)))return;if(num!=null&&p.t===t)NUM[p.id]=num;
-    if(st){p.status=st;if(body)p.inj=body}else if(!keep.includes(String(p.status||'').toUpperCase()))p.status=''});
+/* ===== Injury status: one source, applied in one place =====
+   Every player's status comes from a single live feed, picked per user so it matches the app their leagues are in:
+   ESPN's injury report when every league they've linked is an ESPN league, otherwise Sleeper's (the default: it
+   covers every player, updates fastest, and is what Sleeper leagues show). The nightly data's statuses are only a
+   placeholder until the first live load; after that the last live statuses are cached so a reload never flashes
+   old ones. Nothing else writes p.status. */
+var STATUS={src:null,live:false,at:0};const STATUS_LS='tm-status-v1';
+function statusSrc(){const t=[S&&S.real&&S.real.src&&S.real.src.type,...((S&&S.leagues)||[]).map(l=>l&&l.snap&&l.snap.real&&l.snap.real.src&&l.snap.real.src.type)].filter(Boolean);
+  return t.length&&t.every(x=>x==='espn')?'espn':'sleeper'}
+const ESPN_ST=s=>{s=String(s||'').toLowerCase();return /injured reserve|^ir$/.test(s)?'IR':/physically unable|pup/.test(s)?'PUP':/suspen/.test(s)?'SUS':/^out$/.test(s)?'O':/doubtful/.test(s)?'D':/questionable|day-to-day/.test(s)?'Q':''};
+/* one status per player from the chosen feed: {id:[st,body]}; players the feed covers but lists healthy get ['',''] */
+function statusMap(src){const m={};
+  if(src==='espn'&&Array.isArray(LIVE.notes)&&LIVE.notes.length){
+    LIVE.notes.forEach(x=>{const p=findExact(x.n,null,x.t);if(!p||p.pos==='DST'||(p.t!==x.t&&norm(p.n)!==norm(x.n)))return;const st=ESPN_ST(x.st);if(st)m[p.id]=[st,x.type||p.inj||'']});
+    POOL.forEach(p=>{if(p.pos!=='DST'&&!m[p.id])m[p.id]=['',''] });return {src:'espn',m}}
+  if(!Array.isArray(LIVE.injuries)||!LIVE.injuries.length)return null;
+  LIVE.injuries.forEach(([n,t,st,body,num])=>{const p=findExact(n);if(!p||p.pos==='DST'||(p.t!==t&&norm(p.n)!==norm(n)))return;if(num!=null&&p.t===t)NUM[p.id]=num;m[p.id]=[st||'',st?body||'':'']});
+  /* Sleeper lists every fantasy-relevant player and every injured one, so anyone missing from it is healthy
+     (injAll: a response from before that change only had the top 600, so then missing players keep what they had) */
+  if(LIVE.injAll)POOL.forEach(p=>{if(p.pos!=='DST'&&!m[p.id])m[p.id]=['',''] });return {src:'sleeper',m}}
+function statusApply(m){Object.entries(m).forEach(([id,[st,body]])=>{const p=byId[id];if(!p)return;p.status=st;if(st&&body)p.inj=body})}
+function statusFromCache(){try{const c=JSON.parse(localStorage.getItem(STATUS_LS)||'null');if(!c||!c.m||Date.now()-c.at>18*3600e3||c.src!==statusSrc())return;
+  POOL.forEach(p=>{if(p.pos==='DST')return;const x=c.m[p.id];p.status=x?x[0]:'';if(x&&x[1])p.inj=x[1]})}catch(e){}}
+function liveStatus(){if(!LIVE)return;const r=statusMap(statusSrc())||(statusSrc()==='espn'?statusMap('sleeper'):null);
+  if(r){statusApply(r.m);STATUS={src:r.src,live:true,at:Date.now()};
+    try{const hurt={};Object.entries(r.m).forEach(([id,x])=>{if(x[0])hurt[id]=x});localStorage.setItem(STATUS_LS,JSON.stringify({src:r.src,at:Date.now(),m:hurt}))}catch(e){}}
   liveOdds();liveNotes()}
 /* current betting lines (DraftKings via ESPN) replace the morning's lines until each game kicks off */
 function liveOdds(){if(!LIVE||LIVE.week!==WEEK)return;const gs=Object.entries(LIVE.games||{}).filter(([,g])=>g.implied!=null);if(!gs.length)return;
