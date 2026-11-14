@@ -514,7 +514,7 @@ function tmnRenderBody(Ls){const el=$('tmn-feed');if(!el)return;Ls=Ls||tmnLeague
   /* big plays: your players' plays, crunch-time swings, clinchers, opponents hurt (and their plays if you turned that on) */
   const PLAY_T=['play','clinch','swing','oinj','opp'];
   const evs=TMN.items.filter(e=>PLAY_T.includes(e.type)&&inLg(e.leagues)&&(e.type!=='opp'||tmnNotif().opp));
-  const injList=tmnInjured(Ls),injUp=TMN.items.filter(e=>e.type==='minj'&&inLg(e.leagues));
+  const injList=tmnInjured(Ls),injUp=TMN.items.filter(e=>e.type==='minj'&&inLg(e.leagues)).sort((a,b)=>tmnAt(b)-tmnAt(a));
   const res=TMN.items.filter(e=>e.type==='res'&&inLg(e.leagues));
   const tops=tmnTopNow().filter(e=>inLg(e.leagues));
   const stories=tmnStories(Ls),picked=tmnPickStories(stories);
@@ -538,7 +538,9 @@ function tmnRenderBody(Ls){const el=$('tmn-feed');if(!el)return;Ls=Ls||tmnLeague
        with every card about your team flagged on the rail so the two are easy to tell apart. */
     const act=f==='all',lgAll=tmnLeagueNews(Ls,picked),trades=tmnTrades(Ls,lgAll).filter(x=>act||x.yours),lgNews=act?lgAll.filter(x=>x.kind!=='trade'):[];
     const news=tmnDedupe([...trades,...picked,...lgNews]);
-    const all0=tmnBundle([...evs,...injUp,...res,...news,...tmnRankFeed().filter(e=>inLg(e.leagues))].sort((a,b)=>tmnAt(b)-tmnAt(a)));tmnLoadRecaps([...picked,...lgNews,...trades]);
+    /* strictly by time, whatever the source: Yours and League cards interleave by the time they show. Sorted again
+       after bundling, since a bundled card shows its lead story's time, which can be older than the newest one in it. */
+    const byT=(a,b)=>tmnAt(b)-tmnAt(a),all0=tmnBundle([...evs,...injUp,...res,...news,...tmnRankFeed().filter(e=>inLg(e.leagues))].sort(byT)).sort(byT);tmnLoadRecaps([...picked,...lgNews,...trades]);
     /* the Yours / League switches in the rail (Feed only). A league story about one of your players counts as both. */
     const keep=e=>{const w=whose(e);return w==='mine'?sh.mine:w==='mine lg'?(sh.mine||sh.lg):sh.lg},cut=act&&!(sh.mine&&sh.lg),all=cut?all0.filter(keep):all0;
     if(cut&&!sh.mine)tops.length=0;
