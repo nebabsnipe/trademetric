@@ -11,7 +11,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600;700;800&family=Kanit:ital,wght@0,700;0,800;1,600;1,700;1,800&display=swap">
 <meta name="description" content="Fantasy football trades, rankings and lineup advice built on your league's exact settings.">
-<link rel="stylesheet" href="css/styles.css?v=22">
+<link rel="stylesheet" href="css/styles.css?v=23">
 </head>
 <body class="signed-out">
 <div class="topbar">
@@ -231,7 +231,7 @@
 <p><b>Injured reserve:</b> if your league has IR slots, an <b>Injured reserve</b> card appears under Bench whenever someone is on IR or qualifies for it. It shows who's on IR as synced from Sleeper or ESPN; you make the actual moves there. Players who qualify get an <b>IR eligible</b> tag (Out or IR on ESPN; whatever your Sleeper league allows). A player still on IR after his designation clears is flagged <b>Healthy again</b>, because most apps block adds and trades until you activate him. IR players don't count against your roster limit, here or in trade grades.</p>
 <p>Each projection starts from his points per game this season, blended with preseason expectations early in the year. It is then adjusted for this week's opponent, his team's expected points from the betting line, his injury status and the factors listed under Player values.</p>
 <p>Roster strength compares your starters at each position with the league average. Weakest spot is the position furthest below it.</p></div></details>
-      <details class="faq-i" id="faq-startsit"><summary>Start or sit</summary><div class="faq-b"><p>Your lineup sits under the board, starters and bench. Drag any two or three players onto the board (or tap them) and it tells you who to start and who to sit, with each one's projection, matchup, range and risk. Drag a player back to your lineup, or hit the ×, to take him off. On a phone, press and hold a player for a moment, then drag. It opens on the closest call in your lineup: the starter whose projection is nearest to a bench player who could replace him. You can also type in anyone on your team, or switch to free agents.</p>
+      <details class="faq-i" id="faq-startsit"><summary>Start or sit</summary><div class="faq-b"><p>Your lineup sits under the board, starters and bench. Tap any two or three players to put them on the board and it tells you who to start and who to sit, with each one's projection, matchup, range and risk. Tap a player again, or hit the ×, to take him off. If the board is already full, tap a new player and the board players he could replace light up; tap the one to swap out, or tap him again to cancel. Players on IR are listed but can't be added until you activate them. It opens on the closest call in your lineup: the starter whose projection is nearest to a bench player who could replace him. You can also type in anyone on your team, or switch to free agents.</p>
 <p><b>Floor and ceiling</b> come from how much his scoring has swung week to week. <b>Clear call</b> means a gap of 3 or more points, <b>Lean</b> 1 to 3, and <b>Coin flip</b> under 1.</p></div></details>
       <details class="faq-i" id="faq-values"><summary>Player values, experts and risk</summary><div class="faq-b"><p>A player's value is the points he is projected to score from here on, compared with the best player you could get off waivers at his position. Current production counts most.</p><p><b>This week's projection</b> is 90% ESPN's and Sleeper's own projections, averaged and scored with your league's settings, and 10% TradeMetric's model. The platforms update theirs through the week as injury news and depth charts change, so the site checks them every 5 minutes. If both platforms leave a player out, they're projecting him for zero, usually because he's out. Each player's card shows all three numbers.</p>
 <p>The <b>Experts</b> rank is the FantasyPros consensus for the rest of the season. It makes up 40% of rest-of-season values, so a proven player off to a slow start is not written off after one bad month.</p>
@@ -336,7 +336,7 @@
 <script>
 /* Load the stats snapshot, then start the app */
 fetch('data/nfl.json',{cache:'no-cache'}).then(r=>r.json()).then(d=>{
-  window.NFL_DATA=d;const n=document.createElement('script');n.src='js/news.js?v=15';n.onload=n.onerror=()=>{const s=document.createElement('script');s.src='js/app.js?v=20';s.onload=()=>{const m=document.createElement('script');m.src='js/mobile.js?v=1';document.body.appendChild(m)};document.body.appendChild(s)};document.body.appendChild(n);
+  window.NFL_DATA=d;const n=document.createElement('script');n.src='js/news.js?v=15';n.onload=n.onerror=()=>{const s=document.createElement('script');s.src='js/app.js?v=21';s.onload=()=>{const m=document.createElement('script');m.src='js/mobile.js?v=1';document.body.appendChild(m)};document.body.appendChild(s)};document.body.appendChild(n);
 }).catch(()=>{document.body.insertAdjacentHTML('afterbegin','<p style="padding:20px;font-family:sans-serif">Could not load player data. Refresh to try again.</p>')});
 </script>
 </body>
