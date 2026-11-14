@@ -1331,6 +1331,32 @@ body.signed-out .alerts-wrap{display:none}
 /* ===== Trades tab (2026-11 rework): sections, trade table, rating visuals, recommended trades, head-to-head ===== */
 .tr-sec{display:flex;flex-direction:column;gap:14px}
 .tr-bar{justify-content:space-between;margin:0}
+/* "tell us what you want" box on Trade ideas */
+.tw{display:flex;flex-direction:column;gap:10px;min-width:0}
+.tw-form{display:flex;align-items:center;gap:6px;background:var(--surface);border:1px solid var(--line);border-radius:99px;padding:4px 4px 4px 16px;box-shadow:var(--shadow);max-width:640px}
+.tw-form:focus-within{border-color:var(--ink)}
+.tw-form input{flex:1;min-width:0;border:0;background:none;color:inherit;font:inherit;font-size:15px;padding:8px 0;outline:0}
+.tw-form input::placeholder{color:var(--muted)}
+.tw-go{flex:none;width:34px;height:34px;border-radius:50%;border:0;background:var(--ink);color:var(--surface);display:grid;place-items:center;cursor:pointer}
+.tw-go:disabled{opacity:.45;cursor:default}
+.tw.busy .tw-go svg{animation:tw-pulse 1s ease-in-out infinite}
+@keyframes tw-pulse{50%{opacity:.25}}
+.tw-row{display:flex;align-items:center;gap:8px;min-width:0;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch}.tw-row::-webkit-scrollbar{display:none}
+.tw-row:empty{display:none}
+.tw-chip{flex:none;appearance:none;border:1px solid var(--line);background:var(--surface);color:inherit;border-radius:99px;padding:6px 12px;font:600 12.5px/1.2 var(--f-body);cursor:pointer;white-space:nowrap}
+.tw-chip:hover{border-color:var(--ink)}
+.tw-pill{flex:none;display:inline-flex;align-items:center;gap:8px;max-width:100%;background:var(--accent-soft);border-radius:99px;padding:6px 6px 6px 13px;font-size:13px;font-weight:600}
+.tw-pill span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tw-pill small{font-weight:600;color:var(--muted);font-size:12.5px}
+.tw-x{flex:none;appearance:none;border:0;background:none;color:inherit;width:22px;height:22px;border-radius:50%;cursor:pointer;font-size:13px;line-height:1;display:grid;place-items:center}
+.tw-x:hover{background:var(--surface)}
+.tw-msg{font-size:12.5px;color:var(--muted);white-space:nowrap}
+.tw-err{margin:0;white-space:normal}.tw-err[hidden]{display:none}
+.tw-empty{grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.tw-empty p{margin:0}
+.tc-fit{margin:0;font-size:12.5px;font-weight:600;line-height:1.4;padding:7px 10px;border-radius:8px;background:var(--accent-soft)}
+.tc-fit b{color:var(--accent);font-weight:700}
+@media (max-width:640px){.tw-form{max-width:none}.tw-form input{font-size:16px}.tw-pill{flex:1 1 auto;border-radius:16px;justify-content:space-between}.tw-pill span{white-space:normal}}
 .tr-n{display:inline-block;min-width:18px;padding:0 5px;margin-left:6px;border-radius:99px;background:var(--surface-3);color:var(--muted);font:700 10.5px/17px var(--f-mono);text-align:center}.tr-n:empty{display:none}
 .seg button[aria-pressed="true"] .tr-n{background:var(--accent);color:#fff}
 .tr-sec-h{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;flex-wrap:wrap;padding-bottom:10px;border-bottom:1px solid var(--line)}

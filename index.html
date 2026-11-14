@@ -11,7 +11,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600;700;800&family=Kanit:ital,wght@0,700;0,800;1,600;1,700;1,800&display=swap">
 <meta name="description" content="Fantasy football trades, rankings and lineup advice built on your league's exact settings.">
-<link rel="stylesheet" href="css/styles.css?v=16">
+<link rel="stylesheet" href="css/styles.css?v=17">
 </head>
 <body class="signed-out">
 <div class="topbar">
@@ -123,6 +123,11 @@
       </div>
     </div>
     <div class="tr-sec" id="tr-ideas" hidden>
+      <div class="tw" id="tw">
+        <form class="tw-form" id="tw-form" autocomplete="off"><input type="text" id="tw-in" maxlength="200" enterkeyhint="go" placeholder="Need an RB for the playoffs, can spare a WR" aria-label="Tell us what you want from a trade"><button type="submit" class="tw-go" id="tw-go" aria-label="Find trades that fit"><svg viewBox="0 0 20 20" width="16" height="16" aria-hidden="true"><path d="M4 10h11M11 5.5 15.5 10 11 14.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button></form>
+        <div class="tw-row" id="tw-row"></div>
+        <p class="tw-msg tw-err" id="tw-err" role="status" hidden></p>
+      </div>
       <div class="toolbar tr-bar"><span class="note" id="sug-note"></span><button class="btn" id="refresh-trades">New ideas</button></div>
       <div class="grid3" id="suggestions"></div>
     </div>
@@ -242,6 +247,7 @@
       <details class="faq-i" id="faq-tradevalues"><summary>Trade values</summary><div class="faq-b"><p>Each player gets a 0 to 100 score: half from trade market values (FantasyCalc, KeepTradeCut and FantasyPros) and half from TradeMetric's rest-of-season projection for your scoring. Stars count for more than the sum of lesser players, so two 30s rarely get you a 60.</p>
 <p>Tiers group players with similar scores at each position. In keeper and dynasty leagues, long-term value is blended in.</p></div></details>
       <details class="faq-i" id="faq-trades"><summary>Trade suggestions and grades</summary><div class="faq-b"><p>TradeMetric looks at every deal from one-for-one up to three-for-two with each team, then keeps the ones that help you and that the other manager has a reason to accept: fair market value, a better lineup for them, or filling a need.</p><p>Find them under <b>Trade ideas</b> at the top of the Trades tab. <b>Open in builder</b> moves a deal to the <b>Trade builder</b> to grade or change.</p>
+<p><b>Tell us what you want.</b> The box at the top of Trade ideas takes a plain-English request, like "Need an RB for the playoffs, can spare a WR" or "Get younger", or tap one of the examples. The AI reads it into a few preferences (positions you want, positions you can give, players to keep or move, and whether you lean toward winning now or the future) and never writes the trades itself. The ideas still come from the same trade model. Deals that break your request are dropped, the rest are sorted by how well they fit with the normal grade as the tiebreak, and each card says why it fits. It works in redraft, keeper and dynasty leagues: the more you lean toward the future, the more long-term value and age count against points this season. Tap the ✕ on the "Looking for" pill to go back to the normal ideas. Your last request is remembered for each league on this device.</p>
 <p>The shape fits each team's situation. A team with depth to spare gets offered a consolidation, two players for one better starter. A team with injured starters or holes in its lineup gets offered extra bodies. Trades that would force a team to cut a starter are left out.</p>
 <p>Your grade weighs points added each week, your playoff weeks (15 to 17 count extra), and the change in your playoff and title odds, minus injury and stacking risk. What counts most depends on where you stand: contenders care about the playoffs, teams on the bubble about winning now. Once any player in a deal has played this week, the grade counts from next week on, since this week's points can't change hands.</p><p><b>Realistic trades.</b> Every deal is also checked the way a real manager would see it:</p><ul>
 <li><b>Starting lineup, before and after:</b> each team's best starting lineup in points per week over the rest of the season, now and after the trade. Suggestions only show deals where both lineups get better or stay about even.</li>
@@ -330,7 +336,7 @@
 <script>
 /* Load the stats snapshot, then start the app */
 fetch('data/nfl.json',{cache:'no-cache'}).then(r=>r.json()).then(d=>{
-  window.NFL_DATA=d;const n=document.createElement('script');n.src='js/news.js?v=14';n.onload=n.onerror=()=>{const s=document.createElement('script');s.src='js/app.js?v=13';s.onload=()=>{const m=document.createElement('script');m.src='js/mobile.js?v=1';document.body.appendChild(m)};document.body.appendChild(s)};document.body.appendChild(n);
+  window.NFL_DATA=d;const n=document.createElement('script');n.src='js/news.js?v=14';n.onload=n.onerror=()=>{const s=document.createElement('script');s.src='js/app.js?v=14';s.onload=()=>{const m=document.createElement('script');m.src='js/mobile.js?v=1';document.body.appendChild(m)};document.body.appendChild(s)};document.body.appendChild(n);
 }).catch(()=>{document.body.insertAdjacentHTML('afterbegin','<p style="padding:20px;font-family:sans-serif">Could not load player data. Refresh to try again.</p>')});
 </script>
 </body>
