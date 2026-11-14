@@ -62,6 +62,35 @@ const MY_EXAMPLE=['jalen-hurts','dak-prescott','bryce-young','zach-charbonnet','
 /* ===== State ===== */
 const KEY='trademetric-v1';
 let S;try{S=JSON.parse(localStorage.getItem(KEY))}catch(e){S=null}
+/* ===== Account data =====
+   Everything the site remembers about you beyond your leagues (news history, alerts you've seen, the Feed filter, the
+   stat columns you picked, light or dark) lives in S.acct. S is saved to your account, so every device you sign in on
+   gets the same thing. localStorage only keeps the last copy so the page opens instantly; the server's copy replaces it.
+   ACCT0 is what older builds kept in separate browser keys: it is folded into S.acct once, then those keys are removed. */
+const ACCT_OLD={news:'tm-news-v1',st:'tm-news-st-v1',top:'tm-news-top-v1',show:'tm-news-show-v1',stats:'tm_stats',want:'tm_want',alerts:'tm-alerts-seen',trv:'tm_trv',theme:'hashmark-theme'};
+const ACCT0=(()=>{const o={};Object.entries(ACCT_OLD).forEach(([k,ls])=>{try{const v=localStorage.getItem(ls);if(v==null)return;o[k]=k==='trv'||k==='theme'?v:JSON.parse(v)}catch(e){}});return o})();
+function acctGet(k,d){const a=S&&S.acct;return a&&a[k]!=null?a[k]:ACCT0[k]!=null?ACCT0[k]:d}
+let ACCT_T=null;
+function saveAcct(){S.savedAt=Date.now();clearTimeout(ACCT_T);ACCT_T=setTimeout(()=>{try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}},200);if(typeof cloudSave==='function')cloudSave()}
+function acctSet(k,v){if(!S)return;(S.acct=S.acct||{})[k]=v;saveAcct()}
+function acctFold(){const ks=Object.keys(ACCT0);if(!ks.length)return;S.acct=S.acct||{};ks.forEach(k=>{if(S.acct[k]==null)S.acct[k]=ACCT0[k];delete ACCT0[k]});
+  try{Object.values(ACCT_OLD).forEach(ls=>localStorage.removeItem(ls));localStorage.setItem('tm-acct-legacy','1');localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
+/* Two copies of the account data (the server's and this device's) become one: nothing either side recorded is lost. */
+function acctMerge(cs,la){if(!la)return false;const a=cs.acct=cs.acct||{};let ch=false;
+  const uni=(x,y,n)=>[...new Set([...(x||[]),...(y||[])])].slice(-n),byAt=(x,y)=>(y.at||0)-(x.at||0);
+  const items=(A,B,n)=>{const have=new Set((A||[]).map(e=>e.k)),add=(B||[]).filter(e=>e&&!have.has(e.k));return add.length?[...(A||[]),...add].sort(byAt).slice(0,n):null};
+  if(la.news){const n=a.news;if(!n||(la.news.week||0)>(n.week||0)){a.news=la.news;ch=true}
+    else if(n.week===la.news.week){const it=items(n.items,la.news.items,120);if(it){n.items=it;ch=true}
+      const f=uni(n.fired,la.news.fired,600);if(f.length!==(n.fired||[]).length){n.fired=f;ch=true}if(!n.last&&la.news.last){n.last=la.news.last;ch=true}}}
+  if(la.top){const t=a.top;if(!t){a.top=la.top;ch=true}else{const it=items(t.items,la.top.items,30);if(it){t.items=it;ch=true}
+      ['done','done2','trd'].forEach(k=>{const u=uni(t[k],la.top[k],60);if(u.length!==(t[k]||[]).length){t[k]=u;ch=true}})}}
+  if(la.alerts){const u=uni(a.alerts,la.alerts,300);if(u.length!==(a.alerts||[]).length){a.alerts=u;ch=true}}
+  ['st','show','stats','trv','theme','want'].forEach(k=>{if(a[k]==null&&la[k]!=null){a[k]=la[k];ch=true}});
+  return ch}
+/* after the saved state is replaced (sign-in, or another device saved): re-read everything that was loaded from it */
+function acctApply(){statsLoad();trView=acctGet('trv','build')==='ideas'?'ideas':'build';TW.key=null;
+  const th=acctGet('theme',null);if(th&&th!==themePref){themePref=th;applyTheme()}
+  if(typeof tmnAcctReset==='function')tmnAcctReset()}
 const AUTH_HASH=/access_token=|error_description=/.test(location.hash)?location.hash.slice(1):null;
 function save(){S.savedAt=Date.now();if(S.leagues&&S.leagueKey&&typeof upsertLeague==='function'&&S.teams&&S.teams.length)upsertLeague();try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}if(typeof cloudSave==='function')cloudSave()}
 let POOL=BUILTIN,byId={};
@@ -516,7 +545,52 @@ async function loadPlatform(){const src=S.real&&S.real.src;if(!src)return;let ch
     else if(src.type==='espn'){const creds=src.priv?(IMP.espnCreds||espnSaved()):null;if(src.priv&&!(creds&&creds.s2))return;
       const d=await espnFetch(src.league,creds,WEEK);changed=syncEspnRosters(d);readEspnWeek(d)}}catch(e){}
   SYNC_AT=Date.now();if(POOL_DIRTY){POOL_DIRTY=false;setPool();changed=true}if(changed){REC_CACHE={v:-1};save();rebuildOwn()}}
-async function syncNow(){if(!S.real||!S.real.src)return;await loadPlatform();recompute();const a=document.activeElement;if(!(a&&/INPUT|TEXTAREA|SELECT/.test(a.tagName)))render()}
+async function syncNow(){if(S.real&&S.real.src){await loadPlatform();recompute();const a=document.activeElement;if(!(a&&/INPUT|TEXTAREA|SELECT/.test(a.tagName)))render()}syncSavedLeagues()}
+/* ===== Every saved league stays current, not only the one on screen =====
+   The league you're looking at re-syncs every few minutes (above). Your other saved leagues used to keep the rosters
+   they were imported with until you switched to them, so News and alerts for those leagues went stale. Now each one
+   re-reads its rosters, team names, records, IR and this week's lineups whenever the site opens, when the NFL week
+   changes, and every 6 hours while the site stays open. */
+var SAVED_AT={},SAVED_BUSY=false;
+function snapPid(Z,ids,pid){const src=Z.real.src;let id=src.pmap[pid]||sleeperDst(pid);if(id)return id;const x=ids&&ids[pid];if(!x)return null;
+  const q=findExact(x[0],x[1],x[2]);if(q&&q.pos===x[1]){src.pmap[pid]=q.id;return q.id}
+  if(!OFFK.includes(x[1]))return null;id='x-'+norm(x[0]).replace(/ /g,'-');Z.extraPlayers=Z.extraPlayers||[];if(!Z.extraPlayers.some(y=>y.id===id))Z.extraPlayers.push({id,n:x[0],pos:x[1],t:x[2]||'FA'});src.pmap[pid]=id;return id}
+function snapLineups(Z,out){if(!Object.keys(out).length)return false;const a=JSON.stringify([Z.real.lineupWeek,Z.real.lineups||null]),b=JSON.stringify([WEEK,out]);Z.real.lineups=out;Z.real.lineupWeek=WEEK;return a!==b}
+function snapRec(Z){const g=Math.max(0,...Object.values(Z.real.rec||{}).map(r=>(r.w||0)+(r.l||0)+(r.t||0)));if(g>(Z.real.played||0)){Z.real.played=g;return true}return false}
+async function syncSnapSleeper(Z){const src=Z.real.src,L=src.league;let ch=false;src.pmap=src.pmap||{};Z.real.rec=Z.real.rec||{};
+  const [rosters,users,lg,ms]=await Promise.all([getJSON(`https://api.sleeper.app/v1/league/${L}/rosters`),getJSON(`https://api.sleeper.app/v1/league/${L}/users`),
+    getJSON(`https://api.sleeper.app/v1/league/${L}`).catch(()=>null),getJSON(`https://api.sleeper.app/v1/league/${L}/matchups/${WEEK}`).catch(()=>null)]);
+  if(!Array.isArray(rosters))return false;
+  if(lg&&lg.settings&&Z.league&&Z.league.slots){const n=lg.settings.reserve_slots||0;if(Z.league.slots.IR!==n){Z.league.slots.IR=n;ch=true}
+    const ok=sleeperIrOk(lg.settings);if((Z.league.irOk||[]).join()!==ok.join()){Z.league.irOk=ok;ch=true}}
+  const ids=await sleeperIds();
+  for(const r of rosters){const tid=src.rid[r.roster_id],T=tid&&Z.teams.find(t=>t.id===tid);if(!T)continue;
+    const out=[...new Set((r.players||[]).map(pid=>snapPid(Z,ids,pid)).filter(Boolean))];if(out.length&&rosterChanged(T,out))ch=true;
+    if(irChanged(T,(r.reserve||[]).map(pid=>src.pmap[pid]||sleeperDst(pid)).filter(Boolean)))ch=true;
+    const us=(users||[]).find(x=>x.user_id===r.owner_id),nm=(us&&us.metadata&&us.metadata.team_name)||(us&&us.display_name);if(nm&&nm!==T.name){T.name=nm;ch=true}
+    const st=r.settings||{},rec={w:st.wins||0,l:st.losses||0,t:st.ties||0,pf:(st.fpts||0)+(st.fpts_decimal||0)/100};if(JSON.stringify(Z.real.rec[tid])!==JSON.stringify(rec)){Z.real.rec[tid]=rec;ch=true}}
+  if(snapRec(Z))ch=true;
+  if(Array.isArray(ms)&&src.labels){const out={};ms.forEach(m=>{const tid=src.rid[m.roster_id];if(tid&&Array.isArray(m.starters))out[tid]=m.starters.map((pid,i)=>({label:SLEEPER_SLOT[src.labels[i]]||null,id:src.pmap[pid]||sleeperDst(pid)})).filter(x=>x.label)});
+    if(snapLineups(Z,out))ch=true}
+  return ch}
+async function syncSnapEspn(Z){const src=Z.real.src;let ch=false;Z.real.rec=Z.real.rec||{};
+  const creds=src.priv?(IMP.espnCreds||espnSaved()):null;if(src.priv&&!(creds&&creds.s2))return false;
+  const d=await espnFetch(src.league,creds,WEEK);if(!d||!Array.isArray(d.teams))return false;
+  const ls=d.settings&&d.settings.rosterSettings&&d.settings.rosterSettings.lineupSlotCounts;if(ls&&Z.league&&Z.league.slots){const n=+ls[21]||0;if(Z.league.slots.IR!==n){Z.league.slots.IR=n;ch=true}}
+  const who=pl=>{if(!pl)return null;const q=pl.defaultPositionId===16?(byId['dst-'+String(pl.proTeamAbbreviation||'').toLowerCase()]||findExact(pl.fullName)):findExact(pl.fullName);return q?q.id:null},lu={};
+  d.teams.forEach(t=>{const tid=src.rid[t.id],T=tid&&Z.teams.find(x=>x.id===tid);if(!T)return;const E=(t.roster&&t.roster.entries)||[];
+    const out=[...new Set(E.map(e=>who(e.playerPoolEntry&&e.playerPoolEntry.player)).filter(Boolean))];if(out.length&&rosterChanged(T,out))ch=true;
+    if(out.length&&irChanged(T,E.filter(e=>e.lineupSlotId===21).map(e=>who(e.playerPoolEntry&&e.playerPoolEntry.player)).filter(Boolean)))ch=true;
+    const nm=t.name||[t.location,t.nickname].filter(Boolean).join(' ');if(nm&&nm!==T.name){T.name=nm;ch=true}
+    const o=(t.record&&t.record.overall)||{},rec={w:o.wins||0,l:o.losses||0,t:o.ties||0,pf:o.pointsFor||0};if(JSON.stringify(Z.real.rec[tid])!==JSON.stringify(rec)){Z.real.rec[tid]=rec;ch=true}
+    const L=E.filter(e=>ESPN_SLOT_MAP[e.lineupSlotId]).map(e=>({label:ESPN_SLOT_MAP[e.lineupSlotId],id:who(e.playerPoolEntry&&e.playerPoolEntry.player)})).sort((a,b)=>SLOT_ORDER.indexOf(a.label)-SLOT_ORDER.indexOf(b.label));if(L.length)lu[tid]=L});
+  if(snapRec(Z))ch=true;if(snapLineups(Z,lu))ch=true;return ch}
+async function syncSavedLeagues(force){if(SAVED_BUSY||!USER||!S||!S.leagues||S.leagues.length<2)return;SAVED_BUSY=true;let changed=false;
+  try{for(const e of S.leagues){const Z=e.snap,src=Z&&Z.real&&Z.real.src;if(e.key===S.leagueKey||!src||!Z.teams)continue;
+      const k=e.key+':'+WEEK;if(!force&&Date.now()-(SAVED_AT[k]||0)<6*3600e3)continue;SAVED_AT[k]=Date.now();
+      try{if(src.type==='sleeper'?await syncSnapSleeper(Z):src.type==='espn'?await syncSnapEspn(Z):false){changed=true;e.at=Date.now()}e.syncAt=Date.now();e.syncWk=WEEK}catch(err){}}}
+  finally{SAVED_BUSY=false}
+  if(changed){save();if(typeof tmnTick==='function')tmnTick();if(tab==='news')render();else renderAlerts()}}
 function lprojHtml(id){const g=G[id],l=liveOf(id);
   if(l)return `<div class="lproj live ${l.state}"><b>${f1(l.pts)}</b><span>${l.state==='post'?'final':'proj '+f1(g.projNext)}</span></div>`;
   return `<div class="lproj">${g.next?`<b>${f1(g.projNext)}</b><span>${f1(g.season)} avg</span>`:'<b class="muted">—</b><span>Bye</span>'}</div>`}
@@ -1051,9 +1125,9 @@ const STATS=[
  ['xtd','xTD','Expected','1','Touchdowns his chances were worth','Touchdowns he should have'],
  ['tdoe','TDOE','Expected','s','Touchdowns over expected','Touchdown luck']];
 const STAT_BY=Object.fromEntries(STATS.map(x=>[x[0],x]));
-let STATS_ON=[];try{STATS_ON=(JSON.parse(localStorage.getItem('tm_stats')||'[]')).filter(k=>STAT_BY[k])}catch(e){STATS_ON=[]}
+let STATS_ON=[];function statsLoad(){const v=acctGet('stats',[]);STATS_ON=(Array.isArray(v)?v:[]).filter(k=>STAT_BY[k])}statsLoad();
 const statOrder=()=>STATS.filter(x=>STATS_ON.includes(x[0])).map(x=>x[0]);
-function saveStats(){try{localStorage.setItem('tm_stats',JSON.stringify(STATS_ON))}catch(e){}}
+function saveStats(){acctSet('stats',STATS_ON)}
 function fmtStat(v,f){return f==='%'?Math.round(v)+'%':f==='w'?v.toFixed(2):f==='i'?String(Math.round(v)):f==='s'?(v>0?'+':'')+f1(v):f1(v)}
 function statCells(g){return STATS.map(x=>{const on=STATS_ON.includes(x[0]),v=g[x[0]];
   if(!on)return `<td class="sc sc-${x[0]} r num" data-v="-9999"></td>`;
@@ -1108,23 +1182,23 @@ function sortTable(id){const tbl=document.getElementById(id);if(!tbl)return;cons
 /* ===== TRADES ===== */
 let tgtPos='ALL',rosPos='ALL',sugSkip=0;
 /* Trades tab views, like the Players tab: the builder, or the recommended trades */
-var trView=(()=>{try{return localStorage.getItem('tm_trv')==='ideas'?'ideas':'build'}catch(e){return 'build'}})();
+var trView=acctGet('trv','build')==='ideas'?'ideas':'build';
 const TR_INTRO={build:`<a class="how" href="#help-trades">How it works</a>`,
   ideas:`<a class="how" href="#help-trades">How it works</a>`};
-function setTrView(v){trView=v==='ideas'?'ideas':'build';try{localStorage.setItem('tm_trv',trView)}catch(e){}}
+function setTrView(v){v=v==='ideas'?'ideas':'build';if(v===trView&&acctGet('trv','build')===v)return;trView=v;acctSet('trv',trView)}
 const shortName=n=>{const w=n.split(' ');return w.length>1&&!/D\/ST$/.test(n)?w[0][0]+'. '+w.slice(1).join(' '):n};
 if(!window.__trade)window.__trade={give:[],get:[]};
 const TD=window.__trade;
 /* ===== "Tell us what you want" box (Trade ideas) =====
    The AI turns one plain-English line into preferences only. It never writes trades: the preferences filter and re-rank
-   the same allTrades() candidates. Saved per league in localStorage. */
+   the same allTrades() candidates. Saved per league, with your account. */
 const TW_LS='tm_want',TW_POS=['QB','RB','WR','TE'],TW_CHIPS=['Upgrade RB','Win now','Sell an aging star','Get younger'];
 /* how much "later seasons" can count in each league type. This is the hook for dynasty values: the lean slides weight
    between this season's points and long-term value (DynastyProcess value, age). */
 const TW_FUT={redraft:.5,keeper:.8,dynasty:1};
 let TW={key:null,text:'',prefs:null,loose:false,busy:false,err:''},sugPool=0;
-function twStore(){try{return JSON.parse(localStorage.getItem(TW_LS))||{}}catch(e){return {}}}
-function twSave(){try{const m=twStore();if(TW.prefs)m[TW.key]={text:TW.text,prefs:TW.prefs,loose:TW.loose};else delete m[TW.key];localStorage.setItem(TW_LS,JSON.stringify(m))}catch(e){}}
+function twStore(){const m=acctGet('want',{});return m&&typeof m==='object'&&!Array.isArray(m)?m:{}}
+function twSave(){const m={...twStore()};if(TW.prefs)m[TW.key]={text:TW.text,prefs:TW.prefs,loose:TW.loose};else delete m[TW.key];acctSet('want',m)}
 function twSync(){const k=S.leagueKey||'default';if(TW.key===k)return;const x=twStore()[k],p=x&&x.prefs?twClean(x.prefs):null;
   TW={key:k,text:p&&x.text?String(x.text).slice(0,200):'',prefs:twBlank(p)?null:p,loose:!!(p&&x.loose),busy:false,err:''};const i=$('tw-in');if(i)i.value=TW.text}
 /* keep only what the app understands: real positions, players on my roster, a 0-1 lean, a sane season */
@@ -1882,10 +1956,10 @@ const TEMPLATE='name,pos,team,pass_cmp,pass_yd,pass_td,pass_int,rush_att,rush_yd
 /* ===== Theme ===== */
 const SUN='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>';
 const MOON='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>';
-let themePref=null;try{themePref=localStorage.getItem('hashmark-theme')}catch(e){}
+let themePref=acctGet('theme',null);
 const isDark=()=>themePref?themePref==='dark':matchMedia('(prefers-color-scheme: dark)').matches;
 function applyTheme(){if(themePref)document.documentElement.setAttribute('data-theme',themePref);const d=isDark();$('theme-btn').innerHTML=d?SUN:MOON;$('theme-btn').setAttribute('aria-label',d?'Switch to light mode':'Switch to dark mode')}
-$('theme-btn').addEventListener('click',()=>{themePref=isDark()?'light':'dark';try{localStorage.setItem('hashmark-theme',themePref)}catch(e){}applyTheme()});
+$('theme-btn').addEventListener('click',()=>{themePref=isDark()?'light':'dark';acctSet('theme',themePref);applyTheme()});
 
 /* ===== Routing & events ===== */
 const TABS=['team','news','trade','rankings','hub','season','league','draft','help','welcome','signin','account'];let tab='team';
@@ -1990,6 +2064,7 @@ if(!S||!S.league||!S.teams){S={league:{name:'Sample League',teams:12,sc:{...PRES
 else{S.league.sc={...BASE_SC,...S.league.sc};if(S.league.slots.DST===undefined)S.league.slots.DST=1;if(S.league.slots.K===undefined)S.league.slots.K=1;setPool();recompute();if(S.example&&S.league.slots.K&&!S.teams.some(T=>T.players.some(id=>byId[id]&&byId[id].pos==='K')))exampleLeague()}
 buildLeagueForm();
 S.chat=(S.chat||[]).filter(x=>x.status==='done'||x.status==='error');
+acctFold();
 var INTENDED=location.hash.slice(1);go('signin');
 loadLive();loadProj();loadMarket();
 
@@ -1997,7 +2072,7 @@ loadLive();loadProj();loadMarket();
    Sign-up confirmation happens on the page you signed up from: type the code from the email, or click the email's link
    anywhere and this tab notices and signs you in. Sessions last one season (until Feb 15 after the season). */
 var SUPA_URL='https://rltmfnmgbfgecbaevfvc.supabase.co',SUPA_KEY='sb_publishable_AFX79aKgqorAx3zgOyKatw_o_3_ERWG';
-var SB_FAILED=false,AUTH_VALS={},SB=null,USER=null,PROFILE=null,PROFILE_OK=false,CLOUD={timer:null,last:null,busy:false,err:null},AUTH_MODE='in',AUTH_MSG=null,AUTH_BUSY=false;
+var SB_FAILED=false,AUTH_VALS={},SB=null,USER=null,PROFILE=null,PROFILE_OK=false,CLOUD={timer:null,last:null,busy:false,err:null,rev:null,ready:false,dirty:false,pulling:false,again:false,conflict:false,retry:null},AUTH_MODE='in',AUTH_MSG=null,AUTH_BUSY=false;
 var SIGNING=false,PENDING=null,PROVIDERS=null,CONF_T=null,RESEND_AT=0,UN_T=null,UN_STATE=null;
 var UNTIL_KEY='tm-auth-until',SKIP_UN='tm-skip-username-';
 /* Social sign-in buttons. Each one also has to be switched on in Supabase (Authentication -> Providers). */
@@ -2008,19 +2083,57 @@ function ssoMark(p){return `<span class="sso-ic sso-${p.id}" aria-hidden="true">
 function lsGet(k){try{return localStorage.getItem(k)}catch(e){return null}}
 function lsSet(k,v){try{localStorage.setItem(k,v)}catch(e){}}
 function lsDel(k){try{localStorage.removeItem(k)}catch(e){}}
-function adoptState(st){S=st;setPool();SCHED=null;LIVE_LU=null;recompute();buildLeagueForm();hubSel=S.me;if(tab==='welcome')location.hash='team';render();if(S.real&&S.real.src)loadPlatform().then(()=>{recompute();render()})}
-async function cloudPull(){if(!SB||!USER)return;
-  const {data,error}=await SB.from('user_state').select('state,updated_at').eq('user_id',USER.id).maybeSingle();
-  if(error){CLOUD.err=error.message;acctUI();return}
-  const cs=data&&data.state,other=S.owner&&S.owner!==USER.id;
-  if(other&&!(cs&&cs.league&&cs.teams)){S={league:{name:'Sample League',teams:12,sc:{...PRESETS.sf.sc},slots:{...PRESETS.sf.slots}},teams:[],me:'t1',log:[],example:true,custom:null,onboarded:false,chat:[]};setPool();exampleLeague();S.real=null;SCHED=null;LIVE_LU=null;buildLeagueForm();hubSel=S.me;render()}
-  if(cs&&cs.league&&cs.teams&&(other||S.example||!S.savedAt||(cs.savedAt||0)>S.savedAt)){adoptState(cs);try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}toast('Loaded your saved league')}
-  else await cloudPush();
-  CLOUD.last=Date.now();acctUI()}
-async function cloudPush(){if(!SB||!USER)return;S.owner=USER.id;CLOUD.busy=true;
-  const {error}=await SB.from('user_state').upsert({user_id:USER.id,state:S,updated_at:new Date().toISOString()});
-  CLOUD.busy=false;CLOUD.err=error?error.message:null;if(!error)CLOUD.last=Date.now();acctUI()}
-function cloudSave(){if(!SB||!USER)return;clearTimeout(CLOUD.timer);CLOUD.timer=setTimeout(cloudPush,1500)}
+function adoptState(st){S=st;setPool();SCHED=null;LIVE_LU=null;acctApply();recompute();buildLeagueForm();hubSel=S.me;if(tab==='welcome')location.hash='team';leagueSwitcher();render();if(S.real&&S.real.src)loadPlatform().then(()=>{recompute();render();syncSavedLeagues()});else syncSavedLeagues()}
+/* ---- Saving to the account ----
+   The server's copy is the real one. Opening the site on any device loads it and replaces whatever that browser had
+   cached. Changes made here are sent a moment later, but only if nobody else saved in between (CLOUD.rev is the
+   version this device last saw); if another device got there first, its copy is loaded and this device's news and
+   alert history is merged into it. The only time a device's own copy is sent first is when it holds changes that
+   never reached the server and nothing else has been saved since. */
+var CLOUD_LS='tm-cloud';
+function cloudMeta(){try{return JSON.parse(lsGet(CLOUD_LS)||'null')||{}}catch(e){return {}}}
+function cloudMark(){if(USER)lsSet(CLOUD_LS,JSON.stringify({uid:USER.id,rev:CLOUD.rev,dirty:!!CLOUD.dirty}))}
+function cloudReset(){clearTimeout(CLOUD.timer);CLOUD.rev=null;CLOUD.ready=false;CLOUD.dirty=false;CLOUD.conflict=false}
+async function cloudPull(why){if(!SB||!USER||CLOUD.pulling)return;CLOUD.pulling=true;const uid=USER.id;
+  try{const {data,error}=await SB.from('user_state').select('state,updated_at').eq('user_id',uid).maybeSingle();
+    if(!USER||USER.id!==uid)return;
+    if(error){CLOUD.err=error.message;acctUI();clearTimeout(CLOUD.retry);CLOUD.retry=setTimeout(()=>cloudPull('retry'),30e3);return}
+    const cs=data&&data.state,rev=data&&data.updated_at?Date.parse(data.updated_at):null,meta=cloudMeta(),other=!!(S.owner&&S.owner!==uid);
+    const sameCache=!other&&S.owner===uid&&meta.uid===uid&&meta.rev===rev;
+    if(cs&&cs.league&&cs.teams){
+      if(sameCache&&meta.dirty&&!CLOUD.conflict){CLOUD.rev=rev;CLOUD.ready=true;CLOUD.dirty=true;await cloudPush()}   /* unsent changes, nothing newer on the server */
+      else if(sameCache&&!CLOUD.conflict){CLOUD.rev=rev;CLOUD.ready=true;if(CLOUD.dirty)cloudSave()}                 /* this browser already has that exact copy */
+      else{const loc=S;let merged=false;
+        if(!other){
+          /* leagues imported here before signing in join the account */
+          if(!loc.owner)(loc.leagues||[]).forEach(e=>{if(e&&e.snap&&e.snap.real&&e.snap.real.src&&!(cs.leagues||[]).some(x=>x.key===e.key)){(cs.leagues=cs.leagues||[]).push(e);merged=true}});
+          if(CLOUD.conflict||lsGet('tm-acct-legacy')==='1')merged=acctMerge(cs,loc.acct)||merged}
+        const say=other||!!loc.example&&!cs.example||!loc.owner;
+        CLOUD.rev=rev;CLOUD.ready=true;CLOUD.dirty=false;adoptState(cs);try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}
+        if(say&&why!=='conflict')toast('Loaded your saved league');
+        if(merged){CLOUD.dirty=true;await cloudPush()}}}
+    else{/* nothing saved for this account yet */
+      if(other){S={league:{name:'Sample League',teams:12,sc:{...PRESETS.sf.sc},slots:{...PRESETS.sf.slots}},teams:[],me:'t1',log:[],example:true,custom:null,onboarded:false,chat:[]};setPool();exampleLeague();S.real=null;SCHED=null;LIVE_LU=null;S.leagueKey=leagueKeyOf();upsertLeague();acctApply();buildLeagueForm();hubSel=S.me;leagueSwitcher();render()}
+      CLOUD.rev=rev;CLOUD.ready=true;CLOUD.dirty=true;await cloudPush()}
+    lsDel('tm-acct-legacy');CLOUD.err=CLOUD.err&&CLOUD.ready?null:CLOUD.err;CLOUD.last=Date.now();cloudMark();acctUI()}
+  catch(e){CLOUD.err=String(e&&e.message||e)}
+  finally{CLOUD.pulling=false;CLOUD.conflict=false}}
+async function cloudPush(){if(!SB||!USER||!CLOUD.ready)return;if(CLOUD.busy){CLOUD.again=true;return}
+  S.owner=USER.id;CLOUD.busy=true;const uid=USER.id,now=Date.now(),at=new Date(now).toISOString();let error=null,lost=false;
+  try{if(CLOUD.rev){const r=await SB.from('user_state').update({state:S,updated_at:at}).eq('user_id',uid).eq('updated_at',new Date(CLOUD.rev).toISOString()).select('updated_at');error=r.error;lost=!error&&!(r.data&&r.data.length)}
+    else{const r=await SB.from('user_state').upsert({user_id:uid,state:S,updated_at:at});error=r.error}}catch(e){error={message:String(e&&e.message||e)}}
+  CLOUD.busy=false;if(!USER||USER.id!==uid)return;
+  if(lost){CLOUD.conflict=true;await cloudPull('conflict');return}
+  CLOUD.err=error?error.message:null;if(!error){CLOUD.rev=now;CLOUD.last=now;CLOUD.dirty=!!CLOUD.again}
+  cloudMark();acctUI();if(CLOUD.again){CLOUD.again=false;cloudSave()}}
+function cloudSave(){if(!SB||!USER)return;if(!CLOUD.dirty){CLOUD.dirty=true;cloudMark()}if(!CLOUD.ready)return;clearTimeout(CLOUD.timer);CLOUD.timer=setTimeout(cloudPush,1500)}
+/* Coming back to the tab (or every few minutes while it's open): if another device saved since, load its copy. */
+async function cloudCheck(){if(!SB||!USER||!CLOUD.ready||CLOUD.dirty||CLOUD.busy||CLOUD.pulling||document.hidden)return;
+  const a=document.activeElement;if(a&&/INPUT|TEXTAREA|SELECT/.test(a.tagName))return;const uid=USER.id;
+  try{const {data,error}=await SB.from('user_state').select('updated_at').eq('user_id',uid).maybeSingle();
+    if(error||!data||!USER||USER.id!==uid||CLOUD.dirty)return;if(Date.parse(data.updated_at)!==CLOUD.rev){CLOUD.conflict=true;cloudPull('check')}}catch(e){}}
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)cloudCheck()});
+setInterval(cloudCheck,3*60e3);
 async function loadProfile(){if(!USER)return;const {data,error}=await SB.from('profiles').select('*').eq('id',USER.id).maybeSingle();
   if(error){PROFILE_OK=false}else{PROFILE=data||null;PROFILE_OK=true}acctUI();if(tab==='account')renderAccount()}
 
@@ -2119,11 +2232,11 @@ function enterApp(){stopConfirmWatch();document.body.classList.remove('signed-ou
   let t=INTENDED&&TABS.includes(INTENDED.replace(/-.*/,''))&&INTENDED!=='signin'?INTENDED:'team';INTENDED=null;if(!S.onboarded)t='welcome';
   if(location.hash.slice(1)===t)go(t);else location.hash=t}
 function showSignin(){if(tab!=='signin'){if(location.hash==='#signin')go('signin');else location.hash='signin'}else renderSignin()}
-function leaveApp(){stopConfirmWatch();document.body.classList.add('signed-out');USER=null;PROFILE=null;PROFILE_OK=false;AUTH_MODE='in';AUTH_MSG=null;ACC_EDIT=null;showSignin();acctUI()}
+function leaveApp(){stopConfirmWatch();document.body.classList.add('signed-out');cloudReset();USER=null;PROFILE=null;PROFILE_OK=false;AUTH_MODE='in';AUTH_MSG=null;ACC_EDIT=null;showSignin();acctUI()}
 function authFail(t){AUTH_BUSY=false;AUTH_MSG={bad:true,html:esc(friendly(t))};renderSignin()}
 function authNote(h){AUTH_BUSY=false;AUTH_MSG={bad:false,html:h};renderSignin()}
 /* Everything that happens once someone is signed in, however they got there (form, code, link, Google, another tab). */
-async function signedIn(user,fresh){SIGNING=true;USER=user;startSessionClock(fresh);acctUI();cloudPull();try{await loadProfile()}finally{SIGNING=false}if(!USER||USER.id!==user.id)return;
+async function signedIn(user,fresh){SIGNING=true;USER=user;startSessionClock(fresh);acctUI();cloudReset();cloudPull('signin');try{await loadProfile()}finally{SIGNING=false}if(!USER||USER.id!==user.id)return;
   if(AUTH_MODE==='recover')return;
   if(!PROFILE&&PROFILE_OK&&!lsGet(SKIP_UN+user.id)){AUTH_MODE='username';AUTH_MSG=null;AUTH_BUSY=false;AUTH_VALS={};UN_STATE=null;showSignin();return}
   if(AUTH_MODE==='confirmed'||AUTH_MODE==='reset'){AUTH_BUSY=false;showSignin();return}
@@ -2383,7 +2496,7 @@ function cardHighlights(id){const p=byId[id];if(!FEED){loadFeed();return `<h4>Hi
   const vids=playerVideos(p);
   return `<h4>Highlights</h4>${vids.length?`<div class="hl-clips card-clips">${vids.map((v,i)=>`<a class="hthumb sm" href="${esc(v.url||'#')}" target="_blank" rel="noopener" title="${esc(v.title)} (opens on ${clipOut(v)})"><span class="vimg${v.thumb?'':' noimg'}" style="${tcVars(p.t)}">${v.thumb?`<img src="${esc(v.thumb)}" alt="" loading="lazy" decoding="async" onerror="this.remove()">`:''}<span class="vplay" aria-hidden="true"></span>${srcBadge(v)}</span><span class="vtitle">${v.game?'<span class="vtag">Game</span>':''}${esc(v.title)}</span><span class="note">Week ${v.week}${v.at?' · '+ago(v.at):''} · ${clipOut(v)} ↗</span></a>`).join('')}</div>`
     :`<p class="note">No clips of his plays from this week or last week yet.</p>`}<p class="note" style="margin:8px 0 0"><a href="${nflUrl(p)}" target="_blank" rel="noopener">More on NFL.com ↗</a></p>`}
-setInterval(()=>{if(USER&&!document.hidden&&Date.now()-SYNC_AT>4*60e3)syncNow()},60e3);
+setInterval(()=>{if(USER&&!document.hidden){if(Date.now()-SYNC_AT>4*60e3)syncNow();else syncSavedLeagues()}},60e3);
 document.addEventListener('visibilitychange',()=>{if(!document.hidden&&USER&&Date.now()-SYNC_AT>2*60e3)syncNow()});
 /* ===== Following: pick teams and players (no clips here) ===== */
 const DIVS=[['AFC East',['BUF','MIA','NE','NYJ']],['AFC North',['BAL','CIN','CLE','PIT']],['AFC South',['HOU','IND','JAX','TEN']],['AFC West',['DEN','KC','LV','LAC']],
@@ -2434,6 +2547,20 @@ document.addEventListener('click',e=>{const t=e.target;if(!t.closest)return;cons
 /* first run: register the league already loaded */
 if(!S.leagues||!S.leagues.length){S.leagueKey=leagueKeyOf();upsertLeague();save()}else if(!S.leagueKey)S.leagueKey=leagueKeyOf();
 leagueSwitcher();
+
+/* ===== Always the latest build =====
+   index.html is never cached (vercel.json), so opening the site always gets the newest page. This covers a tab or a
+   phone's home-screen copy that was simply left open: when it comes back to the front it re-reads the page's version
+   numbers (the ?v= on the css and js files) and reloads itself if they changed. */
+const buildSig=t=>[...new Set(String(t).match(/(?:css|js)\/[\w.-]+\?v=\d+/g)||[])].sort().join();
+var BUILD_AT=Date.now();
+async function buildCheck(){if(document.hidden||Date.now()-BUILD_AT<10*60e3)return;BUILD_AT=Date.now();
+  try{const r=await fetch('/?b='+BUILD_AT,{cache:'no-store'});if(!r.ok)return;const now=buildSig(await r.text()),mine=buildSig(document.documentElement.outerHTML);
+    if(!now||!mine||now===mine)return;const a=document.activeElement;
+    if((a&&/INPUT|TEXTAREA|SELECT/.test(a.tagName))||CLOUD.dirty||CLOUD.busy||(typeof asking!=='undefined'&&asking)){BUILD_AT=0;return}
+    location.reload()}catch(e){}}
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)setTimeout(buildCheck,1500)});
+setInterval(buildCheck,15*60e3);
 
 /* ===== Even desktop columns: move "float" cards to the shorter column, size fill boxes ===== */
 var BAL=0;
@@ -2757,8 +2884,7 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape'&&SS_PICK){SS_PICK=nu
   const c=(e.key==='Enter'||e.key===' ')&&e.target.closest&&e.target.closest('#startsit [data-ssswap]');if(c&&e.target===c){e.preventDefault();ssSwapInto(+c.dataset.ssswap)}});
 
 /* ===== Alerts (bell in the top bar) ===== */
-const ALERT_LS='tm-alerts-seen';
-function seenAlerts(){try{return new Set(JSON.parse(localStorage.getItem(ALERT_LS)||'[]'))}catch(e){return new Set()}}
+function seenAlerts(){const v=acctGet('alerts',[]);return new Set(Array.isArray(v)?v:[])}
 function alertsList(){const me=S&&myTeam&&myTeam();if(!me||!V||!G)return [];const out=[],RL=realLineup(S.me),lu=RL||lineup(me.players,projV),st=new Set(lu.slots.filter(x=>x.p).map(x=>x.p.id));
   me.players.forEach(id=>{const p=byId[id],g=G[id];if(!p||!g)return;const s=stOf(id);
     if(st.has(id)&&s&&s!=='Q')out.push({k:`out-${WEEK}-${id}-${s}`,lvl:'bad',t:`${p.n}: ${ST_LABEL[s].toLowerCase()}`,d:RL?'He is in your starting lineup. Swap him out.':'One of your usual starters. Your lineup on My Team already works around him.',open:id});
@@ -2780,7 +2906,7 @@ function renderAlerts(){const b=$('alert-btn');if(!b)return;const L=USER?alertsL
   const pop=$('alert-pop');if(!pop.hidden)paintAlerts(L,seen)}
 function paintAlerts(L,seen){const nn=typeof tmnUnread==='function'?tmnUnread():0;$('alert-pop').innerHTML=`<div class="al-h"><b>Alerts</b><span class="note">Week ${WEEK}</span></div>${nn?`<a class="al-news" href="#news"><b>${nn} new in News</b><span>Big plays from your players →</span></a>`:''}${L.length?`<div class="al-list">${L.map(a=>`<button class="al-i ${a.lvl}${seen.has(a.k)?'':' new'}" data-open="${a.open}"><i>${a.m?a.m:''}</i><span><b>${esc(a.t)}</b><span>${esc(a.d)}</span></span></button>`).join('')}</div>`:'<p class="empty" style="margin:0">All clear. Nothing needs your attention right now.</p>'}`}
 function toggleAlerts(open){const pop=$('alert-pop'),b=$('alert-btn');open=open??pop.hidden;pop.hidden=!open;b.setAttribute('aria-expanded',open);
-  if(open){const L=alertsList(),seen=seenAlerts();paintAlerts(L,seen);try{localStorage.setItem(ALERT_LS,JSON.stringify([...new Set([...seen,...L.map(a=>a.k)])].slice(-300)))}catch(e){}$('alert-n').hidden=true}}
+  if(open){const L=alertsList(),seen=seenAlerts();paintAlerts(L,seen);if(L.some(a=>!seen.has(a.k)))acctSet('alerts',[...new Set([...seen,...L.map(a=>a.k)])].slice(-300));$('alert-n').hidden=true}}
 
 /* ===== Draft: cheat sheet, mock draft, live draft assistant ===== */
 var drView='sheet',DR=null,drPos='ALL',DR_TIMER=null;

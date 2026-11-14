@@ -5,6 +5,8 @@
 // GET /api/news?name=Wan'Dale%20Robinson&team=TEN&pos=WR
 // GET /api/news?probe=1&name=...   -> which sources answered and how many stories matched (no AI)
 
+import { sharedOn, recapsGet, recapsPut, archiveMerge } from './_shared.js';
+
 const API_KEY = process.env.ANTHROPIC_API_KEY || process.env.APIKEY1;
 const MODEL = process.env.NEWS_MODEL || 'claude-haiku-5-5';
 const UA = 'Mozilla/5.0 (compatible; TradeMetric/1.0; +https://www.trademetric.app)';
@@ -230,14 +232,22 @@ const cleanLine = (s, n) => String(s || '').replace(/\s+/g, ' ').trim().slice(0,
 async function recapAll(items) {
   const out = {}, todo = [];
   items.forEach(x => { const c = RECAPS.get((x.pay ? 'v3p|' : 'v2|') + x.u); if (c && Date.now() - c.at < 7 * 864e5) out[x.u] = c.v; else todo.push(x); });
+  /* a story someone else already had recapped: read it from the shared store instead of paying to write it again */
+  const rk = x => (x.pay ? 'v3p|' : 'v2|') + x.u;
+  if (todo.length && sharedOn()) {
+    const got = await recapsGet(todo.map(rk));
+    for (let i = todo.length - 1; i >= 0; i--) { const v = got[rk(todo[i])]; if (v && v.t) { RECAPS.set(rk(todo[i]), { at: Date.now(), v }); out[todo[i].u] = v; todo.splice(i, 1); } }
+  }
   if (todo.length && API_KEY) {
+    const made = {};
     const chunks = []; for (let i = 0; i < todo.length; i += 12) chunks.push(todo.slice(i, i + 12));
     await Promise.all(chunks.map(async ch => {
       const arr = await recapBatch(ch); if (!arr) return;
       arr.forEach(a => { const x = a && ch[a.i]; if (!x || !a.title) return;
         const v = { t: cleanLine(a.title, 110), pts: (Array.isArray(a.points) ? a.points : []).map(p => cleanLine(p, 140)).filter(Boolean).slice(0, 3) };
-        RECAPS.set((x.pay ? 'v3p|' : 'v2|') + x.u, { at: Date.now(), v }); out[x.u] = v; });
+        RECAPS.set(rk(x), { at: Date.now(), v }); out[x.u] = v; made[rk(x)] = v; });
     }));
+    if (sharedOn()) await recapsPut(made);
     if (RECAPS.size > 3000) [...RECAPS.keys()].slice(0, 1000).forEach(k => RECAPS.delete(k));
   }
   return out;
@@ -250,7 +260,7 @@ export default async function handler(req, res) {
   const q = req.query || {};
   /* recap mode for the News tab: POST {items:[{u,n,pos,t,title,desc,outlet}]} -> {items:{[url]:{t,pts}}} */
   if (req.method === 'POST' && q.recap) {
-    if (!API_KEY) return res.status(200).json({ ai: false, items: {} });
+    if (!API_KEY && !sharedOn()) return res.status(200).json({ ai: false, items: {} });
     const raw = (req.body && Array.isArray(req.body.items)) ? req.body.items : [];
     const items = raw.slice(0, 30).filter(x => x && typeof x.u === 'string' && /^https?:/.test(x.u) && x.title).map(x => ({
       u: x.u.slice(0, 600), n: cleanLine(x.n, 60), pos: cleanLine(x.pos, 4), t: cleanLine(x.t, 4),
@@ -340,7 +350,11 @@ export default async function handler(req, res) {
       out.push({ kind, title: i.title, desc: clip(i.desc, 700), url: i.url, outlet: i.outlet, at: i.at, img: i.img || null, athletes: i.athletes || [], pay: !!i.pay });
     }
     out.sort((a, b) => Date.parse(b.at || 0) - Date.parse(a.at || 0));
-    const v = { updated: new Date().toISOString(), items: out.slice(0, 80) };
+    /* outlets only list their newest stories, so the last week of them is kept in the shared store: everyone gets
+       the same seven days, however recently they first opened the site */
+    let items = out.slice(0, 80);
+    try { items = await archiveMerge('league_news', items, { days: 7, max: 300, same: (a, b) => similar(a.title, b.title, new Set()) }); } catch { }
+    const v = { updated: new Date().toISOString(), items };
     cache.set('league', { at: Date.now(), v });
     res.setHeader('Cache-Control', 'public, max-age=0, s-maxage=600');
     return res.status(200).json(v);

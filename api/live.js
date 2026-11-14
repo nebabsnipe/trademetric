@@ -4,6 +4,8 @@
 // Also carries the current betting lines (DraftKings via ESPN) and ESPN's injury notes,
 // which include practice participation through the week.
 
+import { sharedOn, statusTrack, statusLog } from './_shared.js';
+
 const TEAM = { WSH: 'WAS', LA: 'LAR', JAC: 'JAX' };
 const fix = t => TEAM[t] || t;
 const INJ = { Questionable: 'Q', Doubtful: 'D', Out: 'O', IR: 'IR', PUP: 'PUP', Sus: 'SUS', NA: 'O', DNR: '' };
@@ -51,6 +53,24 @@ async function notes() {
   }
   noteCache = { at: Date.now(), data: out };
   return out;
+}
+
+/* Injury status history, kept on the server (see api/_shared.js): record what changed since the last look, then
+   hand back the last 8 days of changes. Costs two or three quick database calls, at most once every 90 seconds. */
+const ESPN_ST = s => { s = String(s || '').toLowerCase(); return /injured reserve|^ir$/.test(s) ? 'IR' : /physically unable|pup/.test(s) ? 'PUP' : /suspen/.test(s) ? 'SUS' : /^out$/.test(s) ? 'O' : /doubtful/.test(s) ? 'D' : /questionable|day-to-day/.test(s) ? 'Q' : ''; };
+let logCache = { at: 0, data: null };
+async function injuryLog(inj, note) {
+  if (!sharedOn()) return null;
+  if (logCache.data && Date.now() - logCache.at < 90e3) return logCache.data;
+  try {
+    await Promise.all([
+      inj ? statusTrack('sleeper', inj) : null,
+      note ? statusTrack('espn', note.map(x => [x.n, x.t, ESPN_ST(x.st), x.type || ''])) : null,
+    ]);
+    const log = await statusLog(8);
+    if (log) logCache = { at: Date.now(), data: log };
+    return log;
+  } catch { return null; }
 }
 
 function oddsOf(c) {
@@ -129,9 +149,10 @@ export default async function handler(req, res) {
       players.push({ n: ps === 'DEF' ? null : `${p.first_name || ''} ${p.last_name || ''}`.trim(), pos: ps === 'DEF' ? 'DST' : ps, t: team, s: statLine(s, ps), ppr: +s.pts_ppr || 0 });
     }
     const live = Object.values(games).some(g => g.state === 'in');
+    const injLog = await injuryLog(inj, note);
     // The page adds a 2-minute time bucket to the URL (&b=...), so a cached copy is never older than that.
     res.setHeader('Cache-Control', `public, max-age=0, s-maxage=${live ? 120 : 240}`);
-    return res.status(200).json({ season, week, nflWeek: state.week, updated: new Date().toISOString(), live, games, players, injuries: inj, injAll: !!inj, notes: note });
+    return res.status(200).json({ season, week, nflWeek: state.week, updated: new Date().toISOString(), live, games, players, injuries: inj, injAll: !!inj, notes: note, ...(injLog ? { injLog } : {}) });
   } catch (e) {
     res.setHeader('Cache-Control', 'public, s-maxage=60');
     return res.status(502).json({ error: 'Live data unavailable' });
