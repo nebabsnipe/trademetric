@@ -583,7 +583,7 @@ function retWeek(id){const s=stOf(id);if(s==='O')return WEEK+1;if(!LONG_OUT.incl
 /* can he be in a lineup in week w: not on bye, and back from injury or suspension. Doubtful players stay available (the sim discounts them) */
 function availIn(id,w){const p=byId[id];return !!p&&BYE[p.t]!==w&&w>=retWeek(id)}
 function playChance(id,w){if(!availIn(id,w))return 0;const r=retWeek(id),s=stOf(id);if(w===WEEK){if(s==='Q')return .8;if(s==='D')return .3}return w===r&&r>WEEK?.85:.96}
-/* THE weekly lineup. Every lineup number in the trade rating (grade, Lineup change tile, lineup bars, week strip) and the Season Sim
+/* THE weekly lineup. Every lineup number in the trade rating (grade, Lineup change tile, league ladder, week strip) and the Season Sim
    comes from here: only players available that week, each slot filled with the highest-projected eligible player. lineup() fills the
    single-position slots (QB, RB, WR, TE; K and DST share no one with them) before FLEX, then SUPERFLEX from who's left. */
 function weekLineup(players,w,val){return lineup(players.filter(id=>availIn(id,w)),val)}
@@ -611,7 +611,7 @@ function rosterAfter(players,out,inn,taken){let after=players.filter(x=>!out.inc
   const over=act(after)>Math.max(lim,base);
   if(act(after)<base){const best=POOL.filter(p=>!OWN[p.id]&&!taken.has(p.id)&&p.pos!=='DST'&&p.pos!=='K').map(p=>p.id).sort((a,b)=>playerValue(b)-playerValue(a))[0];if(best){fa=best;after=after.concat(best)}}
   return {after,drop,fa,over,irIn}}
-/* rows: each rated week's before/after lineups. lp (Lineup change), lineupBars() and weekStrip() all read these same lineups;
+/* rows: each rated week's before/after lineups. lp (Lineup change), lineupLadder() and weekStrip() all read these same lineups;
    bench = bench insurance, shown on its own line so lineup + bench adds up to the grade card */
 function teamImpact(before,after,skipNow){const W=tmWeeks().filter(w=>!skipNow||w>WEEK),PO=poWeeks(),RW=(S.real&&S.real.regWeeks)||14;let tot=0,po=0,poB=0,poA=0,reg=0,nReg=0,lpB=0,lpA=0,insB=0,insA=0;const weeks=[],rows=[];
   W.forEach(w=>{const b=weekTeam(before,w),a=weekTeam(after,w),d=(a.pts+a.ins)-(b.pts+b.ins);tot+=d*wkWt(w);lpB+=b.pts;lpA+=a.pts;insB+=b.ins;insA+=a.ins;rows.push({w,b,a,d:a.pts-b.pts});if(w<=RW){reg+=a.pts-b.pts;nReg++}
@@ -1262,17 +1262,29 @@ function renderTargets(){const q=($('tgt-search').value||'').trim().toLowerCase(
   sortTable('tgt-table')}
 function balanceHtml(fr,them,compact){const pos=Math.max(4,Math.min(96,(1-fr.share)*100));
   return `<div class="balance${compact?' compact':''}"><div class="bal-label">${fr.label}</div><div class="bal-track"><span class="bal-mark" style="left:${pos}%"></span></div><div class="bl"><span>You</span><span>${esc(them)}</span></div></div>`}
-/* starting lineup, slot by slot: average points per week over the rated weeks, from the same weekly lineups as the
-   Lineup change tile (the slot deltas add up to it). Each slot names the player who starts there most weeks. */
-function lineupBars(imp){const R=imp.rows;if(!R.length)return '';const n=R.length,W0=R[0].w,W1=R[n-1].w;
-  const slot=(side,i)=>{const cnt={},seq=[];let tot=0;R.forEach(r=>{const x=r[side].lu.slots[i],id=x&&x.p?x.p.id:'';if(id)tot+=ewk(id,r.w);cnt[id]=(cnt[id]||0)+1;seq.push(id)});
-    const top=Object.keys(cnt).sort((a,b)=>cnt[b]-cnt[a]||(b?1:0)-(a?1:0))[0];return {v:tot/n,id:top||null,k:cnt[top],seq:seq.join()}};
-  const nm=x=>x.id?esc(byId[x.id].n):'Empty',rows0=R[0].b.lu.slots.map((s,i)=>({label:s.label,A:slot('b',i),B:slot('a',i)})),mx=Math.max(10,...rows0.map(r=>Math.max(r.A.v,r.B.v)));
-  const rows=rows0.map(({label,A,B})=>{const o=A.v,v=B.v,d=v-o,same=A.seq===B.seq,c=same?'':d>.05?'up':d<-.05?'down':'';
-    const part=B.id&&B.k<n?` · starts ${B.k} of ${n} wks`:'';
-    return `<div class="lb-row${same?' same':''}"><span class="lb-slot">${label}</span><div class="lb-who"><b>${same||A.id===B.id?nm(A):`${nm(A)} → ${nm(B)}`}</b><span class="psub">${same?'No change':(Math.abs(d)<.05?'Same points':d>=0?'Upgrade':'Downgrade')+part}</span></div>
-      <div class="lb-bars"><i class="o" style="width:${(o/mx*100).toFixed(1)}%"></i><i class="n ${c}" style="width:${(v/mx*100).toFixed(1)}%"></i></div><b class="lb-d num ${c}">${same||Math.abs(d)<.05?'0.0':sgn(d)}</b></div>`}).join('');
-  return `<div class="lb"><div class="lb-h"><span class="lab2">Your starting lineup <span class="lb-rng">avg per week, Wk ${W0}${W1>W0?'–'+W1:''}</span></span><span class="lb-leg"><i class="o"></i>Now<i class="n"></i>After</span></div>${rows}<div class="lb-tot"><span>Lineup total</span><b class="num">${f1(imp.lpB)} → ${f1(imp.lpA)}</b><b class="num ${imp.lp>=0?'up':'down'}">${sgn(imp.lp)}</b></div></div>`}
+/* where your starting lineup ranks in the league: every team's average lineup points over the rated weeks, from the same weekly
+   lineups as the Lineup change tile. You and your trade partner are placed before and after the deal; everyone else stays put. */
+function lineupLadder(e,partner,get){const imp=e.you,R=imp.rows;if(!R.length)return '';const n=R.length,W=R.map(r=>r.w),W0=W[0],W1=W[n-1],d=imp.lpA-imp.lpB,moved=Math.abs(d)>=.05,c=!moved?'':d>0?'up':'down';
+  const avg=pl=>sum(W,w=>weekTeam(pl,w).pts)/n;
+  const T=S.teams.filter(t=>t.id===S.me||t.players.length>=4).map(t=>{const mine=t.id===S.me,th=!mine&&!!partner&&t.id===partner.id&&e.them.rows&&e.them.rows.length>0,b=mine?imp.lpB:th?e.them.lpB:avg(t.players);
+    return {name:t.name,mine,th,b,a:mine?imp.lpA:th?e.them.lpA:b}});
+  const me=T.find(t=>t.mine),oth=T.filter(t=>!t.mine),rk=k=>1+oth.filter(t=>t[k]>me[k]+1e-9).length;
+  const st=id=>R.filter(r=>r.a.lu.slots.some(x=>x.p&&x.p.id===id)).length,ins=(get||[]).map(id=>[id,st(id)]).filter(x=>x[1]>0);
+  const who=ins.length?ins.map(([id,k])=>`${esc(byId[id].n)} starts ${k===n?(n>1?'every week':'this week'):`${k} of ${n} weeks`}`).join(' · '):'No player you get makes your starting lineup';
+  const foot=`<p class="ll-who">${who}</p><div class="lb-tot"><span>Lineup total</span><b class="num">${f1(imp.lpB)} → ${f1(imp.lpA)}</b><b class="num ${d>=0?'up':'down'}">${sgn(imp.lp)}</b></div>`;
+  const head=`<div class="lb-h"><span class="lab2">Your starting lineup <span class="lb-rng">avg per week, Wk ${W0}${W1>W0?'–'+W1:''}</span></span>`;
+  if(!me||!oth.length)return `<div class="lb">${head}</div>${foot}</div>`;
+  const r0=rk('b'),r1=rk('a'),N=T.length,all=T.flatMap(t=>[t.b,t.a]),lo=Math.min(...all),hi=Math.max(...all),pos=v=>((hi-lo<.01?.5:(v-lo)/(hi-lo))*100).toFixed(1);
+  const up=oth.filter(t=>t.a>me.a+1e-9).sort((x,y)=>x.a-y.a)[0],dn=oth.filter(t=>t.a<=me.a+1e-9).sort((x,y)=>y.a-x.a)[0];
+  const gap=[up?`${f1(up.a-me.a)} behind ${ord(r1-1)}`:'',dn?`${f1(me.a-dn.a)} ahead of ${ord(r1+1)}`:''].filter(Boolean).join(' · ');
+  const dots=oth.map(t=>`<i class="ll-dot${t.th?' th':''}" style="left:${pos(t.a)}%" title="${esc(t.name)} · ${t.th&&Math.abs(t.a-t.b)>=.05?f1(t.b)+' → ':''}${f1(t.a)}"></i>`).join('');
+  const x0=+pos(me.b),x1=+pos(me.a);
+  return `<div class="lb ll">${head}<span class="lb-leg">${moved?'<i class="ll-k now"></i>Now':''}<i class="ll-k me ${c}"></i>${moved?'After':'You'}${oth.some(t=>t.th)?`<i class="ll-k th"></i><span class="ll-kn">${esc(partner.name)}</span>`:''}</span></div>
+    <div class="ll-head">${r0!==r1?`<span class="ll-was">${ord(r0)}</span><span class="ll-arr" aria-hidden="true">→</span>`:''}<b class="ll-rank">${ord(r1)}</b><span class="ll-of">of ${N} lineups in your league${r0===r1&&moved?' · same spot as now':''}</span></div>
+    <div class="ll-track" role="img" aria-label="Your lineup ${moved?`goes from ${f1(me.b)} points a week, ${ord(r0)} of ${N}, to ${f1(me.a)}, ${ord(r1)} of ${N}`:`stays at ${f1(me.a)} points a week, ${ord(r1)} of ${N}`}">${dots}
+      ${moved?`<i class="ll-seg ${c}" style="left:${Math.min(x0,x1)}%;width:${Math.abs(x1-x0).toFixed(1)}%"></i><i class="ll-now" style="left:${x0}%"></i><span class="ll-lab now num" style="left:${x0}%">${f1(me.b)}</span>`:''}
+      <i class="ll-me ${c}" style="left:${x1}%"></i><span class="ll-lab me num" style="left:${x1}%">${f1(me.a)}<em>You</em></span></div>
+    <div class="ll-ends"><span>Weakest lineup</span><span class="ll-gap">${gap}</span><span>Strongest</span></div>${foot}</div>`}
 /* every rated week, starting-lineup points gained or lost (same lineups as above); playoff weeks are outlined */
 function weekStrip(imp,get){const PO=poWeeks(),ws=imp.rows;if(!ws.length)return '';
   const tip=r=>{const st=new Set(r.a.lu.slots.filter(x=>x.p).map(x=>x.p.id)),ins=(get||[]).filter(id=>st.has(id)).map(id=>byId[id].n);return `Week ${r.w}: ${ins.length?ins.join(' and ')+' in your lineup':'no player you get starts'}`};
@@ -1295,7 +1307,7 @@ function renderRating(partner){
      :gcard('Your lineup',e.myLG>=0?'ga':'gd',`${sgn(e.myLG)}<small>/wk</small>`,`${sgn(r1(e.you.lp))} starters`,`${sgn(r1(e.you.bench))} bench depth`,true)+gcard(esc(partner.name),e.thLG>=0?'ga':'gd',`${sgn(e.thLG)}<small>/wk</small>`,`${sgn(r1(e.them.lp))} starters`,`${sgn(r1(e.them.bench))} bench depth`,false)}</div>
    <div class="rt-tiles">${tile('Lineup change',`${sgn(e.you.lp)}/wk`,cls(e.you.lp),'starting lineup')}${tile('Playoff odds',dpo?`${pct(e.po0)} → ${pct(e.po1)}`:'—',dpo&&Math.abs(e.po1-e.po0)>=.005?cls(e.po1-e.po0):'',dpo?`${sgn(e.dPO)} pts`:'needs 2+ teams')}${tile('Title odds',dpo&&e.t1!=null?`${pct(e.t0)} → ${pct(e.t1)}`:'—',dpo&&e.t1!=null&&Math.abs(e.t1-e.t0)>=.005?cls(e.t1-e.t0):'',dpo&&e.t1!=null?`${sgn(e.dT)} pts`:'')}${tile('Realism',`${rl.score}`,rl.score>=62?'up':rl.score>=45?'':'down',rl.label)}</div>
    ${outNote}
-   ${lineupBars(e.you)}
+   ${lineupLadder(e,partner,TD.get)}
    ${weekStrip(e.you,TD.get)}
    ${e.skipNow?`<p class="note rt-note">Week ${WEEK} is left out of this rating: a player in the deal has already played this week, so it starts counting from Week ${WEEK+1}.</p>`:''}
    ${e.mine.irIn.length||e.mine.fa||e.mine.drop||e.theirs.fa||e.theirs.drop?`<p class="note rt-note">${[e.mine.irIn.length?`${esc(e.mine.irIn.map(x=>byId[x].n).join(' and '))} would go in your IR ${e.mine.irIn.length>1?"slots until they're":"slot until he's"} back.`:'',e.mine.fa?`You'd pick up ${esc(byId[e.mine.fa].n)} with the open roster spot.`:'',e.mine.drop?`You'd drop ${esc([].concat(e.mine.drop).map(x=>byId[x].n).join(' and '))} to make room.`:'',e.theirs.drop?`${esc(partner.name)} would drop ${esc([].concat(e.theirs.drop).map(x=>byId[x].n).join(' and '))}.`:'',e.theirs.fa?`${esc(partner.name)} would pick up ${esc(byId[e.theirs.fa].n)}.`:''].filter(Boolean).join(' ')}</p>`:''}
