@@ -2193,9 +2193,16 @@ body[data-tab="news"] .tmn-chips{display:none}
   #rank-table{min-width:0!important;width:100%}
   #rank-table th:nth-child(3),#rank-table td:nth-child(3),#rank-table th:nth-child(n+6):nth-child(-n+10),#rank-table td:nth-child(n+6):nth-child(-n+10),#rank-table thead th:last-child,#rank-table td:last-child:not(.empty){display:none}
   #rank-table th,#rank-table td{padding-left:8px;padding-right:8px}
-  #rank-table td:nth-child(2){width:100%;max-width:0;overflow:hidden}
-  #rank-table td:nth-child(2) .meta{min-width:0}
-  #rank-table td:first-child,#rank-table th:first-child{padding-left:10px;width:34px}
+  /* Name column keeps one fixed width however many stats are added. The name plus three stats fill the screen; more stats scroll sideways under the pinned name */
+  main #rank-table{--m-num:24px;--m-stat:54px;--m-name:calc(100vw - 44px - var(--m-num) - 3*var(--m-stat))}
+  main #rank-table th:nth-child(1),main #rank-table td:nth-child(1){width:var(--m-num)!important;min-width:var(--m-num)!important;max-width:var(--m-num);padding-left:6px;padding-right:0}
+  main #rank-table th:nth-child(2),main #rank-table td:nth-child(2){left:var(--m-num)!important;width:var(--m-name);min-width:var(--m-name);max-width:var(--m-name);overflow:hidden;padding-left:8px;padding-right:4px}
+  main #rank-table th:nth-child(n+4),main #rank-table td:nth-child(n+4){min-width:var(--m-stat);padding-left:2px;padding-right:8px;font-size:14px}
+  main #rank-table thead th{letter-spacing:0;white-space:normal;line-height:1.2;vertical-align:bottom;font-size:10.5px}
+  #rank-table td:nth-child(2) .av,#rank-table td:nth-child(2) .pl>img{display:none}
+  #rank-table td:nth-child(2) .meta{min-width:0;flex:1 1 0}
+  #rank-table td:nth-child(2) .pname{white-space:normal;overflow:visible;line-height:1.2}
+  #rank-table td:nth-child(2) .psub{white-space:normal;line-height:1.5}
   .m-more-rows{display:flex;justify-content:center;padding:12px 0 2px}
   .scrollbox{max-height:62dvh}
   .tgt-table{min-width:0;width:100%}
