@@ -1262,27 +1262,26 @@ function renderTargets(){const q=($('tgt-search').value||'').trim().toLowerCase(
   sortTable('tgt-table')}
 function balanceHtml(fr,them,compact){const pos=Math.max(4,Math.min(96,(1-fr.share)*100));
   return `<div class="balance${compact?' compact':''}"><div class="bal-label">${fr.label}</div><div class="bal-track"><span class="bal-mark" style="left:${pos}%"></span></div><div class="bl"><span>You</span><span>${esc(them)}</span></div></div>`}
-/* starting lineup, week by week: your lineup's points in every rated week, now against after the deal, from the same weekly
-   lineups as the Lineup change tile. The gap between the lines is shaded (green gained, red lost); playoff weeks are boxed. */
+/* starting lineup, week by week: points your lineup gains or loses in every rated week (after the deal minus now), from the same
+   weekly lineups as the Lineup change tile. The scale fits the change itself, never less than 2 points tall, so close trades still
+   read clearly without a 0.2 swing filling the chart. Playoff weeks are boxed. */
 function weekChart(imp,get){const R=imp.rows;if(!R.length)return '';const n=R.length,PO=poWeeks(),d=imp.lpA-imp.lpB,c=Math.abs(d)<.05?'':d>0?'up':'down';
-  const B=R.map(r=>r.b.pts),A=R.map(r=>r.a.pts),all=B.concat(A),mn=Math.min(...all),mx=Math.max(...all),pad=Math.max(.6,(mx-mn)*.06),lo=mn-pad,hi=mx+pad;
-  const X=i=>(i+.5)/n*100,Y=v=>(hi-v)/(hi-lo)*100,pt=(i,v)=>`${X(i).toFixed(2)},${Y(v).toFixed(2)}`;
-  let fill='';for(let i=0;i<n-1;i++){const d0=A[i]-B[i],d1=A[i+1]-B[i+1];
-    if(d0*d1<0){const t=d0/(d0-d1),xc=`${(X(i)+t*(X(i+1)-X(i))).toFixed(2)},${Y(B[i]+t*(B[i+1]-B[i])).toFixed(2)}`;
-      fill+=`<polygon class="${d0>0?'up':'down'}" points="${pt(i,B[i])} ${pt(i,A[i])} ${xc}"/><polygon class="${d1>0?'up':'down'}" points="${xc} ${pt(i+1,A[i+1])} ${pt(i+1,B[i+1])}"/>`}
-    else if(d0||d1)fill+=`<polygon class="${d0+d1>0?'up':'down'}" points="${pt(i,B[i])} ${pt(i,A[i])} ${pt(i+1,A[i+1])} ${pt(i+1,B[i+1])}"/>`}
+  const D=R.map(r=>Math.abs(r.d)<.05?0:r.d);let hi=Math.max(0,...D),lo=Math.min(0,...D);const sp=hi-lo;
+  if(sp<2){if(!sp){hi=1;lo=-1}else if(!lo)hi=2;else if(!hi)lo=-2;else{hi*=2/sp;lo*=2/sp}}
+  const S=hi-lo,z=hi/S*100;
   const st=id=>R.filter(r=>r.a.lu.slots.some(x=>x.p&&x.p.id===id)).length,ins=(get||[]).map(id=>[id,st(id)]).filter(x=>x[1]>0);
   const who=ins.length?ins.map(([id,k])=>`${esc(byId[id].n)} starts ${k===n?(n>1?'every week':'this week'):`${k} of ${n} weeks`}`).join(' · '):'No player you get makes your starting lineup';
   const tip=r=>{const s=new Set(r.a.lu.slots.filter(x=>x.p).map(x=>x.p.id)),g=(get||[]).filter(id=>s.has(id)).map(id=>byId[id].n);return `Week ${r.w}: ${f1(r.b.pts)} now, ${f1(r.a.pts)} after. ${g.length?g.join(' and ')+' in your lineup':'No player you get starts'}`};
   const poI=R.map((r,i)=>PO.includes(r.w)?i:-1).filter(i=>i>=0),po=poI.length?`<div class="wc-po" style="left:${(poI[0]/n*100).toFixed(2)}%;width:${((poI[poI.length-1]-poI[0]+1)/n*100).toFixed(2)}%"><span>Playoffs</span></div>`:'';
-  const dots=R.map((r,i)=>`<i class="wc-dot${Math.abs(r.d)<.05?'':r.d>0?' up':' down'}" style="left:${X(i).toFixed(2)}%;top:${Y(A[i]).toFixed(2)}%" title="${esc(tip(r))}"></i>`).join('');
-  const ax=R.map(r=>`<div class="wc-wk${Math.abs(r.d)<.05?'':r.d>0?' up':' down'}${PO.includes(r.w)?' po':''}" data-wk="${r.w}" title="${esc(tip(r))}"><span>${n<=8?'Wk ':''}${r.w}</span><b class="num">${Math.abs(r.d)<.05?'0.0':sgn(r.d)}</b></div>`).join('');
-  return `<div class="lb wc"><div class="lb-h"><span class="lab2">Your starting lineup <span class="lb-rng">week by week</span></span><span class="lb-leg"><i class="wc-k now"></i>Now<i class="wc-k aft"></i>After trade</span></div>
+  const cols=R.map((r,i)=>{const v=D[i],k=!v?'':v>0?' up':' down',h=Math.abs(v)/S*100;
+    return `<div class="wc-col${k}" data-wk="${r.w}" title="${esc(tip(r))}">${v?`<i style="top:${(v>0?z-h:z).toFixed(2)}%;height:${h.toFixed(2)}%"></i>`:''}<b class="num" style="${v>=0?`bottom:${(100-(z-h)).toFixed(2)}%`:`top:${(z+h).toFixed(2)}%`}">${v?sgn(v):'0.0'}</b></div>`}).join('');
+  const ax=R.map(r=>`<div class="wc-wk${PO.includes(r.w)?' po':''}"><span>${n<=8?'Wk ':''}${r.w}</span></div>`).join('');
+  return `<div class="lb wc"><div class="lb-h"><span class="lab2">Your starting lineup <span class="lb-rng">points gained or lost each week</span></span></div>
     <div class="wc-head"><div class="wc-avg"><span>Avg per week after trade</span><b class="num">${f1(imp.lpA)}</b></div><div class="wc-d"><b class="num ${c}">${sgn(imp.lp)}</b><span class="num">from ${f1(imp.lpB)}</span></div></div>
-    <div class="wc-plot" role="img" aria-label="Your lineup's points each week, now against after the trade. Average goes from ${f1(imp.lpB)} to ${f1(imp.lpA)} a week.">
-      <span class="wc-y num" style="top:${Y(mx).toFixed(1)}%">${Math.round(mx)}</span><span class="wc-y num" style="top:${Y(mn).toFixed(1)}%">${Math.round(mn)}</span>
-      <div class="wc-in">${po}<svg viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true"><line class="g" x1="0" x2="100" y1="${Y(mx).toFixed(2)}" y2="${Y(mx).toFixed(2)}"/><line class="g" x1="0" x2="100" y1="${Y(mn).toFixed(2)}" y2="${Y(mn).toFixed(2)}"/>${fill}${n>1?`<polyline class="now" points="${B.map((v,i)=>pt(i,v)).join(' ')}"/><polyline class="aft" points="${A.map((v,i)=>pt(i,v)).join(' ')}"/>`:''}</svg>${dots}</div></div>
-    <div class="wc-ax${n>10?' dense':''}" style="grid-template-columns:repeat(${n},minmax(0,1fr))">${ax}</div>
+    <div class="wc-plot${n>10?' dense':''}" role="img" aria-label="Points your starting lineup gains or loses each week after the trade: ${R.map((r,i)=>`week ${r.w} ${D[i]?sgn(D[i]):'no change'}`).join(', ')}.">
+      <span class="wc-y num" style="top:${z.toFixed(1)}%">0</span>
+      <div class="wc-in">${po}<i class="wc-z" style="top:${z.toFixed(2)}%"></i><div class="wc-cols" style="grid-template-columns:repeat(${n},minmax(0,1fr))">${cols}</div></div></div>
+    <div class="wc-ax" style="grid-template-columns:repeat(${n},minmax(0,1fr))">${ax}</div>
     <p class="wc-who">${who}</p></div>`}
 function renderRating(partner){
   const el=$('rating');
