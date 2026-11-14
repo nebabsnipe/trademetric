@@ -74,7 +74,10 @@ function acctGet(k,d){const a=S&&S.acct;return a&&a[k]!=null?a[k]:ACCT0[k]!=null
 let ACCT_T=null;
 function saveAcct(){S.savedAt=Date.now();clearTimeout(ACCT_T);ACCT_T=setTimeout(()=>{try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}},200);if(typeof cloudSave==='function')cloudSave()}
 function acctSet(k,v){if(!S)return;(S.acct=S.acct||{})[k]=v;saveAcct()}
-function acctFold(){const ks=Object.keys(ACCT0);if(!ks.length)return;S.acct=S.acct||{};ks.forEach(k=>{if(S.acct[k]==null)S.acct[k]=ACCT0[k];delete ACCT0[k]});
+function acctFold(){const ks=Object.keys(ACCT0);if(!ks.length)return;
+  /* merged, not just copied: another device may already have started this account's data, and this browser's history
+     (often the longest one) has to join it rather than be dropped */
+  acctMerge(S,{...ACCT0});ks.forEach(k=>delete ACCT0[k]);
   try{Object.values(ACCT_OLD).forEach(ls=>localStorage.removeItem(ls));localStorage.setItem('tm-acct-legacy','1');localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
 /* Two copies of the account data (the server's and this device's) become one: nothing either side recorded is lost. */
 function acctMerge(cs,la){if(!la)return false;const a=cs.acct=cs.acct||{};let ch=false;
@@ -82,7 +85,10 @@ function acctMerge(cs,la){if(!la)return false;const a=cs.acct=cs.acct||{};let ch
   const items=(A,B,n)=>{const have=new Set((A||[]).map(e=>e.k)),add=(B||[]).filter(e=>e&&!have.has(e.k));return add.length?[...(A||[]),...add].sort(byAt).slice(0,n):null};
   if(la.news){const n=a.news;if(!n||(la.news.week||0)>(n.week||0)){a.news=la.news;ch=true}
     else if(n.week===la.news.week){const it=items(n.items,la.news.items,120);if(it){n.items=it;ch=true}
-      const f=uni(n.fired,la.news.fired,600);if(f.length!==(n.fired||[]).length){n.fired=f;ch=true}if(!n.last&&la.news.last){n.last=la.news.last;ch=true}}}
+      const f=uni(n.fired,la.news.fired,600);if(f.length!==(n.fired||[]).length){n.fired=f;ch=true}
+      const L=la.news.last;if(L&&(!n.last||(L.week||0)>(n.last.week||0))){n.last=L;ch=true}else if(L&&n.last&&L.week===n.last.week){const li=items(n.last.items,L.items,60);if(li){n.last={...n.last,items:li};ch=true}}}
+    /* the other copy is a week behind: its items are last week's */
+    else if(n&&la.news.week===n.week-1&&(la.news.items||[]).length){const li=items(n.last&&n.last.week===la.news.week?n.last.items:[],la.news.items,60);if(li){n.last={week:la.news.week,items:li};ch=true}}}
   if(la.top){const t=a.top;if(!t){a.top=la.top;ch=true}else{const it=items(t.items,la.top.items,30);if(it){t.items=it;ch=true}
       ['done','done2','trd'].forEach(k=>{const u=uni(t[k],la.top[k],60);if(u.length!==(t[k]||[]).length){t[k]=u;ch=true}})}}
   if(la.alerts){const u=uni(a.alerts,la.alerts,300);if(u.length!==(a.alerts||[]).length){a.alerts=u;ch=true}}
