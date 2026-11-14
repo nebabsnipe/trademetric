@@ -8,6 +8,9 @@
    Preview data note: until offseason consensus and ADP feeds exist, consensus = rest-of-season expert
    ranks (data/nfl.json "ros") and market = FantasyCalc redraft values (data/market.json "fc1"). */
 var TMO_W={cons:.40,adp:.275,tm:.325};
+/* BETA: while true, every signed-in account gets Pro for free. Set to false when the beta ends
+   to bring back the paywall (and the 7-day free trial, once checkout is built). */
+var TMO_BETA_PRO=true;
 var TMO_MODE_KEY='tm_mode_override',TMO_PRO_KEY='tm_pro_preview';
 var TMO={rows:null,pos:'ALL',view:'all',q:'',open:null,limit:100,market:null};
 var TMO_PUBLIC=['home','tmrank'];
@@ -33,7 +36,9 @@ function tmoSetMode(m){
   if(location.hash.slice(1)===target)go(target);else location.hash=target;
 }
 function tmoHomeTab(){return tmoMode()==='off'?'home':'team'}
+function tmoSignedIn(){return typeof USER!=='undefined'&&!!USER}
 function tmoIsPro(){
+  if(TMO_BETA_PRO&&tmoSignedIn())return true;
   if(typeof PROFILE!=='undefined'&&PROFILE&&PROFILE.plan&&PROFILE.plan!=='free')return true;
   try{return TMO_IS_PREVIEW&&localStorage.getItem(TMO_PRO_KEY)==='1'}catch(e){return false}
 }
@@ -173,12 +178,12 @@ function renderOffHome(){
   <section class="tmo-pro">
     <div class="tmo-pro-h">
       <div><div class="kicker">TradeMetric Pro</div><h2>Built for your league, not everyone's.</h2>
-      <p>The rankings are free. Pro turns them into decisions for your team.</p></div>
-      ${pro?'<span class="tmo-pro-on">Pro active</span>':`<a class="btn accent" href="${signed?'#account':'#signin'}">${signed?'See Pro plans':'Sign in to get Pro'}</a>`}
+      <p>The rankings are free. Pro turns them into decisions for your team.${TMO_BETA_PRO?' <b>Free for every account during the beta.</b>':''}</p></div>
+      ${pro?`<span class="tmo-pro-on">${TMO_BETA_PRO?'Pro active · free during beta':'Pro active'}</span>`:`<a class="btn accent" href="${signed?'#account':'#signin'}">${signed?'See Pro plans':TMO_BETA_PRO?'Sign in for free Pro':'Sign in to get Pro'}</a>`}
     </div>
     <div class="tmo-tools">${TOOLS.map(([h,p,k])=>`<div class="tmo-tool"><div class="tmo-tool-h"><h3>${h}</h3>${pro?'':'<span class="tmo-lock">'+TMO_LOCK+'Pro</span>'}</div><p>${p}</p>${k==='trade'||k==='mock'||k==='picks'?'<span class="tmo-soon">Coming soon</span>':''}</div>`).join('')}</div>
   </section>
-  ${TMO_IS_PREVIEW?`<p class="tmo-dev note">Preview only: <button class="btn small" type="button" data-tmo-pro>${pro?'View as free':'View as Pro'}</button> Consensus and market numbers use this season's rest-of-season data until the offseason feeds are added.</p>`:''}`;
+  ${TMO_IS_PREVIEW&&!TMO_BETA_PRO?`<p class="tmo-dev note">Preview only: <button class="btn small" type="button" data-tmo-pro>${pro?'View as free':'View as Pro'}</button> Consensus and market numbers use this season's rest-of-season data until the offseason feeds are added.</p>`:''}`;
 }
 
 /* ---------- Rankings ---------- */
@@ -232,7 +237,7 @@ function tmoWhy(o,pro){
       ${f('Age next season',o.age1!=null?Math.floor(o.age1)+(o.ageF>=1?' · prime':o.age1<TMO_PEAK[o.pos][0]?' · rising':' · past peak'):'—')}
       ${f('Depth chart',o.dep?o.pos+o.dep:'—')}
       ${f('Offense',pct(o.offP))}</ul></div></div>`;
-  return pro?inner:`<div class="tmo-locked"><div class="tmo-blur" aria-hidden="true">${inner}</div><div class="tmo-unlock">${TMO_LOCK}<b>See why we rank ${esc(o.n.split(' ').slice(-1)[0])} #${o.rank}</b><span>The full TM Score breakdown is part of TradeMetric Pro.</span><a class="btn accent small" href="${typeof USER!=='undefined'&&USER?'#account':'#signin'}">Get Pro</a></div></div>`;
+  return pro?inner:`<div class="tmo-locked"><div class="tmo-blur" aria-hidden="true">${inner}</div><div class="tmo-unlock">${TMO_LOCK}<b>See why we rank ${esc(o.n.split(' ').slice(-1)[0])} #${o.rank}</b><span>${TMO_BETA_PRO?'Sign in to see the full TM Score breakdown. Pro is free during the beta.':'The full TM Score breakdown is part of TradeMetric Pro.'}</span><a class="btn accent small" href="${tmoSignedIn()?'#account':'#signin'}">${TMO_BETA_PRO?'Sign in free':'Get Pro'}</a></div></div>`;
 }
 
 /* ---------- events ---------- */
