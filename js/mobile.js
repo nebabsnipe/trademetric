@@ -4,6 +4,8 @@
   const mq=matchMedia('(max-width:700px)');
   const svg=d=>`<svg class="nav-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${d}</svg>`;
   const IC={
+    home:'<path d="M3 11l9-7 9 7"/><path d="M5 10v10h14V10"/>',
+    tmrank:'<path d="M5 20V11M12 20V4M19 20v-6"/>',
     team:'<path d="M12 3l7 3v5c0 4.6-3 8-7 10-4-2-7-5.4-7-10V6z"/><path d="M9 12l2 2 4-4"/>',
     news:'<path d="M13 2L4 14h7l-1 8 9-12h-7z"/>',
     rankings:'<path d="M5 20V11M12 20V4M19 20v-6"/>',

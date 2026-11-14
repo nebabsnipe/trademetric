@@ -11,7 +11,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600;700;800&family=Kanit:ital,wght@0,700;0,800;1,600;1,700;1,800&display=swap">
 <meta name="description" content="Fantasy football trades, rankings and lineup advice built on your league's exact settings.">
-<link rel="stylesheet" href="css/styles.css?v=17">
+<link rel="stylesheet" href="css/styles.css?v=20">
 </head>
 <body class="signed-out">
 <div class="topbar">
@@ -20,6 +20,8 @@
     <span class="preview-pill" id="preview-pill" hidden>Preview</span>
     <script>if(!/(^|\.)trademetric\.app$/.test(location.hostname))document.getElementById('preview-pill').hidden=false</script>
     <nav class="nav" aria-label="Sections">
+      <button data-tab="home" class="off-only">Home</button>
+      <button data-tab="tmrank" class="off-only">Rankings</button>
       <button data-tab="team">My Team</button>
       <button data-tab="news">News</button>
       <button data-tab="rankings" data-hash="players">Players</button>
@@ -29,6 +31,7 @@
       <button data-tab="draft" class="nav-draft">Draft</button>
     </nav>
     <div class="topbar-right">
+      <button class="mode-pill" id="mode-pill" type="button"><span class="mp-dot" aria-hidden="true"></span><span class="mp-l">Offseason</span></button>
       <span class="demo-pill" id="week-pill"></span>
       <select id="league-switch" class="league-switch" aria-label="Switch league" hidden></select>
       <div class="alerts-wrap"><button class="alert-btn" id="alert-btn" type="button" aria-label="Alerts" aria-expanded="false"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg><span class="alert-n" id="alert-n" hidden></span></button>
@@ -40,6 +43,11 @@
 </div>
 
 <main class="wrap">
+  <!-- OFFSEASON HOME -->
+  <section class="view" id="v-home" hidden><div id="off-home"></div></section>
+  <!-- TRADEMETRIC RANKINGS (offseason) -->
+  <section class="view" id="v-tmrank" hidden><div id="tm-rank"></div></section>
+
   <!-- MY TEAM -->
   <section class="view" id="v-team" hidden>
     <div class="hero">
@@ -332,7 +340,7 @@
 <script>
 /* Load the stats snapshot, then start the app */
 fetch('data/nfl.json',{cache:'no-cache'}).then(r=>r.json()).then(d=>{
-  window.NFL_DATA=d;const n=document.createElement('script');n.src='js/news.js?v=14';n.onload=n.onerror=()=>{const s=document.createElement('script');s.src='js/app.js?v=11';s.onload=()=>{const m=document.createElement('script');m.src='js/mobile.js?v=1';document.body.appendChild(m)};document.body.appendChild(s)};document.body.appendChild(n);
+  window.NFL_DATA=d;const n=document.createElement('script');n.src='js/news.js?v=14';n.onload=n.onerror=()=>{const o=document.createElement('script');o.src='js/offseason.js?v=2';o.onload=o.onerror=()=>{const s=document.createElement('script');s.src='js/app.js?v=12';s.onload=()=>{const m=document.createElement('script');m.src='js/mobile.js?v=2';document.body.appendChild(m)};document.body.appendChild(s)};document.body.appendChild(o)};document.body.appendChild(n);
 }).catch(()=>{document.body.insertAdjacentHTML('afterbegin','<p style="padding:20px;font-family:sans-serif">Could not load player data. Refresh to try again.</p>')});
 </script>
 </body>

@@ -1749,12 +1749,12 @@ function applyTheme(){if(themePref)document.documentElement.setAttribute('data-t
 $('theme-btn').addEventListener('click',()=>{themePref=isDark()?'light':'dark';try{localStorage.setItem('hashmark-theme',themePref)}catch(e){}applyTheme()});
 
 /* ===== Routing & events ===== */
-const TABS=['team','news','trade','rankings','hub','season','league','draft','help','welcome','signin','account'];let tab='team';
+const TABS=['team','news','trade','rankings','hub','season','league','draft','help','welcome','signin','account','home','tmrank'];let tab='team';
 function howLink(k){return `<a class="how how-wrap" href="#help-${k}">How this works</a>`}
 const TAB_ALIAS={players:['rankings','rank'],waivers:['rankings','waiv'],values:['rankings','vals']};
-function go(t){let helpSec=null;if(t&&t.startsWith('help-')){helpSec=t.slice(5);t='help'}if(t&&t.startsWith('account-')){ACC_TAB=t.slice(8);t='account'}else if(t==='account')ACC_TAB='profile';if(t!==tab||t==='account'){ACC_EDIT=null;ACC_MSG=null}if(t==='trade-ideas'||t==='trade-builder'){setTrView(t==='trade-ideas'?'ideas':'build');t='trade'}if(TAB_ALIAS[t]){plView=TAB_ALIAS[t][1];t=TAB_ALIAS[t][0]}if(t==='helper'){if(USER)openAI();t=TABS.includes(tab)?tab:'team';history.replaceState(null,'','#'+t)}if(!USER&&t!=='signin')t='signin';tab=TABS.includes(t)?t:'team';document.body.dataset.tab=tab;if(tab!=='welcome'&&S&&!S.onboarded){S.onboarded=true;save()}document.querySelectorAll('.nav button').forEach(b=>{if(b.dataset.tab===tab)b.setAttribute('aria-current','page');else b.removeAttribute('aria-current')});
+function go(t){let helpSec=null;if(t&&t.startsWith('help-')){helpSec=t.slice(5);t='help'}if(t&&t.startsWith('account-')){ACC_TAB=t.slice(8);t='account'}else if(t==='account')ACC_TAB='profile';if(t!==tab||t==='account'){ACC_EDIT=null;ACC_MSG=null}if(t==='trade-ideas'||t==='trade-builder'){setTrView(t==='trade-ideas'?'ideas':'build');t='trade'}if(TAB_ALIAS[t]){plView=TAB_ALIAS[t][1];t=TAB_ALIAS[t][0]}if(t==='helper'){if(USER)openAI();t=TABS.includes(tab)?tab:'team';history.replaceState(null,'','#'+t)}if(!USER&&t!=='signin'&&!TMO_PUBLIC.includes(t))t='signin';tab=TABS.includes(t)?t:'team';document.body.dataset.tab=tab;if(tab!=='welcome'&&S&&!S.onboarded){S.onboarded=true;save()}document.querySelectorAll('.nav button').forEach(b=>{if(b.dataset.tab===tab)b.setAttribute('aria-current','page');else b.removeAttribute('aria-current')});
   TABS.forEach(x=>$('v-'+x).hidden=x!==tab);render();window.scrollTo(0,0);if(tab==='help')openHelp(helpSec)}
-function render(){({team:renderTeam,news:tmnRender,rankings:renderPlayers,draft:renderDraft,help:()=>{},trade:renderTrade,hub:renderHub,season:renderSeason,welcome:renderWelcome,league:fillLeagueForm,signin:renderSignin,account:renderAccount})[tab]();renderAlerts();if(openId&&!$('scrim').hidden)openCard(openId);queueBalance()}
+function render(){tmoApplyMode();({home:renderOffHome,tmrank:renderTmRank,team:renderTeam,news:tmnRender,rankings:renderPlayers,draft:renderDraft,help:()=>{},trade:renderTrade,hub:renderHub,season:renderSeason,welcome:renderWelcome,league:fillLeagueForm,signin:renderSignin,account:renderAccount})[tab]();renderAlerts();if(openId&&!$('scrim').hidden)openCard(openId);queueBalance()}
 document.querySelectorAll('.nav button').forEach(b=>b.addEventListener('click',()=>{location.hash=b.dataset.hash||b.dataset.tab}));
 window.addEventListener('hashchange',()=>{closeCard();go(location.hash.slice(1))});
 function loadTrade(str){setTrView('build');const [g,r]=str.split('|');TD.give=g?g.split(','):[];TD.get=r?r.split(','):[];closeCard();if(tab==='trade')renderTrade();else location.hash='trade';setTimeout(()=>$('rating').scrollIntoView({behavior:'smooth',block:'center'}),60)}
@@ -1846,7 +1846,7 @@ if(!S||!S.league||!S.teams){S={league:{name:'Sample League',teams:12,sc:{...PRES
 else{S.league.sc={...BASE_SC,...S.league.sc};if(S.league.slots.DST===undefined)S.league.slots.DST=1;if(S.league.slots.K===undefined)S.league.slots.K=1;setPool();recompute();if(S.example&&S.league.slots.K&&!S.teams.some(T=>T.players.some(id=>byId[id]&&byId[id].pos==='K')))exampleLeague()}
 buildLeagueForm();
 S.chat=(S.chat||[]).filter(x=>x.status==='done'||x.status==='error');
-var INTENDED=location.hash.slice(1);go('signin');
+var INTENDED=location.hash.slice(1);go(TMO_PUBLIC.includes(INTENDED)?INTENDED:!INTENDED&&tmoMode()==='off'?'home':'signin');
 loadLive();loadProj();loadMarket();
 
 /* ===== Accounts (Supabase): TradeMetric's own sign-in page, social sign-in, email codes, league saved to the cloud =====
@@ -1864,7 +1864,7 @@ function ssoMark(p){return `<span class="sso-ic sso-${p.id}" aria-hidden="true">
 function lsGet(k){try{return localStorage.getItem(k)}catch(e){return null}}
 function lsSet(k,v){try{localStorage.setItem(k,v)}catch(e){}}
 function lsDel(k){try{localStorage.removeItem(k)}catch(e){}}
-function adoptState(st){S=st;setPool();SCHED=null;LIVE_LU=null;recompute();buildLeagueForm();hubSel=S.me;if(tab==='welcome')location.hash='team';render();if(S.real&&S.real.src)loadPlatform().then(()=>{recompute();render()})}
+function adoptState(st){S=st;setPool();SCHED=null;LIVE_LU=null;recompute();buildLeagueForm();hubSel=S.me;if(tab==='welcome'||(tab==='home'&&tmoMode()==='in'))location.hash='team';render();if(S.real&&S.real.src)loadPlatform().then(()=>{recompute();render()})}
 async function cloudPull(){if(!SB||!USER)return;
   const {data,error}=await SB.from('user_state').select('state,updated_at').eq('user_id',USER.id).maybeSingle();
   if(error){CLOUD.err=error.message;acctUI();return}
@@ -1972,10 +1972,10 @@ function checkUsername(raw){const u=String(raw||'').trim().toLowerCase();clearTi
   UN_T=setTimeout(async()=>{const {data,error}=await SB.rpc('username_available',{p_username:u});if(!UN_STATE||UN_STATE.u!==u)return;
     UN_STATE=error?{u,ok:null,text:"Can't check that right now"}:{u,ok:data!==false,text:data===false?'Taken. Try another.':'Available'};paintUn()},350)}
 function enterApp(){stopConfirmWatch();document.body.classList.remove('signed-out');setTimeout(syncNow,300);if(typeof tmnTopBanners==='function')setTimeout(()=>{tmnTopCatchUp();tmnTopBanners()},2000);AUTH_MODE='in';AUTH_MSG=null;PENDING=null;AUTH_VALS={};UN_STATE=null;
-  let t=INTENDED&&TABS.includes(INTENDED.replace(/-.*/,''))&&INTENDED!=='signin'?INTENDED:'team';INTENDED=null;if(!S.onboarded)t='welcome';
+  let t=INTENDED&&TABS.includes(INTENDED.replace(/-.*/,''))&&INTENDED!=='signin'?INTENDED:tmoHomeTab();INTENDED=null;if(!S.onboarded)t='welcome';
   if(location.hash.slice(1)===t)go(t);else location.hash=t}
 function showSignin(){if(tab!=='signin'){if(location.hash==='#signin')go('signin');else location.hash='signin'}else renderSignin()}
-function leaveApp(){stopConfirmWatch();document.body.classList.add('signed-out');USER=null;PROFILE=null;PROFILE_OK=false;AUTH_MODE='in';AUTH_MSG=null;ACC_EDIT=null;showSignin();acctUI()}
+function leaveApp(){stopConfirmWatch();document.body.classList.add('signed-out');USER=null;PROFILE=null;PROFILE_OK=false;AUTH_MODE='in';AUTH_MSG=null;ACC_EDIT=null;if(TMO_PUBLIC.includes(tab))render();else showSignin();acctUI()}
 function authFail(t){AUTH_BUSY=false;AUTH_MSG={bad:true,html:esc(friendly(t))};renderSignin()}
 function authNote(h){AUTH_BUSY=false;AUTH_MSG={bad:false,html:h};renderSignin()}
 /* Everything that happens once someone is signed in, however they got there (form, code, link, Google, another tab). */
