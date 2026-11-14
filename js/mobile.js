@@ -16,7 +16,11 @@
     draft:'<path d="M8 6h12M8 12h12M8 18h12M4 6h.01M4 12h.01M4 18h.01"/>',
     account:'<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/>',
     help:'<circle cx="12" cy="12" r="9"/><path d="M9.5 9.3a2.6 2.6 0 1 1 3.6 2.4c-.7.4-1.1 1-1.1 1.800M12 17h.01"/>',
-    theme:'<path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/>'
+    theme:'<path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/>',
+    recap:'<rect x="4" y="5" width="16" height="15" rx="2"/><path d="M8 3v4M16 3v4M4 10h16M9 15l2 2 4-4"/>',
+    drafttools:'<path d="M8 6h12M8 12h12M8 18h12M4 6h.01M4 12h.01M4 18h.01"/>',
+    leaguefit:'<circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4.5"/><circle cx="12" cy="12" r=".8"/>',
+    lock:'<rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>'
   };
   const nav=document.querySelector('.nav');if(!nav)return;
 
@@ -28,8 +32,9 @@
   // More sheet
   const scrim=document.createElement('div');scrim.className='m-sheet-scrim';
   const sheet=document.createElement('div');sheet.className='m-sheet';sheet.setAttribute('role','dialog');sheet.setAttribute('aria-label','More');
-  const LINKS=[['season','Season Sim'],['hub','League'],['draft','Draft'],['account','Account'],['help','How it works']];
-  sheet.innerHTML=LINKS.map(([t,l])=>`<a href="#${t}" data-m="${t}">${svg(IC[t])}${l}</a>`).join('')+`<button type="button" data-m="theme">${svg(IC.theme)}Dark mode<small></small></button>`;
+  // Offseason mode lists the Pro tools (m-off); in-season lists the league pages (m-in). The css shows the right set.
+  const LINKS=[['recap','Recap','m-off'],['drafttools','Draft Tools','m-off'],['leaguefit','League Fit','m-off'],['season','Season Sim','m-in'],['hub','League','m-in'],['draft','Draft','m-in'],['account','Account',''],['help','How it works','']];
+  sheet.innerHTML=LINKS.map(([t,l,c])=>`<a href="#${t}" data-m="${t}"${c?` class="${c}"`:''}>${svg(IC[t])}${l}${c==='m-off'?`<span class="nav-lock">${svg(IC.lock)}Pro</span>`:''}</a>`).join('')+`<button type="button" data-m="theme">${svg(IC.theme)}Dark mode<small></small></button>`;
   document.body.append(scrim,sheet);
   const isDark=()=>{const t=document.documentElement.getAttribute('data-theme');return t?t==='dark':matchMedia('(prefers-color-scheme: dark)').matches};
   function setMore(on){

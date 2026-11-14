@@ -26,9 +26,11 @@ const FOCUS = {
   inj: '(injury OR injured OR practice OR "ruled out" OR questionable OR doubtful OR status OR return)',
   role: '(snaps OR role OR "depth chart" OR targets OR carries OR workload OR starter OR usage)',
   trade: '(traded OR trade OR acquire OR acquired OR acquires OR deal)',
+  /* offseason outlook (api/take.js): how the team talks about his role, and moves at his position */
+  outlook: '(role OR usage OR workload OR touches OR targets OR starter OR "depth chart" OR coach OR signs OR signed OR drafted OR extension OR trade)',
 };
 const perPlayer = (name, team, focus) => [
-  { src: 'Google News', kind: 'rss', url: `https://news.google.com/rss/search?q=${encodeURIComponent(focus ? `"${name}" ${FOCUS[focus]} when:7d` : `"${name}" NFL when:14d`)}&hl=en-US&gl=US&ceid=US:en` },
+  { src: 'Google News', kind: 'rss', url: `https://news.google.com/rss/search?q=${encodeURIComponent(focus ? `"${name}" ${FOCUS[focus]} when:${focus === 'outlook' ? '30d' : '7d'}` : `"${name}" NFL when:14d`)}&hl=en-US&gl=US&ceid=US:en` },
   ...(ESPN_TEAM[team] ? [{ src: 'ESPN', kind: 'espn', url: `https://site.api.espn.com/apis/site/v2/sports/football/nfl/news?team=${ESPN_TEAM[team]}&limit=50` }] : []),
 ];
 
@@ -242,6 +244,23 @@ async function recapAll(items) {
   }
   return out;
 }
+
+/* One plain Claude call (same model and settings as the recaps above). Used by api/take.js. Returns the reply text or null. */
+async function askClaude(prompt, maxTokens = 600, ms = 20000) {
+  if (!API_KEY) return null;
+  const ctl = new AbortController(); const t = setTimeout(() => ctl.abort(), ms);
+  try {
+    const r = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST', signal: ctl.signal,
+      headers: { 'content-type': 'application/json', 'x-api-key': API_KEY, 'anthropic-version': '2023-06-01' },
+      body: JSON.stringify({ model: MODEL, max_tokens: maxTokens, thinking: { type: 'disabled' }, messages: [{ role: 'user', content: prompt }] }),
+    });
+    if (!r.ok) { LAST_ERR = 'HTTP ' + r.status; return null; }
+    const j = await r.json(); return (j.content || []).map(c => c.text || '').join('');
+  } catch (e) { LAST_ERR = String(e && e.message || e).slice(0, 150); return null; } finally { clearTimeout(t); }
+}
+const lastErr = () => LAST_ERR;
+export { API_KEY, ESPN_TEAM, collect, getText, parseRSS, parseESPN, norm, similar, moveOf, FLUFF, RUMOR, askClaude, lastErr, cleanLine };
 
 const clip = (s, n) => { s = String(s || ''); if (s.length <= n) return s; const c = s.slice(0, n); const k = Math.max(c.lastIndexOf('. '), c.lastIndexOf(' ')); return c.slice(0, k > n * .6 ? k + 1 : n).trim() + '…'; };
 const cache = new Map();

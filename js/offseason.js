@@ -12,8 +12,10 @@ var TMO_W={cons:.40,adp:.275,tm:.325};
    to bring back the paywall (and the 7-day free trial, once checkout is built). */
 var TMO_BETA_PRO=true;
 var TMO_MODE_KEY='tm_mode_override',TMO_PRO_KEY='tm_pro_preview';
-var TMO={rows:null,pos:'ALL',view:'all',q:'',open:null,limit:100,market:null};
-var TMO_PUBLIC=['home','tmrank'];
+var TMO={rows:null,pos:'ALL',view:'all',q:'',open:null,limit:100,market:null,takes:{}};
+/* Pro tools that have a tab in the offseason nav. Signed out they show a locked page; signed in, a Coming soon page. */
+var TMO_PRO_TABS=['recap','drafttools','leaguefit'];
+var TMO_PUBLIC=['home','tmrank'].concat(TMO_PRO_TABS);
 var TMO_IS_PREVIEW=!/(^|\.)trademetric\.app$/.test(location.hostname);
 
 /* ---------- mode ---------- */
@@ -26,6 +28,7 @@ function tmoMode(){
 }
 function tmoApplyMode(){
   const m=tmoMode();document.body.classList.toggle('mode-off',m==='off');document.body.classList.toggle('mode-in',m==='in');
+  document.body.classList.toggle('tmo-is-pro',tmoIsPro());
   const p=document.getElementById('mode-pill');
   if(p){p.dataset.mode=m;p.querySelector('.mp-l').textContent=m==='off'?'Offseason':'In-season';p.title='Switch to '+(m==='off'?'in-season':'offseason')+' mode'}
 }
@@ -224,20 +227,88 @@ function renderTmRank(){
     <tbody>${rows||'<tr><td colspan="8" class="note" style="padding:24px">No players match.</td></tr>'}</tbody></table></div>
   ${!filtered&&L.length>shown.length?`<div class="rank-more"><button class="btn" type="button" data-tmo-more>Show ${Math.min(50,L.length-shown.length)} more</button></div>`:''}
   <p class="note tmo-foot">Tiers break where the score drops off the most. Ages are for next season.</p>`;
+  if(TMO.open&&pro){const o=R.find(r=>r.id===TMO.open);if(o)tmoTakeLoad(o)}
 }
+function tmoOrd(n){const t=n%100;return n+(t>=11&&t<=13?'th':['th','st','nd','rd'][n%10]||'th')}
 function tmoWhy(o,pro){
   const bar=(l,v,c)=>`<div class="tmo-wb"><span>${l}</span><span class="tmo-bar ${c}"><i style="width:${Math.max(3,v).toFixed(0)}%"></i></span><b>${v.toFixed(0)}</b></div>`;
-  const f=(l,v)=>`<li><span>${l}</span><b>${v}</b></li>`,pct=x=>x==null?'—':Math.round(x*100)+'th pct';
+  const f=(l,v)=>`<li><span>${l}</span><b>${v}</b></li>`,pct=x=>x==null?'':' · '+tmoOrd(Math.round(x*100))+' pct';
   const inner=`<div class="tmo-why-in">
-    <div class="tmo-why-col"><h4>Score parts</h4>${bar('Experts',o.sCons,'c')}${bar('Market',o.sAdp,'m')}${bar('TradeMetric model',o.sTm,'t')}</div>
-    <div class="tmo-why-col"><h4>Opportunity model</h4><ul class="tmo-facts">
-      ${f('Expected points / game',o.xfpg!=null?o.xfpg.toFixed(1)+' · '+pct(o.xfpgP):'—')}
-      ${o.pos!=='QB'?f('Weighted opportunity (WOPR)',o.wopr!=null?o.wopr.toFixed(2)+' · '+pct(o.woprP):'—'):''}
-      ${f('Points over expected',o.fpoeg!=null?(o.fpoeg>0?'+':'')+o.fpoeg.toFixed(1)+'/g':'—')}
-      ${f('Age next season',o.age1!=null?Math.floor(o.age1)+(o.ageF>=1?' · prime':o.age1<TMO_PEAK[o.pos][0]?' · rising':' · past peak'):'—')}
-      ${f('Depth chart',o.dep?o.pos+o.dep:'—')}
-      ${f('Offense',pct(o.offP))}</ul></div></div>`;
-  return pro?inner:`<div class="tmo-locked"><div class="tmo-blur" aria-hidden="true">${inner}</div><div class="tmo-unlock">${TMO_LOCK}<b>See why we rank ${esc(o.n.split(' ').slice(-1)[0])} #${o.rank}</b><span>${TMO_BETA_PRO?'Sign in to see the full TM Score breakdown. Pro is free during the beta.':'The full TM Score breakdown is part of TradeMetric Pro.'}</span><a class="btn accent small" href="${tmoSignedIn()?'#account':'#signin'}">${TMO_BETA_PRO?'Sign in free':'Get Pro'}</a></div></div>`;
+    <div class="tmo-why-col"><h4>Score parts</h4>${bar('Experts',o.sCons,'c')}${bar('Market',o.sAdp,'m')}${bar('TradeMetric model',o.sTm,'t')}
+      <ul class="tmo-facts">
+      ${f('Expected points per game',o.xfpg!=null?o.xfpg.toFixed(1)+pct(o.xfpgP):'—')}
+      ${o.pos!=='QB'?f('Receiving role (WOPR)',o.wopr!=null?o.wopr.toFixed(2)+pct(o.woprP):'—'):''}</ul></div>
+    <div class="tmo-why-col tmo-take" data-tmo-take="${o.id}">${pro?tmoTakeHtml(o):tmoTakeGhost()}</div></div>`;
+  return pro?inner:`<div class="tmo-locked"><div class="tmo-blur" aria-hidden="true">${inner}</div><div class="tmo-unlock">${TMO_LOCK}<b>See why we rank ${esc(o.n.replace(/\s+(Jr\.?|Sr\.?|II|III|IV|V)$/,'').split(' ').slice(-1)[0])} #${o.rank}</b><span>${TMO_BETA_PRO?'Sign in to see the score breakdown and our take on him. Pro is free during the beta.':'The score breakdown and our take on him are part of TradeMetric Pro.'}</span><a class="btn accent small" href="${tmoSignedIn()?'#account':'#signin'}">${TMO_BETA_PRO?'Sign in free':'Get Pro'}</a></div></div>`;
+}
+
+/* ---------- the TradeMetric take (Pro): written on the server by AI the first time a panel is opened ---------- */
+var TMO_OUTLOOK={growing:['Growing','His role looks set to get bigger','<path d="M5 17l6-6 4 4 5-7"/><path d="M15 8h5v5"/>'],
+  steady:['Steady','His role looks about the same','<path d="M4 12h15"/><path d="M14 7l5 5-5 5"/>'],
+  threatened:['Threatened','His role could shrink','<path d="M5 7l6 6 4-4 5 7"/><path d="M15 16h5v-5"/>']};
+function tmoTakeHead(tag){return `<div class="tmo-take-h"><h4>TradeMetric take</h4>${tag||''}</div>`}
+function tmoTakeGhost(){return tmoTakeHead('<span class="tmo-out ghost"></span>')+'<div class="tmo-take-sk still"><i></i><i></i><i></i></div>'}
+function tmoTakeHtml(o){
+  const t=TMO.takes[o.id];
+  if(!t||t.st==='load')return tmoTakeHead()+'<div class="tmo-take-sk" role="status" aria-label="Writing the take"><i class="skel"></i><i class="skel"></i><i class="skel"></i></div>';
+  if(t.st==='ok'){const k=TMO_OUTLOOK[t.outlook]||TMO_OUTLOOK.steady,d=t.updated?new Date(t.updated):null;
+    return tmoTakeHead(`<span class="tmo-out ${esc(t.outlook)}" title="Role outlook: ${k[1]}"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${k[2]}</svg><span class="tmo-out-l">Role</span>${k[0]}</span>`)+
+      `<p class="tmo-take-t">${esc(t.take)}</p>${d&&!isNaN(d)?`<p class="tmo-take-d">Updated ${d.toLocaleDateString('en-US',{month:'short',day:'numeric'})}</p>`:''}`}
+  const msg={signin:'Sign in again to see the take.',pro:'The take is part of TradeMetric Pro.',rate:'That’s a lot of takes in an hour. Try again in a bit.',ai_off:'Takes aren’t switched on yet.'}[t.code]||'We couldn’t load the take.';
+  return tmoTakeHead()+`<p class="tmo-take-t muted">${msg}${t.code==='signin'||t.code==='pro'||t.code==='ai_off'?'':` <button class="btn small" type="button" data-tmo-take-retry="${o.id}">Try again</button>`}</p>`;
+}
+async function tmoToken(){try{if(typeof SB!=='undefined'&&SB){const {data}=await SB.auth.getSession();return data&&data.session?data.session.access_token:null}}catch(e){}return null}
+function tmoTakePaint(o){const el=document.querySelector(`[data-tmo-take="${o.id}"]`);if(el&&tmoIsPro())el.innerHTML=tmoTakeHtml(o)}
+async function tmoTakeLoad(o,force){
+  const cur=TMO.takes[o.id];if(cur&&!force&&(cur.st==='load'||cur.st==='ok'||Date.now()-cur.at<60e3))return;
+  TMO.takes[o.id]={st:'load',at:Date.now()};tmoTakePaint(o);
+  let out={st:'err',code:'net',at:Date.now()};
+  try{
+    const tok=await tmoToken();
+    if(!tok)out.code='signin';
+    else{
+      const r1=x=>x==null?null:+x.toFixed(3);
+      const r=await fetch('/api/take',{method:'POST',headers:{'content-type':'application/json',authorization:'Bearer '+tok},
+        body:JSON.stringify({id:o.id,n:o.n,pos:o.pos,t:o.t,age:o.age,rank:o.rank,posRank:o.posRank,cRank:o.cRank,mRank:o.mRank,tag:o.tag,grade:o.grade,g:o.g,ppg:r1(o.ppg),xfpg:r1(o.xfpg),xfpgP:r1(o.xfpgP),wopr:r1(o.wopr),woprP:r1(o.woprP)})});
+      const j=await r.json().catch(()=>null);
+      if(j&&j.ok&&j.take)out={st:'ok',take:j.take,outlook:j.outlook,updated:j.updated,at:Date.now()};
+      else out.code=(j&&j.code)||(r.status===401?'signin':'net');
+    }
+  }catch(e){}
+  TMO.takes[o.id]=out;tmoTakePaint(o);
+}
+
+/* ---------- Pro tool pages (Recap, Draft Tools, League Fit) ---------- */
+var TMO_CHECK='<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
+var TMO_PAGES={
+  recap:{nav:'Recap',h:'Season Recap',lead:'Your whole season, card by card. See what won you games, what cost you, and how you stacked up against your league.',
+    pts:['Your best and worst trades, graded with what happened after','Your best waiver pickup and the points it added','How your standing moved week to week','A final card you can save and share'],
+    cards:[['Trades, graded again','Every deal you made, re-graded with how the players really finished.'],['Your season in numbers','Points for and against, luck, your best week and your worst.'],['A card to share','One clean summary card to drop in your league chat.']]},
+  drafttools:{nav:'Draft Tools',h:'Draft Tools',lead:'Go into your draft with a plan. Know what every pick is worth, and practice until the board stops surprising you.',
+    pts:['Pick values for every slot in your draft','Grade any pick-for-pick or pick-for-player trade','Mock drafts against opponents that change strategy every run','A draft grade when you finish'],
+    cards:[['Pick values','Is 1.04 worth more than 1.07 plus a 3rd? See the answer before you say yes.'],['Mock drafts','Practice from your real draft slot against opponents that draft like real leagues.'],['Draft grade','Finish a mock and see where you won value and where you reached.']]},
+  leaguefit:{nav:'League Fit',h:'League Fit',lead:'The TradeMetric Rankings, re-sorted for your league. Your scoring, your roster spots and what your team needs.',
+    pts:['Rankings adjusted to your league’s scoring','Position value based on your roster spots and league size','Players who fit your roster needs moved up','Works with the league you already connected'],
+    cards:[['Your scoring','PPR, half-PPR, bonuses, TE premium. The order changes with the rules.'],['Your roster spots','Two flex spots or superflex changes what a position is worth.'],['Your needs','Thin at running back? The players who fix it rise to the top.']]}};
+function renderProTab(){
+  const key=document.body.dataset.tab,P=TMO_PAGES[key],el=document.getElementById('pro-'+key);if(!P||!el)return;
+  const signed=tmoSignedIn(),pro=tmoIsPro();
+  const chip=pro?'<span class="tmo-soon-chip">Coming soon</span>':`<span class="tmo-lock">${TMO_LOCK}Pro</span>`;
+  const cta=pro?`<p class="tmo-pp-note"><b>You’re in.</b> ${TMO_BETA_PRO?'Pro is free for your account during the beta, and ':'It’s part of your Pro plan, and '}${esc(P.h)} will show up here as soon as it’s ready.</p>
+      <div class="tmo-cta"><a class="btn tmo-big" href="#tmrank">See the rankings</a></div>`
+    :signed?`<p class="tmo-pp-note">${esc(P.h)} is part of TradeMetric Pro.</p><div class="tmo-cta"><a class="btn accent tmo-big" href="#account-plan">See Pro plans</a></div>`
+    :`<p class="tmo-pp-note">${TMO_BETA_PRO?'<b>Pro is free during the beta.</b> Sign in and it’s yours, no card needed.':'Sign in to get TradeMetric Pro.'}</p>
+      <div class="tmo-cta"><a class="btn accent tmo-big" href="#signin">${TMO_BETA_PRO?'Sign in free':'Sign in'}</a><a class="btn tmo-big" href="#tmrank">See the free rankings</a></div>`;
+  el.innerHTML=`<div class="tmo-pp">
+    <div class="tmo-pp-main">
+      <div class="tmo-pp-k"><span class="kicker">TradeMetric Pro</span>${chip}</div>
+      <h1>${esc(P.h)}</h1>
+      <p class="tmo-pp-lead">${P.lead}</p>
+      <ul class="tmo-pp-list">${P.pts.map(x=>`<li>${TMO_CHECK}<span>${x}</span></li>`).join('')}</ul>
+      ${cta}
+    </div>
+    <div class="tmo-pp-cards">${P.cards.map(([h,p],i)=>`<div class="tmo-pp-card"><span class="tmo-pp-n">${i+1}</span><div><h3>${h}</h3><p>${p}</p></div></div>`).join('')}</div>
+  </div>`;
 }
 
 /* ---------- events ---------- */
@@ -247,6 +318,7 @@ document.addEventListener('click',e=>{
   const v=t.closest('[data-tmo-view]');if(v){TMO.view=v.dataset.tmoView;TMO.open=null;if(document.body.dataset.tab==='tmrank'){e.preventDefault();renderTmRank()}return}
   const p=t.closest('[data-tmo-pos]');if(p){TMO.pos=p.dataset.tmoPos;TMO.open=null;TMO.limit=100;renderTmRank();return}
   if(t.closest('[data-tmo-more]')){TMO.limit+=50;renderTmRank();return}
+  const tr=t.closest('[data-tmo-take-retry]');if(tr){const o=tmoRows().find(r=>r.id===tr.dataset.tmoTakeRetry);if(o)tmoTakeLoad(o,true);return}
   if(t.closest('[data-tmo-pro]')){try{localStorage.setItem(TMO_PRO_KEY,tmoIsPro()?'0':'1')}catch(x){}render();return}
   const g=t.closest('[data-tmo-go]');if(g){TMO.open=g.dataset.tmoGo;TMO.view='all';TMO.pos='ALL';TMO.q='';const o=tmoRows().find(r=>r.id===TMO.open);if(o&&o.rank>TMO.limit)TMO.limit=Math.ceil(o.rank/50)*50;
     setTimeout(()=>{const r=document.querySelector(`[data-tmo-row="${TMO.open}"]`);if(r)r.scrollIntoView({block:'center'})},60);return}
@@ -257,4 +329,6 @@ document.addEventListener('input',e=>{if(e.target.id!=='tmo-q')return;TMO.q=e.ta
 
 /* ---------- start ---------- */
 fetch('data/market.json',{cache:'no-cache'}).then(r=>r.ok?r.json():null).then(d=>{if(d){TMO.market=d;TMO.rows=null;if(['home','tmrank'].includes(document.body.dataset.tab))render()}}).catch(()=>{});
+/* a small lock on the Pro tabs for anyone without Pro (hidden by css once body has tmo-is-pro) */
+document.querySelectorAll('.nav .pro-tab').forEach(b=>{if(!b.querySelector('.nav-lock'))b.insertAdjacentHTML('beforeend','<span class="nav-lock" title="Pro">'+TMO_LOCK+'</span>')});
 tmoApplyMode();

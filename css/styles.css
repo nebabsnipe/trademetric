@@ -2250,10 +2250,10 @@ body.mode-off .nav .off-only{display:inline-flex}
 body.mode-off .nav button[data-tab]:not(.off-only){display:none}
 body.mode-off #week-pill{display:none}
 /* signed out on a public page: show the nav and a Sign in button */
-body.signed-out.mode-off:is([data-tab="home"],[data-tab="tmrank"]) .nav{display:flex}
-body.signed-out.mode-off:is([data-tab="home"],[data-tab="tmrank"]) #acct-btn{display:inline-flex;align-items:center}
+body.signed-out.mode-off:is([data-tab="home"],[data-tab="tmrank"],[data-tab="recap"],[data-tab="drafttools"],[data-tab="leaguefit"]) .nav{display:flex}
+body.signed-out.mode-off:is([data-tab="home"],[data-tab="tmrank"],[data-tab="recap"],[data-tab="drafttools"],[data-tab="leaguefit"]) #acct-btn{display:inline-flex;align-items:center}
 body.signed-out .mode-pill{display:none}
-body.signed-out.mode-off:is([data-tab="home"],[data-tab="tmrank"]) .mode-pill{display:inline-flex}
+body.signed-out.mode-off:is([data-tab="home"],[data-tab="tmrank"],[data-tab="recap"],[data-tab="drafttools"],[data-tab="leaguefit"]) .mode-pill{display:inline-flex}
 
 .mode-pill{display:inline-flex;align-items:center;gap:7px;height:34px;padding:0 13px;border-radius:99px;border:1px solid rgba(255,255,255,.22);background:transparent;color:var(--bar-ink);font:600 12.5px/1 var(--f-body);cursor:pointer;white-space:nowrap}
 .mode-pill:hover{border-color:rgba(255,255,255,.5)}
@@ -2358,7 +2358,56 @@ body.signed-out.mode-off:is([data-tab="home"],[data-tab="tmrank"]) .mode-pill{di
 .tmo-unlock b{font-size:15px}.tmo-unlock span{color:var(--muted);font-size:13px;margin-bottom:4px}
 .tmo-unlock svg{color:var(--accent);width:20px;height:20px}
 
-@media (max-width:900px){.tmo-grid{grid-template-columns:1fr}.tmo-tools{grid-template-columns:repeat(2,minmax(0,1fr))}}
+/* panel: the two stats under the score bars, and the TradeMetric take beside them */
+.tmo-why-col .tmo-facts{grid-template-columns:1fr;margin-top:14px;gap:4px}
+.tmo-take-h{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:6px 0 10px}
+.tmo-take-h h4{margin:0}
+.tmo-out{display:inline-flex;align-items:center;gap:5px;height:24px;padding:0 10px 0 8px;border-radius:99px;font-size:12px;font-weight:700;white-space:nowrap;color:var(--muted);background:var(--surface-3)}
+.tmo-out-l{font-weight:600;opacity:.75}
+.tmo-out.growing{color:var(--good);background:var(--good-soft)}
+.tmo-out.threatened{color:var(--bad);background:var(--bad-soft)}
+.tmo-out.ghost{width:92px}
+.tmo-take-t{margin:0;font-size:14px;line-height:1.6;color:var(--ink);max-width:62ch;text-wrap:pretty}
+.tmo-take-t.muted{color:var(--muted);font-size:13px}.tmo-take-t .btn{margin-left:6px}
+.tmo-take-d{margin:8px 0 0;font-size:11.5px;color:var(--muted)}
+.tmo-take-sk{display:flex;flex-direction:column;gap:9px;padding-top:2px}
+.tmo-take-sk i{display:block;height:12px;border-radius:6px}
+.tmo-take-sk i:nth-child(2){width:94%}.tmo-take-sk i:nth-child(3){width:58%}
+.tmo-take-sk.still i{background:var(--surface-3)}
+
+/* Pro tabs in the nav: a small lock until the account has Pro */
+.nav .pro-tab{align-items:center}
+.nav .nav-lock{display:inline-flex;margin-left:5px;opacity:.75}
+.nav .nav-lock svg{width:11px;height:11px}
+body.tmo-is-pro .nav-lock{display:none}
+
+/* Pro tool pages (Recap, Draft Tools, League Fit) */
+.tmo-pp{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);gap:18px;align-items:stretch;padding-top:6px}
+.tmo-pp-main{border:1px solid var(--line);border-radius:14px;background:var(--surface);box-shadow:var(--shadow);padding:40px 40px 36px}
+.tmo-pp-k{display:flex;align-items:center;gap:10px;margin-bottom:12px}.tmo-pp-k .kicker{margin:0}
+.tmo-soon-chip{font-size:10.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--good);background:var(--good-soft);padding:3px 9px;border-radius:99px;white-space:nowrap}
+.tmo-pp h1{margin:0;font-family:var(--f-display);font-style:italic;font-weight:800;text-transform:uppercase;font-size:clamp(32px,4.6vw,50px);line-height:.94;letter-spacing:.005em}
+.tmo-pp-lead{margin:14px 0 0;color:var(--muted);font-size:16px;line-height:1.55;max-width:54ch}
+.tmo-pp-list{list-style:none;margin:22px 0 0;padding:0;display:flex;flex-direction:column;gap:10px}
+.tmo-pp-list li{display:flex;align-items:flex-start;gap:10px;font-size:14.5px;line-height:1.45}
+.tmo-pp-list svg{flex:0 0 auto;margin-top:2px;color:var(--accent)}
+.tmo-pp-note{margin:26px 0 0;padding-top:20px;border-top:1px solid var(--line);color:var(--muted);font-size:14px;line-height:1.5;max-width:54ch}
+.tmo-pp-note b{color:var(--ink)}
+.tmo-pp .tmo-cta{margin-top:16px}
+.tmo-pp a.btn:not(.accent){color:var(--ink)}
+.tmo-pp-cards{display:flex;flex-direction:column;gap:14px}
+.tmo-pp-card{flex:1;display:flex;align-items:center;gap:16px;border:1px solid var(--line);border-radius:14px;background:var(--surface);box-shadow:var(--shadow);padding:22px 24px}
+.tmo-pp-n{flex:0 0 auto;display:grid;place-items:center;width:34px;height:34px;border-radius:9px;background:#0B0C0E;color:#F2F3F5;font:700 16px/1 var(--f-display);font-style:italic}
+[data-theme="dark"] .tmo-pp-n{background:var(--surface-3)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .tmo-pp-n{background:var(--surface-3)}}
+.tmo-pp-card h3{margin:0;font-size:15.5px}
+.tmo-pp-card p{margin:5px 0 0;color:var(--muted);font-size:13.5px;line-height:1.5}
+/* the phone More sheet lists the offseason tools in offseason mode and the league pages in-season */
+body.mode-off .m-sheet .m-in,body:not(.mode-off) .m-sheet .m-off{display:none}
+.m-sheet .nav-lock{margin-left:auto;display:inline-flex;align-items:center;gap:4px;font-size:10.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--accent);background:var(--accent-soft);padding:3px 8px;border-radius:99px}
+.m-sheet .nav-lock svg{width:11px;height:11px;color:inherit}
+
+@media (max-width:900px){.tmo-grid{grid-template-columns:1fr}.tmo-tools{grid-template-columns:repeat(2,minmax(0,1fr))}.tmo-pp{grid-template-columns:1fr}}
 @media (max-width:700px){
   .tmo-hero{padding:28px 20px 24px;border-radius:12px}
   .tmo-hero p{font-size:14.5px}
@@ -2379,4 +2428,12 @@ body.signed-out.mode-off:is([data-tab="home"],[data-tab="tmrank"]) .mode-pill{di
   .tmo-rkc{width:auto}
   .tmo-why-in,.tmo-facts{grid-template-columns:1fr}.tmo-wb{grid-template-columns:110px 1fr 30px}
   .tmo-toolbar .seg{width:100%;overflow-x:auto}
+  .tmo-why-in{gap:18px}
+  body.mode-off .nav .pro-tab{display:none}
+  body.mode-off .nav,body.signed-out.mode-off:is([data-tab="home"],[data-tab="tmrank"],[data-tab="recap"],[data-tab="drafttools"],[data-tab="leaguefit"]) .nav{display:grid;grid-template-columns:repeat(3,minmax(0,1fr))}
+  body:is([data-tab="recap"],[data-tab="drafttools"],[data-tab="leaguefit"]) .nav-more{opacity:1;color:var(--accent)}
+  .tmo-pp-main{padding:26px 20px 24px;border-radius:12px}
+  .tmo-pp-lead{font-size:14.5px}
+  .tmo-pp-card{padding:16px;border-radius:12px}
+  .tmo-pp .btn.tmo-big{flex:1 1 auto;justify-content:center}
 }

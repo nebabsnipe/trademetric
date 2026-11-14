@@ -41,5 +41,10 @@
       "permanent": false
     }
   ],
+  "functions": {
+    "api/take.js": {
+      "includeFiles": "data/nfl.json"
+    }
+  },
   "cleanUrls": true
 }
