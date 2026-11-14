@@ -486,7 +486,7 @@ function tmnOppCard(x,Ls){const f=byId[x.from],s=stOf(x.from),mine=Ls.some(c=>c.
     <ul class="tmn-op-l">${x.rows.map(row).join('')}</ul></article>`}
 
 /* ---------- the News tab ---------- */
-const TMN_F=[['all','Feed'],['team','Your team'],['inj','Injuries'],['clips','Clips']];
+const TMN_F=[['all','Feed'],['inj','Injuries'],['clips','Clips']];
 function tmnMood(){const gs=LIVE&&LIVE.week===WEEK?Object.values(LIVE.games||{}):[];if(gs.some(g=>g.state==='in'))return 'live';if(gs.some(g=>g.state==='post'))return 'after';return 'quiet'}
 /* 8-tooth gear, drawn on the same 24px grid and stroke as the other line icons */
 const TMN_GEAR='<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" aria-hidden="true"><path d="M10.15 4.84L10.18 2.17A10 10 0 0 1 13.82 2.17L13.85 4.84A7.4 7.4 0 0 1 15.76 5.62L17.66 3.76A10 10 0 0 1 20.24 6.34L18.38 8.24A7.4 7.4 0 0 1 19.16 10.15L21.83 10.18A10 10 0 0 1 21.83 13.82L19.16 13.85A7.4 7.4 0 0 1 18.38 15.76L20.24 17.66A10 10 0 0 1 17.66 20.24L15.76 18.38A7.4 7.4 0 0 1 13.85 19.16L13.82 21.83A10 10 0 0 1 10.18 21.83L10.15 19.16A7.4 7.4 0 0 1 8.24 18.38L6.34 20.24A10 10 0 0 1 3.76 17.66L5.62 15.76A7.4 7.4 0 0 1 4.84 13.85L2.17 13.82A10 10 0 0 1 2.17 10.18L4.84 10.15A7.4 7.4 0 0 1 5.62 8.24L3.76 6.34A10 10 0 0 1 6.34 3.76L8.24 5.62A7.4 7.4 0 0 1 10.15 4.84Z"/><circle cx="12" cy="12" r="3.1"/></svg>';
@@ -495,7 +495,7 @@ const TMN_SHOW_LS='tm-news-show-v1';
 function tmnFilt(){if(TMN.show)return TMN.show;let v=null;try{v=JSON.parse(localStorage.getItem(TMN_SHOW_LS)||'null')}catch(e){}
   return TMN.show=v&&(v.mine||v.lg)?{mine:!!v.mine,lg:!!v.lg}:{mine:true,lg:true}}
 function tmnFiltFlip(k){const sh=tmnFilt(),o=k==='mine'?'lg':'mine';sh[k]=!sh[k];if(!sh[k]&&!sh[o])sh[o]=true;try{localStorage.setItem(TMN_SHOW_LS,JSON.stringify(sh))}catch(e){}tmnRenderBody()}
-function tmnRender(){const el=$('news-body');if(!el)return;tmnWeek();TMN.unread=0;
+function tmnRender(){const el=$('news-body');if(!el)return;if(!TMN_F.some(([k])=>k===TMN.f))TMN.f='all';tmnWeek();TMN.unread=0;
   if(typeof FEED!=='undefined'&&typeof loadFeed==='function'&&(!FEED||Date.now()-FEED_AT>4*60e3))Promise.resolve(loadFeed()).then(()=>{if(tab==='news'&&FEED)tmnRenderBody()});
   const Ls=tmnLeagues();if(TMN.lg!=='all'&&!Ls.some(c=>c.key===TMN.lg))TMN.lg='all';const mood=tmnMood();
   try{const fr=[];tmnMyInj(Ls,fr,Date.now());tmnResults(Ls,fr,Date.now());if(fr.length)tmnSave()}catch(e){}
@@ -755,13 +755,13 @@ document.addEventListener('click',e=>{const t=e.target;if(!t.closest)return;
   const nk=t.closest('.tmn-ban[data-nk],.tmn-chip[data-nk]');if(nk){tmnOpen(nk.dataset.nk);return}
   const nr=t.closest('[data-nres]');if(nr&&!t.closest('a,button')){const k=nr.dataset.nres;if(k&&k!==S.leagueKey&&typeof switchLeague==='function')switchLeague(k);location.hash='team';return}
   const nc=t.closest('[data-ncard]');if(nc&&!t.closest('a,button,select,input')&&typeof openCard==='function'){openCard(nc.dataset.ncard);return}
-  const ng=t.closest('[data-nk-go]');if(ng){TMN.f='team';TMN.focus=ng.dataset.nkGo;tmnRender();return}
+  const ng=t.closest('[data-nk-go]');if(ng){TMN.f='all';TMN.focus=ng.dataset.nkGo;tmnRender();return}
   const gw=t.closest('[data-go-waivers]');if(gw){e.preventDefault();e.stopPropagation();location.hash='waivers';return}
   const ns=t.closest('[data-nshow]');if(ns){if(!ns.disabled)tmnFiltFlip(ns.dataset.nshow);return}
   const nf=t.closest('[data-nf]');if(nf){TMN.f=nf.dataset.nf;tmnRender();return}
   const ml=t.closest('[data-nlg]');if(ml){e.preventDefault();TMN.lg=TMN.lg===ml.dataset.nlg?'all':ml.dataset.nlg;tmnRender();return}
   if(t.closest('[data-notif-go]'))TMN.goNotif=true;
-  if(t.closest('.tmn-chip.more')){TMN.f='team';if(location.hash==='#news')tmnRender()}});
+  if(t.closest('.tmn-chip.more')){TMN.f='all';if(location.hash==='#news')tmnRender()}});
 document.addEventListener('keydown',e=>{if((e.key==='Enter'||e.key===' ')&&e.target.matches&&e.target.matches('.tmn-ban[data-nk],.tmn-chip[data-nk]')){e.preventDefault();tmnOpen(e.target.dataset.nk);return}
   if(e.key==='Enter'&&e.target.matches&&e.target.matches('[data-ncard]')&&typeof openCard==='function'){e.preventDefault();openCard(e.target.dataset.ncard)}});
 document.addEventListener('change',e=>{const t=e.target;

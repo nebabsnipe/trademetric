@@ -2221,3 +2221,20 @@ body[data-tab="news"] .tmn-chips{display:none}
 }
 @keyframes m-up{from{transform:translateY(40px);opacity:.4}to{transform:none;opacity:1}}
 @media (max-width:700px) and (prefers-reduced-motion:reduce){.modal{animation:none}.m-sheet,.m-tradebar{transition:none}}
+
+/* News round 9: a little more air between and inside cards, league news without a fill, and Yours / League
+   read as plainly on or off */
+.tmn-tl{gap:12px}
+.tmn-tl .tmn-ev-card{padding:15px 18px}
+.tmn-tl .tmn-ev-top{margin-bottom:8px}
+.tmn-tl .tmn-ev-txt h3{line-height:1.35;margin-bottom:4px}
+.tmn-tl .tmn-ev-txt p{line-height:1.5}
+.tmn-tl.act li.lg:not(.mine) .tmn-ev-card{background:transparent;border-color:var(--line);box-shadow:none}
+.tmn-tog button[aria-pressed="true"]{background:var(--ink);border-color:var(--ink);color:var(--bg)}
+.tmn-tog button[aria-pressed="true"] i{opacity:1;background:var(--bg);box-shadow:none}
+.tmn-tog button.y[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:#fff}
+.tmn-tog button.y[aria-pressed="true"] i{background:#fff}
+.tmn-tog button[aria-pressed="false"]{background:transparent;color:var(--muted);border-style:dashed}
+.tmn-tog button[aria-pressed="true"]:not(:disabled):hover{color:var(--bg);border-color:var(--ink);filter:brightness(1.12)}
+.tmn-tog button.y[aria-pressed="true"]:not(:disabled):hover{color:#fff;border-color:var(--accent)}
+@media (max-width:600px){.tmn-tl{gap:10px}.tmn-tl .tmn-ev-card{padding:14px 15px}}
