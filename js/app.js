@@ -892,7 +892,7 @@ function renderIR(me,IRS){const el=$('ir-card');if(!el)return;const n=irSlots();
     return `<div class="lrow ir-row${stale?' stale':''}" data-open="${id}"><span class="slot">IR</span><div class="pl">${av(p)}<div class="meta"><span style="display:flex;gap:6px;align-items:center;min-width:0"><button class="pname" data-open="${id}">${esc(p.n)}</button>${stHtml(id)}</span><span class="psub">${p.pos}${V.posRank[id]} · ${p.t} · ${stale?`<b class="ir-warn">Healthy again. Activate him in ${esc(app)}.</b>`:esc(s?ST_LABEL[s]:'No designation')}</span></div></div><span></span></div>`};
   const open=Array.from({length:IRS.open},()=>`<div class="lrow ir-open" style="cursor:default"><span class="slot">IR</span><span class="empty">${IRS.cand.length?`Open. ${esc(byId[IRS.cand[0]].n)} can go here in ${esc(app)}.`:'Open slot'}</span><span></span></div>`).join('');
   el.innerHTML=`<div class="card-h"><h2>Injured reserve</h2><span class="note">${IRS.ir.length} of ${n} slot${n===1?'':'s'} used</span></div>${IRS.ir.map(row).join('')}${open}
-    ${IRS.cand.length&&!IRS.open?`<p class="note ir-foot">${IRS.cand.map(id=>esc(byId[id].n)).join(', ')} ${IRS.cand.length===1?'is':'are'} IR eligible, but your IR is full.</p>`:''}<p class="note ir-foot">${plat?`Synced from ${plat}. Make IR moves there and they show up here within a few minutes.`:'Make IR moves in your league app.'}</p>`}
+    ${IRS.cand.length&&!IRS.open?`<p class="note ir-foot">${IRS.cand.map(id=>esc(byId[id].n)).join(', ')} ${IRS.cand.length===1?'is':'are'} IR eligible, but your IR is full.</p>`:''}<p class="note ir-foot">${plat?`Synced from ${plat}`:'Make IR moves in your league app'}</p>`}
 function renderTeam(){
   const me=myTeam(),st=teamStats(),mine=st.rows.find(r=>r.T.id===S.me),RL=realLineup(S.me);
   const IRS=irState(me),act=activeOf(me);
@@ -1021,7 +1021,7 @@ function renderRankings(){
   const q=$('rank-search').value.trim().toLowerCase();
   const RN={free:'Available: players no one in your league has. Players on IR show only when they are expected back this season.',buy:'Buy low: good players who scored less than expected the last two weeks but are still getting the ball. They should bounce back.',
     opp:'Opportunities: players who should get more work because a teammate at their position just got hurt.'};
-  $('rank-note').hidden=!RN[rankOwn];$('rank-note').textContent=RN[rankOwn]||'';
+  $('rank-note').hidden=true;
   const L=V.list.filter(p=>(rankPos==='ALL'||p.pos===rankPos)&&(!q||p.n.toLowerCase().includes(q)||p.t.toLowerCase()===q)&&(rankOwn==='all'||(rankOwn==='free'&&!OWN[p.id]&&irBack(p.id))||(rankOwn==='buy'&&G[p.id].buy)||(rankOwn==='opp'&&G[p.id].opp.length)));
   const cap=q||RANK_ALL?L.length:300,more=L.length-cap;L.length=Math.min(L.length,cap);
   setTimeout(()=>{const m=$('rank-more');if(m)m.innerHTML=more>0?`<button class="btn" id="rank-all">Show all ${(L.length+more).toLocaleString()} players</button>`:''},0);
@@ -1109,8 +1109,8 @@ function sortTable(id){const tbl=document.getElementById(id);if(!tbl)return;cons
 let tgtPos='ALL',rosPos='ALL',sugSkip=0;
 /* Trades tab views, like the Players tab: the builder, or the recommended trades */
 var trView=(()=>{try{return localStorage.getItem('tm_trv')==='ideas'?'ideas':'build'}catch(e){return 'build'}})();
-const TR_INTRO={build:`Build a deal and see how it grades for both teams. <a class="how" href="#help-trades">How this works</a>`,
-  ideas:`Fair deals that make your lineup better. <a class="how" href="#help-trades">How this works</a>`};
+const TR_INTRO={build:`<a class="how" href="#help-trades">How it works</a>`,
+  ideas:`<a class="how" href="#help-trades">How it works</a>`};
 function setTrView(v){trView=v==='ideas'?'ideas':'build';try{localStorage.setItem('tm_trv',trView)}catch(e){}}
 const shortName=n=>{const w=n.split(' ');return w.length>1&&!/D\/ST$/.test(n)?w[0][0]+'. '+w.slice(1).join(' '):n};
 if(!window.__trade)window.__trade={give:[],get:[]};
@@ -1229,7 +1229,7 @@ function renderTrade(){
   if(!tw&&sug.length<3){const used=new Set(sug.map(t=>t.team)),pool=allTrades(true).filter(t=>!used.has(t.team)&&!sug.some(x=>x.get.some(id=>t.get.includes(id))&&x.give.join()===t.give.join()));sug=sug.concat(pickDiverse(pool,3-sug.length,0,true,sug.some(t=>t.give.concat(t.get).some(id=>byId[id].pos==='QB'))?1:0))}
   $('suggestions').innerHTML=sug.length?(()=>{const used=new Set();return sug.map(t=>tradeCardHtml(t,tradeTitle(t,null,used),false,fitOf.get(t))).join('')})()
     :tw?`<div class="card tw-empty"><p class="empty">${TW.loose?'Still nothing fits, even loosened. Clear the request to see the normal ideas.':'No trade ideas fit that request.'}</p><button class="btn" ${TW.loose?'data-twclear':'data-twloose'}>${TW.loose?'Clear request':'Loosen request'}</button></div>`
-    :`<div class="card" style="grid-column:1/-1"><p class="empty" style="margin:0">No fair trades found. Fill in the other teams in League Hub and TradeMetric will build ideas from their rosters.</p></div>`;
+    :`<div class="card" style="grid-column:1/-1"><p class="empty" style="margin:0">No fair trades found. Add the other rosters in League Hub.</p></div>`;
   $('sug-note').textContent=sug.length?tw?`${sug.length} idea${sug.length===1?'':'s'} that fit${TW.loose?' loosely':''}`:`${sug.length} idea${sug.length===1?'':'s'} for ${myTeam().name}`:'';$('tr-n').textContent=sug.length||'';
   const me=myTeam();TD.give=TD.give.filter(id=>me.players.includes(id));TD.get=TD.get.filter(id=>OWN[id]&&OWN[id]!==S.me);
   const card=(id,kind)=>{const p=byId[id],g=G[id];
@@ -1554,7 +1554,7 @@ function renderOppCard(){const el=$('opp-card');if(!el)return;
   const best=p=>Math.max(...G[p.id].opp.map(o=>o.mult)),list=POOL.filter(p=>G[p.id].opp.length).sort((a,b)=>best(b)-best(a));
   const show=[...list.filter(p=>OWN[p.id]===S.me),...list.filter(p=>!OWN[p.id])].slice(0,6);
   el.innerHTML=`<div class="card-h"><h2>Injury opportunities</h2><span class="note">Players gaining work from teammate injuries</span></div>`+(show.length?show.map(p=>`<div class="mini-row">${plCell(p,`${roleTag(p.id)?roleTag(p.id)+' ':''}${oppTxtLine(G[p.id].opp[0])}`)}${OWN[p.id]===S.me?'<span class="tag mine">Yours</span>':'<span class="gain">Pickup</span>'}${OWN[p.id]?'<span></span>':`<button class="btn small" data-assign-me="${p.id}">Add</button>`}</div>`).join('')
-   :`<p class="empty" style="margin:0">When a starter is ruled out or lands on injured reserve, the teammates who inherit his work show up here as pickups. This turns on with the live injury feed, or now if you import projections with a status column.</p>`)}
+   :`<p class="empty" style="margin:0">Nothing here yet. Backups who gain work from injuries show up here.</p>`)}
 function renderMatchup(){const el=$('matchup');const oid=oppOf(S.me,WEEK);
   if(!oid){el.innerHTML=`<div class="card-h"><h2>Week ${WEEK} matchup</h2></div><p class="empty">No opponent this week.</p>`;return}
   const me=myTeam(),O=teamById(oid),A=weekLine(me.players,WEEK,S.me),Bm=weekLine(O.players,WEEK,oid),pw=Phi((A.m-Bm.m)/Math.sqrt(A.sd**2+Bm.sd**2)),f=pickVal(WEEK);
@@ -1563,7 +1563,7 @@ function renderMatchup(){const el=$('matchup');const oid=oppOf(S.me,WEEK);
   const rows=A.lu.slots.map((x,i)=>{const o=Bm.lu.slots[i],a=x.p?f(x.p.id):0,b=o&&o.p?f(o.p.id):0;
     const sub=id=>liveOf(id)?`${byId[id].pos} · ${liveTxt(id)} ${f1(liveOf(id).pts)} pts`:`${byId[id].pos} · ${oppHtml(id)}`;
     return `<tr><td>${x.p?plCell(x.p,sub(x.p.id)):'<span class="empty">Empty</span>'}</td>${cell(x.p&&x.p.id,a,a>=b,'r')}<td class="mu-slot">${x.label}</td>${cell(o&&o.p&&o.p.id,b,b>a,'')}<td>${o&&o.p?plCell(o.p,sub(o.p.id)):'<span class="empty">Empty</span>'}</td></tr>`}).join('');
-  el.innerHTML=`<div class="card-h"><h2>Week ${WEEK} matchup</h2><span class="note">${A.lu.real?'Your real lineups · ':''}${LIVE&&LIVE.week===WEEK&&Object.values(LIVE.games).some(g=>g.state!=='pre')?`<span class="live-dot${LIVE.live?' on':''}"></span>${LIVE.live?'Live':'Updated'} · ${new Date(LIVE.updated).toLocaleTimeString([], {hour:'numeric',minute:'2-digit'})} · points so far plus the rest of each game projected`:'Win probability from projected lineups'}</span></div>
+  el.innerHTML=`<div class="card-h"><h2>Week ${WEEK} matchup</h2><span class="note">${A.lu.real?'Your real lineups · ':''}${LIVE&&LIVE.week===WEEK&&Object.values(LIVE.games).some(g=>g.state!=='pre')?`<span class="live-dot${LIVE.live?' on':''}"></span>${LIVE.live?'Live':'Updated'} · ${new Date(LIVE.updated).toLocaleTimeString([], {hour:'numeric',minute:'2-digit'})} · points so far plus the rest of each game projected`:''}</span></div>
    <div class="mu-head"><div class="mu-team"><span class="mu-name"><i class="tsq" style="background:${teamColor(S.me)}"></i>${esc(me.name)}</span><span class="note">${recTxt(S.me)}</span><b class="num">${f1(anyLive?aA:A.m)}</b>${anyLive?`<span class="mu-proj">proj ${f1(A.m)}</span>`:''}</div>
     <div class="mu-mid"><div class="mu-pct">${pct(pw)}</div><div class="note">chance you win</div></div>
     <div class="mu-team r"><span class="mu-name"><i class="tsq" style="background:${teamColor(oid)}"></i>${esc(O.name)}</span><span class="note">${recTxt(oid)}</span><b class="num">${f1(anyLive?aB:Bm.m)}</b>${anyLive?`<span class="mu-proj">proj ${f1(Bm.m)}</span>`:''}</div></div>
@@ -1694,7 +1694,7 @@ function espnPrivateForm(id,err){const sv=espnSaved()||{};
    <label>SWID<input type="text" class="imp-in espn-swid" autocomplete="off" spellcheck="false" value="${esc(sv.swid||'')}" placeholder="{XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX}"></label></div>
    <label class="espn-rem"><input type="checkbox" class="espn-remember" ${sv.s2?'checked':''}> Remember on this device</label>
    <div class="toolbar" style="margin-top:10px"><button class="btn primary" data-espn-private="${esc(id)}">Import private league</button>${sv.s2?'<button class="btn" data-espn-forget="1">Forget codes</button>':''}</div>
-   <p class="note" style="margin:8px 0 0">These codes act like your ESPN login. TradeMetric only uses them to read your league and never stores them on its servers. Signing out of ESPN makes them stop working.</p></div>`}
+   <p class="note" style="margin:8px 0 0">Only used to read your league. Never stored on our servers.</p></div>`}
 async function espnImport(id,creds){
   if(!/^\d+$/.test(id)){impMsg('<p class="note" style="color:var(--bad)">An ESPN league ID is a number, like 12345678. You can find it in your league page address after "leagueId=".</p>');return}
   IMP.espnId=id;if(!creds){const sv=espnSaved();if(sv&&sv.s2)creds=sv}
@@ -2083,7 +2083,7 @@ function renderSignin(){const el=$('signin-card');if(!el)return;
      <form id="auth-form" data-mode="verify" novalidate>${codeField('Confirmation code')}${msg}${btn('Confirm email')}</form>
      <p class="auth-wait"><span class="pulse" aria-hidden="true"></span>Waiting for you to confirm</p>
      <p class="auth-foot">${resendBtn('Send a new code')} · <button type="button" class="linkish" data-auth-mode="up">Use a different email</button></p>`;
-  else if(AUTH_MODE==='forgot')h=`<h1>Reset your password</h1><p class="auth-sub">Enter your account email. We'll send a code to set a new password, right here on this page.</p><form id="auth-form" data-mode="forgot" novalidate>
+  else if(AUTH_MODE==='forgot')h=`<h1>Reset your password</h1><p class="auth-sub">We'll email you a code to reset it.</p><form id="auth-form" data-mode="forgot" novalidate>
      <label>Email<input type="email" id="auth-email" autocomplete="email" autocapitalize="none" spellcheck="false" required></label>${msg}${btn('Send code')}</form>
      <p class="auth-foot"><button type="button" class="linkish" data-auth-mode="in">Back to sign in</button></p>`;
   else if(AUTH_MODE==='recover')h=`<h1>Set a new password</h1><p class="auth-sub">Enter the code we sent to ${pe} and pick a new password.</p><form id="auth-form" data-mode="recover" novalidate>
@@ -2092,11 +2092,11 @@ function renderSignin(){const el=$('signin-card');if(!el)return;
      <p class="auth-foot">${resendBtn('Send a new code')} · <button type="button" class="linkish" data-auth-mode="in">Back to sign in</button></p>`;
   else if(AUTH_MODE==='reset')h=`<h1>Set a new password</h1><p class="auth-sub">You're signed in. Pick a new password to finish.</p><form id="auth-form" data-mode="reset" novalidate>
      ${pwField('auth-pw','New password','new-password','minlength="8" placeholder="At least 8 characters"')}${msg}${btn('Save password')}</form>`;
-  else if(AUTH_MODE==='username')h=`<h1>Pick a username</h1><p class="auth-sub">This is the name TradeMetric shows for you, and you can sign in with it too.</p><form id="auth-form" data-mode="username" novalidate>
+  else if(AUTH_MODE==='username')h=`<h1>Pick a username</h1><p class="auth-sub">You can sign in with this too.</p><form id="auth-form" data-mode="username" novalidate>
      <label>Username<input type="text" id="auth-user" autocapitalize="none" autocorrect="off" spellcheck="false" maxlength="20" required placeholder="3 to 20 characters"><span class="hint" id="un-hint" aria-live="polite"></span></label>${msg}${btn('Continue')}</form>
      <p class="auth-foot"><button type="button" class="linkish" data-auth-skip-un>Skip for now</button></p>`;
   else if(AUTH_MODE==='confirmed')h=`<div class="auth-ic ok" aria-hidden="true"><svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg></div><h1>You're confirmed</h1>
-     <p class="auth-sub">Your email is verified and you're signed in. If TradeMetric is open in another tab, it's signed in there too, so you can close this one.</p>
+     <p class="auth-sub">Email verified. You're signed in.</p>
      <button class="btn primary auth-go" type="button" data-auth-continue>Continue to TradeMetric</button>`;
   el.innerHTML=h;el.dataset.mode=AUTH_MODE;
   ['auth-id','auth-user','auth-email'].forEach(k=>{const i=$(k);if(i&&AUTH_VALS[k])i.value=AUTH_VALS[k]});
@@ -2515,7 +2515,7 @@ function accLeagues(){const L=S.leagues||[],me=typeof myTeam==='function'&&S.tea
   const sync=CLOUD.err?`<span class="pill-warn">Not saved</span><span class="note">${esc(CLOUD.err)}</span>`:CLOUD.busy?'<span class="note">Saving...</span>':`<span class="pill-ok">Saved</span><span class="note">${CLOUD.last?'Last saved '+new Date(CLOUD.last).toLocaleTimeString([], {hour:'numeric',minute:'2-digit'}):'To your account'}</span>`;
   const list=L.length?`<ul class="acc-lg">${L.map(x=>`<li class="${x.key===S.leagueKey?'cur':''}"><span class="acc-lg-ic" aria-hidden="true">${esc((x.name||'L')[0].toUpperCase())}</span><span class="acc-lg-t"><b>${esc(x.name||'League')}</b><span class="note">${esc(x.src||'')}${x.key===S.leagueKey&&me?' · '+esc(me.name):''}</span></span>${x.key===S.leagueKey?'<span class="pill-ok">Current</span>':''}</li>`).join('')}</ul>`
     :`<div class="acc-empty"><b>${esc(S.league&&S.league.name||'Sample League')}</b><p class="note">${S.example?"You're looking at the sample league. Bring in yours from Sleeper or ESPN.":'This is the league on this account.'}</p></div>`;
-  return `<section class="card acc-sec"><header class="acc-sec-h"><h2>Leagues</h2><p>Saved to your account, so they follow you to any device.</p></header>
+  return `<section class="card acc-sec"><header class="acc-sec-h"><h2>Leagues</h2><p>Synced to any device.</p></header>
     ${list}<div class="acc-sec-f"><a class="btn primary" href="#hub">Manage leagues</a><a class="btn" href="#league">League settings</a></div></section>
     ${typeof tmnNotifHtml==='function'?tmnNotifHtml():''}
     <section class="card acc-sec"><header class="acc-sec-h"><h2>Sync</h2></header>${accRow('Cloud save',sync)}</section>`}
@@ -2523,7 +2523,7 @@ function accPlan(){const p=planOf();
   return `<section class="acc-plans">
       <div class="card acc-plan cur"><div class="acc-plan-top"><span class="acc-badge plan">Current plan</span></div><h3>${esc(p.name)}</h3><div class="acc-price">${esc(p.price)}</div><p>${esc(p.blurb)}</p>
         <ul class="acc-feat"><li>Trade analyzer and Trade Score</li><li>Rankings, waivers and Season Sim</li><li>League sync for Sleeper and ESPN</li><li>AI Helper</li></ul></div>
-      <div class="card acc-plan next"><div class="acc-plan-top"><span class="acc-badge soon">Coming soon</span></div><h3>Pro</h3><div class="acc-price muted">Pricing to come</div><p>Paid plans are on the way. When they launch you'll upgrade, switch plans and cancel right here.</p>
+      <div class="card acc-plan next"><div class="acc-plan-top"><span class="acc-badge soon">Coming soon</span></div><h3>Pro</h3><div class="acc-price muted">Pricing to come</div><p>Paid plans coming soon.</p>
         <button class="btn" type="button" disabled>Not available yet</button></div></section>
     <section class="card acc-sec"><header class="acc-sec-h"><h2>Billing</h2><p>Payment details and receipts will live here.</p></header>
       ${accRow('Payment method','<span class="note">None on file</span>')}${accRow('Receipts','<span class="note">No receipts yet</span>')}</section>`}
@@ -2593,9 +2593,9 @@ document.addEventListener('click',e=>{const b=e.target.closest&&e.target.closest
 
 /* ===== Players tab: rankings, waiver wire with bid advice, trade value chart ===== */
 var plView='rank',waivPos='ALL',valPos='ALL',VAL_ALL=false;
-const PL_INTRO={rank:`Every player valued for your league's scoring. <a class="how" href="#help-rankings">How this works</a>`,
-  waiv:`The best pickups for your team, with a bid and who to drop. <a class="how" href="#help-waivers">How this works</a>`,
-  vals:`What every player is worth in a trade, from 0 to 100. <a class="how" href="#help-tradevalues">How this works</a>`};
+const PL_INTRO={rank:`<a class="how" href="#help-rankings">How it works</a>`,
+  waiv:`<a class="how" href="#help-waivers">How it works</a>`,
+  vals:`<a class="how" href="#help-tradevalues">How it works</a>`};
 function renderPlayers(){document.querySelectorAll('#pl-seg button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.pl===plView));
   ['rank','waiv','vals'].forEach(k=>$('pl-'+k).hidden=k!==plView);$('pl-intro').innerHTML=PL_INTRO[plView];
   if(plView==='rank')renderRankings();else{$('rank-kicker').textContent=`${S.league.name||'My League'} · ${leagueTagline(S.league)}`;if(plView==='waiv')renderWaivers();else renderValues()}}
@@ -2715,10 +2715,10 @@ function renderStartSit(){const el=$('startsit');if(!el)return;const me=myTeam()
      <div class="ss-proj"><b class="num">${f1(x.proj)}</b><span>projected</span></div>
      <dl class="ss-dl"><dt>Matchup</dt><dd>${g.next?`${g.next.home?'vs':'at'} ${g.next.opp} <span class="drk ${g.next.rank>=24?'easy':g.next.rank<=8?'hard':''}">${ord(g.next.rank)}</span>`:'Bye'}</dd><dt>Range</dt><dd>${f1(x.floor)}&ndash;${f1(x.ceil)}</dd><dt>Last 3</dt><dd>${f1(g.last3)}</dd><dt>Risk</dt><dd>${riskHtml(p.id)}</dd></dl>
      </div>`};
-  el.innerHTML=`<div class="card-h"><h2>Start or sit</h2><span class="note">Week ${WEEK} · drag up to three</span></div>
+  el.innerHTML=`<div class="card-h"><h2>Start or sit</h2><span class="note">Week ${WEEK}</span></div>
    ${verdict}
    <div class="ss-grid ss-board n${n}" id="ss-board">${Array.from({length:n},(_,i)=>col(i)).join('')}</div>
-   <div class="ss-lu" data-ssdrop="lu"><div class="ss-lu-h"><b>Your lineup</b><span class="note">Drag a player onto the board, or tap him. Drag him back here to take him off.</span></div>
+   <div class="ss-lu" data-ssdrop="lu"><div class="ss-lu-h"><b>Your lineup</b></div>
      <div class="ss-lu-g"><span class="ss-lu-k">Starters</span><div class="ss-tiles">${LU.st.map(ssTile).join('')}</div></div>
      ${LU.bench.length?`<div class="ss-lu-g"><span class="ss-lu-k">Bench</span><div class="ss-tiles">${LU.bench.map(ssTile).join('')}</div></div>`:''}
      ${ssAddRow()}</div>`}
@@ -2825,7 +2825,7 @@ function drRun(){clearTimeout(DR_TIMER);renderDraft();if(!DR||DR.mode!=='mock'||
   DR_TIMER=setTimeout(()=>{if(!DR||tab!=='draft')return;const id=drBot(k);if(!id)return;DR.picks.push({id,t:drTeamAt(k),k});drRun()},DR.fast?0:140)}
 function renderDraft(){document.querySelectorAll('#dr-seg button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.dr===drView));
   $('draft-kicker').textContent=`${S.league.name||'My League'} · ${leagueTagline(S.league)}${fmtOf()!=='redraft'?' · '+fmtOf():''}`;
-  $('draft-intro').innerHTML=`${WEEK>1&&WEEK<=18?'During the season, values are rest-of-season.':'Cheat sheets, mock drafts and a live draft assistant for your league.'} <a class="how" href="#help-draft">How this works</a>`;
+  $('draft-intro').hidden=false;$('draft-intro').innerHTML=`<a class="how" href="#help-draft">How it works</a>`;
   if(drView==='sheet')return renderSheet();
   if(drView==='live'&&(!DR||DR.mode!=='live'))DR=S.draftLive&&S.draftLive.picks?S.draftLive:null;
   if(!DR||DR.mode!==drView)drNew(drView);
@@ -2836,11 +2836,11 @@ function renderSheet(){const B=draftBoard(),cols=[['QB',24],['RB',48],['WR',60],
   const top=B.list.slice(0,200);
   $('draft-body').innerHTML=`<div class="toolbar">${howLink('draft')}<button class="btn" id="sh-print">Print cheat sheet</button></div>
     <div class="sh-grid">${cols.map(col).join('')}</div>
-    <div class="card"><div class="card-h"><h2>Top 200 overall</h2><span class="note">Value over a replacement-level starter${fmtOf()!=='redraft'?', with long-term value blended in':''}</span></div>
+    <div class="card"><div class="card-h"><h2>Top 200 overall</h2></div>
       <ol class="sh-all">${top.map(x=>{const p=byId[x.id];return `<li><span class="num sh-n">${x.rk}</span><span class="pos ${p.pos}">${p.pos}${V.posRank[p.id]}</span><button class="pname" data-open="${p.id}">${esc(p.n)}</button><span class="sh-m">${p.t} · ${BYE[p.t]||'-'}</span></li>`}).join('')}</ol></div>`}
 function renderBoard(){const B=draftBoard(),N=DR.n*DR.R,k=DR.picks.length,done=k>=N,onT=done?null:drTeamAt(k),mine=drMine(),myTurn=!done&&onT===DR.slot-1,live=DR.mode==='live';
   const setup=!DR.started&&!live;
-  if(setup){$('draft-body').innerHTML=`<div class="card dr-setup"><h2>Mock draft</h2><p class="note">Snake draft against ${DR.n-1} computer drafters, using your league's roster and scoring.</p>
+  if(setup){$('draft-body').innerHTML=`<div class="card dr-setup"><h2>Mock draft</h2><p class="note">${DR.n-1} computer drafters</p>
       <div class="field-row"><div class="field"><label for="dr-slot">Your draft slot</label><select id="dr-slot">${Array.from({length:DR.n},(_,i)=>`<option value="${i+1}" ${DR.slot===i+1?'selected':''}>Pick ${i+1}</option>`).join('')}</select></div>
       <div class="field"><label for="dr-teams">Teams</label><select id="dr-teams">${[8,10,12,14,16].map(n=>`<option ${DR.n===n?'selected':''}>${n}</option>`).join('')}</select></div>
       <div class="field"><label for="dr-rounds">Rounds</label><select id="dr-rounds">${[8,10,12,14,15,16,18,20].map(n=>`<option ${DR.R===n?'selected':''}>${n}</option>`).join('')}</select></div></div>

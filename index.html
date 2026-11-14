@@ -41,19 +41,19 @@
   <!-- MY TEAM -->
   <section class="view" id="v-team" hidden>
     <div class="hero">
-      <div><div class="kicker" id="team-kicker"></div><h1 id="team-title">Your Team</h1><p>Your best <span class="wk-now">this week's</span> lineup for your league's scoring. Select any player for his full profile.</p></div>
+      <div><div class="kicker" id="team-kicker"></div><h1 id="team-title">Your Team</h1></div>
       <span class="example" id="team-example">Sample league. Import yours in League Hub.</span>
     </div>
     <div class="tiles" id="team-tiles"></div>
     <div class="card" id="matchup"></div>
     <div class="grid2 even">
       <div class="stack">
-        <div class="card"><div class="card-h"><h2>Starting lineup</h2><span class="note"><span class="wk-now">This week's</span> projection</span></div>
+        <div class="card"><div class="card-h"><h2>Starting lineup</h2></div>
           <div id="lineup"></div>
           <div class="total"><span id="lineup-total-lab">Projected total</span><span class="total-r"><b id="lineup-total">0.0</b><small id="lineup-total-sub"></small></span></div></div>
         <div class="card"><div class="card-h"><h2>Bench</h2></div><div id="bench"></div></div>
         <div class="card" id="ir-card" hidden></div>
-        <div class="card" data-float><div class="card-h"><h2>Roster strength</h2><span class="note">Pts/week vs league average</span></div><div class="strength" id="strength"></div></div>
+        <div class="card" data-float><div class="card-h"><h2>Roster strength</h2></div><div class="strength" id="strength"></div></div>
         <div class="card" data-float><div class="card-h"><h3>Add a player</h3></div>
           <div class="addrow"><input type="text" id="add-player" list="dl-players" placeholder="Type a name, like Puka Nacua" autocomplete="off"><button class="btn primary" id="add-btn">Add</button></div>
           <p class="note" id="roster-count" style="margin:8px 0 0"></p></div>
@@ -86,7 +86,7 @@
         <div class="as-chips" id="as-chips"></div>
       </div>
     <div class="tablebox"><table id="rank-table" style="min-width:1110px">
-      <thead><tr><th class="r" data-sort data-first="asc">#</th><th data-sort data-first="asc">Player</th><th data-sort data-first="asc">Pos</th><th class="r" data-sort>Wk <span class="wk-num">9</span></th><th class="r" data-sort title="Projected points per game for the rest of the season">Pts/G</th><th class="r" data-sort data-first="asc" title="FantasyPros expert consensus rank at his position for the rest of the season">Experts</th><th class="r" data-sort title="Last 3 games compared with his season average">Trend</th><th class="r" data-sort title="Share of his team's targets">Tgt share</th><th class="r" data-sort title="Share of his team's offensive snaps">Snap %</th><th class="r" data-sort title="Carries plus targets per game">Opp/G</th><th data-sort data-first="asc">League team</th></tr></thead>
+      <thead><tr><th class="r" data-sort data-first="asc">#</th><th data-sort data-first="asc">Player</th><th data-sort data-first="asc">Pos</th><th class="r" data-sort>Wk <span class="wk-num">9</span></th><th class="r" data-sort title="Projected points per game for the rest of the season">Pts/G</th><th class="r" data-sort data-first="asc" title="Expert consensus rank at his position, rest of season">Experts</th><th class="r" data-sort title="Last 3 games compared with his season average">Trend</th><th class="r" data-sort title="Share of his team's targets">Tgt share</th><th class="r" data-sort title="Share of his team's offensive snaps">Snap %</th><th class="r" data-sort title="Carries plus targets per game">Opp/G</th><th data-sort data-first="asc">League team</th></tr></thead>
       <tbody id="rank-body"></tbody></table></div>
       <div id="rank-more" class="rank-more"></div>
     </div>
@@ -145,7 +145,7 @@
         <div class="card" data-float><div class="card-h"><h2>Trade log</h2></div><div id="trade-log"></div></div>
       </div>
       <div class="stack">
-        <div class="card"><div class="card-h"><h2>Power rankings</h2><span class="note">Roster strength and points scored</span></div><div id="power"></div></div>
+        <div class="card"><div class="card-h"><h2>Power rankings</h2></div><div id="power"></div></div>
         <div class="card" data-float><div class="card-h"><h2>What your scoring rewards</h2></div><ul class="dna" id="dna-list"></ul></div>
       </div>
     </div>
@@ -153,12 +153,12 @@
 
   <!-- SEASON -->
   <section class="view" id="v-season" hidden>
-    <div class="hero"><div><div class="kicker" id="season-kicker">Season simulator</div><h1>Season Sim</h1><p>Playoff and title odds from 2,000 simulated seasons. <a class="how" href="#help-sim">How this works</a></p></div></div>
+    <div class="hero"><div><div class="kicker" id="season-kicker">Season simulator</div><h1>Season Sim</h1><p><a class="how" href="#help-sim">How it works</a></p></div></div>
     <div id="sim-hero"></div>
     <div class="card" id="sim-race"></div>
     <div class="grid2 grid-season">
       <div class="card" id="sim-need"></div>
-      <div class="stack"><div class="card road-card"><div class="card-h"><h2>Your road</h2><span class="note">Win odds each week</span></div><div id="road"></div></div><div class="card" id="tiebreak"></div></div>
+      <div class="stack"><div class="card road-card"><div class="card-h"><h2>Your road</h2></div><div id="road"></div></div><div class="card" id="tiebreak"></div></div>
     </div>
   </section>
 
@@ -178,7 +178,7 @@
           <span class="auth-beta">Free during the beta</span>
         </div>
         <h2>Win the trade.<br>Win the league.</h2>
-        <p class="auth-brand-lede">Every trade, ranking and lineup call, scored on your league's exact rules.</p>
+        
         <div class="auth-demo" aria-hidden="true">
           <div class="auth-demo-h"><span>Trade Score</span><span class="auth-demo-tag">Example</span></div>
           <div class="auth-demo-b">
@@ -206,19 +206,19 @@
 
   <section class="view" id="v-welcome" hidden>
     <div class="wl">
-      <div class="wl-hero"><div class="kicker">Welcome to TradeMetric</div><h1>Bring in your league</h1><p>TradeMetric scores every player, lineup and trade with your league's exact rules. Connect your league to start; it takes about a minute.</p></div>
+      <div class="wl-hero"><div class="kicker">Welcome to TradeMetric</div><h1>Bring in your league</h1><p>Takes about a minute.</p></div>
       <div class="card" id="wl-import"></div>
       <div class="wl-alt">
-        <div class="card wl-opt"><h3>Upload a screenshot</h3><p class="note">Works with any app. The AI reads your roster and you check every player before saving.</p><label class="btn primary" for="wl-shot">Choose a screenshot</label><input type="file" id="wl-shot" accept="image/*" hidden></div>
-        <div class="card wl-opt"><h3>Build it by hand</h3><p class="note">Start with empty teams and add players by name.</p><div class="addrow"><select id="wl-teams" aria-label="Number of teams"><option value="8">8 teams</option><option value="10">10 teams</option><option value="12" selected>12 teams</option><option value="14">14 teams</option></select><button class="btn" id="wl-hand">Start</button></div></div>
+        <div class="card wl-opt"><h3>Upload a screenshot</h3><p class="note">Works with any app.</p><label class="btn primary" for="wl-shot">Choose a screenshot</label><input type="file" id="wl-shot" accept="image/*" hidden></div>
+        <div class="card wl-opt"><h3>Build it by hand</h3><div class="addrow"><select id="wl-teams" aria-label="Number of teams"><option value="8">8 teams</option><option value="10">10 teams</option><option value="12" selected>12 teams</option><option value="14">14 teams</option></select><button class="btn" id="wl-hand">Start</button></div></div>
       </div>
-      <button class="btn ghost wl-skip" id="wl-skip">Skip for now and explore a sample league</button>
+      <button class="btn ghost wl-skip" id="wl-skip">Skip and try a sample league</button>
     </div>
   </section>
 
   <!-- DRAFT -->
   <section class="view" id="v-draft" hidden>
-    <div class="hero"><div><div class="kicker" id="draft-kicker">Draft tools</div><h1>Draft</h1><p id="draft-intro">Cheat sheets, mock drafts and a live draft assistant, all valued for your league's scoring and roster.</p></div>
+    <div class="hero"><div><div class="kicker" id="draft-kicker">Draft tools</div><h1>Draft</h1><p id="draft-intro" hidden></p></div>
       <div class="seg" id="dr-seg" aria-label="Draft tools"><button data-dr="sheet" aria-pressed="true">Cheat sheet</button><button data-dr="mock" aria-pressed="false">Mock draft</button><button data-dr="live" aria-pressed="false">Live draft</button></div></div>
     <div id="draft-body"></div>
   </section>
@@ -307,7 +307,7 @@
     <div class="card"><div class="card-h"><h2>Scoring</h2></div><div id="scoring-form"></div></div>
   </section>
 </main>
-<footer><div class="wrap" id="site-foot"><a href="#help" class="foot-help">How TradeMetric works</a> · <a href="/privacy" class="foot-help">Privacy</a> · Stats, schedules, betting lines and injury reports from nflverse. Expert consensus (weekly and rest-of-season) and dynasty values from FantasyPros via DynastyProcess. Projections blend preseason expectations with 2026 production. Updated every morning.</div></footer>
+<footer><div class="wrap" id="site-foot"><a href="#help" class="foot-help">How TradeMetric works</a> · <a href="/privacy" class="foot-help">Privacy</a></div></footer>
 <datalist id="dl-players"></datalist>
 <div class="scrim" id="scrim" hidden><div class="modal" id="modal" role="dialog" aria-modal="true" aria-label="Player card"></div></div>
 <div class="toast" id="toast" hidden></div>
@@ -336,7 +336,7 @@
 <script>
 /* Load the stats snapshot, then start the app */
 fetch('data/nfl.json',{cache:'no-cache'}).then(r=>r.json()).then(d=>{
-  window.NFL_DATA=d;const n=document.createElement('script');n.src='js/news.js?v=14';n.onload=n.onerror=()=>{const s=document.createElement('script');s.src='js/app.js?v=19';s.onload=()=>{const m=document.createElement('script');m.src='js/mobile.js?v=1';document.body.appendChild(m)};document.body.appendChild(s)};document.body.appendChild(n);
+  window.NFL_DATA=d;const n=document.createElement('script');n.src='js/news.js?v=15';n.onload=n.onerror=()=>{const s=document.createElement('script');s.src='js/app.js?v=20';s.onload=()=>{const m=document.createElement('script');m.src='js/mobile.js?v=1';document.body.appendChild(m)};document.body.appendChild(s)};document.body.appendChild(n);
 }).catch(()=>{document.body.insertAdjacentHTML('afterbegin','<p style="padding:20px;font-family:sans-serif">Could not load player data. Refresh to try again.</p>')});
 </script>
 </body>
