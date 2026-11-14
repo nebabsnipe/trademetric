@@ -562,6 +562,7 @@ function aboveRepl(id,src){const p=byId[id];let v=(src==='cons'?V.cons[id]:V.tpt
 const starW=v=>Math.pow(v,STAR_POW)/Math.pow(STAR_REF,STAR_POW-1);
 const tval=id=>starW(aboveRepl(id)),cval=id=>starW(aboveRepl(id,'cons'));
 const tptsV=id=>V.tpts[id];
+const r1=x=>Math.round(x*10)/10;
 const tradeGrade=x=>x>=3?'A+':x>=2?'A':x>=1.2?'B+':x>=.5?'B':x>=-.5?'C':x>=-1.5?'D':'F';
 function subsets(arr,max){const res=[];const rec=(i,cur)=>{if(cur.length)res.push(cur);if(cur.length===max)return;for(let j=i;j<arr.length;j++)rec(j+1,[...cur,arr[j]])};rec(0,[]);return res}
 let TR_CACHE={v:-1,list:[]},TR_LOOSE={v:-1,list:[]};
@@ -576,9 +577,16 @@ const PO_WT=1.75;
 const poWeeks=()=>{const r=(S.real&&S.real.regWeeks)||14;return [r+1,r+2,r+3].filter(w=>w<=18)};
 const tmWeeks=()=>{const out=[];for(let w=WEEK;w<=Math.max(...poWeeks());w++)out.push(w);return out};
 const wkWt=w=>poWeeks().includes(w)?PO_WT:1;
-/* when a player on IR / PUP / suspended / out should be back (an estimate: the injury feed has no return dates) */
-function retWeek(id){const s=stOf(id);return s==='IR'||s==='PUP'?WEEK+4:s==='SUS'?WEEK+2:s==='O'?WEEK+1:WEEK}
-function playChance(id,w){const r=retWeek(id);if(w<r)return 0;const s=stOf(id);if(w===WEEK){if(s==='Q')return .8;if(s==='D')return .3}return w===r&&r>WEEK?.85:.96}
+/* first week a player can play. Ruled out: next week. IR / PUP / suspended: the week irReturn() expects him back (never this week);
+   season-ending, or no return data: Infinity, out for the season */
+function retWeek(id){const s=stOf(id);if(s==='O')return WEEK+1;if(!LONG_OUT.includes(s))return WEEK;const r=irReturn(id);return r.back?Math.max(WEEK+1,r.wk==null?WEEK+1:r.wk):Infinity}
+/* can he be in a lineup in week w: not on bye, and back from injury or suspension. Doubtful players stay available (the sim discounts them) */
+function availIn(id,w){const p=byId[id];return !!p&&BYE[p.t]!==w&&w>=retWeek(id)}
+function playChance(id,w){if(!availIn(id,w))return 0;const r=retWeek(id),s=stOf(id);if(w===WEEK){if(s==='Q')return .8;if(s==='D')return .3}return w===r&&r>WEEK?.85:.96}
+/* THE weekly lineup. Every lineup number in the trade rating (grade, Lineup change tile, lineup bars, week strip) and the Season Sim
+   comes from here: only players available that week, each slot filled with the highest-projected eligible player. lineup() fills the
+   single-position slots (QB, RB, WR, TE; K and DST share no one with them) before FLEX, then SUPERFLEX from who's left. */
+function weekLineup(players,w,val){return lineup(players.filter(id=>availIn(id,w)),val)}
 let EWK={v:-1,m:{}};
 function ewk(id,w){if(EWK.v!==VER)EWK={v:VER,m:{}};const k=id+'|'+w;if(k in EWK.m)return EWK.m[k];const p=byId[id];let v=0;
   if(p&&BYE[p.t]!==w){const o=OPP[p.t]&&OPP[p.t][w];if(o||w===WEEK)v=(w===WEEK&&G[id]?G[id].projNext:(V.ros?V.ros[id]:V.pts[id])*(o?matchF(o.opp,p.pos):1))*playChance(id,w)}
@@ -587,23 +595,28 @@ let PVC={v:-1,m:{}},MVC={v:-1,m:{}};
 function playerValue(id){if(PVC.v!==VER)PVC={v:VER,m:{}};const c=PVC.m[id];if(c!=null)return c;return PVC.m[id]=sum(tmWeeks(),w=>ewk(id,w)*wkWt(w))}
 const ELIG={QB:['QB'],RB:['RB'],WR:['WR'],TE:['TE'],FLEX:['RB','WR','TE'],SF:OFF,K:['K'],DST:['DST']};
 /* best lineup for one week plus "bench insurance": a backup's points x the chance the starter ahead of him misses */
-function weekTeam(players,w){const f=id=>ewk(id,w),lu=lineup(players,f);let ins=0;
+function weekTeam(players,w){const f=id=>ewk(id,w),lu=weekLineup(players,w,f);let ins=0;
   lu.slots.forEach(x=>{if(!x.p)return;const miss=1-playChance(x.p.id,w)+.04;if(miss<=.05)return;
     const b=lu.bench.filter(id=>ELIG[x.label]&&ELIG[x.label].includes(byId[id].pos)).reduce((m,id)=>Math.max(m,f(id)),0);ins+=Math.min(1,miss)*b*.9});
   return {pts:lu.total,ins,lu}}
 /* roster after the deal: drop the least valuable bench player if over the limit, or add the best free agent with a freed spot */
 function rosterAfter(players,out,inn,taken){let after=players.filter(x=>!out.includes(x)).concat(inn),drop=null,fa=null;const lim=rosterSize();
-  /* players who stay in an IR slot don't use a roster spot */
-  const irs=irSet(),hold=x=>irs.has(x)&&players.includes(x),act=a=>a.filter(x=>!hold(x)).length,base=act(players);
+  /* players in an IR slot don't use a roster spot. Players received while on IR / PUP (whatever this league's IR allows) take an
+     open IR slot, best first, until they're back; with IR full they take a bench spot */
+  const irs=irSet(),kept=players.filter(x=>irs.has(x)&&!out.includes(x)),open=Math.max(0,irSlots()-kept.length);
+  const irIn=inn.filter(x=>LONG_OUT.includes(stOf(x))&&irEligible(x)).sort((a,b)=>playerValue(b)-playerValue(a)).slice(0,open);
+  const held=new Set([...kept,...irIn]),hold=x=>held.has(x),act=a=>a.filter(x=>!hold(x)).length,base=players.filter(x=>!irs.has(x)).length;
   while(act(after)>Math.max(lim,base)){const st=new Set(lineup(after,id=>playerValue(id)).slots.filter(x=>x.p).map(x=>x.p.id));
     const c=after.filter(id=>!st.has(id)&&!inn.includes(id)&&!hold(id)).sort((a,b)=>playerValue(a)-playerValue(b))[0];if(!c)break;drop=drop?[].concat(drop,c):c;after=after.filter(x=>x!==c)}
   const over=act(after)>Math.max(lim,base);
   if(act(after)<base){const best=POOL.filter(p=>!OWN[p.id]&&!taken.has(p.id)&&p.pos!=='DST'&&p.pos!=='K').map(p=>p.id).sort((a,b)=>playerValue(b)-playerValue(a))[0];if(best){fa=best;after=after.concat(best)}}
-  return {after,drop,fa,over}}
-function teamImpact(before,after,skipNow){const W=tmWeeks().filter(w=>!skipNow||w>WEEK),PO=poWeeks(),RW=(S.real&&S.real.regWeeks)||14;let tot=0,po=0,poB=0,poA=0,reg=0,nReg=0,lpB=0,lpA=0;const weeks=[];
-  W.forEach(w=>{const b=weekTeam(before,w),a=weekTeam(after,w),d=(a.pts+a.ins)-(b.pts+b.ins);tot+=d*wkWt(w);lpB+=b.pts;lpA+=a.pts;if(w<=RW){reg+=a.pts-b.pts;nReg++}
+  return {after,drop,fa,over,irIn}}
+/* rows: each rated week's before/after lineups. lp (Lineup change), lineupBars() and weekStrip() all read these same lineups;
+   bench = bench insurance, shown on its own line so lineup + bench adds up to the grade card */
+function teamImpact(before,after,skipNow){const W=tmWeeks().filter(w=>!skipNow||w>WEEK),PO=poWeeks(),RW=(S.real&&S.real.regWeeks)||14;let tot=0,po=0,poB=0,poA=0,reg=0,nReg=0,lpB=0,lpA=0,insB=0,insA=0;const weeks=[],rows=[];
+  W.forEach(w=>{const b=weekTeam(before,w),a=weekTeam(after,w),d=(a.pts+a.ins)-(b.pts+b.ins);tot+=d*wkWt(w);lpB+=b.pts;lpA+=a.pts;insB+=b.ins;insA+=a.ins;rows.push({w,b,a,d:a.pts-b.pts});if(w<=RW){reg+=a.pts-b.pts;nReg++}
     if(PO.includes(w)){po+=a.pts-b.pts;poB+=b.pts;poA+=a.pts;weeks.push({w,b:b.pts,a:a.pts})}});
-  const wsum=sum(W,wkWt)||1,nW=Math.max(1,W.length);return {perWeek:tot/wsum,po:po/Math.max(1,PO.length),reg:nReg?reg/nReg:0,poB,poA,weeks,lpB:lpB/nW,lpA:lpA/nW,lp:(lpA-lpB)/nW}}
+  const wsum=sum(W,wkWt)||1,nW=Math.max(1,W.length);return {perWeek:tot/wsum,po:po/Math.max(1,PO.length),reg:nReg?reg/nReg:0,poB,poA,weeks,rows,lpB:lpB/nW,lpA:lpA/nW,lp:(lpA-lpB)/nW,bench:(insA-insB)/nW}}
 /* market value: each source's ranking mapped onto this league's points-above-replacement scale, then averaged */
 let MKT={v:-1},LIVE_FC=null,MKT_TIMER=null;
 /* FantasyCalc values straight from /api/market every 5 minutes (the daily snapshot stays as the fallback) */
@@ -695,10 +708,10 @@ function realismOf(e,n){const sig=x=>1/(1+Math.exp(-x));
   r=Math.round(Math.max(0,Math.min(100,r)));return {score:r,label:r>=80?'Very realistic':r>=62?'Realistic':r>=45?'A stretch':'Unlikely'}}
 function evalTrade(give,get,partnerId,opts={}){
   const me=myTeam(),P=teamById(partnerId),taken=new Set([...give,...get]);
-  const mine=rosterAfter(me.players,give,get,taken);if(mine.fa)taken.add(mine.fa);const theirs=P?rosterAfter(P.players,get,give,taken):{after:[],drop:null,fa:null};
+  const mine=rosterAfter(me.players,give,get,taken);if(mine.fa)taken.add(mine.fa);const theirs=P?rosterAfter(P.players,get,give,taken):{after:[],drop:null,fa:null,irIn:[]};
   /* once any player in the deal has kicked off this week, this week's points can't change hands: rate the deal from next week on */
   const skipNow=give.concat(get).some(id=>!!liveOf(id));
-  const you=teamImpact(me.players,mine.after,skipNow),them=P?teamImpact(P.players,theirs.after,skipNow):{perWeek:0,po:0,weeks:[]};
+  const you=teamImpact(me.players,mine.after,skipNow),them=P?teamImpact(P.players,theirs.after,skipNow):{perWeek:0,po:0,weeks:[],rows:[],lp:0,bench:0};
   const vIn=sum(get,playerValue),vOut=sum(give,playerValue);
   /* will they accept */
   const mIn=sum(give,marketValue),mOut=sum(get,marketValue),tn=P?needsOf(partnerId):[];
@@ -724,7 +737,7 @@ function evalTrade(give,get,partnerId,opts={}){
   const dw=DY_W[fmtOf()]||0,dy=dw?(sum(get,dynV)-sum(give,dynV))*dw*.5:0;
   const parts={N:Wm.N*you.reg,L:Wm.L*you.perWeek,P:Wm.P*you.po,PO:Wm.PO*dPO,T:Wm.T*dT,U:Wm.U*upside,SH:Wm.SH*sellHigh,R:-Wm.R*risk,DY:dy,F:.35*fitMe,DC:-.5*dcMe,CT:-taxMe.tax};
   const youNet=sum(Object.values(parts),x=>x);
-  return {mode,parts,youNet,themNet,d:youNet-themNet,gYou:tradeGrade(youNet),gThem:tradeGrade(themNet),myLG:you.perWeek,thLG:them.perWeek,
+  return {mode,parts,youNet,themNet,d:youNet-themNet,gYou:tradeGrade(youNet),gThem:tradeGrade(themNet),myLG:r1(you.lp)+r1(you.bench),thLG:r1(them.lp)+r1(them.bench),
     vIn,vOut,mIn,mOut,fillsNeed,fillsMine,you,them,mine,theirs,sitMe,sitThem,fitMe,fitThem,dy,infeasible:mine.over||theirs.over,dPO,dT,po0,po1:sa?sa[S.me].playoff:null,t0:sb?sb[S.me].title:null,t1:sa?sa[S.me].title:null,risk,upside,sellHigh,
     dcMe,dcThem,taxMe,taxThem,recip,thProf,thLine:thLineup,skipNow,real:null}}
 function realism(e,give,get){if(!e.real)e.real=realismOf(e,give.length+get.length);return e.real}
@@ -1249,32 +1262,43 @@ function renderTargets(){const q=($('tgt-search').value||'').trim().toLowerCase(
   sortTable('tgt-table')}
 function balanceHtml(fr,them,compact){const pos=Math.max(4,Math.min(96,(1-fr.share)*100));
   return `<div class="balance${compact?' compact':''}"><div class="bal-label">${fr.label}</div><div class="bal-track"><span class="bal-mark" style="left:${pos}%"></span></div><div class="bl"><span>You</span><span>${esc(them)}</span></div></div>`}
-/* starting lineup, slot by slot, before and after (rest-of-season pts/G) */
-function lineupBars(before,after){const A=lineup(before,projV),B=lineup(after,projV),mx=Math.max(10,...A.slots.map(s=>s.p?projV(s.p.id):0),...B.slots.map(s=>s.p?projV(s.p.id):0));
-  const rows=A.slots.map((s,i)=>{const n=B.slots[i]||{p:null},o=s.p?projV(s.p.id):0,v=n.p?projV(n.p.id):0,d=v-o,same=(s.p&&s.p.id)===(n.p&&n.p.id),c=d>.05?'up':d<-.05?'down':'';
-    return `<div class="lb-row${same?' same':''}"><span class="lb-slot">${s.label}</span><div class="lb-who"><b>${same?esc(s.p?s.p.n:'Empty'):`${esc(s.p?s.p.n:'Empty')} → ${esc(n.p?n.p.n:'Empty')}`}</b><span class="psub">${same?'No change':d>=0?'Upgrade':'Downgrade'}</span></div>
+/* starting lineup, slot by slot: average points per week over the rated weeks, from the same weekly lineups as the
+   Lineup change tile (the slot deltas add up to it). Each slot names the player who starts there most weeks. */
+function lineupBars(imp){const R=imp.rows;if(!R.length)return '';const n=R.length,W0=R[0].w,W1=R[n-1].w;
+  const slot=(side,i)=>{const cnt={},seq=[];let tot=0;R.forEach(r=>{const x=r[side].lu.slots[i],id=x&&x.p?x.p.id:'';if(id)tot+=ewk(id,r.w);cnt[id]=(cnt[id]||0)+1;seq.push(id)});
+    const top=Object.keys(cnt).sort((a,b)=>cnt[b]-cnt[a]||(b?1:0)-(a?1:0))[0];return {v:tot/n,id:top||null,k:cnt[top],seq:seq.join()}};
+  const nm=x=>x.id?esc(byId[x.id].n):'Empty',rows0=R[0].b.lu.slots.map((s,i)=>({label:s.label,A:slot('b',i),B:slot('a',i)})),mx=Math.max(10,...rows0.map(r=>Math.max(r.A.v,r.B.v)));
+  const rows=rows0.map(({label,A,B})=>{const o=A.v,v=B.v,d=v-o,same=A.seq===B.seq,c=same?'':d>.05?'up':d<-.05?'down':'';
+    const part=B.id&&B.k<n?` · starts ${B.k} of ${n} wks`:'';
+    return `<div class="lb-row${same?' same':''}"><span class="lb-slot">${label}</span><div class="lb-who"><b>${same||A.id===B.id?nm(A):`${nm(A)} → ${nm(B)}`}</b><span class="psub">${same?'No change':(Math.abs(d)<.05?'Same points':d>=0?'Upgrade':'Downgrade')+part}</span></div>
       <div class="lb-bars"><i class="o" style="width:${(o/mx*100).toFixed(1)}%"></i><i class="n ${c}" style="width:${(v/mx*100).toFixed(1)}%"></i></div><b class="lb-d num ${c}">${same||Math.abs(d)<.05?'0.0':sgn(d)}</b></div>`}).join('');
-  return `<div class="lb"><div class="lb-h"><span class="lab2">Your starting lineup</span><span class="lb-leg"><i class="o"></i>Now<i class="n"></i>After</span></div>${rows}<div class="lb-tot"><span>Lineup total</span><b class="num">${f1(A.total)} → ${f1(B.total)}</b><b class="num ${B.total-A.total>=0?'up':'down'}">${sgn(B.total-A.total)}</b></div></div>`}
-/* every remaining week, starting-lineup points gained or lost; playoff weeks are outlined */
-function weekStrip(before,after,skipNow){const PO=poWeeks(),ws=tmWeeks().filter(w=>!skipNow||w>WEEK).map(w=>{const b=weekTeam(before,w),a=weekTeam(after,w);return {w,d:a.pts-b.pts}});if(!ws.length)return '';
-  return `<div class="wst"><div class="lb-h"><span class="lab2">Points per week, after vs now</span><span class="note">Playoff weeks outlined</span></div><div class="wst-row">${ws.map(x=>`<div class="wst-i ${x.d>=0?'up':'down'}${PO.includes(x.w)?' po':''}"><span>Wk ${x.w}</span><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${x.d>=0?'M6 15l6-6 6 6':'M6 9l6 6 6-6'}"/></svg><b class="num">${sgn(x.d)}</b></div>`).join('')}</div></div>`}
+  return `<div class="lb"><div class="lb-h"><span class="lab2">Your starting lineup <span class="lb-rng">avg per week, Wk ${W0}${W1>W0?'–'+W1:''}</span></span><span class="lb-leg"><i class="o"></i>Now<i class="n"></i>After</span></div>${rows}<div class="lb-tot"><span>Lineup total</span><b class="num">${f1(imp.lpB)} → ${f1(imp.lpA)}</b><b class="num ${imp.lp>=0?'up':'down'}">${sgn(imp.lp)}</b></div></div>`}
+/* every rated week, starting-lineup points gained or lost (same lineups as above); playoff weeks are outlined */
+function weekStrip(imp,get){const PO=poWeeks(),ws=imp.rows;if(!ws.length)return '';
+  const tip=r=>{const st=new Set(r.a.lu.slots.filter(x=>x.p).map(x=>x.p.id)),ins=(get||[]).filter(id=>st.has(id)).map(id=>byId[id].n);return `Week ${r.w}: ${ins.length?ins.join(' and ')+' in your lineup':'no player you get starts'}`};
+  return `<div class="wst"><div class="lb-h"><span class="lab2">Points per week, after vs now</span><span class="note">Playoff weeks outlined</span></div><div class="wst-row">${ws.map(x=>`<div class="wst-i ${x.d>=0?'up':'down'}${PO.includes(x.w)?' po':''}" title="${esc(tip(x))}" data-wk="${x.w}"><span>Wk ${x.w}</span><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${x.d>=0?'M6 15l6-6 6 6':'M6 9l6 6 6-6'}"/></svg><b class="num">${sgn(x.d)}</b></div>`).join('')}</div></div>`}
 function renderRating(partner){
   const el=$('rating');
   if(!TD.give.length||!TD.get.length){el.innerHTML=`<div class="card-h"><h2>Trade rating</h2></div><div class="rt-empty"><b>Build a deal to see it graded</b></div>`;return}
-  const me=myTeam(),fr=fairness(TD.give,TD.get,partner.id),e=fr.e,hm=RATE_MODE==='hm',over=activeOf(me).filter(x=>!TD.give.includes(x)).length+TD.get.length-rosterSize();
+  const me=myTeam(),fr=fairness(TD.give,TD.get,partner.id),e=fr.e,hm=RATE_MODE==='hm',over=activeOf(me).filter(x=>!TD.give.includes(x)).length+TD.get.length-e.mine.irIn.length-rosterSize();
   const cls=v=>v>=0?'up':'down',row=(l,v,note)=>`<tr><td>${l}${note?`<span class="note"> · ${note}</span>`:''}</td><td class="r num ${cls(v)}">${sgn(v)}</td></tr>`,P=e.parts,rl=realism(e,TD.give,TD.get);
   const gcard=(who,g,big,line,sub,mine)=>`<div class="gcard ${g}${mine?' mine':''}"><span class="gc-who">${who}</span><b class="gc-g">${big}</b><span class="gc-line">${line}</span><span class="gc-sub">${sub}</span></div>`;
   const tile=(l,v,c,sub)=>`<div class="rt-tile"><span>${l}</span><b class="num ${c||''}">${v}</b>${sub?`<em>${sub}</em>`:''}</div>`;
   const dpo=e.po1!=null;
+  /* received players who can't play in some or all of the rated weeks (IR, PUP, suspended, ruled out) */
+  const Wr=e.you.rows.map(r=>r.w),wLast=Math.max(...Wr),why={IR:'on IR',PUP:'on the PUP list',SUS:'suspended',O:'ruled out'};
+  const outNote=Wr.length?TD.get.filter(id=>retWeek(id)>Wr[0]).map(id=>{const r=retWeek(id),n=esc(byId[id].n),w=why[stOf(id)]||'out';
+    return r>wLast?`${n} is ${w} and not expected back this season, so he never makes your lineup.`:`${n} is ${w} and counts from Week ${r}, his expected return.`}).map(t=>`<p class="note rt-note rt-out">${t}</p>`).join(''):'';
   el.innerHTML=`<div class="card-h"><h2>Trade rating</h2><div class="seg"><button data-rmode="hm" aria-pressed="${hm}">Trade Score</button><button data-rmode="pw" aria-pressed="${!hm}">Points per week</button></div></div>
    ${balanceHtml(fr,partner.name,false)}
    <div class="gcards">${hm?gcard('Your grade',gcls(e.gYou),e.gYou,`${sgn(e.youNet)} score`,esc(MODE_TXT[e.mode]).split(':')[0],true)+gcard(esc(partner.name),gcls(e.gThem),e.gThem,`${sgn(e.themNet)} score`,e.thProf?esc(PROF_TXT[e.thProf.standing]):'',false)
-     :gcard('Your lineup',e.myLG>=0?'ga':'gd',`${sgn(e.myLG)}<small>/wk</small>`,'starting lineup','incl. bench insurance',true)+gcard(esc(partner.name),e.thLG>=0?'ga':'gd',`${sgn(e.thLG)}<small>/wk</small>`,'starting lineup','',false)}</div>
+     :gcard('Your lineup',e.myLG>=0?'ga':'gd',`${sgn(e.myLG)}<small>/wk</small>`,`${sgn(r1(e.you.lp))} starters`,`${sgn(r1(e.you.bench))} bench depth`,true)+gcard(esc(partner.name),e.thLG>=0?'ga':'gd',`${sgn(e.thLG)}<small>/wk</small>`,`${sgn(r1(e.them.lp))} starters`,`${sgn(r1(e.them.bench))} bench depth`,false)}</div>
    <div class="rt-tiles">${tile('Lineup change',`${sgn(e.you.lp)}/wk`,cls(e.you.lp),'starting lineup')}${tile('Playoff odds',dpo?`${pct(e.po0)} → ${pct(e.po1)}`:'—',dpo&&Math.abs(e.po1-e.po0)>=.005?cls(e.po1-e.po0):'',dpo?`${sgn(e.dPO)} pts`:'needs 2+ teams')}${tile('Title odds',dpo&&e.t1!=null?`${pct(e.t0)} → ${pct(e.t1)}`:'—',dpo&&e.t1!=null&&Math.abs(e.t1-e.t0)>=.005?cls(e.t1-e.t0):'',dpo&&e.t1!=null?`${sgn(e.dT)} pts`:'')}${tile('Realism',`${rl.score}`,rl.score>=62?'up':rl.score>=45?'':'down',rl.label)}</div>
-   ${lineupBars(me.players,e.mine.after)}
-   ${weekStrip(me.players,e.mine.after,e.skipNow)}
+   ${outNote}
+   ${lineupBars(e.you)}
+   ${weekStrip(e.you,TD.get)}
    ${e.skipNow?`<p class="note rt-note">Week ${WEEK} is left out of this rating: a player in the deal has already played this week, so it starts counting from Week ${WEEK+1}.</p>`:''}
-   ${e.mine.fa||e.mine.drop||e.theirs.fa||e.theirs.drop?`<p class="note rt-note">${[e.mine.fa?`You'd pick up ${esc(byId[e.mine.fa].n)} with the open roster spot.`:'',e.mine.drop?`You'd drop ${esc([].concat(e.mine.drop).map(x=>byId[x].n).join(' and '))} to make room.`:'',e.theirs.drop?`${esc(partner.name)} would drop ${esc([].concat(e.theirs.drop).map(x=>byId[x].n).join(' and '))}.`:'',e.theirs.fa?`${esc(partner.name)} would pick up ${esc(byId[e.theirs.fa].n)}.`:''].filter(Boolean).join(' ')}</p>`:''}
+   ${e.mine.irIn.length||e.mine.fa||e.mine.drop||e.theirs.fa||e.theirs.drop?`<p class="note rt-note">${[e.mine.irIn.length?`${esc(e.mine.irIn.map(x=>byId[x].n).join(' and '))} would go in your IR ${e.mine.irIn.length>1?"slots until they're":"slot until he's"} back.`:'',e.mine.fa?`You'd pick up ${esc(byId[e.mine.fa].n)} with the open roster spot.`:'',e.mine.drop?`You'd drop ${esc([].concat(e.mine.drop).map(x=>byId[x].n).join(' and '))} to make room.`:'',e.theirs.drop?`${esc(partner.name)} would drop ${esc([].concat(e.theirs.drop).map(x=>byId[x].n).join(' and '))}.`:'',e.theirs.fa?`${esc(partner.name)} would pick up ${esc(byId[e.theirs.fa].n)}.`:''].filter(Boolean).join(' ')}</p>`:''}
    ${over>0?`<p class="note rt-note">You would be ${over} over your roster limit and need to drop ${over>1?'players':'a player'}.</p>`:''}`;
 }
 
@@ -1477,8 +1501,8 @@ function schedule(){REG_WEEKS=(S.real&&S.real.regWeeks)||14;const ids=S.teams.ma
   if(S.real&&S.real.sched)for(const w in S.real.sched){const pr=S.real.sched[w].filter(x=>ids.includes(x[0])&&(!x[1]||ids.includes(x[1])));if(pr.length)weeks[w]=pr}
   SCHED={key,weeks};return weeks}
 function oppOf(tid,w){const pr=(schedule()[w]||[]).find(p=>p.includes(tid));return pr?(pr[0]===tid?pr[1]:pr[0]):null}
-function pickVal(w){return id=>{const p=byId[id];if(BYE[p.t]===w||LONG_OUT.includes(stOf(id)))return 0;if(w===WEEK&&G[id]&&G[id].live)return G[id].projNext;const o=OPP[p.t]&&OPP[p.t][w];return V.pts[id]*(o?matchF(o.opp,p.pos):1)*(w===WEEK?weekMult(id)*(p.pos==='DST'?1:vegasF(p.t)):1)}}
-function weekLine(players,w,tid){const f=pickVal(w),lu=(w===WEEK&&tid&&realLineup(tid))||lineup(players,f);let m=0,v=0;lu.slots.forEach(s=>{if(!s.p)return;const x=f(s.p.id),l=w===WEEK&&liveOf(s.p.id),rf=l?(l.state==='post'?0:l.rem):1;m+=x;v+=(CV[s.p.pos]*x*rf)**2});return {m,sd:Math.sqrt(v)||1,lu}}
+function pickVal(w){return id=>{const p=byId[id];if(!availIn(id,w))return 0;if(w===WEEK&&G[id]&&G[id].live)return G[id].projNext;const o=OPP[p.t]&&OPP[p.t][w];return V.pts[id]*(o?matchF(o.opp,p.pos):1)*(w===WEEK?weekMult(id)*(p.pos==='DST'?1:vegasF(p.t)):1)}}
+function weekLine(players,w,tid){const f=pickVal(w),lu=(w===WEEK&&tid&&realLineup(tid))||weekLineup(players,w,f);let m=0,v=0;lu.slots.forEach(s=>{if(!s.p)return;const x=f(s.p.id),l=w===WEEK&&liveOf(s.p.id),rf=l?(l.state==='post'?0:l.rem):1;m+=x;v+=(CV[s.p.pos]*x*rf)**2});return {m,sd:Math.sqrt(v)||1,lu}}
 function recordsThru(n){const d={};S.teams.forEach(T=>d[T.id]={w:0,l:0,t:0,pf:0});const sched=schedule();
   if(S.real&&S.real.scores){for(let w=1;w<=n;w++){const sc=S.real.scores[w]||{};(sched[w]||[]).forEach(([a,b])=>{if(!a||!b||sc[a]==null||sc[b]==null)return;d[a].pf+=sc[a];d[b].pf+=sc[b];if(sc[a]>sc[b]){d[a].w++;d[b].l++}else if(sc[b]>sc[a]){d[b].w++;d[a].l++}else{d[a].t++;d[b].t++}})}return d}
   for(let w=1;w<=n;w++){const sc={};S.teams.forEach(T=>{const lu=lineup(T.players,id=>BYE[byId[id].t]===w?0:V.pts[id]);sc[T.id]=lu.slots.reduce((a,x)=>a+(x.p?(G[x.p.id].pts[w-1]||0):0),0)});
