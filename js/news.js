@@ -490,16 +490,24 @@ const TMN_F=[['all','Feed'],['team','Your team'],['inj','Injuries'],['clips','Cl
 function tmnMood(){const gs=LIVE&&LIVE.week===WEEK?Object.values(LIVE.games||{}):[];if(gs.some(g=>g.state==='in'))return 'live';if(gs.some(g=>g.state==='post'))return 'after';return 'quiet'}
 /* 8-tooth gear, drawn on the same 24px grid and stroke as the other line icons */
 const TMN_GEAR='<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" aria-hidden="true"><path d="M10.15 4.84L10.18 2.17A10 10 0 0 1 13.82 2.17L13.85 4.84A7.4 7.4 0 0 1 15.76 5.62L17.66 3.76A10 10 0 0 1 20.24 6.34L18.38 8.24A7.4 7.4 0 0 1 19.16 10.15L21.83 10.18A10 10 0 0 1 21.83 13.82L19.16 13.85A7.4 7.4 0 0 1 18.38 15.76L20.24 17.66A10 10 0 0 1 17.66 20.24L15.76 18.38A7.4 7.4 0 0 1 13.85 19.16L13.82 21.83A10 10 0 0 1 10.18 21.83L10.15 19.16A7.4 7.4 0 0 1 8.24 18.38L6.34 20.24A10 10 0 0 1 3.76 17.66L5.62 15.76A7.4 7.4 0 0 1 4.84 13.85L2.17 13.82A10 10 0 0 1 2.17 10.18L4.84 10.15A7.4 7.4 0 0 1 5.62 8.24L3.76 6.34A10 10 0 0 1 6.34 3.76L8.24 5.62A7.4 7.4 0 0 1 10.15 4.84Z"/><circle cx="12" cy="12" r="3.1"/></svg>';
+/* Feed filter: Yours and League can each be switched off, never both. Remembered on this device. */
+const TMN_SHOW_LS='tm-news-show-v1';
+function tmnFilt(){if(TMN.show)return TMN.show;let v=null;try{v=JSON.parse(localStorage.getItem(TMN_SHOW_LS)||'null')}catch(e){}
+  return TMN.show=v&&(v.mine||v.lg)?{mine:!!v.mine,lg:!!v.lg}:{mine:true,lg:true}}
+function tmnFiltFlip(k){const sh=tmnFilt(),o=k==='mine'?'lg':'mine';sh[k]=!sh[k];if(!sh[k]&&!sh[o])sh[o]=true;try{localStorage.setItem(TMN_SHOW_LS,JSON.stringify(sh))}catch(e){}tmnRenderBody()}
 function tmnRender(){const el=$('news-body');if(!el)return;tmnWeek();TMN.unread=0;
   if(typeof FEED!=='undefined'&&typeof loadFeed==='function'&&(!FEED||Date.now()-FEED_AT>4*60e3))Promise.resolve(loadFeed()).then(()=>{if(tab==='news'&&FEED)tmnRenderBody()});
   const Ls=tmnLeagues();if(TMN.lg!=='all'&&!Ls.some(c=>c.key===TMN.lg))TMN.lg='all';const mood=tmnMood();
   try{const fr=[];tmnMyInj(Ls,fr,Date.now());tmnResults(Ls,fr,Date.now());if(fr.length)tmnSave()}catch(e){}
   tmnLoadArt(Ls);tmnLoadLeague();tmnTopCatchUp(Ls);tmnTopBanners();
-  el.innerHTML=`<header class="hero tmn-head"><div class="tmn-head-t"><div class="kicker">Week ${WEEK} · ${Ls.length>1?`all ${Ls.length} leagues`:'your league'}</div><h1>News${mood==='live'?' <span class="tmn-live"><span class="live-dot on"></span>Live</span>':''}</h1></div>
-      <a class="tmn-gear" href="#account-leagues" data-notif-go="1" title="Notification settings" aria-label="Notification settings">${TMN_GEAR}</a></header>
-    <div class="tmn-bar"><div class="seg" role="group" aria-label="Show" id="tmn-seg"></div>
-      ${Ls.length>1?`<select id="tmn-lg" class="tmn-lgsel" aria-label="League"><option value="all">All leagues</option>${Ls.map(c=>`<option value="${esc(c.key)}" ${TMN.lg===c.key?'selected':''}>${esc(c.name)}</option>`).join('')}</select>`:''}</div>
-    <div class="tmn-feed" id="tmn-feed"></div>`;
+  const sh=tmnFilt();
+  el.innerHTML=`<div class="tmn-lay"><aside class="tmn-side" aria-label="News sections">
+      <header class="hero tmn-head"><div class="kicker">Week ${WEEK} · ${Ls.length>1?`all ${Ls.length} leagues`:'your league'}</div><h1>News${mood==='live'?' <span class="tmn-live"><span class="live-dot on"></span>Live</span>':''}</h1></header>
+      <div class="tmn-nav" role="group" aria-label="Show" id="tmn-seg"></div>
+      ${Ls.length>1?`<select id="tmn-lg" class="tmn-lgsel" aria-label="League"><option value="all">All leagues</option>${Ls.map(c=>`<option value="${esc(c.key)}" ${TMN.lg===c.key?'selected':''}>${esc(c.name)}</option>`).join('')}</select>`:''}
+      <div class="tmn-tog" role="group" aria-label="Filter the Feed" id="tmn-tog"><button type="button" class="y" data-nshow="mine" aria-pressed="${sh.mine}"><i aria-hidden="true"></i>Yours</button><button type="button" data-nshow="lg" aria-pressed="${sh.lg}"><i aria-hidden="true"></i>League</button></div>
+      <a class="tmn-gear" href="#account-leagues" data-notif-go="1" title="Notification settings" aria-label="Notification settings">${TMN_GEAR}</a></aside>
+    <div class="tmn-feed" id="tmn-feed"></div></div>`;
   tmnRenderBody(Ls)}
 function tmnRenderBody(Ls){const el=$('tmn-feed');if(!el)return;Ls=Ls||tmnLeagues();
   const inLg=l=>TMN.lg==='all'||(l||[]).some(x=>(x.key||x)===TMN.lg),f=TMN.f;tmnBuildClips(Ls);const CM=tmnClipMap();
@@ -514,10 +522,12 @@ function tmnRenderBody(Ls){const el=$('tmn-feed');if(!el)return;Ls=Ls||tmnLeague
   const clipsAll=typeof CLIPS!=='undefined'?CLIPS.filter(v=>!v.game):[];
   const cnt={all:0,team:evs.length,inj:injList.length,clips:clipsAll.length};
   const seg=$('tmn-seg');if(seg)seg.innerHTML=TMN_F.map(([k,l])=>`<button type="button" data-nf="${k}" aria-pressed="${f===k}">${l}${cnt[k]?` <span class="tmn-n">${cnt[k]}</span>`:''}</button>`).join('');
+  const sh=tmnFilt(),feedTab=f==='all';document.querySelectorAll('#tmn-tog [data-nshow]').forEach(b=>{b.setAttribute('aria-pressed',String(!!sh[b.dataset.nshow]));b.disabled=!feedTab;b.title=feedTab?'':'Filters the Feed tab'});
+  const tg=$('tmn-tog');if(tg)tg.classList.toggle('off',!feedTab);
   const sec=(id,title,note,html)=>html?`<section class="tmn-sec" data-sec="${id}"><div class="tmn-sec-h"><h2>${title}</h2>${note?`<span class="note">${note}</span>`:''}</div>${html}</section>`:'';
   const card=e=>e.type==='second'||e.type==='top'?tmnRankCard(e):e.type==='res'?tmnResultCard(e):e.type==='trade'?tmnTradeCard(e):e.type==='lg'?tmnLeagueCard(e):e.type==='art'||e.type==='vid'?tmnStoryCard(e):tmnEvCard(e,CM.map.get(e.k));
   const whose=e=>e.type==='lg'||e.type==='trade'?(e.yours?'mine lg':'lg'):e.type==='opp'||e.type==='oinj'?'opp':'mine';
-  const tl=(list,act)=>list.length?`<ol class="tmn-tl${act?' act':''}">${tmnGroups(list).map((g,i)=>`<li class="tmn-day"><span>${g.label}<small>${esc(g.sub)}</small></span>${i===0?`<em class="tmn-newest">${act?'<span class="tmn-key"><i class="y"></i>Yours <i></i>League</span>':''}Newest first<b aria-hidden="true">↓</b></em>`:''}</li>${g.items.map(e=>`<li class="${act?whose(e):''}">${card(e)}</li>`).join('')}`).join('')}</ol>`:'';
+  const tl=(list,act)=>list.length?`<ol class="tmn-tl${act?' act':''}">${tmnGroups(list).map((g,i)=>`<li class="tmn-day"><span>${g.label}<small>${esc(g.sub)}</small></span>${i===0?`<em class="tmn-newest">Newest first<b aria-hidden="true">↓</b></em>`:''}</li>${g.items.map(e=>`<li class="${act?whose(e):''}">${card(e)}</li>`).join('')}`).join('')}</ol>`:'';
   let html='';
   if(f==='inj'){const arts=stories.filter(x=>x.kind==='inj'&&stOf(x.pid));
     html=sec('injup','Latest updates',injUp.length?'Newest first':'',tl(injUp))
@@ -528,10 +538,14 @@ function tmnRenderBody(Ls){const el=$('tmn-feed');if(!el)return;Ls=Ls||tmnLeague
        with every card about your team flagged on the rail so the two are easy to tell apart. */
     const act=f==='all',lgAll=tmnLeagueNews(Ls,picked),trades=tmnTrades(Ls,lgAll).filter(x=>act||x.yours),lgNews=act?lgAll.filter(x=>x.kind!=='trade'):[];
     const news=tmnDedupe([...trades,...picked,...lgNews]);
-    const all=tmnBundle([...evs,...injUp,...res,...news,...tmnRankFeed().filter(e=>inLg(e.leagues))].sort((a,b)=>tmnAt(b)-tmnAt(a)));tmnLoadRecaps([...picked,...lgNews,...trades]);
+    const all0=tmnBundle([...evs,...injUp,...res,...news,...tmnRankFeed().filter(e=>inLg(e.leagues))].sort((a,b)=>tmnAt(b)-tmnAt(a)));tmnLoadRecaps([...picked,...lgNews,...trades]);
+    /* the Yours / League switches in the rail (Feed only). A league story about one of your players counts as both. */
+    const keep=e=>{const w=whose(e);return w==='mine'?sh.mine:w==='mine lg'?(sh.mine||sh.lg):sh.lg},cut=act&&!(sh.mine&&sh.lg),all=cut?all0.filter(keep):all0;
+    if(cut&&!sh.mine)tops.length=0;
     /* the biggest #1 gets the full card; any others this week sit in a row of smaller orange cards under it */
     const tp=[...tops].sort((a,b)=>(b.overall-a.overall)||(b.pts-a.pts));
     html=(tp.length?`<div class="tmn-tops">${tmnTopCard(tp[0])}${tp.length>1?`<div class="tmn-tops-more">${tp.slice(1).map(tmnTopMini).join('')}</div>`:''}</div>`:'')+tl(all,act)
+      +(cut&&!all.length&&!tops.length&&all0.length?`<div class="card tmn-empty"><h2>${sh.mine?'Nothing about your team yet':'No league news right now'}</h2><p class="note">${sh.mine?'League news is switched off. Turn <b>League</b> back on in the rail to see trades, signings and injuries around the league.':'Your team is switched off. Turn <b>Yours</b> back on in the rail to see your players.'}</p></div>`:'')
       +(!picked.length&&TMN.artBusy?'<p class="note tmn-loading"><span class="spin"></span> Pulling the latest on your players…</p>':'')}
   const empty={all:['Nothing yet this week','Everything about your team lands here as it happens, plus the trades, signings and big injuries around the league that move fantasy value.'],
     team:['Nothing yet this week','Big plays, injury news, role changes and results for your players show up here as they happen, from outlets all over the web.'],
@@ -540,6 +554,7 @@ function tmnRenderBody(Ls){const el=$('tmn-feed');if(!el)return;Ls=Ls||tmnLeague
   const lastWk=TMN.last&&TMN.last.items.length&&(f==='all'||f==='team')?(()=>{const L=TMN.last.items.filter(e=>PLAY_T.includes(e.type)&&inLg(e.leagues)).slice(0,30);
     return L.length?`<details class="tmn-last"><summary>Week ${TMN.last.week} big plays <span class="tmn-n">${L.length}</span></summary><div class="tmn-last-l">${L.map(e=>tmnEvCard(e,null,true)).join('')}</div></details>`:''})():'';
   el.innerHTML=(html||`<div class="card tmn-empty"><h2>${empty[0]}</h2><p class="note">${empty[1]}</p></div>`)+lastWk;
+  el.querySelectorAll('.tmn-tl .tmn-ev').forEach(a=>{const r=a.querySelector(':scope>.tmn-ev-rail'),t=a.querySelector('.tmn-ev-top');if(r&&t){r.className='tmn-when';t.appendChild(r)}});
   if(TMN.focus){const k=TMN.focus;TMN.focus=null;const it=el.querySelector(`[data-nkf="${CSS.escape(k)}"]`);if(it){it.classList.add('focus');setTimeout(()=>it.scrollIntoView({behavior:'smooth',block:'center'}),40);setTimeout(()=>it.classList.remove('focus'),2600)}}}
 const tmnAt=e=>(e.wall&&Date.parse(e.wall))||e.at||0;
 /* One card per player per story line per day. A status change and every injury story about him that day become one
@@ -740,6 +755,7 @@ document.addEventListener('click',e=>{const t=e.target;if(!t.closest)return;
   const nc=t.closest('[data-ncard]');if(nc&&!t.closest('a,button,select,input')&&typeof openCard==='function'){openCard(nc.dataset.ncard);return}
   const ng=t.closest('[data-nk-go]');if(ng){TMN.f='team';TMN.focus=ng.dataset.nkGo;tmnRender();return}
   const gw=t.closest('[data-go-waivers]');if(gw){e.preventDefault();e.stopPropagation();location.hash='waivers';return}
+  const ns=t.closest('[data-nshow]');if(ns){if(!ns.disabled)tmnFiltFlip(ns.dataset.nshow);return}
   const nf=t.closest('[data-nf]');if(nf){TMN.f=nf.dataset.nf;tmnRender();return}
   const ml=t.closest('[data-nlg]');if(ml){e.preventDefault();TMN.lg=TMN.lg===ml.dataset.nlg?'all':ml.dataset.nlg;tmnRender();return}
   if(t.closest('[data-notif-go]'))TMN.goNotif=true;
