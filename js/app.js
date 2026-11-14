@@ -1930,7 +1930,7 @@ function renderSignin(){const el=$('signin-card');if(!el)return;
      ${pwField('auth-pw','<span class="lab-row">Password<button type="button" class="linkish" data-auth-mode="forgot">Forgot?</button></span>','current-password')}${msg}${btn('Sign in')}</form>
      <p class="auth-foot">New to TradeMetric? <button type="button" class="linkish strong" data-auth-mode="up">Create an account</button></p>`;
   else if(AUTH_MODE==='up')h=`<h1>Create your account</h1><p class="auth-sub">Free during the beta.</p>${oauthHtml()}<form id="auth-form" data-mode="up" novalidate>
-     <label>Username<input type="text" id="auth-user" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" maxlength="20" required placeholder="3 to 20 letters, numbers or _"><span class="hint" id="un-hint" aria-live="polite"></span></label>
+     <label>Username<input type="text" id="auth-user" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" maxlength="20" required placeholder="3 to 20 letters, numbers or underscores"><span class="hint" id="un-hint" aria-live="polite"></span></label>
      <label>Email<input type="email" id="auth-email" autocomplete="email" autocapitalize="none" spellcheck="false" required></label>
      ${pwField('auth-pw','Password','new-password','minlength="8" placeholder="At least 8 characters"')}${msg}${btn('Create account')}</form>
      <p class="auth-foot">Already have an account? <button type="button" class="linkish strong" data-auth-mode="in">Sign in</button></p>`;
@@ -1949,7 +1949,7 @@ function renderSignin(){const el=$('signin-card');if(!el)return;
   else if(AUTH_MODE==='reset')h=`<h1>Set a new password</h1><p class="auth-sub">You're signed in. Pick a new password to finish.</p><form id="auth-form" data-mode="reset" novalidate>
      ${pwField('auth-pw','New password','new-password','minlength="8" placeholder="At least 8 characters"')}${msg}${btn('Save password')}</form>`;
   else if(AUTH_MODE==='username')h=`<h1>Pick a username</h1><p class="auth-sub">This is the name TradeMetric shows for you, and you can sign in with it too.</p><form id="auth-form" data-mode="username" novalidate>
-     <label>Username<input type="text" id="auth-user" autocapitalize="none" autocorrect="off" spellcheck="false" maxlength="20" required placeholder="3 to 20 letters, numbers or _"><span class="hint" id="un-hint" aria-live="polite"></span></label>${msg}${btn('Continue')}</form>
+     <label>Username<input type="text" id="auth-user" autocapitalize="none" autocorrect="off" spellcheck="false" maxlength="20" required placeholder="3 to 20 letters, numbers or underscores"><span class="hint" id="un-hint" aria-live="polite"></span></label>${msg}${btn('Continue')}</form>
      <p class="auth-foot"><button type="button" class="linkish" data-auth-skip-un>Skip for now</button></p>`;
   else if(AUTH_MODE==='confirmed')h=`<div class="auth-ic ok" aria-hidden="true"><svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg></div><h1>You're confirmed</h1>
      <p class="auth-sub">Your email is verified and you're signed in. If TradeMetric is open in another tab, it's signed in there too, so you can close this one.</p>
@@ -1966,7 +1966,7 @@ setInterval(()=>{const w=document.querySelector('[data-resend-wait]');if(!w||tab
 function paintUn(){const h=$('un-hint');if(!h||!UN_STATE)return;h.className='hint '+(UN_STATE.ok===true?'ok':UN_STATE.ok===false?'bad':'');h.textContent=UN_STATE.text}
 function checkUsername(raw){const u=String(raw||'').trim().toLowerCase();clearTimeout(UN_T);
   if(!u){UN_STATE=null;const h=$('un-hint');if(h){h.textContent='';h.className='hint'}return}
-  if(!/^[a-z0-9_]{3,20}$/.test(u)){UN_STATE={u,ok:false,text:u.length<3?'At least 3 characters':'Only letters, numbers and _'};paintUn();return}
+  if(!/^[a-z0-9_]{3,20}$/.test(u)){UN_STATE={u,ok:false,text:u.length<3?'At least 3 characters':'Only letters, numbers and underscores'};paintUn();return}
   if(PROFILE&&PROFILE.username===u){UN_STATE={u,ok:null,text:"That's your current username"};paintUn();return}
   UN_STATE={u,ok:null,text:'Checking...'};paintUn();
   UN_T=setTimeout(async()=>{const {data,error}=await SB.rpc('username_available',{p_username:u});if(!UN_STATE||UN_STATE.u!==u)return;
