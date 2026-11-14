@@ -223,13 +223,13 @@ function renderTmRank(){
     <thead><tr><th class="r">#</th><th>Player</th><th title="TradeMetric Score, 0 to 100">TM Score</th><th class="r" title="How many spots higher (▲) or lower (▼) we rank him than the market">vs Market</th><th class="r" title="Expert consensus rank">Experts</th><th class="r" title="Market rank (average draft position)">Market</th><th class="c" title="Opportunity grade at his position: volume, role, age, depth chart and offense">Opp.</th><th class="r" title="Half-PPR points per game this season">2026 Pts/G</th></tr></thead>
     <tbody>${rows||'<tr><td colspan="8" class="note" style="padding:24px">No players match.</td></tr>'}</tbody></table></div>
   ${!filtered&&L.length>shown.length?`<div class="rank-more"><button class="btn" type="button" data-tmo-more>Show ${Math.min(50,L.length-shown.length)} more</button></div>`:''}
-  <p class="note tmo-foot">TM Score = ${tmoPctW(TMO_W.cons)} expert consensus + ${tmoPctW(TMO_W.adp)} market + ${tmoPctW(TMO_W.tm)} TradeMetric opportunity. Tiers break where the score drops off the most. Ages are for next season.</p>`;
+  <p class="note tmo-foot">Tiers break where the score drops off the most. Ages are for next season.</p>`;
 }
 function tmoWhy(o,pro){
   const bar=(l,v,c)=>`<div class="tmo-wb"><span>${l}</span><span class="tmo-bar ${c}"><i style="width:${Math.max(3,v).toFixed(0)}%"></i></span><b>${v.toFixed(0)}</b></div>`;
   const f=(l,v)=>`<li><span>${l}</span><b>${v}</b></li>`,pct=x=>x==null?'—':Math.round(x*100)+'th pct';
   const inner=`<div class="tmo-why-in">
-    <div class="tmo-why-col"><h4>Score parts</h4>${bar('Experts ('+tmoPctW(TMO_W.cons)+')',o.sCons,'c')}${bar('Market ('+tmoPctW(TMO_W.adp)+')',o.sAdp,'m')}${bar('TradeMetric ('+tmoPctW(TMO_W.tm)+')',o.sTm,'t')}</div>
+    <div class="tmo-why-col"><h4>Score parts</h4>${bar('Experts',o.sCons,'c')}${bar('Market',o.sAdp,'m')}${bar('TradeMetric model',o.sTm,'t')}</div>
     <div class="tmo-why-col"><h4>Opportunity model</h4><ul class="tmo-facts">
       ${f('Expected points / game',o.xfpg!=null?o.xfpg.toFixed(1)+' · '+pct(o.xfpgP):'—')}
       ${o.pos!=='QB'?f('Weighted opportunity (WOPR)',o.wopr!=null?o.wopr.toFixed(2)+' · '+pct(o.woprP):'—'):''}
