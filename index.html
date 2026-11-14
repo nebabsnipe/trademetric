@@ -11,12 +11,14 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600;700;800&family=Kanit:ital,wght@0,700;0,800;1,600;1,700;1,800&display=swap">
 <meta name="description" content="Fantasy football trades, rankings and lineup advice built on your league's exact settings.">
-<link rel="stylesheet" href="css/styles.css?v=16">
+<link rel="stylesheet" href="css/styles.css?v=17">
 </head>
 <body class="signed-out">
 <div class="topbar">
   <div class="wrap topbar-in">
     <a class="logo" href="#team" aria-label="TradeMetric home"><img class="logo-img" src="/logo-tm.png?v=2" width="398" height="160" alt=""><b>Trade<span>Metric</span></b></a>
+    <span class="preview-pill" id="preview-pill" hidden>Preview</span>
+    <script>if(!/(^|\.)trademetric\.app$/.test(location.hostname))document.getElementById('preview-pill').hidden=false</script>
     <nav class="nav" aria-label="Sections">
       <button data-tab="team">My Team</button>
       <button data-tab="news">News</button>

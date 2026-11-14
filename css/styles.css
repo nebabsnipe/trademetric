@@ -2238,3 +2238,7 @@ body[data-tab="news"] .tmn-chips{display:none}
 .tmn-tog button[aria-pressed="true"]:not(:disabled):hover{color:var(--bg);border-color:var(--ink);filter:brightness(1.12)}
 .tmn-tog button.y[aria-pressed="true"]:not(:disabled):hover{color:#fff;border-color:var(--accent)}
 @media (max-width:600px){.tmn-tl{gap:10px}.tmn-tl .tmn-ev-card{padding:14px 15px}}
+
+/* Preview pill: shows on preview builds only (any host that isn't trademetric.app) */
+.preview-pill{font:700 10px/1 var(--f-body);letter-spacing:.08em;text-transform:uppercase;color:var(--accent-ink);background:var(--accent);border-radius:99px;padding:5px 8px;flex-shrink:0}
+.preview-pill[hidden]{display:none}
