@@ -62,6 +62,7 @@ const MY_EXAMPLE=['jalen-hurts','dak-prescott','bryce-young','zach-charbonnet','
 /* ===== State ===== */
 const KEY='trademetric-v1';
 let S;try{S=JSON.parse(localStorage.getItem(KEY))}catch(e){S=null}
+const SAVED0=(S&&S.savedAt)||0;   /* when the cached copy was last saved, before this visit touched it */
 /* ===== Account data =====
    Everything the site remembers about you beyond your leagues (news history, alerts you've seen, the Feed filter, the
    stat columns you picked, light or dark) lives in S.acct. S is saved to your account, so every device you sign in on
@@ -2093,7 +2094,7 @@ function adoptState(st){S=st;setPool();SCHED=null;LIVE_LU=null;acctApply();recom
 var CLOUD_LS='tm-cloud';
 function cloudMeta(){try{return JSON.parse(lsGet(CLOUD_LS)||'null')||{}}catch(e){return {}}}
 function cloudMark(){if(USER)lsSet(CLOUD_LS,JSON.stringify({uid:USER.id,rev:CLOUD.rev,dirty:!!CLOUD.dirty}))}
-function cloudReset(){clearTimeout(CLOUD.timer);CLOUD.rev=null;CLOUD.ready=false;CLOUD.dirty=false;CLOUD.conflict=false}
+function cloudReset(){clearTimeout(CLOUD.timer);CLOUD.loose=false;CLOUD.lostN=0;CLOUD.rev=null;CLOUD.ready=false;CLOUD.dirty=false;CLOUD.conflict=false}
 async function cloudPull(why){if(!SB||!USER||CLOUD.pulling)return;CLOUD.pulling=true;const uid=USER.id;
   try{const {data,error}=await SB.from('user_state').select('state,updated_at').eq('user_id',uid).maybeSingle();
     if(!USER||USER.id!==uid)return;
@@ -2101,7 +2102,11 @@ async function cloudPull(why){if(!SB||!USER||CLOUD.pulling)return;CLOUD.pulling=
     const cs=data&&data.state,rev=data&&data.updated_at?Date.parse(data.updated_at):null,meta=cloudMeta(),other=!!(S.owner&&S.owner!==uid);
     const sameCache=!other&&S.owner===uid&&meta.uid===uid&&meta.rev===rev;
     if(cs&&cs.league&&cs.teams){
-      if(sameCache&&meta.dirty&&!CLOUD.conflict){CLOUD.rev=rev;CLOUD.ready=true;CLOUD.dirty=true;await cloudPush()}   /* unsent changes, nothing newer on the server */
+      /* the first time this browser runs this build it has no record of which server version it holds, so the old rule
+         applies once: if its copy was saved later than the server's, it is the newer one */
+      const firstRun=meta.rev==null&&!CLOUD.ready&&!other&&S.owner===uid&&!CLOUD.conflict&&SAVED0>(cs.savedAt||0);
+      if(firstRun){acctMerge(S,cs.acct);CLOUD.rev=rev;CLOUD.ready=true;CLOUD.dirty=true;await cloudPush()}
+      else if(sameCache&&meta.dirty&&!CLOUD.conflict){CLOUD.rev=rev;CLOUD.ready=true;CLOUD.dirty=true;await cloudPush()}   /* unsent changes, nothing newer on the server */
       else if(sameCache&&!CLOUD.conflict){CLOUD.rev=rev;CLOUD.ready=true;if(CLOUD.dirty)cloudSave()}                 /* this browser already has that exact copy */
       else{const loc=S;let merged=false;
         if(!other){
@@ -2120,10 +2125,15 @@ async function cloudPull(why){if(!SB||!USER||CLOUD.pulling)return;CLOUD.pulling=
   finally{CLOUD.pulling=false;CLOUD.conflict=false}}
 async function cloudPush(){if(!SB||!USER||!CLOUD.ready)return;if(CLOUD.busy){CLOUD.again=true;return}
   S.owner=USER.id;CLOUD.busy=true;const uid=USER.id,now=Date.now(),at=new Date(now).toISOString();let error=null,lost=false;
-  try{if(CLOUD.rev){const r=await SB.from('user_state').update({state:S,updated_at:at}).eq('user_id',uid).eq('updated_at',new Date(CLOUD.rev).toISOString()).select('updated_at');error=r.error;lost=!error&&!(r.data&&r.data.length)}
+  try{if(CLOUD.rev&&!CLOUD.loose){const r=await SB.from('user_state').update({state:S,updated_at:at}).eq('user_id',uid).eq('updated_at',new Date(CLOUD.rev).toISOString()).select('updated_at');error=r.error;lost=!error&&!(r.data&&r.data.length)
+      /* "lost" has to mean someone else saved. If the server's version is still the one this device has (a timestamp
+         the check can't match exactly), or this keeps happening, save without the check for the rest of the visit. */
+      if(lost){const c=await SB.from('user_state').select('updated_at').eq('user_id',uid).maybeSingle();
+        if(!c.error&&(!c.data||Date.parse(c.data.updated_at)===CLOUD.rev||(CLOUD.lostN=(CLOUD.lostN||0)+1)>3)){CLOUD.loose=true;lost=false;const r2=await SB.from('user_state').upsert({user_id:uid,state:S,updated_at:at});error=r2.error}}}
     else{const r=await SB.from('user_state').upsert({user_id:uid,state:S,updated_at:at});error=r.error}}catch(e){error={message:String(e&&e.message||e)}}
   CLOUD.busy=false;if(!USER||USER.id!==uid)return;
   if(lost){CLOUD.conflict=true;await cloudPull('conflict');return}
+  if(!error)CLOUD.lostN=0;
   CLOUD.err=error?error.message:null;if(!error){CLOUD.rev=now;CLOUD.last=now;CLOUD.dirty=!!CLOUD.again}
   cloudMark();acctUI();if(CLOUD.again){CLOUD.again=false;cloudSave()}}
 function cloudSave(){if(!SB||!USER)return;if(!CLOUD.dirty){CLOUD.dirty=true;cloudMark()}if(!CLOUD.ready)return;clearTimeout(CLOUD.timer);CLOUD.timer=setTimeout(cloudPush,1500)}
