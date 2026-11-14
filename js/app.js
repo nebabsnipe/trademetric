@@ -1265,7 +1265,7 @@ function balanceHtml(fr,them,compact){const pos=Math.max(4,Math.min(96,(1-fr.sha
 /* starting lineup, week by week: your lineup's points in every rated week, now against after the deal, from the same weekly
    lineups as the Lineup change tile. The gap between the lines is shaded (green gained, red lost); playoff weeks are boxed. */
 function weekChart(imp,get){const R=imp.rows;if(!R.length)return '';const n=R.length,PO=poWeeks(),d=imp.lpA-imp.lpB,c=Math.abs(d)<.05?'':d>0?'up':'down';
-  const B=R.map(r=>r.b.pts),A=R.map(r=>r.a.pts),all=B.concat(A),mn=Math.min(...all),mx=Math.max(...all),pad=Math.max(1.5,(mx-mn)*.2),lo=mn-pad,hi=mx+pad;
+  const B=R.map(r=>r.b.pts),A=R.map(r=>r.a.pts),all=B.concat(A),mn=Math.min(...all),mx=Math.max(...all),pad=Math.max(.6,(mx-mn)*.06),lo=mn-pad,hi=mx+pad;
   const X=i=>(i+.5)/n*100,Y=v=>(hi-v)/(hi-lo)*100,pt=(i,v)=>`${X(i).toFixed(2)},${Y(v).toFixed(2)}`;
   let fill='';for(let i=0;i<n-1;i++){const d0=A[i]-B[i],d1=A[i+1]-B[i+1];
     if(d0*d1<0){const t=d0/(d0-d1),xc=`${(X(i)+t*(X(i+1)-X(i))).toFixed(2)},${Y(B[i]+t*(B[i+1]-B[i])).toFixed(2)}`;
