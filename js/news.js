@@ -455,9 +455,18 @@ function tmnArtPlayers(Ls){const m=new Map();Ls.forEach(c=>c.roster.forEach(id=>
 async function tmnLoadArt(Ls){const L=tmnArtPlayers(Ls);if(!L.length||TMN.artBusy)return;
   const q=L.map(x=>{const p=byId[x.id];return [p.n,p.t,p.pos,x.inj?'i':''].join('|')}).join(';');
   if(TMN.art&&TMN.art.key===q&&Date.now()-TMN.art.at<10*60e3)return;TMN.artBusy=true;
+  let ok=false;
   try{const r=await fetch('/api/news?feed='+encodeURIComponent(q)+'&b='+Math.floor(Date.now()/600000));const j=r.ok?await r.json():null;
-    if(j&&Array.isArray(j.items)){TMN.art={key:q,at:Date.now(),items:j.items};try{localStorage.setItem(TMN_ART_LS,JSON.stringify(TMN.art))}catch(e){}}}catch(e){}
-  TMN.artBusy=false;if(tab==='news')tmnRenderBody()}
+    if(j&&Array.isArray(j.items)){ok=true;TMN.art={key:q,at:Date.now(),items:j.items};try{localStorage.setItem(TMN_ART_LS,JSON.stringify(TMN.art))}catch(e){}}
+    else tmnFail('art','status '+r.status)}catch(e){tmnFail('art',e)}
+  TMN.artBusy=false;tmnLoadState('art',ok);if(tab==='news')tmnRenderBody()}
+/* a news load that failed: noted for the problem report (diagReport in app.js), retried in a minute instead of ten,
+   and shown on the page, so an empty Feed never looks like "nothing happened" */
+TMN.fail={};
+function tmnFail(what,e){TMN.fail[what]={at:Date.now(),why:String(e&&e.message||e).slice(0,160)};if(typeof diagNote==='function')diagNote('news:'+what,TMN.fail[what].why)}
+function tmnLoadState(what,ok){if(ok){delete TMN.fail[what];return}
+  if(what==='lg'&&TMN.lgn)TMN.lgn.at=Date.now()-9*60e3;if(what==='art'&&TMN.art)TMN.art.at=Date.now()-9*60e3;
+  clearTimeout(TMN['retry_'+what]);TMN['retry_'+what]=setTimeout(()=>{if(tab==='news')tmnRender()},65e3)}
 /* ---------- same story, different outlet ----------
    Two headlines are the same story when most of their meaningful words match (the player's name and filler words
    don't count). Also compares the AI recap titles, since two outlets' different headlines often recap the same way.
@@ -594,7 +603,8 @@ function tmnRenderBody(Ls){const el=$('tmn-feed');if(!el)return;Ls=Ls||tmnLeague
     const tp=[...tops].sort((a,b)=>(b.overall-a.overall)||(b.pts-a.pts));
     html=(tp.length?`<div class="tmn-tops">${tmnTopCard(tp[0])}${tp.length>1?`<div class="tmn-tops-more">${tp.slice(1).map(tmnTopMini).join('')}</div>`:''}</div>`:'')+tl(all,act)
       +(cut&&!all.length&&!tops.length&&all0.length?`<div class="card tmn-empty"><h2>${sh.mine?'Nothing about your team yet':'No league news right now'}</h2><p class="note">${sh.mine?'League news is switched off. Turn <b>League</b> back on in the rail to see trades, signings and injuries around the league.':'Your team is switched off. Turn <b>Yours</b> back on in the rail to see your players.'}</p></div>`:'')
-      +(!picked.length&&TMN.artBusy?'<p class="note tmn-loading"><span class="spin"></span> Pulling the latest on your players…</p>':'')}
+      +(!picked.length&&TMN.artBusy?'<p class="note tmn-loading"><span class="spin"></span> Pulling the latest on your players…</p>':'')
+      +(act&&(TMN.fail.lg||TMN.fail.art)&&!(TMN.lgn&&TMN.lgn.items.length&&TMN.art)?'<p class="note tmn-loading">Some news didn\'t load. Trying again in a minute.</p>':'')}
   const empty={all:['Nothing yet this week','Everything about your team lands here as it happens, plus the trades, signings and big injuries around the league that move fantasy value.'],
     team:['Nothing yet this week','Big plays, injury news, role changes and results for your players show up here as they happen, from outlets all over the web.'],
     inj:['Everyone is healthy','Any player on your rosters who gets hurt shows up here right away, with every status change, the latest news on him, and who picks up his work.'],
@@ -625,7 +635,9 @@ function tmnGroups(evs){const out=[],today=new Date().toDateString(),yest=new Da
 function tmnClock(t){return t?new Date(t).toLocaleTimeString([], {hour:'numeric',minute:'2-digit'}).replace(/\s?([AP])M$/i,(m,x)=>x.toLowerCase()+'m'):''}
 /* the rail: one quiet time per card. Inside the last hour it reads "12m ago", after that the clock time; the full date is the tooltip */
 function tmnTime(t){if(!t)return '';const m=(Date.now()-t)/60e3;return m<1?'now':m<60?Math.round(m)+'m ago':tmnClock(t)}
-const tmnRail=t=>`<div class="tmn-ev-rail"><time datetime="${t?new Date(t).toISOString():''}" title="${t?esc(new Date(t).toLocaleString([], {weekday:'long',month:'short',day:'numeric',hour:'numeric',minute:'2-digit'})):''}">${tmnTime(t)}</time></div>`;
+/* day: the source only gave a date (the nightly trade list), so show the day, never a made-up time */
+const tmnRail=(t,day)=>day?`<div class="tmn-ev-rail"><time datetime="${t?new Date(t).toISOString().slice(0,10):''}" title="${t?esc(new Date(t).toLocaleDateString([], {weekday:'long',month:'short',day:'numeric'})):''}">${t?(new Date(t).toDateString()===new Date().toDateString()?'Today':new Date(t).toLocaleDateString([], {weekday:'short'})):''}</time></div>`
+  :`<div class="tmn-ev-rail"><time datetime="${t?new Date(t).toISOString():''}" title="${t?esc(new Date(t).toLocaleString([], {weekday:'long',month:'short',day:'numeric',hour:'numeric',minute:'2-digit'})):''}">${tmnTime(t)}</time></div>`;
 const tmnMulti=()=>!!(S.leagues&&S.leagues.length>1);
 function tmnEvCard(e,clip,old){const [lbl,tone]=TMN_LBL[e.cls]||['News','accent'],p=e.pid&&byId[e.pid];
   const lg=(e.leagues||[]).filter(l=>tmnMulti()||l.bench||l.their||l.wp1!=null).map(l=>{const d=l.wp0!=null&&l.wp1!=null&&!l.bench?Math.round((l.wp1-l.wp0)*100):null;
@@ -673,9 +685,11 @@ async function tmnLoadRecaps(list){const R=tmnRecaps();TMN.rcTried=TMN.rcTried||
 const TMN_LG_LS='tm-news-league-v1';
 try{const c=JSON.parse(localStorage.getItem(TMN_LG_LS)||'null');if(c&&c.items&&Date.now()-c.at<12*3600e3)TMN.lgn={...c,at:c.at-10*60e3}}catch(e){}
 async function tmnLoadLeague(){if(TMN.lgBusy||(TMN.lgn&&Date.now()-TMN.lgn.at<10*60e3))return;TMN.lgBusy=true;
+  let ok=false;
   try{const r=await fetch('/api/news?league=1&b='+Math.floor(Date.now()/600000));const j=r.ok?await r.json():null;
-    if(j&&Array.isArray(j.items)){TMN.lgn={at:Date.now(),items:j.items};try{localStorage.setItem(TMN_LG_LS,JSON.stringify(TMN.lgn))}catch(e){}}}catch(e){}
-  TMN.lgBusy=false;if(tab==='news'&&(TMN.f==='all'||TMN.f==='team')&&$('tmn-feed'))tmnRenderBody()}
+    if(j&&Array.isArray(j.items)){ok=true;TMN.lgn={at:Date.now(),items:j.items};try{localStorage.setItem(TMN_LG_LS,JSON.stringify(TMN.lgn))}catch(e){}}
+    else tmnFail('lg','status '+r.status)}catch(e){tmnFail('lg',e)}
+  TMN.lgBusy=false;tmnLoadState('lg',ok);if(tab==='news'&&(TMN.f==='all'||TMN.f==='team')&&$('tmn-feed'))tmnRenderBody()}
 const TMN_LGK={trade:['Trade','accent'],inj:['Injury','bad'],move:['Roster move','muted'],role:['Depth chart','warn']};
 function tmnLeagueNews(Ls,picked){const raw=TMN.lgn&&TMN.lgn.items;if(!raw||!raw.length)return [];
   const rk=id=>(typeof V!=='undefined'&&V&&V.rank&&V.rank[id])||999;
@@ -708,13 +722,13 @@ async function tmnLoadTradeArts(list){const need=list.filter(x=>!x.url&&!(TMN.tr
   TMN.traBusy=false;if(!got){TMN.traFail=Date.now();return}if(tab==='news'&&$('tmn-feed'))tmnRenderBody()}
 function tmnTrades(Ls,lg){const rk=id=>(typeof V!=='undefined'&&V&&V.rank&&V.rank[id])||999,mine=new Set();Ls.forEach(c=>c.roster.forEach(id=>mine.add(id)));
   const cut=Date.now()-14*864e5,by={},D=window.NFL_DATA;
-  ((D&&D.moves)||[]).forEach(([id,from,to,day])=>{const p=byId[id],at=Date.parse(day+'T12:00:00');if(!p||rk(id)>TMN_TRADE_TOP||!at||at<cut)return;by[id]={from,to,at}});
-  (lg||[]).filter(x=>x.kind==='trade').forEach(x=>{const m=by[x.pid]||(by[x.pid]={from:'',to:byId[x.pid].t,at:x.at});if(!m.url||(m.pay&&!x.pay)){m.url=x.url;m.title=x.title;m.desc=x.desc;m.outlet=x.outlet;m.img=x.img;m.pay=!!x.pay;m.at=Math.min(m.at,x.at)}});
+  ((D&&D.moves)||[]).forEach(([id,from,to,day])=>{const p=byId[id],at=Date.parse(day+'T12:00:00');if(!p||rk(id)>TMN_TRADE_TOP||!at||at<cut)return;by[id]={from,to,at,day:true}});
+  (lg||[]).filter(x=>x.kind==='trade').forEach(x=>{const m=by[x.pid]||(by[x.pid]={from:'',to:byId[x.pid].t,at:x.at});if(!m.url||(m.pay&&!x.pay)){m.url=x.url;m.title=x.title;m.desc=x.desc;m.outlet=x.outlet;m.img=x.img;m.pay=!!x.pay;m.at=Math.min(m.at,x.at);m.day=false}});
   const out=Object.entries(by).map(([pid,m])=>{let a=m.url?null:TMN.tra&&TMN.tra.items&&TMN.tra.items[pid]&&TMN.tra.items[pid].a;
     if(a&&Date.parse(a.at||0)<m.at-5*864e5)a=null;    /* a story from long before the move is about something else */
     const how=m.url||(a&&/\btrade[ds]?\b|\bdealt\b|\bacquire/i.test((a.title||'')+' '+(a.desc||'')))?'trade':'move';
-    const x={type:'trade',kind:'trade',how,k:'tr:'+pid,pid,from:m.from,to:m.to||byId[pid].t,yours:mine.has(pid),at:m.at,leagues:[],url:m.url||(a&&a.url)||'',title:m.title||(a&&a.title)||'',desc:m.desc||(a&&a.desc)||'',outlet:m.outlet||(a&&a.outlet)||'',img:m.img||(a&&a.img)||null,pay:m.url?!!m.pay:!!(a&&a.pay)};
-    if(a&&a.at){const t=Date.parse(a.at);if(t&&t<x.at)x.at=t}return x}).sort((a,b)=>b.at-a.at).slice(0,20);
+    const x={type:'trade',kind:'trade',how,k:'tr:'+pid,pid,from:m.from,to:m.to||byId[pid].t,yours:mine.has(pid),at:m.at,day:!!m.day,leagues:[],url:m.url||(a&&a.url)||'',title:m.title||(a&&a.title)||'',desc:m.desc||(a&&a.desc)||'',outlet:m.outlet||(a&&a.outlet)||'',img:m.img||(a&&a.img)||null,pay:m.url?!!m.pay:!!(a&&a.pay)};
+    if(a&&a.at){const t=Date.parse(a.at);if(t){if(t<x.at)x.at=t;x.day=false}}return x}).sort((a,b)=>b.at-a.at).slice(0,20);
   tmnLoadTradeArts(out);return out}
 /* a story's title, always about the player on the card: when the headline doesn't name him, lead with his name */
 function tmnTitleFor(p,t){if(!p||!t)return t||'';const last=norm(p.n).split(' ').filter(w=>w.length>1).pop()||'';return last&&wordIn(normT(t),last)?t:`${p.n}: ${t}`}
@@ -731,7 +745,7 @@ function tmnStoryShell({x,p,cls,tone,lbl,right,body,link,pay,vid}){
   const more=tmnMore(x);if(more&&link&&!pay){body=body.replace(/<h3>([\s\S]*?)<\/h3>/,`<h3><a class="tmn-hl" href="${esc(x.url)}" target="_blank" rel="noopener">$1</a></h3>`);link=false}
   const open=link&&!pay?`<a class="tmn-ev tmn-story ${cls} tone-${tone}" href="${esc(x.url)}" target="_blank" rel="noopener" data-nkf="${esc(x.k||'')}" title="${esc(x.title||'')}">`
     :`<article class="tmn-ev tmn-story ${cls} tone-${tone} tap${pay?' pay':''}" data-ncard="${p.id}" data-nkf="${esc(x.k||'')}" tabindex="0">`;
-  return `${open}${tmnRail(x.at)}
+  return `${open}${tmnRail(x.at,x.day)}
     <div class="tmn-ev-card"><div class="tmn-ev-top"><span class="tmn-kick"><span class="tmn-lbl ${tone}">${lbl}</span>${src?`<span class="tmn-src">${src}${link&&!pay?' <i aria-hidden="true">↗</i>':''}</span>`:''}</span>${right||''}</div>
       <div class="tmn-ev-main"><div class="tmn-b-av">${av(p)}</div><div class="tmn-ev-txt">${body}${more}</div>
         ${x.img?`<span class="tmn-sthumb${vid?' vid':''}"><img src="${esc(x.img)}" alt="" loading="lazy" decoding="async" onerror="this.parentNode.remove()">${vid?'<span class="vplay" aria-hidden="true"></span>':''}</span>`:''}</div></div>${link&&!pay?'</a>':'</article>'}`}

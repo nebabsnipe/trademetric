@@ -118,3 +118,6 @@ export async function archiveMerge(key, fresh, { days = 7, max = 400, same } = {
   if (items.length !== had.size || items.some(x => !had.has(x.url))) await kvPut(key, { items });
   return items;
 }
+
+/* ---- problem reports from visitors' browsers (api/report.js) ---- */
+export async function reportPut(row) { if (KEY) await rest('client_reports', { method: 'POST', body: row, prefer: 'return=minimal' }); }

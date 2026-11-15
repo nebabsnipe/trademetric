@@ -2564,6 +2564,38 @@ document.addEventListener('click',e=>{const t=e.target;if(!t.closest)return;cons
 if(!S.leagues||!S.leagues.length){S.leagueKey=leagueKeyOf();upsertLeague();save()}else if(!S.leagueKey)S.leagueKey=leagueKeyOf();
 leagueSwitcher();
 
+/* ===== Problem reports =====
+   What breaks on other people's computers never shows on the owner's, whose browser has days of saved copies of
+   everything. So the page notes what fails here (script errors, server requests that fail or time out, news that didn't
+   load) and sends a short technical report to /api/report: right away when something failed, and otherwise once a day,
+   or when the Feed looks thin. Never league contents, emails or passwords. */
+var DIAG={id:Math.random().toString(36).slice(2,10),notes:[],upto:0,sent:0,timer:null};
+const diagFetch=window.fetch.bind(window);
+function diagPath(u){try{const x=new URL(u,location.href);return (x.host===location.host?'':x.host)+x.pathname+(x.search?'?'+[...x.searchParams.keys()].filter(k=>k!=='b'&&k!=='apikey').join('&'):'')}catch(e){return String(u).slice(0,60)}}
+function diagNote(kind,msg){if(DIAG.notes.length>=40)return;DIAG.notes.push({k:String(kind).slice(0,40),m:String(msg&&msg.message||msg||'').slice(0,300),t:Math.round(performance.now()/1000)});diagSoon(5000)}
+addEventListener('error',e=>{if(e&&e.message)diagNote('error',e.message+' @'+String(e.filename||'').split('/').pop()+':'+(e.lineno||''))});
+addEventListener('unhandledrejection',e=>diagNote('reject',e&&e.reason));
+window.fetch=async function(u,o){const url=String(u&&u.url||u);if(!/^\/api\/|supabase\.co\/(rest|auth)/.test(url.replace(location.origin,'')))return diagFetch(u,o);const t0=performance.now();
+  try{const r=await diagFetch(u,o);if(!r.ok&&r.status!==406)diagNote('http',r.status+' '+diagPath(url)+' '+Math.round(performance.now()-t0)+'ms');return r}
+  catch(e){if(!(e&&e.name==='AbortError'))diagNote('net',diagPath(url)+' '+(e&&e.message||e)+' '+Math.round(performance.now()-t0)+'ms');throw e}};
+function diagSnap(){const o={host:location.host,tab:typeof tab!=='undefined'?tab:null,w:innerWidth,ua:navigator.userAgent.slice(0,220),tz:(()=>{try{return Intl.DateTimeFormat().resolvedOptions().timeZone}catch(e){return null}})(),online:navigator.onLine};
+  try{o.build=buildSig(document.documentElement.outerHTML)}catch(e){}
+  try{o.signedIn=!!USER;o.week=WEEK;o.example=!!(S&&S.example);o.leagues=(S&&S.leagues||[]).map(l=>((l.snap&&l.snap.real&&l.snap.real.src&&l.snap.real.src.type)||'custom')+(l.key===S.leagueKey?'*':''));
+    o.cloud={ready:!!CLOUD.ready,dirty:!!CLOUD.dirty,err:CLOUD.err||null};o.ls=Object.keys(localStorage).length}catch(e){}
+  try{if(typeof STATUS!=='undefined')o.status={src:STATUS.src,live:!!STATUS.live}}catch(e){}
+  try{if(typeof TMN!=='undefined')o.news={f:TMN.f,items:TMN.items.length,lgn:TMN.lgn?TMN.lgn.items.length:null,lgnMin:TMN.lgn?Math.round((Date.now()-TMN.lgn.at)/60e3):null,art:TMN.art?TMN.art.items.length:null,
+    fail:TMN.fail||{},show:tmnFilt(),cards:document.querySelectorAll('#tmn-feed .tmn-tl > li:not(.tmn-day)').length}}catch(e){}
+  return o}
+function diagSoon(ms){clearTimeout(DIAG.timer);DIAG.timer=setTimeout(()=>diagSend(),Math.max(ms,DIAG.sent?20e3:0))}
+async function diagSend(force){if(DIAG.sent>=5)return;const fresh=DIAG.notes.slice(DIAG.upto);let last=0;try{last=+localStorage.getItem('tm-diag-at')||0}catch(e){}
+  const snap=diagSnap(),thin=snap.tab==='news'&&snap.news&&snap.news.f==='all'&&snap.news.cards<8;
+  if(!force&&!fresh.length&&!thin&&Date.now()-last<864e5)return;
+  DIAG.upto=DIAG.notes.length;DIAG.sent++;try{localStorage.setItem('tm-diag-at',String(Date.now()))}catch(e){}
+  try{await diagFetch('/api/report',{method:'POST',headers:{'content-type':'application/json'},keepalive:true,
+    body:JSON.stringify({sid:DIAG.id,uid:USER?USER.id:null,user:PROFILE&&PROFILE.username||null,snap,notes:fresh})})}catch(e){}}
+setTimeout(()=>diagSend(),30e3);
+addEventListener('hashchange',()=>{if(location.hash==='#news'&&!DIAG.newsT)DIAG.newsT=setTimeout(()=>diagSend(),25e3)});
+
 /* ===== Always the latest build =====
    index.html is never cached (vercel.json), so opening the site always gets the newest page. This covers a tab or a
    phone's home-screen copy that was simply left open: when it comes back to the front it re-reads the page's version
