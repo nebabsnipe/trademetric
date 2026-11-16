@@ -39,7 +39,7 @@ const SEASON_OVER = /season[- ]ending|out for the (?:rest of the |remainder of t
 /* ESPN injury notes (Rotowire-style), with practice participation through the week */
 let noteCache = { at: 0, data: null };
 async function notes() {
-  if (noteCache.data && Date.now() - noteCache.at < 5 * 60e3) return noteCache.data;
+  if (noteCache.data && Date.now() - noteCache.at < 60e3) return noteCache.data;
   const d = await j('https://site.api.espn.com/apis/site/v2/sports/football/nfl/injuries');
   const out = [];
   for (const t of d.injuries || []) for (const x of t.injuries || []) {
@@ -150,9 +150,9 @@ export default async function handler(req, res) {
     }
     const live = Object.values(games).some(g => g.state === 'in');
     const injLog = await injuryLog(inj, note);
-    // The page adds a time bucket to the URL (&b=...): 15 seconds while games are on, 2 minutes otherwise,
+    // The page adds a time bucket to the URL (&b=...): 15 seconds while games are on, 1 minute otherwise,
     // so a cached copy is never older than that and every visitor shares the same copy.
-    res.setHeader('Cache-Control', `public, max-age=0, s-maxage=${live ? 15 : 120}`);
+    res.setHeader('Cache-Control', `public, max-age=0, s-maxage=${live ? 15 : 60}`);
     return res.status(200).json({ season, week, nflWeek: state.week, updated: new Date().toISOString(), live, games, players, injuries: inj, injAll: !!inj, notes: note, ...(injLog ? { injLog } : {}) });
   } catch (e) {
     res.setHeader('Cache-Control', 'public, s-maxage=60');
