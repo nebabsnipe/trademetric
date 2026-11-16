@@ -1684,6 +1684,15 @@ function renderOppCard(){const el=$('opp-card');if(!el)return;
   const show=[...list.filter(p=>OWN[p.id]===S.me),...list.filter(p=>!OWN[p.id])].slice(0,6);
   el.innerHTML=`<div class="card-h"><h2>Injury opportunities</h2><span class="note">Players gaining work from teammate injuries</span></div>`+(show.length?show.map(p=>`<div class="mini-row">${plCell(p,`${roleTag(p.id)?roleTag(p.id)+' ':''}${oppTxtLine(G[p.id].opp[0])}`)}${OWN[p.id]===S.me?'<span class="tag mine">Yours</span>':'<span class="gain">Pickup</span>'}${OWN[p.id]?'<span></span>':`<button class="btn small" data-assign-me="${p.id}">Add</button>`}</div>`).join('')
    :`<p class="empty" style="margin:0">Nothing here yet. Backups who gain work from injuries show up here.</p>`)}
+/* matchup header status: Live while games are on, else the next kickoff for a starter in this matchup, else when scores last updated */
+function muStatus(A,Bm){if(!LIVE||LIVE.week!==WEEK||!LIVE.games)return '';
+  const gs=[...new Set([...A.lu.slots,...Bm.lu.slots].filter(x=>x.p).map(x=>x.p.t))].map(t=>LIVE.games[t]).filter(Boolean);
+  if(gs.some(g=>g.state==='in'))return `<span class="note"><span class="live-dot on"></span>Live</span>`;
+  const nx=gs.filter(g=>g.state==='pre'&&g.start&&Date.parse(g.start)>Date.now()).map(g=>Date.parse(g.start)).sort((a,b)=>a-b)[0];
+  if(nx){const d=new Date(nx),soon=nx-Date.now()<864e5&&d.toDateString()===new Date().toDateString();
+    return `<span class="note">Next kickoff ${soon?'today '+d.toLocaleTimeString([], {hour:'numeric',minute:'2-digit'}):d.toLocaleString([], {weekday:'short',hour:'numeric',minute:'2-digit'})}</span>`}
+  if(Object.values(LIVE.games).some(g=>g.state!=='pre'))return `<span class="note"><span class="live-dot"></span>Updated ${new Date(LIVE.updated).toLocaleTimeString([], {hour:'numeric',minute:'2-digit'})}</span>`;
+  return ''}
 function renderMatchup(){const el=$('matchup');const oid=oppOf(S.me,WEEK);
   if(!oid){el.innerHTML=`<div class="card-h"><h2>Week ${WEEK} matchup</h2></div><p class="empty">No opponent this week.</p>`;return}
   const me=myTeam(),O=teamById(oid),A=weekLine(me.players,WEEK,S.me),Bm=weekLine(O.players,WEEK,oid),pw=lineP(A,Bm,WEEK),f=pickVal(WEEK);
@@ -1692,7 +1701,7 @@ function renderMatchup(){const el=$('matchup');const oid=oppOf(S.me,WEEK);
   const nSlots=A.lu.slots.length,rows=A.lu.slots.map((x,i)=>{const o=Bm.lu.slots[i],a=x.p?f(x.p.id):0,b=o&&o.p?f(o.p.id):0;
     const sub=id=>liveOf(id)?`${byId[id].pos} · ${liveTxt(id)} ${f1(liveOf(id).pts)} pts`:`${byId[id].pos} · ${oppHtml(id)}`;
     return `<tr${i>=MU_PEEK?' class="mu-more"':''}><td>${x.p?plCell(x.p,sub(x.p.id)):'<span class="empty">Empty</span>'}</td>${cell(x.p&&x.p.id,a,a>=b,'r')}<td class="mu-slot">${x.label}</td>${cell(o&&o.p&&o.p.id,b,b>a,'')}<td>${o&&o.p?plCell(o.p,sub(o.p.id)):'<span class="empty">Empty</span>'}</td></tr>`}).join('');
-  el.innerHTML=`<div class="card-h"><h2>Week ${WEEK} matchup</h2>${LIVE&&LIVE.week===WEEK&&Object.values(LIVE.games).some(g=>g.state!=='pre')?`<span class="note"><span class="live-dot${LIVE.live?' on':''}"></span>${LIVE.live?'Live':'Updated '+new Date(LIVE.updated).toLocaleTimeString([], {hour:'numeric',minute:'2-digit'})}</span>`:''}</div>
+  el.innerHTML=`<div class="card-h"><h2>Week ${WEEK} matchup</h2>${muStatus(A,Bm)}</div>
    <div class="mu-head"><div class="mu-team"><span class="mu-name"><i class="tsq" style="background:${teamColor(S.me)}"></i>${esc(me.name)}</span><span class="note">${recTxt(S.me)}</span><b class="num">${f1(anyLive?aA:A.m)}</b>${anyLive?`<span class="mu-proj">proj ${f1(A.m)}</span>`:''}</div>
     <div class="mu-mid"><div class="mu-pct">${wpPct(pw)}</div><div class="note">chance you win</div></div>
     <div class="mu-team r"><span class="mu-name"><i class="tsq" style="background:${teamColor(oid)}"></i>${esc(O.name)}</span><span class="note">${recTxt(oid)}</span><b class="num">${f1(anyLive?aB:Bm.m)}</b>${anyLive?`<span class="mu-proj">proj ${f1(Bm.m)}</span>`:''}</div></div>
