@@ -70,12 +70,10 @@ All of it lives in `js/polish.js` (loaded last, never changes app.js logic) with
 - **Round 2:** alerts popup items and News cards arrive one after another (Magic UI "Animated List", only when the popup opens or the tab is first shown, not on every refresh); the Live dot ripples (iconiq "Status Dot"); confetti bursts out of a "clinched" banner (Magic UI "Confetti", own small canvas, no library); the toast gets a green check or amber "!" icon and slides up (cnippet "Toast").
 - Not used: the Colorful-Pricing section (owner decided to keep the current pricing grid). A win-chance ring on the matchup (Magic UI "Animated Circular Progress Bar") shipped briefly and was removed the same day at the owner's request.
 
-## Theme refresh test (added 2026-11-16, `theme-refresh` branch only, not on main)
-Owner picked the "Terrel Sportswear" palette from 21st.dev themes. Test branch to judge the look before deciding.
-- **Colors:** near-black text, off-white cards on a white page (light) / #111 page with #1A1A1A cards (dark), one red accent (#D93636 light, #E35353 dark), 2px corners. Loss/"bad" color moved to a pink-red (#C2185B / #F06292) so it never looks like the accent. The orange logo image and the orange #1 news alert were left as they are.
-- **Spacing:** 4px grid (`--s1`..`--s8`), 20px card padding and gaps on desktop; phone layout keeps its own spacing.
-- **My Team tiles:** mono numbers; projection tile shows a change badge (this week vs. league average) and a small line of projected points for this week and the next four; playoff-odds tile has a thin meter; weakest-spot tile shows its gap as a badge.
-- **Matchup:** big scores, win chance in a boxed badge, dot-grid wash behind the scores, thinner bar. Peek / "see all positions" unchanged.
-- **Season Sim:** stats as joined bento cells, flat bars, your row marked with a red edge.
-- **Trade week chart:** flat bars, light guide lines, playoffs as a shaded band instead of a dashed box.
-- References used from 21st.dev: progress-metric-card (matchup), analytics-bento (Season Sim), advanced-stats (chart style). The dashboard-02 and efferd dashboard-2 references could not be found on 21st.dev; standard KPI-tile and 4px-spacing patterns were used instead.
+## Scoreboard restyle test (added 2026-11-16, `theme-refresh` branch only, not on main)
+Owner tried a quieter red "Terrel" palette first and turned it down: the site should stay as aggressive as it is, and stay orange. This version keeps the original orange colors and pushes the bold look further.
+- **My Team tiles:** big slanted numbers; the projection tile is a solid orange block with a change badge (this week vs. league average) and a line of projected points for this week and the next four; playoff odds gets a thick meter; weakest spot shows its gap as a solid badge.
+- **Matchup:** orange top edge, bigger scores, win chance in a slanted orange block, thick slanted score bar. Peek / "see all positions" unchanged.
+- **Season Sim:** bigger dial and headline, stats as solid black blocks (white in dark mode), thick bars, your row with an orange edge.
+- **Trade week chart:** wide bars, bold slanted labels, thick zero line, playoffs as an orange band.
+- References from 21st.dev: progress-metric-card (matchup), analytics-bento (Season Sim), advanced-stats (chart). dashboard-02 and efferd dashboard-2 could not be found there.
