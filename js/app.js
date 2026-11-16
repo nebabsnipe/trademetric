@@ -403,7 +403,8 @@ async function loadProj(){clearTimeout(PROJ_TIMER);
 function platHtml(g){const x=g.plat;if(!x||!g.next)return '';const it=[x.espn!=null?`ESPN <b>${f1(x.espn)}</b>`:'',x.sleeper!=null?`Sleeper <b>${f1(x.sleeper)}</b>`:'',`TradeMetric <b>${f1(x.ours)}</b>`].filter(Boolean).join(' · ');
   return `<p class="plat-line"><span class="lab2">Week ${WEEK} projection ${f1(g.projNext)}</span>${it}<em>${x.plat===0?'ESPN and Sleeper both project zero, which usually means he is ruled out or not expected to play. Check his news below.':'90% ESPN and Sleeper, 10% TradeMetric, in your league\'s scoring'}</em></p>`}
 /* ===== Live game-day data (/api/live) ===== */
-let LIVE=null,LIVEST={},LIVE_TIMER=null;
+/* while a game is on (or one kicks off within 30 minutes) scores refresh every 15 seconds, otherwise every 5 minutes */
+let LIVE=null,LIVEST={},LIVE_TIMER=null,LIVE_FAST=false;
 function applyLive(){
   if(!LIVE||LIVE.week!==WEEK)return;const sc=S.league.sc;
   POOL.forEach(p=>{const gm=LIVE.games[p.t],g=G[p.id];if(!gm||!g||gm.state==='pre')return;const st=LIVEST[p.id];
@@ -458,9 +459,9 @@ function checkRollover(){if(!LIVE||LIVE.week!==WEEK||WEEK>=18)return false;const
   WEEK++;ROLLED=true;LIVE=null;PROJ=null;PROJN=null;setTimeout(loadProj,800);LIVEST={};LIVE_LU=null;PLAT=null;SCHED=null;weekLabels();return true}
 async function loadLive(){
   clearTimeout(LIVE_TIMER);let next=5*60e3;
-  try{const r=await fetch('/api/live?week='+WEEK+'&b='+Math.floor(Date.now()/120000));if(r.ok){const j=await r.json();
+  try{const r=await fetch('/api/live?week='+WEEK+'&b='+Math.floor(Date.now()/(LIVE_FAST?15e3:120e3)));if(r.ok){const j=await r.json();
     if(j&&j.games){await loadPlatform();LIVE=j;LIVEST={};(j.players||[]).forEach(x=>{const p=x.pos==='DST'?byId['dst-'+String(x.t).toLowerCase()]:findExact(x.n);if(p&&p.pos===x.pos)LIVEST[p.id]=x.s});
-      liveSave();liveStatus();if(typeof tmnTick==='function'&&Object.values(j.games).every(g=>g.state==='post')){recompute();await tmnTick()}if(checkRollover()){setTimeout(loadLive,500);await loadPlatform()}recompute();if(Object.values(j.games).some(g=>g.state==='post'))loadProjNext();const a=document.activeElement;if(!(a&&/INPUT|TEXTAREA|SELECT/.test(a.tagName)))render();if(typeof tmnTick==='function')tmnTick();if(j.live||Object.values(j.games).some(g=>g.state==='pre'&&Date.parse(g.start)-Date.now()<30*60e3))next=2*60e3}}}catch(e){}
+      liveSave();liveStatus();if(typeof tmnTick==='function'&&Object.values(j.games).every(g=>g.state==='post')){recompute();await tmnTick()}if(checkRollover()){setTimeout(loadLive,500);await loadPlatform()}recompute();if(Object.values(j.games).some(g=>g.state==='post'))loadProjNext();const a=document.activeElement;if(!(a&&/INPUT|TEXTAREA|SELECT/.test(a.tagName)))render();if(typeof tmnTick==='function')tmnTick();LIVE_FAST=!!(j.live||Object.values(j.games).some(g=>g.state==='pre'&&Date.parse(g.start)-Date.now()<30*60e3));if(LIVE_FAST)next=15e3}}}catch(e){}
   LIVE_TIMER=setTimeout(()=>{if(document.hidden)document.addEventListener('visibilitychange',loadLive,{once:true});else loadLive()},next)}
 const liveOf=id=>G[id]&&G[id].live;
 /* last live scores and real lineups, kept in this browser so a reload opens on them instead of

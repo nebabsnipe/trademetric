@@ -150,8 +150,9 @@ export default async function handler(req, res) {
     }
     const live = Object.values(games).some(g => g.state === 'in');
     const injLog = await injuryLog(inj, note);
-    // The page adds a 2-minute time bucket to the URL (&b=...), so a cached copy is never older than that.
-    res.setHeader('Cache-Control', `public, max-age=0, s-maxage=${live ? 120 : 240}`);
+    // The page adds a time bucket to the URL (&b=...): 15 seconds while games are on, 2 minutes otherwise,
+    // so a cached copy is never older than that and every visitor shares the same copy.
+    res.setHeader('Cache-Control', `public, max-age=0, s-maxage=${live ? 15 : 120}`);
     return res.status(200).json({ season, week, nflWeek: state.week, updated: new Date().toISOString(), live, games, players, injuries: inj, injAll: !!inj, notes: note, ...(injLog ? { injLog } : {}) });
   } catch (e) {
     res.setHeader('Cache-Control', 'public, s-maxage=60');
