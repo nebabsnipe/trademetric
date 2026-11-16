@@ -38,7 +38,9 @@
   more.addEventListener('click',()=>setMore(!document.body.classList.contains('m-more')));
   scrim.addEventListener('click',()=>setMore(false));
   sheet.addEventListener('click',e=>{const x=e.target.closest('[data-m]');if(!x)return;
-    if(x.dataset.m==='theme'){const t=document.getElementById('theme-btn');if(t)t.click();sheet.querySelector('small').textContent=isDark()?'On':'Off';return}
+    if(x.dataset.m==='theme'){const lbl=()=>{sheet.querySelector('small').textContent=isDark()?'On':'Off'};
+      if(window.tmToggleTheme){const r=x.getBoundingClientRect();tmToggleTheme(r.left+r.width/2,r.top+r.height/2).then(lbl)}
+      else{const t=document.getElementById('theme-btn');if(t)t.click();lbl()}return}
     setMore(false)});
   window.addEventListener('hashchange',()=>setMore(false));
   document.addEventListener('keydown',e=>{if(e.key==='Escape')setMore(false)});

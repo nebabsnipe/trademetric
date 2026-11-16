@@ -46,6 +46,12 @@ button,input,select,textarea{font:inherit;color:inherit}
 .demo-pill b{color:var(--accent);font-weight:600}
 .theme-btn{appearance:none;border:1px solid rgba(255,255,255,.22);background:none;color:inherit;width:34px;height:34px;border-radius:99px;display:grid;place-items:center;cursor:pointer}
 .theme-btn svg{width:16px;height:16px}
+.theme-btn.anim svg{animation:theme-icon .33s ease-out}
+.theme-btn[data-mode="dark"] svg{--rot:25deg}
+.theme-btn[data-mode="light"] svg{--rot:-25deg}
+@keyframes theme-icon{from{opacity:0;transform:scale(.55) rotate(var(--rot,0deg))}to{opacity:1;transform:none}}
+/* Theme switch: circle reveal instead of the browser's default crossfade */
+::view-transition-old(root),::view-transition-new(root){animation:none;mix-blend-mode:normal}
 @media (max-width:820px){.nav{order:3;flex-basis:100%;padding-bottom:8px}.demo-pill{display:none}}
 
 /* Page hero */
