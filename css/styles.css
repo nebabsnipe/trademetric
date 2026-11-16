@@ -2290,6 +2290,23 @@ body[data-tab="news"] .tmn-chips{display:none}
 .tmn-tog button[aria-pressed="true"]:not(:disabled):hover{color:var(--bg);border-color:var(--ink);filter:brightness(1.12)}
 .tmn-tog button.y[aria-pressed="true"]:not(:disabled):hover{color:#fff;border-color:var(--accent)}
 @media (max-width:600px){.tmn-tl{gap:10px}.tmn-tl .tmn-ev-card{padding:14px 15px}}
+/* matchup table on wider screens: equal player columns so the points and slot sit in the middle, mirrored like a scoreboard */
+@media (min-width:701px){
+  .mu-peek .mu-table table{min-width:0;table-layout:fixed}
+  .mu-peek .mu-table th:nth-child(2),.mu-peek .mu-table th:nth-child(4){width:84px}
+  .mu-peek .mu-table th:nth-child(3){width:64px}
+  .mu-peek .mu-table th:nth-child(2),.mu-peek .mu-table td:nth-child(2){text-align:right}
+  .mu-peek .mu-table th:nth-child(3),.mu-peek .mu-table td:nth-child(3){text-align:center}
+  .mu-peek .mu-table th:nth-child(4),.mu-peek .mu-table td:nth-child(4){text-align:left}
+  .mu-peek .mu-table th:nth-child(5),.mu-peek .mu-table td:nth-child(5){text-align:right}
+  .mu-peek .mu-table td:nth-child(5) .pl{flex-direction:row-reverse}
+  .mu-peek .mu-table td:nth-child(5) .meta{align-items:flex-end;text-align:right}
+  .mu-peek .mu-table td:nth-child(1),.mu-peek .mu-table td:nth-child(5){overflow:hidden}
+  .mu-peek .mu-table .meta{min-width:0}
+  .mu-peek .mu-table .pname{text-align:inherit}
+  .mu-peek .mu-table .pname,.mu-peek .mu-table .psub{display:block;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+}
+.mu-table td.num{font-variant-numeric:tabular-nums}
 /* matchup peek on phones: fits the screen, no sideways scroll */
 @media (max-width:700px){
   .mu-peek .mu-table{overflow:visible}
