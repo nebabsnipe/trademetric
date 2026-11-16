@@ -460,9 +460,18 @@ async function loadLive(){
   clearTimeout(LIVE_TIMER);let next=5*60e3;
   try{const r=await fetch('/api/live?week='+WEEK+'&b='+Math.floor(Date.now()/120000));if(r.ok){const j=await r.json();
     if(j&&j.games){await loadPlatform();LIVE=j;LIVEST={};(j.players||[]).forEach(x=>{const p=x.pos==='DST'?byId['dst-'+String(x.t).toLowerCase()]:findExact(x.n);if(p&&p.pos===x.pos)LIVEST[p.id]=x.s});
-      liveStatus();if(typeof tmnTick==='function'&&Object.values(j.games).every(g=>g.state==='post')){recompute();await tmnTick()}if(checkRollover()){setTimeout(loadLive,500);await loadPlatform()}recompute();if(Object.values(j.games).some(g=>g.state==='post'))loadProjNext();const a=document.activeElement;if(!(a&&/INPUT|TEXTAREA|SELECT/.test(a.tagName)))render();if(typeof tmnTick==='function')tmnTick();if(j.live||Object.values(j.games).some(g=>g.state==='pre'&&Date.parse(g.start)-Date.now()<30*60e3))next=2*60e3}}}catch(e){}
+      liveSave();liveStatus();if(typeof tmnTick==='function'&&Object.values(j.games).every(g=>g.state==='post')){recompute();await tmnTick()}if(checkRollover()){setTimeout(loadLive,500);await loadPlatform()}recompute();if(Object.values(j.games).some(g=>g.state==='post'))loadProjNext();const a=document.activeElement;if(!(a&&/INPUT|TEXTAREA|SELECT/.test(a.tagName)))render();if(typeof tmnTick==='function')tmnTick();if(j.live||Object.values(j.games).some(g=>g.state==='pre'&&Date.parse(g.start)-Date.now()<30*60e3))next=2*60e3}}}catch(e){}
   LIVE_TIMER=setTimeout(()=>{if(document.hidden)document.addEventListener('visibilitychange',loadLive,{once:true});else loadLive()},next)}
 const liveOf=id=>G[id]&&G[id].live;
+/* last live scores and real lineups, kept in this browser so a reload opens on them instead of
+   projections for the couple of seconds before /api/live and the platform answer */
+const LIVE_LS='tm-live-cache';
+function liveSave(){if(!LIVE)return;try{localStorage.setItem(LIVE_LS,JSON.stringify({at:Date.now(),week:LIVE.week,live:LIVE,key:leagueKeyOf(),lu:LIVE_LU,plat:PLAT}))}catch(e){}}
+function liveRestore(){let c;try{c=JSON.parse(localStorage.getItem(LIVE_LS)||'null')}catch(e){}
+  if(!c||!c.live||c.week!==WEEK||Date.now()-c.at>12*3600e3)return false;
+  LIVE=c.live;LIVEST={};(LIVE.players||[]).forEach(x=>{const p=x.pos==='DST'?byId['dst-'+String(x.t).toLowerCase()]:findExact(x.n);if(p&&p.pos===x.pos)LIVEST[p.id]=x.s});
+  if(c.key&&c.key!=='custom'&&c.key===leagueKeyOf()){LIVE_LU=c.lu||null;PLAT=c.plat||null}
+  return true}
 /* ===== The week a player's number belongs to =====
    Before and during his game: this week's projection. Once his game is final, the useful number is next week's
    projection (90% ESPN and Sleeper when /api/proj has next week, otherwise TradeMetric's own). If there is no next
@@ -2112,6 +2121,7 @@ $('csv-template').addEventListener('click',()=>{navigator.clipboard.writeText(TE
 applyTheme();
 if(!S||!S.league||!S.teams){S=blankState();setPool();recompute()}
 else{dropSample();if(!S.teams.length)S.teams=makeTeams(S.league.teams||12);S.league.sc={...BASE_SC,...S.league.sc};if(S.league.slots.DST===undefined)S.league.slots.DST=1;if(S.league.slots.K===undefined)S.league.slots.K=1;setPool();recompute()}
+try{if(liveRestore())recompute()}catch(e){LIVE=null;LIVEST={};LIVE_LU=null;PLAT=null}
 buildLeagueForm();
 S.chat=(S.chat||[]).filter(x=>x.status==='done'||x.status==='error');
 acctFold();
@@ -2133,7 +2143,7 @@ function ssoMark(p){return `<span class="sso-ic sso-${p.id}" aria-hidden="true">
 function lsGet(k){try{return localStorage.getItem(k)}catch(e){return null}}
 function lsSet(k,v){try{localStorage.setItem(k,v)}catch(e){}}
 function lsDel(k){try{localStorage.removeItem(k)}catch(e){}}
-function adoptState(st){S=st;const dropped=dropSample();if(dedupeLeagues())setTimeout(()=>{try{save()}catch(e){}},0);if(!S.teams||!S.teams.length)S.teams=makeTeams((S.league&&S.league.teams)||12);setPool();SCHED=null;LIVE_LU=null;acctApply();recompute();buildLeagueForm();hubSel=S.me;if(tab==='welcome'&&!S.noLeague)location.hash='team';else if(S.noLeague&&NEED_LG.includes(tab))go(tab);leagueSwitcher();render();if(dropped)setTimeout(save,0);if(S.real&&S.real.src)loadPlatform().then(()=>{recompute();render();syncSavedLeagues()});else syncSavedLeagues()}
+function adoptState(st){const key0=S&&leagueKeyOf();S=st;const dropped=dropSample();if(dedupeLeagues())setTimeout(()=>{try{save()}catch(e){}},0);if(!S.teams||!S.teams.length)S.teams=makeTeams((S.league&&S.league.teams)||12);setPool();SCHED=null;if(leagueKeyOf()!==key0){LIVE_LU=null;PLAT=null}acctApply();recompute();buildLeagueForm();hubSel=S.me;if(tab==='welcome'&&!S.noLeague)location.hash='team';else if(S.noLeague&&NEED_LG.includes(tab))go(tab);leagueSwitcher();render();if(dropped)setTimeout(save,0);if(S.real&&S.real.src)loadPlatform().then(()=>{recompute();render();syncSavedLeagues()});else syncSavedLeagues()}
 /* ---- Saving to the account ----
    The server's copy is the real one. Opening the site on any device loads it and replaces whatever that browser had
    cached. Changes made here are sent a moment later, but only if nobody else saved in between (CLOUD.rev is the
