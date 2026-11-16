@@ -2424,7 +2424,7 @@ body[data-tab="news"] .tmn-chips{display:none}
 .toast-ic.warn{background:var(--warn)}
 
 /* ===================== Scoreboard touches (2026-11, theme-refresh branch) =====================
-   Only three spots: the matchup scoreboard, the Season Sim playoff race, and the playoffs band on the trade week chart. */
+   Two spots: the matchup scoreboard and the playoffs band on the trade week chart. */
 
 /* My Team: matchup scoreboard */
 #matchup{border-top:4px solid var(--accent)}
@@ -2434,13 +2434,6 @@ body[data-tab="news"] .tmn-chips{display:none}
 #matchup .mu-mid .note{margin-top:4px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;font-size:10.5px}
 #matchup .mu-bar{height:16px;border-radius:4px;gap:3px;margin:16px 0 4px;transform:skewX(-12deg)}
 @media (max-width:560px){#matchup .mu-team b{font-size:36px}#matchup .mu-pct{font-size:24px}#matchup .mu-bar{height:12px}}
-
-/* Season Sim: playoff race */
-.r2.me{background:var(--accent-soft);border-radius:var(--r-sm);box-shadow:inset 5px 0 0 var(--accent)}
-.r2-rk{font:italic 800 22px var(--f-display)}
-.r2-odds b{font:italic 800 18px var(--f-display)}
-.pr-bar{height:14px;border-radius:3px;transform:skewX(-12deg)}.pr-bar i{border-radius:3px}
-.r2-cut::before{border-top:3px solid var(--accent)}
 
 /* Trade rating: playoffs band on the week-by-week chart */
 .wc-po{border:0;border-radius:var(--r-sm);background:color-mix(in srgb,var(--accent) 12%,transparent);box-shadow:inset 0 3px 0 var(--accent)}
