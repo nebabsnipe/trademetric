@@ -2841,11 +2841,8 @@ function renderValues(){const L=POOL.filter(p=>p.pos!=='K'&&p.pos!=='DST').map(p
   const si=$('val-search');if(si&&q){si.focus();si.setSelectionRange(q.length,q.length)}}
 
 /* ===== Start or sit ===== */
-var SS=null;
-function ssDefault(){const me=myTeam(),act=activeOf(me),lu=lineup(act,nextV);let best=null;
-  lu.slots.forEach(x=>{if(!x.p||x.label==='K'||x.label==='DST')return;const el=ELIG[x.label]||[x.label];
-    lu.bench.filter(id=>el.includes(byId[id].pos)&&G[id].next&&!isOut(id)).forEach(b=>{const d=nextV(x.p.id)-nextV(b);if(!best||d<best.d)best={d,ids:[x.p.id,b]}})});
-  return best?best.ids:act.filter(id=>byId[id].pos!=='K'&&byId[id].pos!=='DST').slice(0,2)}
+/* the board starts empty: players only go on it when you tap them. It clears when you switch league or team. */
+var SS=null,SS_KEY=null;
 function ssStats(id){const g=G[id],proj=g.next?g.projNext:0,cv=Math.max(.25,Math.min(.9,g.cv||.45));return {proj,floor:Math.max(0,proj*(1-.75*cv)),ceil:proj*(1+.8*cv)}}
 var SS_FA=false;
 /* the add box searches your roster by default; the link switches it to free agents */
@@ -2880,7 +2877,7 @@ function ssTile(x){const p=byId[x.id],g=G[x.id],inB=SS.includes(x.id),pk=SS_PICK
   return `<button type="button" class="ss-tile${inB?' in':''}${pk?' pick':''}${x.ir?' ir':''}" data-sstap="${p.id}" aria-pressed="${inB||pk}"${x.ir?' aria-disabled="true"':''} title="${esc(p.n)}: ${tip}">
     <span class="ss-slot">${esc(x.slot)}</span>${av(p,'sm')}<span class="ss-tn"><b>${esc(p.pos==='DST'?p.n:typeof tmnShort==='function'?tmnShort(p.n):p.n)}</b><small>${p.pos} · ${g.next?`${g.next.home?'vs':'@'} ${g.next.opp}`:'Bye'}${s?` · <em class="st-${s}">${s}</em>`:''}</small></span><span class="ss-tp num">${g.next?f1(g.projNext):'–'}</span>${x.ir?'':SS_CK}</button>`}
 function renderStartSit(){const el=$('startsit');if(!el)return;const me=myTeam();if(!me||me.players.length<2){el.innerHTML='';return}
-  if(!SS)SS=ssDefault();SS=SS.filter(id=>byId[id]&&G[id]&&!ssIsIR(id)).slice(0,3);
+  const ssk=(S.leagueKey||'')+'|'+S.me;if(!SS||SS_KEY!==ssk){SS=[];SS_PICK=null;SS_KEY=ssk}SS=SS.filter(id=>byId[id]&&G[id]&&!ssIsIR(id)).slice(0,3);
   if(SS_PICK&&(SS.length<3||SS.includes(SS_PICK)||!byId[SS_PICK]))SS_PICK=null;const TG=SS_PICK?ssTargets(SS_PICK):[];
   const LU=ssLineup(),st=SS.map(id=>({id,...ssStats(id)})),ord2=[...st].sort((a,b)=>b.proj-a.proj),win=ord2[0],run=ord2[1];
   let verdict='<div class="ss-verdict ss-wait"><b>Pick two players</b><span>Tap anyone in your lineup below to put him on the board. Starters and bench both work, up to three at once.</span></div>';
