@@ -35,7 +35,7 @@ function tmnNotif(){S.notif=S.notif||{off:[],opp:false};S.notif.off=S.notif.off|
 const tmnOn=key=>!tmnNotif().off.includes(key);
 
 /* ---------- leagues: rosters, lineups and this week's matchup for every saved league ---------- */
-function tmnLeagues(){const out=[],L=S.leagues&&S.leagues.length?S.leagues:[{key:S.leagueKey,name:S.league&&S.league.name}];
+function tmnLeagues(){const out=[];if(S&&S.noLeague&&!(S.leagues&&S.leagues.length))return out;const L=S.leagues&&S.leagues.length?S.leagues:[{key:S.leagueKey,name:S.league&&S.league.name}];
   L.forEach(e=>{const cur=e.key===S.leagueKey,snap=cur?S:e.snap;if(!snap||!snap.teams||!snap.teams.length)return;const me=snap.teams.find(T=>T.id===snap.me);if(!me)return;
     const c={key:e.key,name:(cur&&S.league&&S.league.name)||e.name||'League',cur,sc:{...BASE_SC,...((snap.league&&snap.league.sc)||{})},roster:new Set(me.players),starters:new Set(),oppStarters:new Set(),opp:null,team:me.name};
     try{if(cur)tmnCurMatch(c);else tmnSnapMatch(c,snap)}catch(err){}
@@ -522,9 +522,12 @@ function tmnStoriesFor(pid,all){return all.filter(x=>x.pid===pid&&x.type==='art'
 
 /* ---------- injury opportunities: who gets the work while a starter is out ----------
    From the same model the Rankings "UP" badge uses (OPPS in app.js): carries and targets the missing player leaves
-   behind, split by depth chart and by what actually happened in games he missed. Ownership is for the league on screen. */
+   behind, split by depth chart and by what actually happened in games he missed. Ownership is for the league on screen.
+   A backup is listed only if his projection WITH the extra work is TMN_OPP_MIN points a game or more; an injured player
+   with no backup at that level is left out. */
+const TMN_OPP_MIN=7;
 function tmnOppGroups(Ls){if(typeof OPPS==='undefined'||!OPPS.length)return [];const mine=new Set();Ls.forEach(c=>c.roster.forEach(id=>mine.add(id)));
-  const g={};OPPS.forEach(o=>{if(!byId[o.id]||!byId[o.from])return;(g[o.from]=g[o.from]||{from:o.from,long:o.long,rows:[]}).rows.push(o)});
+  const g={};OPPS.forEach(o=>{if(!byId[o.id]||!byId[o.from]||!(o.p1>=TMN_OPP_MIN))return;(g[o.from]=g[o.from]||{from:o.from,long:o.long,rows:[]}).rows.push(o)});
   const own=id=>OWN[id]===S.me?'mine':OWN[id]==null?'fa':'other';
   return Object.values(g).map(x=>{x.rows.sort((a,b)=>b.dp-a.dp);x.rows=x.rows.slice(0,3);const best=x.rows[0].dp;
     x.score=(mine.has(x.from)?100:0)+(x.rows.some(r=>mine.has(r.id))?60:0)+(x.rows.some(r=>own(r.id)==='fa')?30:0)+best;return x})
@@ -535,7 +538,7 @@ function tmnOppCard(x,Ls){const f=byId[x.from],s=stOf(x.from),mine=Ls.some(c=>c.
     const work=[o.dc>=1?`+${Math.round(o.dc)} carr${Math.round(o.dc)===1?'y':'ies'}`:'',o.dt>=1?`+${Math.round(o.dt)} target${Math.round(o.dt)===1?'':'s'}`:''].filter(Boolean).join(', ');
     return `<li class="tmn-op-r" data-ncard="${o.id}" tabindex="0">${av(p,'sm')}<span class="tmn-op-who"><b>${esc(p.n)}</b><span class="psub">${p.pos} · ${p.t}${role?` · <em>${esc(role)}</em>`:''}${work?` · ${work} a game`:''}</span></span>
       <span class="tmn-op-gain num">+${f1(o.dp)}<small>pts/g</small></span>
-      ${ow==='mine'?'<span class="tmn-own mine">Yours</span>':ow==='fa'?'<a class="tmn-own fa" href="#waivers">Free agent</a>':`<span class="tmn-own">${esc(T?T.name:'Rostered')}</span>`}</li>`};
+      ${ow==='mine'?'<span class="tmn-own mine">Yours</span>':ow==='fa'?'<a class="tmn-own fa" href="#waivers">Free agent</a>':`<span class="tmn-own-w"><span class="tmn-own">${esc(T?T.name:'Rostered')}</span><button type="button" class="tmn-tt" data-ntrade="${o.id}" title="Open the trade builder with ${esc(p.n)}">Trade target</button></span>`}</li>`};
   return `<article class="tmn-op${mine?' mine':''}"><header class="tmn-op-h" data-ncard="${f.id}" tabindex="0">${av(f,'sm')}<span><span class="tmn-op-k">With ${esc(f.n)} ${why}${mine?' · your player':''}</span><b>His work goes to</b></span><span class="tmn-lbl ${s==='Q'||s==='D'?'warn':'bad'}">${esc(ST_LABEL[s]||s||'Out')}</span></header>
     <ul class="tmn-op-l">${x.rows.map(row).join('')}</ul></article>`}
 
@@ -815,6 +818,7 @@ document.addEventListener('click',e=>{const t=e.target;if(!t.closest)return;
   const xc=t.closest('[data-nxc]');if(xc){e.stopPropagation();tmnTopDismiss(xc.dataset.nxc);TMN.chips=TMN.chips.filter(c=>c.k!==xc.dataset.nxc);tmnPaintChips();return}
   const nk=t.closest('.tmn-ban[data-nk],.tmn-chip[data-nk]');if(nk){tmnOpen(nk.dataset.nk);return}
   const nr=t.closest('[data-nres]');if(nr&&!t.closest('a,button')){const k=nr.dataset.nres;if(k&&k!==S.leagueKey&&typeof switchLeague==='function')switchLeague(k);location.hash='team';return}
+  const tt=t.closest('[data-ntrade]');if(tt){e.preventDefault();e.stopPropagation();if(typeof loadTrade==='function')loadTrade('|'+tt.dataset.ntrade);return}
   const nc=t.closest('[data-ncard]');if(nc&&!t.closest('a,button,select,input')&&typeof openCard==='function'){openCard(nc.dataset.ncard);return}
   const ng=t.closest('[data-nk-go]');if(ng){TMN.f='all';TMN.focus=ng.dataset.nkGo;tmnRender();return}
   const gw=t.closest('[data-go-waivers]');if(gw){e.preventDefault();e.stopPropagation();location.hash='waivers';return}

@@ -5,7 +5,7 @@ const tcVars=t=>{const c=TC[t]||['#333','#666','#fff'];return `--c1:${c[0]};--c2
 
 /* ===== Real 2026 data: nflverse snapshot ===== */
 const DATA=window.NFL_DATA;
-function weekLabels(){document.querySelectorAll('.wk-now').forEach(x=>x.textContent='Week '+WEEK);document.querySelectorAll('.wk-num').forEach(x=>x.textContent=WEEK);{const el=document.getElementById('week-pill');if(el){el.innerHTML=`<b>Week ${WEEK}</b><span class="wk-thru"> · stats thru Wk ${DATA.played}</span>`;el.title=`Real ${DATA.asOf.slice(0,4)} stats through Week ${DATA.played}, updated ${DATA.asOf}. Refreshed every morning.`}}}
+function weekLabels(){document.querySelectorAll('.wk-now').forEach(x=>x.textContent='Week '+WEEK);document.querySelectorAll('.wk-num').forEach(x=>x.textContent=WEEK);}
 const FUM={QB:.2,RB:.09,WR:.04,TE:.04};
 const slug=n=>n.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');
 const Z={cmp:0,pyd:0,ptd:0,int:0,ratt:0,ryd:0,rtd:0,tgt:0,rec:0,recyd:0,rectd:0};
@@ -57,7 +57,6 @@ const SC_FIELDS=[['Passing',[['pyd','Passing yards per point',1,'25 = 1 pt per 2
  ['Team defense',[['dsk','Sack',.5],['dint','Interception',.5],['dfr','Fumble recovery',.5],['dtd','Defensive or return TD',.5],['dsf','Safety',.5],['pa0','0 points allowed',1],['pa6','1-6 points allowed',1],['pa13','7-13 points allowed',1],['pa20','14-20 points allowed',1],['pa27','21-27 points allowed',1],['pa34','28-34 points allowed',1],['pa35','35+ points allowed',1]]]];
 const SLOT_FIELDS=[['teams','Teams',4,16],['QB','QB',0,3],['RB','RB',0,4],['WR','WR',0,5],['TE','TE',0,3],['FLEX','Flex',0,4],['SFLEX','Superflex',0,2],['K','K',0,2],['DST','D/ST',0,2],['BN','Bench',0,15],['IR','IR',0,6]];
 const TEAM_NAMES=['Monday Night Miracles','Fourth & Long','Red Zone Regulars','Blitz Brigade','Two-Point Conversion','Waiver Wire Kings','Pick Six Society','The Taxi Squad','Hail Mary Club','Sunday Scaries','End Zone Express','Goal Line Stand','Audible Alert','Play Action Pros','Trick Play Turnover'];
-const MY_EXAMPLE=['jalen-hurts','dak-prescott','bryce-young','zach-charbonnet','chase-brown','jaylen-warren','tony-pollard','rhamondre-stevenson','drake-london','tee-higgins','courtland-sutton','dj-moore','jakobi-meyers','jauan-jennings','hunter-henry','dallas-goedert'];
 
 /* ===== State ===== */
 const KEY='trademetric-v1';
@@ -92,6 +91,9 @@ function acctMerge(cs,la){if(!la)return false;const a=cs.acct=cs.acct||{};let ch
   if(la.top){const t=a.top;if(!t){a.top=la.top;ch=true}else{const it=items(t.items,la.top.items,30);if(it){t.items=it;ch=true}
       ['done','done2','trd'].forEach(k=>{const u=uni(t[k],la.top[k],60);if(u.length!==(t[k]||[]).length){t[k]=u;ch=true}})}}
   if(la.alerts){const u=uni(a.alerts,la.alerts,300);if(u.length!==(a.alerts||[]).length){a.alerts=u;ch=true}}
+  /* alert times: earliest first-shown and earliest seen win, so opening the bell on any device counts */
+  if(la.alertT&&typeof la.alertT==='object'){const m=a.alertT=a.alertT&&typeof a.alertT==='object'?a.alertT:{};const lo=(x,y)=>x&&y?Math.min(x,y):x||y;
+    Object.entries(la.alertT).forEach(([k,y])=>{if(!y)return;const x=m[k];if(!x){m[k]={...y};ch=true;return}const c=lo(x.c,y.c),s=lo(x.s,y.s);if(c!==x.c||s!==x.s){m[k]={c,...(s?{s}:{})};ch=true}})}
   ['st','show','stats','trv','theme','want'].forEach(k=>{if(a[k]==null&&la[k]!=null){a[k]=la[k];ch=true}});
   return ch}
 /* after the saved state is replaced (sign-in, or another device saved): re-read everything that was loaded from it */
@@ -99,7 +101,7 @@ function acctApply(){statsLoad();trView=acctGet('trv','build')==='ideas'?'ideas'
   const th=acctGet('theme',null);if(th&&th!==themePref){themePref=th;applyTheme()}
   if(typeof tmnAcctReset==='function')tmnAcctReset()}
 const AUTH_HASH=/access_token=|error_description=/.test(location.hash)?location.hash.slice(1):null;
-function save(){S.savedAt=Date.now();if(S.leagues&&S.leagueKey&&typeof upsertLeague==='function'&&S.teams&&S.teams.length)upsertLeague();try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}if(typeof cloudSave==='function')cloudSave()}
+function save(){S.savedAt=Date.now();if(!S.noLeague&&S.leagues&&S.leagueKey&&typeof upsertLeague==='function'&&S.teams&&S.teams.length)upsertLeague();try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}if(typeof cloudSave==='function')cloudSave()}
 let POOL=BUILTIN,byId={};
 function setPool(){const base=(S.custom&&S.custom.length)?S.custom:BUILTIN,have=new Set(base.map(p=>p.id));
   POOL=base.concat((S.extraPlayers||[]).filter(x=>!have.has(x.id)).map(x=>({...Z,...KZ,fl:0,id:x.id,n:x.n,pos:x.pos,t:x.t||'FA',status:'',extra:true})));byId={};POOL.forEach(p=>byId[p.id]=p);statusFromCache();
@@ -171,7 +173,7 @@ function computeBoosts(){BOOST={};WBOOST={};OPPS=[];const sc=S.league.sc;
       const cl=(v,d,lo,hi)=>Math.max(lo,Math.min(hi,v||d));const add={...q,ratt:q.ratt+g.ratt,ryd:q.ryd+g.ratt*cl(r('ryd'),4.1,3.4,5),rtd:q.rtd+g.ratt*cl(r('rtd'),.028,.015,.04),tgt:q.tgt+g.tgt,rec:q.rec+g.tgt*cl(t('rec'),.64,.5,.78),recyd:q.recyd+g.tgt*cl(t('recyd'),7.2,5.5,9.5),rectd:q.rectd+g.tgt*cl(t('rectd'),.04,.02,.06)};
       const p0=Math.max(.5,projPts(q,sc));let p1=projPts(add,sc);p1=Math.min(p1,p0+xPts*.8);const mult=p1/p0;
       if(p1-p0<.8||mult<1.06)return;const map=long?BOOST:WBOOST;map[q.id]=(map[q.id]||1)*mult;
-      OPPS.push({id:q.id,from:x.id,mult,long,dp:p1-p0,dc:g.ratt,dt:g.tgt})})});
+      OPPS.push({id:q.id,from:x.id,mult,long,dp:p1-p0,p1,dc:g.ratt,dt:g.tgt})})});
   // role tags: who moves up the team's pecking order at his position
   ROLE_UP={};const byTeamPos={};POOL.forEach(p=>{if(['RB','WR','TE'].includes(p.pos))(byTeamPos[p.t+p.pos]=byTeamPos[p.t+p.pos]||[]).push(p)});
   Object.values(byTeamPos).forEach(L=>{const base=p=>projPts(p,sc),before=[...L].sort((a,b)=>base(b)-base(a)),after=L.filter(p=>!isOut(p.id)).sort((a,b)=>base(b)*(BOOST[b.id]||1)-base(a)*(BOOST[a.id]||1));
@@ -943,22 +945,21 @@ function findByName(v){const q=norm(v||'');if(!q)return null;const ex=findExact(
   if(parts.length===1){const m=POOL.filter(x=>norm(x.n).split(' ').includes(q));return m.length===1?m[0]:m.sort((a,b)=>V.rank[a.id]-V.rank[b.id])[0]||null}
   const last=parts[parts.length-1],fi=parts[0][0];
   return POOL.filter(x=>{const n=norm(x.n).split(' ');return n[n.length-1]===last&&n[0][0]===fi}).sort((a,b)=>V.rank[a.id]-V.rank[b.id])[0]||null}
-function assign(id,teamId){S.teams.forEach(T=>{T.players=T.players.filter(x=>x!==id);if(T.ir)T.ir=T.ir.filter(x=>x!==id)});if(teamId)teamById(teamId).players.push(id);S.example=false;save();recompute()}
+function assign(id,teamId){S.teams.forEach(T=>{T.players=T.players.filter(x=>x!==id);if(T.ir)T.ir=T.ir.filter(x=>x!==id)});if(teamId)teamById(teamId).players.push(id);S.noLeague=false;save();recompute()}
 const bump=()=>{save();recompute();render()};
 
 /* ===== Demo league ===== */
 function makeTeams(n){const t=[{id:'t1',name:'Your Team',players:[]}];for(let i=1;i<n;i++)t.push({id:'t'+(i+1),name:TEAM_NAMES[i-1]||'Team '+(i+1),players:[]});return t}
-function exampleLeague(){
-  S.teams=makeTeams(S.league.teams);S.me='t1';S.teams[0].players=MY_EXAMPLE.filter(id=>byId[id]);S.log=[];S.example=true;
-  recompute();const r=seed('draft'),taken=new Set(S.teams[0].players);
-  const pool=POOL.filter(p=>!taken.has(p.id)).map(p=>({p,v:tv(p.id)*(.8+r()*.4)})).sort((a,b)=>b.v-a.v);
-  const others=S.teams.slice(1),caps={QB:S.league.slots.SFLEX||S.league.slots.QB>1?3:2,RB:5,WR:6,TE:2,K:0,DST:0},rounds=Math.min(13,Math.floor((pool.length)/Math.max(1,others.length)));
-  for(let round=0;round<rounds;round++){const order=round%2?[...others].reverse():others;order.forEach(T=>{
-    const cnt=x=>T.players.filter(id=>byId[id].pos===x).length;const i=pool.findIndex(o=>cnt(o.p.pos)<caps[o.p.pos]);if(i>=0){T.players.push(pool[i].p.id);pool.splice(i,1)}})}
-  if(S.league.slots.K){const kk=POOL.filter(p=>p.pos==='K'&&!OWN[p.id]).map(p=>({p,v:V.pts[p.id]*(.85+r()*.3)})).sort((a,b)=>b.v-a.v);S.teams.forEach(T=>{if(!T.players.some(id=>byId[id].pos==='K')&&kk.length)T.players.push(kk.shift().p.id)})}
-  if(S.league.slots.DST){const d=POOL.filter(p=>p.pos==='DST').map(p=>({p,v:V.pts[p.id]*(.85+r()*.3)})).sort((a,b)=>b.v-a.v);S.teams.forEach(T=>{if(!T.players.some(id=>byId[id].pos==='DST')&&d.length)T.players.push(d.shift().p.id)})}
-  save();recompute();
-}
+/* No league yet: an empty league shell. S.noLeague stays set until a league is imported or built by hand,
+   and the league tabs show the import prompt (Welcome) until then. Nothing is saved to S.leagues for it. */
+function blankState(){return {league:{name:'My League',teams:12,sc:{...PRESETS.sf.sc},slots:{...PRESETS.sf.slots}},teams:makeTeams(12),me:'t1',log:[],custom:null,onboarded:false,noLeague:true,chat:[]}}
+function blankLeague(){const b=blankState();['league','teams','me','log','noLeague'].forEach(k=>S[k]=b[k]);S.real=null;S.imported=null;S.leagueKey=null;S.onboarded=false}
+/* The old sample league is gone: drop it from saved copies. If it was on screen, open another saved league, or none. */
+function dropSample(){if(!S)return false;const isS=x=>x&&(x.key==='sample'||x.src==='Sample');const cur=!!S.example||S.leagueKey==='sample';
+  if(!cur&&!(S.leagues||[]).some(isS)&&!('example' in S))return false;
+  S.leagues=(S.leagues||[]).filter(x=>!isS(x));(S.leagues||[]).forEach(x=>{if(x.snap)delete x.snap.example});delete S.example;
+  if(cur){const e=S.leagues[0];if(e&&e.snap){lkeys().forEach(k=>S[k]=clone(e.snap[k]));S.leagueKey=e.key;S.noLeague=false}else blankLeague()}
+  return true}
 function syncTeamCount(){const n=S.league.teams;while(S.teams.length<n)S.teams.push({id:'t'+Date.now().toString(36)+S.teams.length,name:'Team '+(S.teams.length+1),players:[]});
   while(S.teams.length>n){const i=S.teams.map(T=>T.id).lastIndexOf(S.teams.filter(T=>T.id!==S.me).pop().id);S.teams.splice(i,1)}}
 
@@ -979,7 +980,7 @@ function renderTeam(){
   const IRS=irState(me),act=activeOf(me);
   const LU=RL?{slots:RL.slots,bench:act.filter(id=>!RL.slots.some(x=>x.p&&x.p.id===id)).sort((a,b)=>nextV(b)-nextV(a)),total:sum(RL.slots.filter(x=>x.p),x=>G[x.p.id].projNext),real:true}:lineup(act,nextV);
   const started=LU.slots.filter(x=>x.p&&liveOf(x.p.id)),actual=sum(started,x=>liveOf(x.p.id).pts);
-  $('team-example').hidden=!S.example;$('team-title').textContent=me.name;$('team-kicker').textContent=`${S.league.name||'My League'} · Week ${WEEK}`;
+  $('team-title').textContent=me.name;$('team-kicker').textContent=`${S.league.name||'My League'} · Week ${WEEK}`;
   const sim=simulate();const byes=me.players.filter(id=>!G[id].next).length,tags=me.players.filter(id=>G[id].tag).length;
   const weak=weakList(mine)[0];
   $('team-tiles').innerHTML=(started.length?`<div class="tile hot"><div class="lab">Week ${WEEK} score <span class="live-dot${LIVE&&LIVE.live?' on':''}"></span></div><div class="val num">${f1(actual)}</div><div class="sub">Projected ${f1(LU.total)} · ${started.length} of ${LU.slots.filter(x=>x.p).length} playing or done</div></div>`
@@ -1831,7 +1832,7 @@ function applyImport(name,teams,sc,slots,src,real,extra){
   if(S.real&&S.real.src)setTimeout(syncNow,0);
   let mi=teams.findIndex(t=>t.mine);
   if(mi<0&&prev&&prev.meRef!=null&&S.real&&S.real.src){const t=S.real.src.rid[prev.meRef];const k=S.teams.findIndex(x=>x.id===t);if(k>=0)mi=k}
-  S.me=S.teams[mi>=0?mi:0].id;S.log=prev&&prev.snap.log||[];S.example=false;S.imported={name,src};S.leagueKey=key;upsertLeague();S.onboarded=true;IMP.open=undefined;hubSel=S.me;bump();buildLeagueForm();toast('Imported '+name);if(location.hash!=='#team')location.hash='team';else render();window.scrollTo({top:0,behavior:'smooth'});
+  S.me=S.teams[mi>=0?mi:0].id;S.log=prev&&prev.snap.log||[];S.noLeague=false;S.imported={name,src};S.leagueKey=key;upsertLeague();S.onboarded=true;IMP.open=undefined;hubSel=S.me;bump();buildLeagueForm();toast('Imported '+name);if(location.hash!=='#team')location.hash='team';else render();window.scrollTo({top:0,behavior:'smooth'});
   impMsg(`<div class="callout buy"><b>Imported ${esc(name)}.</b> ${teams.length} teams and your scoring are loaded.${miss?` ${miss} players aren't in TradeMetric's player list yet and were skipped.`:''}${mi<0?' Pick your team in Team rosters and press "This is my team".':''}</div>`)}
 
 /* ===== AI scouting report ===== */
@@ -1976,9 +1977,11 @@ $('theme-btn').addEventListener('click',()=>{themePref=isDark()?'light':'dark';a
 
 /* ===== Routing & events ===== */
 const TABS=['team','news','trade','rankings','hub','season','league','draft','help','welcome','signin','account'];let tab='team';
+/* tabs that need a league: with none, they show the import prompt */
+const NEED_LG=['team','trade','season'];
 function howLink(k){return `<a class="how how-wrap" href="#help-${k}">How this works</a>`}
 const TAB_ALIAS={players:['rankings','rank'],waivers:['rankings','waiv'],values:['rankings','vals']};
-function go(t){let helpSec=null;if(t&&t.startsWith('help-')){helpSec=t.slice(5);t='help'}if(t&&t.startsWith('account-')){ACC_TAB=t.slice(8);t='account'}else if(t==='account')ACC_TAB='profile';if(t!==tab||t==='account'){ACC_EDIT=null;ACC_MSG=null}if(t==='trade-ideas'||t==='trade-builder'){setTrView(t==='trade-ideas'?'ideas':'build');t='trade'}if(TAB_ALIAS[t]){plView=TAB_ALIAS[t][1];t=TAB_ALIAS[t][0]}if(t==='helper'){if(USER)openAI();t=TABS.includes(tab)?tab:'team';history.replaceState(null,'','#'+t)}if(!USER&&t!=='signin')t='signin';tab=TABS.includes(t)?t:'team';document.body.dataset.tab=tab;if(tab!=='welcome'&&S&&!S.onboarded){S.onboarded=true;save()}document.querySelectorAll('.nav button').forEach(b=>{if(b.dataset.tab===tab)b.setAttribute('aria-current','page');else b.removeAttribute('aria-current')});
+function go(t){let helpSec=null;if(t&&t.startsWith('help-')){helpSec=t.slice(5);t='help'}if(t&&t.startsWith('account-')){ACC_TAB=t.slice(8);t='account'}else if(t==='account')ACC_TAB='profile';if(t!==tab||t==='account'){ACC_EDIT=null;ACC_MSG=null}if(t==='trade-ideas'||t==='trade-builder'){setTrView(t==='trade-ideas'?'ideas':'build');t='trade'}if(TAB_ALIAS[t]){plView=TAB_ALIAS[t][1];t=TAB_ALIAS[t][0]}if(t==='helper'){if(USER)openAI();t=TABS.includes(tab)?tab:'team';history.replaceState(null,'','#'+t)}if(!USER&&t!=='signin')t='signin';tab=TABS.includes(t)?t:'team';if(S&&S.noLeague&&NEED_LG.includes(tab))tab='welcome';document.body.dataset.tab=tab;if(tab!=='welcome'&&S&&!S.onboarded){S.onboarded=true;save()}document.querySelectorAll('.nav button').forEach(b=>{if(b.dataset.tab===tab)b.setAttribute('aria-current','page');else b.removeAttribute('aria-current')});
   TABS.forEach(x=>$('v-'+x).hidden=x!==tab);render();window.scrollTo(0,0);if(tab==='help')openHelp(helpSec)}
 function render(){({team:renderTeam,news:tmnRender,rankings:renderPlayers,draft:renderDraft,help:()=>{},trade:renderTrade,hub:renderHub,season:renderSeason,welcome:renderWelcome,league:fillLeagueForm,signin:renderSignin,account:renderAccount})[tab]();renderAlerts();if(openId&&!$('scrim').hidden)openCard(openId);queueBalance()}
 document.querySelectorAll('.nav button').forEach(b=>b.addEventListener('click',()=>{location.hash=b.dataset.hash||b.dataset.tab}));
@@ -2005,7 +2008,7 @@ document.addEventListener('click',e=>{
     if(!s2.trim()||!swid.trim()){toast('Paste both codes first');return}const c={s2:s2.trim(),swid:swid.trim()};
     try{if(rem)localStorage.setItem(ESPN_KEY,JSON.stringify(c));else localStorage.removeItem(ESPN_KEY)}catch(e){}espnImport(d.espnPrivate,c)}
   else if(d.espnForget){try{localStorage.removeItem(ESPN_KEY)}catch(e){}impMsg(espnPrivateForm(IMP.espnId||''));toast('ESPN codes forgotten')}
-  else if(t.id==='set-me'){S.me=hubSel;S.example=false;upsertLeague();bump();toast(teamById(S.me).name+' is now your team')}
+  else if(t.id==='set-me'){S.me=hubSel;if(!S.noLeague)upsertLeague();bump();toast(teamById(S.me).name+' is now your team')}
   else if(d.assignMe){assign(d.assignMe,S.me);toast('Added '+byId[d.assignMe].n);render()}
   else if(d.unassign){const n=byId[d.unassign].n;assign(d.unassign,null);toast('Removed '+n);render()}
   else if(d.give){if(TD.give.includes(d.give))TD.give=TD.give.filter(x=>x!==d.give);else{TD.give=[...TD.give,d.give];TD.fresh=d.give}renderTrade()}
@@ -2019,7 +2022,7 @@ document.addEventListener('click',e=>{
   else if(d.preset){const pr=PRESETS[d.preset];S.league.sc={...pr.sc};S.league.slots={...pr.slots};bump();toast('Applied '+t.textContent.trim())}
   else if(d.q){$('helper-q').value=d.q;askHelper(d.q)}
   else if(t.id==='shot-replace'||t.id==='shot-add'){const T=teamById(shotState.team);if(t.id==='shot-replace'){T.players.forEach(id=>{});T.players=[]}
-    const ids=shotState.items.filter(x=>x.on&&x.id).map(x=>x.id);if($('sr-rename')&&$('sr-rename').checked&&shotState.teamName)T.name=shotState.teamName;ids.forEach(id=>{S.teams.forEach(x=>x.players=x.players.filter(y=>y!==id));T.players.push(id)});shotState=null;S.example=false;S.onboarded=true;bump();toast(`${ids.length} players saved to ${T.name}`)}
+    const ids=shotState.items.filter(x=>x.on&&x.id).map(x=>x.id);if($('sr-rename')&&$('sr-rename').checked&&shotState.teamName)T.name=shotState.teamName;ids.forEach(id=>{S.teams.forEach(x=>x.players=x.players.filter(y=>y!==id));T.players.push(id)});shotState=null;S.noLeague=false;S.onboarded=true;bump();toast(`${ids.length} players saved to ${T.name}`)}
   else if(t.id==='shot-cancel'){shotState=null;renderShot()}
   else if(d.srsug){const [i,id]=d.srsug.split('|');Object.assign(shotState.items[+i],{id,on:true});renderShot()}
   else if(t.id==='hub-add-btn'){const p=findByName($('hub-add').value);if(!p){toast('No player found with that name');return}const from=OWN[p.id];assign(p.id,hubSel);toast(from&&from!==hubSel?`Moved ${p.n} from ${teamById(from)?teamById(from).name:'another team'}`:'Added '+p.n);render();$('hub-add')&&$('hub-add').focus()}
@@ -2051,13 +2054,11 @@ $('tr-ideas').addEventListener('click',e=>{const c=e.target.closest('[data-twchi
 $('rank-search').addEventListener('input',renderRankings);$('tgt-search').addEventListener('input',renderTargets);
 $('helper-ask').addEventListener('click',()=>askHelper($('helper-q').value));
 $('helper-q').addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();askHelper($('helper-q').value)}});
-function freshLeague(n){S.real=null;SCHED=null;S.league.teams=n;S.teams=makeTeams(n);S.me='t1';S.example=false;S.imported=null;S.log=[];S.onboarded=true;hubSel='t1';shotState=null;save();recompute()}
-$('wl-skip').addEventListener('click',()=>{S.onboarded=true;save();location.hash='team'});
+function freshLeague(n){S.real=null;SCHED=null;S.league.teams=n;S.teams=makeTeams(n);S.me='t1';S.noLeague=false;S.imported=null;S.log=[];S.onboarded=true;hubSel='t1';shotState=null;save();recompute()}
 $('wl-hand').addEventListener('click',()=>{freshLeague(+$('wl-teams').value);location.hash='hub';toast('Empty league ready. Add players to each team.')});
 $('wl-shot').addEventListener('change',e=>{const f=e.target.files[0];if(!f)return;freshLeague(+$('wl-teams').value);location.hash='hub';go('hub');readScreenshot(f);e.target.value=''});
 $('hist-clear').addEventListener('click',()=>{S.chat=[];save();renderHelper()});
-$('load-sample').addEventListener('click',()=>{saveCurrentLeague();S.leagueKey='sample';S.imported=null;S.real=null;SCHED=null;S.league.teams=S.league.teams||12;exampleLeague();upsertLeague();save();leagueSwitcher();hubSel=S.me;shotState=null;render();toast('Sample league loaded')});
-$('clear-league').addEventListener('click',()=>{S.teams.forEach(T=>{if(T.id!==S.me)T.players=[]});S.example=false;bump();toast('Other rosters cleared. Your team was kept.')});
+$('clear-league').addEventListener('click',()=>{S.teams.forEach(T=>{if(T.id!==S.me)T.players=[]});bump();toast('Other rosters cleared. Your team was kept.')});
 $('v-league').addEventListener('input',e=>{const i=e.target;
   if(i.dataset.sc!==undefined){const v=parseFloat(i.value);if(isNaN(v))return;S.league.sc[i.dataset.sc]=v}
   else if(i.dataset.slot!==undefined){let v=parseInt(i.value,10);if(isNaN(v))return;const f=SLOT_FIELDS.find(x=>x[0]===i.dataset.slot);v=Math.max(f[2],Math.min(f[3],v));if(i.dataset.slot==='teams'){S.league.teams=v;syncTeamCount()}else S.league.slots[i.dataset.slot]=v}
@@ -2073,8 +2074,8 @@ $('csv-template').addEventListener('click',()=>{navigator.clipboard.writeText(TE
 
 /* ===== Boot ===== */
 applyTheme();
-if(!S||!S.league||!S.teams){S={league:{name:'Sample League',teams:12,sc:{...PRESETS.sf.sc},slots:{...PRESETS.sf.slots}},teams:[],me:'t1',log:[],example:true,custom:null,onboarded:false,chat:[]};setPool();exampleLeague()}
-else{S.league.sc={...BASE_SC,...S.league.sc};if(S.league.slots.DST===undefined)S.league.slots.DST=1;if(S.league.slots.K===undefined)S.league.slots.K=1;setPool();recompute();if(S.example&&S.league.slots.K&&!S.teams.some(T=>T.players.some(id=>byId[id]&&byId[id].pos==='K')))exampleLeague()}
+if(!S||!S.league||!S.teams){S=blankState();setPool();recompute()}
+else{dropSample();if(!S.teams.length)S.teams=makeTeams(S.league.teams||12);S.league.sc={...BASE_SC,...S.league.sc};if(S.league.slots.DST===undefined)S.league.slots.DST=1;if(S.league.slots.K===undefined)S.league.slots.K=1;setPool();recompute()}
 buildLeagueForm();
 S.chat=(S.chat||[]).filter(x=>x.status==='done'||x.status==='error');
 acctFold();
@@ -2096,7 +2097,7 @@ function ssoMark(p){return `<span class="sso-ic sso-${p.id}" aria-hidden="true">
 function lsGet(k){try{return localStorage.getItem(k)}catch(e){return null}}
 function lsSet(k,v){try{localStorage.setItem(k,v)}catch(e){}}
 function lsDel(k){try{localStorage.removeItem(k)}catch(e){}}
-function adoptState(st){S=st;setPool();SCHED=null;LIVE_LU=null;acctApply();recompute();buildLeagueForm();hubSel=S.me;if(tab==='welcome')location.hash='team';leagueSwitcher();render();if(S.real&&S.real.src)loadPlatform().then(()=>{recompute();render();syncSavedLeagues()});else syncSavedLeagues()}
+function adoptState(st){S=st;const dropped=dropSample();if(!S.teams||!S.teams.length)S.teams=makeTeams((S.league&&S.league.teams)||12);setPool();SCHED=null;LIVE_LU=null;acctApply();recompute();buildLeagueForm();hubSel=S.me;if(tab==='welcome'&&!S.noLeague)location.hash='team';else if(S.noLeague&&NEED_LG.includes(tab))go(tab);leagueSwitcher();render();if(dropped)setTimeout(save,0);if(S.real&&S.real.src)loadPlatform().then(()=>{recompute();render();syncSavedLeagues()});else syncSavedLeagues()}
 /* ---- Saving to the account ----
    The server's copy is the real one. Opening the site on any device loads it and replaces whatever that browser had
    cached. Changes made here are sent a moment later, but only if nobody else saved in between (CLOUD.rev is the
@@ -2125,12 +2126,12 @@ async function cloudPull(why){if(!SB||!USER||CLOUD.pulling)return;CLOUD.pulling=
           /* leagues imported here before signing in join the account */
           if(!loc.owner)(loc.leagues||[]).forEach(e=>{if(e&&e.snap&&e.snap.real&&e.snap.real.src&&!(cs.leagues||[]).some(x=>x.key===e.key)){(cs.leagues=cs.leagues||[]).push(e);merged=true}});
           if(CLOUD.conflict||lsGet('tm-acct-legacy')==='1')merged=acctMerge(cs,loc.acct)||merged}
-        const say=other||!!loc.example&&!cs.example||!loc.owner;
+        const say=other||!loc.owner;
         CLOUD.rev=rev;CLOUD.ready=true;CLOUD.dirty=false;adoptState(cs);try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}
         if(say&&why!=='conflict')toast('Loaded your saved league');
         if(merged){CLOUD.dirty=true;await cloudPush()}}}
     else{/* nothing saved for this account yet */
-      if(other){S={league:{name:'Sample League',teams:12,sc:{...PRESETS.sf.sc},slots:{...PRESETS.sf.slots}},teams:[],me:'t1',log:[],example:true,custom:null,onboarded:false,chat:[]};setPool();exampleLeague();S.real=null;SCHED=null;LIVE_LU=null;S.leagueKey=leagueKeyOf();upsertLeague();acctApply();buildLeagueForm();hubSel=S.me;leagueSwitcher();render()}
+      if(other){S=blankState();setPool();recompute();S.real=null;SCHED=null;LIVE_LU=null;acctApply();buildLeagueForm();hubSel=S.me;leagueSwitcher();go(tab)}
       CLOUD.rev=rev;CLOUD.ready=true;CLOUD.dirty=true;await cloudPush()}
     lsDel('tm-acct-legacy');CLOUD.err=CLOUD.err&&CLOUD.ready?null:CLOUD.err;CLOUD.last=Date.now();cloudMark();acctUI()}
   catch(e){CLOUD.err=String(e&&e.message||e)}
@@ -2168,7 +2169,9 @@ async function checkExpiry(){const v=lsGet(UNTIL_KEY);if(!USER||!v||Date.now()<+
 /* ---- Names: the username everywhere, never the email */
 function acctName(){const md=USER&&USER.user_metadata||{};return PROFILE&&PROFILE.username||md.username||md.user_name||md.preferred_username||md.full_name||md.name||''}
 function acctAvatar(){const md=USER&&USER.user_metadata||{};return md.avatar_url||md.picture||''}
-function avatarHtml(cls){const a=acctAvatar(),n=acctName();return a?`<span class="${cls}"><img src="${esc(a)}" alt="" referrerpolicy="no-referrer"></span>`:`<span class="${cls}">${esc((n[0]||'•').toUpperCase())}</span>`}
+/* the letter: first letter of the username; no username yet, the email's first letter */
+function acctLetter(){const md=USER&&USER.user_metadata||{},u=String(PROFILE&&PROFILE.username||md.username||'').trim(),e=String(USER&&USER.email||'').trim();return ((u||e)[0]||'•').toUpperCase()}
+function avatarHtml(cls){const a=acctAvatar();return a?`<span class="${cls}"><img src="${esc(a)}" alt="" referrerpolicy="no-referrer"></span>`:`<span class="${cls}">${esc(acctLetter())}</span>`}
 function acctUI(){const b=$('acct-btn');if(b){if(USER){b.innerHTML=avatarHtml('acct-av');b.classList.add('in');b.title=acctName()?'Account: '+acctName():'Account';b.setAttribute('aria-label',b.title)}else{b.textContent='Sign in';b.classList.remove('in');b.title='';b.removeAttribute('aria-label')}}
   if(tab==='signin')renderSignin();else if(tab==='account'&&!ACC_EDIT&&USER)renderAccount()}
 function suggestUsername(){const md=USER&&USER.user_metadata||{},src=md.username||md.user_name||md.preferred_username||md.full_name||md.name||(USER&&USER.email||'').split('@')[0]||'';return src.toLowerCase().replace(/[^a-z0-9_]+/g,'_').replace(/^_+|_+$/g,'').slice(0,20)}
@@ -2543,16 +2546,16 @@ var RANK_ALL=false;document.addEventListener('click',e=>{if(e.target.id==='rank-
 
 /* ===== Saved leagues: every league you import is kept (with your team) and you can switch between them ===== */
 /* function declarations (hoisted) so save() can use them during startup */
-function lkeys(){return ['league','teams','me','log','real','imported','example','extraPlayers']}
+function lkeys(){return ['league','teams','me','log','real','imported','extraPlayers']}
 function clone(x){return x==null?x:JSON.parse(JSON.stringify(x))}
-function leagueKeyOf(){return S.real&&S.real.src?S.real.src.type+':'+S.real.src.league:S.example?'sample':'custom'}
+function leagueKeyOf(){return S.real&&S.real.src?S.real.src.type+':'+S.real.src.league:'custom'}
 function meRefOf(){const src=S.real&&S.real.src;if(!src)return null;const k=Object.keys(src.rid||{}).find(r=>src.rid[r]===S.me);return k??null}
 function upsertLeague(){S.leagues=S.leagues||[];if(!S.leagueKey)S.leagueKey=leagueKeyOf();const snap={};lkeys().forEach(k=>snap[k]=clone(S[k]));
-  const e={key:S.leagueKey,name:(S.league&&S.league.name)||'My League',src:S.imported?S.imported.src:S.example?'Sample':'Manual',meRef:meRefOf(),snap,at:Date.now()};
+  const e={key:S.leagueKey,name:(S.league&&S.league.name)||'My League',src:S.imported?S.imported.src:'Manual',meRef:meRefOf(),snap,at:Date.now()};
   const i=S.leagues.findIndex(x=>x.key===e.key);if(i>=0)S.leagues[i]=e;else{S.leagues.push(e);setTimeout(leagueSwitcher,0)}}
-function saveCurrentLeague(){if(S&&S.teams&&S.teams.length)upsertLeague()}
+function saveCurrentLeague(){if(S&&!S.noLeague&&S.teams&&S.teams.length)upsertLeague()}
 function switchLeague(key){if(key===S.leagueKey)return;saveCurrentLeague();const e=(S.leagues||[]).find(x=>x.key===key);if(!e)return;
-  lkeys().forEach(k=>S[k]=clone(e.snap[k]));if(!S.league.sc)S.league.sc={...BASE_SC};S.league.sc={...BASE_SC,...S.league.sc};S.leagueKey=key;
+  lkeys().forEach(k=>S[k]=clone(e.snap[k]));S.noLeague=false;if(!S.league.sc)S.league.sc={...BASE_SC};S.league.sc={...BASE_SC,...S.league.sc};S.leagueKey=key;
   setPool();SCHED=null;LIVE_LU=null;PLAT=null;REC_CACHE={v:-1};TD.give=[];TD.get=[];hubSel=S.me;shotState=null;save();recompute();buildLeagueForm();render();leagueSwitcher();toast(`Switched to ${e.name}`);setTimeout(syncNow,0)}
 function removeLeague(key){if(!confirmRemove(key))return;S.leagues=(S.leagues||[]).filter(x=>x.key!==key);save();renderLeagueList();leagueSwitcher();toast('League removed')}
 function confirmRemove(key){const L=S.leagues||[];if(L.length<2){toast('You need at least one league');return false}const x=L.find(l=>l.key===key);if(!confirm(`Remove ${x?x.name:'this league'} from your account?`))return false;if(key===S.leagueKey)switchLeague(L.find(l=>l.key!==key).key);return true}
@@ -2567,7 +2570,7 @@ function renderLeagueList(){const el=$('league-list');if(!el)return;const L=S.le
 document.addEventListener('change',e=>{if(e.target.id!=='league-switch'&&e.target.id!=='hub-league')return;const v=e.target.value;if(v==='__add'){leagueSwitcher();renderLeagueList();location.hash='hub';setTimeout(()=>{IMP.open=true;renderImport();const c=$('import-card');if(c)c.scrollIntoView({behavior:'smooth',block:'start'})},50);return}switchLeague(v)});
 document.addEventListener('click',e=>{const t=e.target;if(!t.closest)return;const sw=t.closest('[data-lswitch]');if(sw){switchLeague(sw.dataset.lswitch);return}const rm=t.closest('[data-lremove]');if(rm)removeLeague(rm.dataset.lremove)});
 /* first run: register the league already loaded */
-if(!S.leagues||!S.leagues.length){S.leagueKey=leagueKeyOf();upsertLeague();save()}else if(!S.leagueKey)S.leagueKey=leagueKeyOf();
+if(S.noLeague){}else if(!S.leagues||!S.leagues.length){S.leagueKey=leagueKeyOf();upsertLeague();save()}else if(!S.leagueKey)S.leagueKey=leagueKeyOf();
 leagueSwitcher();
 
 /* ===== Problem reports =====
@@ -2586,7 +2589,7 @@ window.fetch=async function(u,o){const url=String(u&&u.url||u);if(!/^\/api\/|sup
   catch(e){if(!(e&&e.name==='AbortError'))diagNote('net',diagPath(url)+' '+(e&&e.message||e)+' '+Math.round(performance.now()-t0)+'ms');throw e}};
 function diagSnap(){const o={host:location.host,tab:typeof tab!=='undefined'?tab:null,w:innerWidth,ua:navigator.userAgent.slice(0,220),tz:(()=>{try{return Intl.DateTimeFormat().resolvedOptions().timeZone}catch(e){return null}})(),online:navigator.onLine};
   try{o.build=buildSig(document.documentElement.outerHTML)}catch(e){}
-  try{o.signedIn=!!USER;o.week=WEEK;o.example=!!(S&&S.example);o.leagues=(S&&S.leagues||[]).map(l=>((l.snap&&l.snap.real&&l.snap.real.src&&l.snap.real.src.type)||'custom')+(l.key===S.leagueKey?'*':''));
+  try{o.signedIn=!!USER;o.week=WEEK;o.noLeague=!!(S&&S.noLeague);o.leagues=(S&&S.leagues||[]).map(l=>((l.snap&&l.snap.real&&l.snap.real.src&&l.snap.real.src.type)||'custom')+(l.key===S.leagueKey?'*':''));
     o.cloud={ready:!!CLOUD.ready,dirty:!!CLOUD.dirty,err:CLOUD.err||null};o.ls=Object.keys(localStorage).length}catch(e){}
   try{if(typeof STATUS!=='undefined')o.status={src:STATUS.src,live:!!STATUS.live}}catch(e){}
   try{if(typeof TMN!=='undefined')o.news={f:TMN.f,items:TMN.items.length,lgn:TMN.lgn?TMN.lgn.items.length:null,lgnMin:TMN.lgn?Math.round((Date.now()-TMN.lgn.at)/60e3):null,art:TMN.art?TMN.art.items.length:null,
@@ -2695,7 +2698,7 @@ function accProfile(){const un=PROFILE&&PROFILE.username,email=USER.email||'';
 function accLeagues(){const L=S.leagues||[],me=typeof myTeam==='function'&&S.teams&&S.teams.length?myTeam():null;
   const sync=CLOUD.err?`<span class="pill-warn">Not saved</span><span class="note">${esc(CLOUD.err)}</span>`:CLOUD.busy?'<span class="note">Saving...</span>':`<span class="pill-ok">Saved</span><span class="note">${CLOUD.last?'Last saved '+new Date(CLOUD.last).toLocaleTimeString([], {hour:'numeric',minute:'2-digit'}):'To your account'}</span>`;
   const list=L.length?`<ul class="acc-lg">${L.map(x=>`<li class="${x.key===S.leagueKey?'cur':''}"><span class="acc-lg-ic" aria-hidden="true">${esc((x.name||'L')[0].toUpperCase())}</span><span class="acc-lg-t"><b>${esc(x.name||'League')}</b><span class="note">${esc(x.src||'')}${x.key===S.leagueKey&&me?' · '+esc(me.name):''}</span></span>${x.key===S.leagueKey?'<span class="pill-ok">Current</span>':''}</li>`).join('')}</ul>`
-    :`<div class="acc-empty"><b>${esc(S.league&&S.league.name||'Sample League')}</b><p class="note">${S.example?"You're looking at the sample league. Bring in yours from Sleeper or ESPN.":'This is the league on this account.'}</p></div>`;
+    :S.noLeague?`<div class="acc-empty"><b>No league yet</b><p class="note">Bring in yours from Sleeper or ESPN.</p></div>`:`<div class="acc-empty"><b>${esc(S.league&&S.league.name||'My League')}</b><p class="note">This is the league on this account.</p></div>`;
   return `<section class="card acc-sec"><header class="acc-sec-h"><h2>Leagues</h2><p>Synced to any device.</p></header>
     ${list}<div class="acc-sec-f"><a class="btn primary" href="#hub">Manage leagues</a><a class="btn" href="#league">League settings</a></div></section>
     ${typeof tmnNotifHtml==='function'?tmnNotifHtml():''}
@@ -2935,7 +2938,19 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape'&&SS_PICK){SS_PICK=nu
   const c=(e.key==='Enter'||e.key===' ')&&e.target.closest&&e.target.closest('#startsit [data-ssswap]');if(c&&e.target===c){e.preventDefault();ssSwapInto(+c.dataset.ssswap)}});
 
 /* ===== Alerts (bell in the top bar) ===== */
-function seenAlerts(){const v=acctGet('alerts',[]);return new Set(Array.isArray(v)?v:[])}
+/* Alerts expire. S.acct.alertT keeps, per alert, when it first showed up (c) and when you opened the bell with it in
+   the list (s), so it syncs across devices. Seen alerts go 3 days after they were seen; unseen ones 7 days after they
+   showed up. An expired alert stays gone for as long as the same alert key would still be raised. */
+const AL_SEEN_MS=3*864e5,AL_NEW_MS=7*864e5,AL_KEEP_MS=14*864e5;
+function alertTimes(){const m=acctGet('alertT',null);return m&&typeof m==='object'&&!Array.isArray(m)?m:{}}
+function alertExpired(x,now){return !!x&&(x.s?now-x.s>=AL_SEEN_MS:now-(x.c||now)>=AL_NEW_MS)}
+function alertsLive(){const raw=alertsList(),now=Date.now(),m={...alertTimes()},keys=new Set(raw.map(a=>a.k));let ch=false;
+  /* alerts seen under the old list (no times) count as seen now */
+  const old=acctGet('alerts',[]);(Array.isArray(old)?old:[]).forEach(k=>{if(keys.has(k)&&!m[k]){m[k]={c:now,s:now};ch=true}});
+  raw.forEach(a=>{if(!m[a.k]){m[a.k]={c:now};ch=true}});
+  Object.keys(m).forEach(k=>{const x=m[k];if(!keys.has(k)&&now-Math.max(x.c||0,x.s||0)>AL_KEEP_MS){delete m[k];ch=true}});
+  if(ch)acctSet('alertT',m);
+  const L=raw.filter(a=>!alertExpired(m[a.k],now));return {L,seen:new Set(L.filter(a=>m[a.k]&&m[a.k].s).map(a=>a.k))}}
 function alertsList(){const me=S&&myTeam&&myTeam();if(!me||!V||!G)return [];const out=[],RL=realLineup(S.me),lu=RL||lineup(me.players,projV),st=new Set(lu.slots.filter(x=>x.p).map(x=>x.p.id));
   me.players.forEach(id=>{const p=byId[id],g=G[id];if(!p||!g)return;const s=stOf(id);
     if(st.has(id)&&s&&s!=='Q')out.push({k:`out-${WEEK}-${id}-${s}`,lvl:'bad',t:`${p.n}: ${ST_LABEL[s].toLowerCase()}`,d:RL?'He is in your starting lineup. Swap him out.':'One of your usual starters. Your lineup on My Team already works around him.',open:id});
@@ -2952,12 +2967,12 @@ function alertsList(){const me=S&&myTeam&&myTeam();if(!me||!V||!G)return [];cons
   if(typeof tmnTop==='function'){const cut=Date.now()-5*864e5;tmnTop().items.filter(e=>(e.type==='top'||e.type==='second')&&(e.at||0)>cut&&byId[e.pid]).sort((a,b)=>(a.type==='top'?0:1)-(b.type==='top'?0:1)||b.pts-a.pts).slice(0,3)
     .forEach(e=>{const one=e.type==='top';top.push({k:`rank-${e.k}`,lvl:one?'n1':'n2',m:one?1:2,t:e.head,d:`${one?(e.overall?'#1 scorer in the NFL':'#1 '+(e.pos||'')+' in the NFL'):'#2 '+(e.pos||'')+' in the NFL'} · Week ${e.week} · ${f1(e.pts)} pts`,open:e.pid})})}
   return [...top,...out]}
-function renderAlerts(){const b=$('alert-btn');if(!b)return;const L=USER?alertsList():[],seen=seenAlerts(),n=L.filter(a=>!seen.has(a.k)).length+(USER&&typeof tmnUnread==='function'&&tab!=='news'?tmnUnread():0);
+function renderAlerts(){const b=$('alert-btn');if(!b)return;const {L,seen}=USER?alertsLive():{L:[],seen:new Set()},n=L.filter(a=>!seen.has(a.k)).length+(USER&&typeof tmnUnread==='function'&&tab!=='news'?tmnUnread():0);
   const c=$('alert-n');c.hidden=!n;c.textContent=n>9?'9+':n;b.setAttribute('aria-label',n?`Alerts, ${n} new`:'Alerts');
   const pop=$('alert-pop');if(!pop.hidden)paintAlerts(L,seen)}
 function paintAlerts(L,seen){const nn=typeof tmnUnread==='function'?tmnUnread():0;$('alert-pop').innerHTML=`<div class="al-h"><b>Alerts</b><span class="note">Week ${WEEK}</span></div>${nn?`<a class="al-news" href="#news"><b>${nn} new in News</b><span>Big plays from your players →</span></a>`:''}${L.length?`<div class="al-list">${L.map(a=>`<button class="al-i ${a.lvl}${seen.has(a.k)?'':' new'}" data-open="${a.open}"><i>${a.m?a.m:''}</i><span><b>${esc(a.t)}</b><span>${esc(a.d)}</span></span></button>`).join('')}</div>`:'<p class="empty" style="margin:0">All clear. Nothing needs your attention right now.</p>'}`}
 function toggleAlerts(open){const pop=$('alert-pop'),b=$('alert-btn');open=open??pop.hidden;pop.hidden=!open;b.setAttribute('aria-expanded',open);
-  if(open){const L=alertsList(),seen=seenAlerts();paintAlerts(L,seen);if(L.some(a=>!seen.has(a.k)))acctSet('alerts',[...new Set([...seen,...L.map(a=>a.k)])].slice(-300));$('alert-n').hidden=true}}
+  if(open){const {L,seen}=alertsLive();paintAlerts(L,seen);if(L.some(a=>!seen.has(a.k))){const m={...alertTimes()},now=Date.now();L.forEach(a=>{m[a.k]={...(m[a.k]||{c:now}),s:(m[a.k]&&m[a.k].s)||now}});acctSet('alertT',m)}$('alert-n').hidden=true}}
 
 /* ===== Draft: cheat sheet, mock draft, live draft assistant ===== */
 var drView='sheet',DR=null,drPos='ALL',DR_TIMER=null;
