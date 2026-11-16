@@ -382,7 +382,13 @@ function tmnTopFind(week,stats,games,Ls,fresh,live){const T=tmnTop();T.done2=T.d
    Any player on one of your rosters who changed NFL teams in the last 7 days: one banner (or a corner chip if a
    bigger one is up), a row in the bell, and a louder card in the Feed. Each trade alerts once. */
 function tmnMyTrades(){try{const Ls=tmnLeagues();return tmnTrades(Ls,tmnLeagueNews(Ls,[])).filter(x=>x.yours&&x.at>Date.now()-7*864e5)}catch(e){return []}}
-function tmnTradeAlerts(){if(typeof USER!=='undefined'&&!USER)return;const T=tmnTop(),Ls=tmnLeagues();T.trd=T.trd||[];let n=0;
+/* stored trade alerts (bell, banners, chips) that no longer pass the checks are removed, like the false Brock Bowers one */
+function tmnPurgeTrades(){const D=window.NFL_DATA;if(!D||!Array.isArray(D.moves))return 0;const T=tmnTop(),ok=tmnMovesOK(),good=k=>{const m=/^mytr:(.+):([A-Z]{2,4})$/.exec(k);return !!(m&&ok[m[1]]&&ok[m[1]].to===tmnTeamCode(m[2]))};
+  const n0=(T.trd||[]).length+T.items.length;T.trd=(T.trd||[]).filter(good);
+  const gone=new Set(T.items.filter(e=>e.type==='mytrade'&&!good(e.k)).map(e=>e.k));T.items=T.items.filter(e=>!gone.has(e.k));
+  if(gone.size){TMN.chips=(TMN.chips||[]).filter(c=>!gone.has(c.k));TMN.queue=(TMN.queue||[]).filter(e=>!gone.has(e.k));if(typeof tmnPaintChips==='function')try{tmnPaintChips()}catch(e){}}
+  const n=n0-T.trd.length-T.items.length;if(n)tmnTopSave();return n}
+function tmnTradeAlerts(){if(typeof USER!=='undefined'&&!USER)return;tmnPurgeTrades();const T=tmnTop(),Ls=tmnLeagues();T.trd=T.trd||[];let n=0;
   tmnMyTrades().forEach(x=>{const p=byId[x.pid],k='mytr:'+x.pid+':'+x.to;if(!p||T.trd.includes(k))return;T.trd.push(k);n++;
     const L=Ls.filter(c=>c.roster.has(x.pid)).map(c=>({key:c.key,name:c.name,st:c.starters.has(x.pid)}));
     /* builds before this one alerted from the weekly store: those were already seen */
@@ -718,19 +724,37 @@ const TMN_TRADE_TOP=500;   /* trade cards for anyone ranked inside this */
 try{const c=JSON.parse(localStorage.getItem(TMN_TR_LS)||'null');if(c&&c.items)TMN.tra=c}catch(e){}
 async function tmnLoadTradeArts(list){const need=list.filter(x=>!x.url&&!(TMN.tra&&TMN.tra.items&&TMN.tra.items[x.pid]&&Date.now()-TMN.tra.items[x.pid].at<30*60e3));
   if(!need.length||TMN.traBusy||Date.now()-(TMN.traFail||0)<2*60e3)return;TMN.traBusy=true;let got=false;
-  const q=need.slice(0,12).map(x=>[byId[x.pid].n,x.from||'',x.to||''].join('|')).join(';');
+  const q=need.slice(0,12).map(x=>[byId[x.pid].n,x.from||'',x.to||'',x.mday||''].join('|')).join(';');
   try{const r=await fetch('/api/news?trades='+encodeURIComponent(q)+'&b='+Math.floor(Date.now()/1200000));const j=r.ok?await r.json():null;
     if(j&&j.items){got=true;TMN.tra=TMN.tra||{items:{}};need.slice(0,12).forEach(x=>{TMN.tra.items[x.pid]={at:Date.now(),a:j.items[byId[x.pid].n]||null}});
       try{localStorage.setItem(TMN_TR_LS,JSON.stringify(TMN.tra))}catch(e){}}}catch(e){}
   TMN.traBusy=false;if(!got){TMN.traFail=Date.now();return}if(tab==='news'&&$('tmn-feed'))tmnRenderBody()}
+/* ---------- every trade is checked before it shows ----------
+   A move counts only if the nightly update confirmed it (he showed on the new team in two runs in a row), both teams
+   are real NFL teams after aliases (LV/OAK, LAR/LA, JAX/JAC, WAS/WSH...), the teams differ, and he is on the new team
+   right now. Stories never create a trade on their own. "Traded" needs a story that names him, says traded, dealt or
+   acquired, has no rumour words, and is dated on or after the move (the nightly run sees a move the morning after,
+   so the day before it was first seen counts). Anything that fails is held back: no card, banner, chip or bell row. */
+const TMN_TEAM_ALIAS={OAK:'LV',LVR:'LV',RAI:'LV',LA:'LAR',STL:'LAR',RAM:'LAR',SD:'LAC',SDG:'LAC',JAC:'JAX',WSH:'WAS',WFT:'WAS',GNB:'GB',KAN:'KC',KCC:'KC',NWE:'NE',NOR:'NO',SFO:'SF',TAM:'TB',ARZ:'ARI',BLT:'BAL',CLV:'CLE',HST:'HOU',HOU:'HOU'};
+function tmnTeamCode(t){t=String(t||'').toUpperCase().trim();t=TMN_TEAM_ALIAS[t]||t;const D=window.NFL_DATA,nfl=D&&D.sched?D.sched:null;return t&&t!=='FA'&&(!nfl||nfl[t])?t:''}
+function tmnMoveOK(m){if(!Array.isArray(m)||m.length<4)return null;const [id,f0,t0,day]=m,p=byId[id];if(!p||!day)return null;
+  const from=tmnTeamCode(f0),to=tmnTeamCode(t0),now=tmnTeamCode(p.t);if(!from||!to||from===to||now!==to)return null;
+  const at=Date.parse(day+'T12:00:00');return at?{id,from,to,day,at}:null}
+function tmnMovesOK(){const D=window.NFL_DATA,by={};((D&&D.moves)||[]).forEach(m=>{const x=tmnMoveOK(m);if(x&&(!by[x.id]||by[x.id].at<x.at))by[x.id]=x});return by}
+const TMN_TR_WORD=/\b(traded|dealt|acquired?|acquires|acquiring)\b/i,TMN_TR_RUMOR=/\b(could|might|would|may|interest(ed)?\s+in|potential(ly)?|talks?|rumou?rs?|considering|exploring|shopping|candidates?|trade targets?|speculat\w*|eyeing|linked)\b/i;
+function tmnTradeStoryOK(a,pid,day){if(!a||!byId[pid])return false;const t=String(a.title||''),d=String(a.desc||'').slice(0,400),both=t+' '+d;
+  const nm=norm(byId[pid].n);if(!nm||!wordIn(normT(both),nm))return false;
+  if(!TMN_TR_WORD.test(both)||TMN_TR_RUMOR.test(t)||TMN_TR_RUMOR.test(d.slice(0,220)))return false;
+  const at=Date.parse(a.at||0),from=Date.parse(day+'T00:00:00')-864e5;return !!at&&!!from&&at>=from}
 function tmnTrades(Ls,lg){const rk=id=>(typeof V!=='undefined'&&V&&V.rank&&V.rank[id])||999,mine=new Set();Ls.forEach(c=>c.roster.forEach(id=>mine.add(id)));
-  const cut=Date.now()-14*864e5,by={},D=window.NFL_DATA;
-  ((D&&D.moves)||[]).forEach(([id,from,to,day])=>{const p=byId[id],at=Date.parse(day+'T12:00:00');if(!p||rk(id)>TMN_TRADE_TOP||!at||at<cut)return;by[id]={from,to,at,day:true}});
-  (lg||[]).filter(x=>x.kind==='trade').forEach(x=>{const m=by[x.pid]||(by[x.pid]={from:'',to:byId[x.pid].t,at:x.at});if(!m.url||(m.pay&&!x.pay)){m.url=x.url;m.title=x.title;m.desc=x.desc;m.outlet=x.outlet;m.img=x.img;m.pay=!!x.pay;m.at=Math.min(m.at,x.at);m.day=false}});
+  const cut=Date.now()-14*864e5,by={},ok=tmnMovesOK();
+  Object.values(ok).forEach(({id,from,to,at,day})=>{if(rk(id)>TMN_TRADE_TOP||at<cut)return;by[id]={from,to,at,mday:day,day:true}});
+  /* trade stories only attach to a confirmed move, and only if they pass the story check */
+  (lg||[]).filter(x=>x.kind==='trade'&&by[x.pid]).forEach(x=>{const m=by[x.pid];if(!tmnTradeStoryOK(x,x.pid,m.mday))return;if(!m.url||(m.pay&&!x.pay)){m.url=x.url;m.title=x.title;m.desc=x.desc;m.outlet=x.outlet;m.img=x.img;m.pay=!!x.pay;m.at=Math.min(m.at,x.at);m.day=false}});
   const out=Object.entries(by).map(([pid,m])=>{let a=m.url?null:TMN.tra&&TMN.tra.items&&TMN.tra.items[pid]&&TMN.tra.items[pid].a;
-    if(a&&Date.parse(a.at||0)<m.at-5*864e5)a=null;    /* a story from long before the move is about something else */
-    const how=m.url||(a&&/\btrade[ds]?\b|\bdealt\b|\bacquire/i.test((a.title||'')+' '+(a.desc||'')))?'trade':'move';
-    const x={type:'trade',kind:'trade',how,k:'tr:'+pid,pid,from:m.from,to:m.to||byId[pid].t,yours:mine.has(pid),at:m.at,day:!!m.day,leagues:[],url:m.url||(a&&a.url)||'',title:m.title||(a&&a.title)||'',desc:m.desc||(a&&a.desc)||'',outlet:m.outlet||(a&&a.outlet)||'',img:m.img||(a&&a.img)||null,pay:m.url?!!m.pay:!!(a&&a.pay)};
+    if(a&&!tmnTradeStoryOK(a,pid,m.mday))a=null;
+    const how=m.url||a?'trade':'move';
+    const x={type:'trade',kind:'trade',how,k:'tr:'+pid,pid,mday:m.mday,from:m.from,to:m.to||byId[pid].t,yours:mine.has(pid),at:m.at,day:!!m.day,leagues:[],url:m.url||(a&&a.url)||'',title:m.title||(a&&a.title)||'',desc:m.desc||(a&&a.desc)||'',outlet:m.outlet||(a&&a.outlet)||'',img:m.img||(a&&a.img)||null,pay:m.url?!!m.pay:!!(a&&a.pay)};
     if(a&&a.at){const t=Date.parse(a.at);if(t){if(t<x.at)x.at=t;x.day=false}}return x}).sort((a,b)=>b.at-a.at).slice(0,20);
   tmnLoadTradeArts(out);return out}
 /* a story's title, always about the player on the card: when the headline doesn't name him, lead with his name */

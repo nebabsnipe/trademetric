@@ -190,6 +190,9 @@ const MOVE = [
   ['role', /\b(names? [\w'. -]{2,40} (the |as )?(starting \w+|starter)|named (the )?starter|new starter|will start|to start (at|for|week)|benched|takes over (as|at)|starting (qb|quarterback|job)|demoted|promoted to|depth chart change)\b/i],
 ];
 const RUMOR = /\b(could|might|would|interest(ed)? in|rumou?rs?|potential|candidates?|should|predict|trade targets?|ideas|deadline (buyers|sellers)|what if|mock)\b/i;
+/* trade cards: the story has to say it happened, in so many words */
+const TR_WORD = /\b(traded|dealt|acquired?|acquires|acquiring)\b/i;
+const TR_RUMOR = /\b(could|might|would|may|interest(ed)?\s+in|potential(ly)?|talks?|rumou?rs?|considering|exploring|shopping|candidates?|trade targets?|speculat\w*|eyeing|linked)\b/i;
 function moveOf(t) { for (const [k, re] of MOVE) if (re.test(t || '')) return k; return null; }
 function kindOf(x) {
   const t = x.title || '', d = x.desc || '';
@@ -308,20 +311,27 @@ export default async function handler(req, res) {
     return res.status(200).json(v);
   }
   /* trade mode for the News tab's Feed: the best story about each fantasy-relevant player who just changed teams,
-     so the trade card can carry an article about that trade. No AI. GET /api/news?trades=Name|FROM|TO;...
+     so the trade card can carry an article about that trade. No AI. GET /api/news?trades=Name|FROM|TO|DAY;...
+     A story only counts if it names the player, says traded / dealt / acquired, has no rumour words ("could",
+     "interest in", "potential", "talks"...), and is dated on or after the move (DAY, the day the nightly update first
+     saw him on the new team; the day before also counts, since that run happens the morning after).
      -> {items:{[name]:{title,desc,url,outlet,at,img}}}; a player with no good story is simply left out. */
   if (q.trades) {
     const list = String(q.trades).split(';').map(x => x.split('|')).filter(x => x[0]).slice(0, 12)
-      .map(([n, f, t]) => ({ n: String(n).slice(0, 60), from: String(f || '').toUpperCase().slice(0, 4), to: String(t || '').toUpperCase().slice(0, 4) }));
-    const key = 'trades:' + list.map(x => norm(x.n) + x.to).sort().join(',');
+      .map(([n, f, t, d]) => ({ n: String(n).slice(0, 60), from: String(f || '').toUpperCase().slice(0, 4), to: String(t || '').toUpperCase().slice(0, 4), day: /^\d{4}-\d\d-\d\d$/.test(d || '') ? d : '' }));
+    const key = 'trades:' + list.map(x => norm(x.n) + x.to + x.day).sort().join(',');
     const c = cache.get(key);
     if (c && Date.now() - c.at < 20 * 60e3) { res.setHeader('Cache-Control', 'public, max-age=0, s-maxage=1200'); return res.status(200).json(c.v); }
     const out = {};
     await Promise.all(list.map(async x => {
       try {
         const { items } = await collect(x.n, x.to || x.from, false, false, 'trade', 21);
-        const last = norm(x.n).split(' ').pop();
-        const good = items.filter(i => !RUMOR.test(i.title) && !FLUFF.test(i.title) && (moveOf(i.title) === 'trade' || moveOf((i.desc || '').slice(0, 300)) === 'trade'))
+        const last = norm(x.n).split(' ').pop(), full = norm(x.n), since = x.day ? Date.parse(x.day + 'T00:00:00Z') - 864e5 : 0;
+        const good = items.filter(i => {
+          const t = i.title || '', d = (i.desc || '').slice(0, 400), at = Date.parse(i.at || 0);
+          return !RUMOR.test(t) && !TR_RUMOR.test(t) && !TR_RUMOR.test(d.slice(0, 220)) && !FLUFF.test(t) && TR_WORD.test(t + ' ' + d)
+            && (' ' + norm(t + ' ' + d) + ' ').includes(' ' + full + ' ') && (!since || (at && at >= since));
+        })
           .map(i => ({ i, s: (i.pay ? -3 : 0) + (norm(i.title).includes(last) ? 2 : 0) + (moveOf(i.title) === 'trade' ? 2 : 0) + (i.desc ? 1 : 0) + Date.parse(i.at || 0) / 864e5 / 100 }))
           .sort((a, b) => b.s - a.s);
         const b = good[0] && good[0].i;

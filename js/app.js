@@ -493,21 +493,23 @@ const SLOT_ORDER=['QB','RB','WR','TE','FLEX','SF','K','DST'];
 let LIVE_LU=null,PLAT=null;
 const SLEEPER_SLOT={QB:'QB',RB:'RB',WR:'WR',TE:'TE',FLEX:'FLEX',REC_FLEX:'FLEX',WRRB_FLEX:'FLEX',SUPER_FLEX:'SF',K:'K',DEF:'DST'};
 function realLineup(tid){let r=LIVE_LU&&LIVE_LU[tid];if(!r&&S.real&&S.real.lineups&&S.real.lineupWeek===WEEK)r=S.real.lineups[tid];if(!r||!r.length)return null;
-  return {slots:r.map(x=>({label:x.label,p:x.id&&byId[x.id]||null})),bench:[],total:0,real:true}}
+  return {slots:r.map(x=>({label:x.label,el:x.el,p:x.id&&byId[x.id]||null})),bench:[],total:0,real:true}}
+/* flex slots narrower than RB/WR/TE: Sleeper REC_FLEX and WRRB_FLEX, ESPN 3 (RB/WR) and 5 (WR/TE) */
+var SLOT_EL={REC_FLEX:['WR','TE'],WRRB_FLEX:['RB','WR'],e3:['RB','WR'],e5:['WR','TE']};
 const sleeperDst=pid=>/^[A-Z]{2,3}$/.test(pid)?'dst-'+(pid==='LA'?'lar':pid.toLowerCase()):null;
 /* Real lineups and the platform's own fantasy points for this week, so numbers match Sleeper or ESPN exactly */
 async function loadSleeperLineups(){const src=S.real&&S.real.src;if(!src||src.type!=='sleeper')return;
   try{const ms=await getJSON(`https://api.sleeper.app/v1/league/${src.league}/matchups/${WEEK}`),out={},pts={},team={};
     (ms||[]).forEach(m=>{const tid=src.rid[m.roster_id];if(!tid)return;team[tid]=+m.points||0;
       Object.entries(m.players_points||{}).forEach(([pid,v])=>{const id=src.pmap[pid]||sleeperDst(pid);if(id)pts[id]=+v||0});
-      if(Array.isArray(m.starters))out[tid]=m.starters.map((pid,i)=>({label:SLEEPER_SLOT[src.labels[i]]||null,id:src.pmap[pid]||sleeperDst(pid)})).filter(x=>x.label)});
+      if(Array.isArray(m.starters))out[tid]=m.starters.map((pid,i)=>({label:SLEEPER_SLOT[src.labels[i]]||null,el:SLOT_EL[src.labels[i]],id:src.pmap[pid]||sleeperDst(pid)})).filter(x=>x.label)});
     LIVE_LU=out;PLAT={src:'Sleeper',pts,team,at:Date.now()}}catch(e){}}
 const ESPN_SLOT_MAP={0:'QB',2:'RB',4:'WR',6:'TE',16:'DST',17:'K',23:'FLEX',3:'FLEX',5:'FLEX',7:'SF'};
 function readEspnWeek(d){const src=S.real&&S.real.src;if(!d||!src||src.type!=='espn')return;const out={},pts={},team={};
   (d.teams||[]).forEach(t=>{const tid=src.rid[t.id];if(!tid)return;const L=[];
     ((t.roster&&t.roster.entries)||[]).forEach(e=>{const pl=e.playerPoolEntry&&e.playerPoolEntry.player;if(!pl)return;const q=findExact(pl.fullName)||(pl.defaultPositionId===16?byId['dst-'+String(pl.proTeamAbbreviation||'').toLowerCase()]:null);
       const st=(pl.stats||[]).find(x=>x.scoringPeriodId===WEEK&&x.statSourceId===0&&(x.statSplitTypeId===1||x.statSplitTypeId==null));if(q&&st)pts[q.id]=+st.appliedTotal||0;
-      if(ESPN_SLOT_MAP[e.lineupSlotId])L.push({label:ESPN_SLOT_MAP[e.lineupSlotId],id:q?q.id:null})});
+      if(ESPN_SLOT_MAP[e.lineupSlotId])L.push({label:ESPN_SLOT_MAP[e.lineupSlotId],el:SLOT_EL['e'+e.lineupSlotId],id:q?q.id:null})});
     L.sort((a,b)=>SLOT_ORDER.indexOf(a.label)-SLOT_ORDER.indexOf(b.label));if(L.length)out[tid]=L});
   (d.schedule||[]).filter(m=>m.matchupPeriodId===WEEK).forEach(m=>[m.home,m.away].forEach(x=>{if(x&&src.rid[x.teamId])team[src.rid[x.teamId]]=+(x.totalPointsLive??x.totalPoints)||0}));
   LIVE_LU=out;PLAT={src:'ESPN',pts,team,at:Date.now()}}
@@ -579,7 +581,7 @@ async function syncSnapSleeper(Z){const src=Z.real.src,L=src.league;let ch=false
     const us=(users||[]).find(x=>x.user_id===r.owner_id),nm=(us&&us.metadata&&us.metadata.team_name)||(us&&us.display_name);if(nm&&nm!==T.name){T.name=nm;ch=true}
     const st=r.settings||{},rec={w:st.wins||0,l:st.losses||0,t:st.ties||0,pf:(st.fpts||0)+(st.fpts_decimal||0)/100};if(JSON.stringify(Z.real.rec[tid])!==JSON.stringify(rec)){Z.real.rec[tid]=rec;ch=true}}
   if(snapRec(Z))ch=true;
-  if(Array.isArray(ms)&&src.labels){const out={};ms.forEach(m=>{const tid=src.rid[m.roster_id];if(tid&&Array.isArray(m.starters))out[tid]=m.starters.map((pid,i)=>({label:SLEEPER_SLOT[src.labels[i]]||null,id:src.pmap[pid]||sleeperDst(pid)})).filter(x=>x.label)});
+  if(Array.isArray(ms)&&src.labels){const out={};ms.forEach(m=>{const tid=src.rid[m.roster_id];if(tid&&Array.isArray(m.starters))out[tid]=m.starters.map((pid,i)=>({label:SLEEPER_SLOT[src.labels[i]]||null,el:SLOT_EL[src.labels[i]],id:src.pmap[pid]||sleeperDst(pid)})).filter(x=>x.label)});
     if(snapLineups(Z,out))ch=true}
   return ch}
 async function syncSnapEspn(Z){const src=Z.real.src;let ch=false;Z.real.rec=Z.real.rec||{};
@@ -592,7 +594,7 @@ async function syncSnapEspn(Z){const src=Z.real.src;let ch=false;Z.real.rec=Z.re
     if(out.length&&irChanged(T,E.filter(e=>e.lineupSlotId===21).map(e=>who(e.playerPoolEntry&&e.playerPoolEntry.player)).filter(Boolean)))ch=true;
     const nm=t.name||[t.location,t.nickname].filter(Boolean).join(' ');if(nm&&nm!==T.name){T.name=nm;ch=true}
     const o=(t.record&&t.record.overall)||{},rec={w:o.wins||0,l:o.losses||0,t:o.ties||0,pf:o.pointsFor||0};if(JSON.stringify(Z.real.rec[tid])!==JSON.stringify(rec)){Z.real.rec[tid]=rec;ch=true}
-    const L=E.filter(e=>ESPN_SLOT_MAP[e.lineupSlotId]).map(e=>({label:ESPN_SLOT_MAP[e.lineupSlotId],id:who(e.playerPoolEntry&&e.playerPoolEntry.player)})).sort((a,b)=>SLOT_ORDER.indexOf(a.label)-SLOT_ORDER.indexOf(b.label));if(L.length)lu[tid]=L});
+    const L=E.filter(e=>ESPN_SLOT_MAP[e.lineupSlotId]).map(e=>({label:ESPN_SLOT_MAP[e.lineupSlotId],el:SLOT_EL['e'+e.lineupSlotId],id:who(e.playerPoolEntry&&e.playerPoolEntry.player)})).sort((a,b)=>SLOT_ORDER.indexOf(a.label)-SLOT_ORDER.indexOf(b.label));if(L.length)lu[tid]=L});
   if(snapRec(Z))ch=true;if(snapLineups(Z,lu))ch=true;return ch}
 async function syncSavedLeagues(force){if(SAVED_BUSY||!USER||!S||!S.leagues||S.leagues.length<2)return;SAVED_BUSY=true;let changed=false;
   try{for(const e of S.leagues){const Z=e.snap,src=Z&&Z.real&&Z.real.src;if(e.key===S.leagueKey||!src||!Z.teams)continue;
@@ -632,7 +634,7 @@ function teamStats(){
     const scale=x=>Math.max(1,(s[x]||0));
     r.needs=POS.filter(x=>r.rel[x]/scale(x)<-1.2).sort((a,b)=>r.rel[a]/scale(a)-r.rel[b]/scale(b)).slice(0,2);
     r.deep=POS.filter(x=>r.depth[x]>3).sort((a,b)=>r.depth[b]-r.depth[a]).slice(0,1);
-    r.weak=[...POS].filter(x=>(s[x]||0)>0||x!=='QB'||s.SFLEX).sort((a,b)=>r.rel[a]/scale(a)-r.rel[b]/scale(b))[0]});
+    r.weak=[...POS].filter(x=>x!=='K'&&x!=='DST'&&((s[x]||0)>0||x!=='QB'||s.SFLEX)).sort((a,b)=>r.rel[a]/scale(a)-r.rel[b]/scale(b))[0]});
   const ranked=[...rows].sort((a,b)=>b.total-a.total);ranked.forEach((r,i)=>r.rank=i+1);
   TS_CACHE={v:VER,d:{rows,ranked,mean}};return TS_CACHE.d;
 }
@@ -969,16 +971,48 @@ function irPill(id,IRS){if(!IRS.cand.includes(id))return '';const p=byId[id],why
   return `<span class="ir-pill${IRS.open?'':' full'}" title="${esc(p.n)} is ${why}${IRS.open?` and you have an open IR slot. Move him there in ${irApp()} to free a roster spot.`:', but your IR slots are full.'}">IR eligible</span>`}
 function renderIR(me,IRS){const el=$('ir-card');if(!el)return;const n=irSlots();
   el.hidden=!(n>0&&(IRS.ir.length||IRS.cand.length));if(el.hidden){el.innerHTML='';return}
-  const plat=S.real&&S.real.src?({sleeper:'Sleeper',espn:'ESPN'})[S.real.src.type]:null,app=irApp();
+  const app=irApp();
   const row=id=>{const p=byId[id],s=stOf(id),stale=IRS.stale.includes(id);
     return `<div class="lrow ir-row${stale?' stale':''}" data-open="${id}"><span class="slot">IR</span><div class="pl">${av(p)}<div class="meta"><span style="display:flex;gap:6px;align-items:center;min-width:0"><button class="pname" data-open="${id}">${esc(p.n)}</button>${stHtml(id)}</span><span class="psub">${p.pos}${V.posRank[id]} · ${p.t} · ${stale?`<b class="ir-warn">Healthy again. Activate him in ${esc(app)}.</b>`:esc(s?ST_LABEL[s]:'No designation')}</span></div></div><span></span></div>`};
   const open=Array.from({length:IRS.open},()=>`<div class="lrow ir-open" style="cursor:default"><span class="slot">IR</span><span class="empty">${IRS.cand.length?`Open. ${esc(byId[IRS.cand[0]].n)} can go here in ${esc(app)}.`:'Open slot'}</span><span></span></div>`).join('');
   el.innerHTML=`<div class="card-h"><h2>Injured reserve</h2><span class="note">${IRS.ir.length} of ${n} slot${n===1?'':'s'} used</span></div>${IRS.ir.map(row).join('')}${open}
-    ${IRS.cand.length&&!IRS.open?`<p class="note ir-foot">${IRS.cand.map(id=>esc(byId[id].n)).join(', ')} ${IRS.cand.length===1?'is':'are'} IR eligible, but your IR is full.</p>`:''}<p class="note ir-foot">${plat?`Synced from ${plat}`:'Make IR moves in your league app'}</p>`}
+`}
+/* the lineup My Team shows: the one set in Sleeper/ESPN when we have it, else the best projected lineup */
+function myLineup(me,RL){const act=activeOf(me);RL=RL===undefined?realLineup(S.me):RL;
+  /* ESPN leaves empty starting slots out of the lineup entirely: put them back from the league's slot counts */
+  if(RL){const s=S.league.slots||{},need={QB:s.QB||0,RB:s.RB||0,WR:s.WR||0,TE:s.TE||0,FLEX:s.FLEX||0,SF:s.SFLEX||0,K:s.K||0,DST:s.DST||0},have={};
+    RL.slots.forEach(x=>have[x.label]=(have[x.label]||0)+1);const add=[];
+    Object.keys(need).forEach(l=>{for(let n=have[l]||0;n<need[l];n++)add.push({label:l,p:null})});
+    if(add.length){const ord=['QB','RB','WR','TE','FLEX','SF','K','DST'],sl=[...RL.slots,...add].map((x,i)=>({x,i}));
+      sl.sort((a,b)=>(ord.indexOf(a.x.label)-ord.indexOf(b.x.label))||a.i-b.i);RL={...RL,slots:sl.map(o=>o.x)}}}
+  return RL?{slots:RL.slots,bench:act.filter(id=>!RL.slots.some(x=>x.p&&x.p.id===id)).sort((a,b)=>nextV(b)-nextV(a)),total:sum(RL.slots.filter(x=>x.p),x=>G[x.p.id].projNext),real:true}:lineup(act,nextV)}
+/* ===== Lineup alerts: only obvious problems in your starting lineup =====
+   An empty slot, a starter on bye / Out / Suspended / IR / PUP, or a bench player who fits the slot and is projected
+   at least LU_GAP points more AND about double (LU_X) the starter. Close calls never show. Each alert is dropped once
+   the starter's game has kicked off (and nobody is suggested whose own game has started). */
+var LU_GAP=5,LU_X=1.8,LU_BAD={O:'is out',SUS:'is suspended',IR:'is on injured reserve',PUP:'is on the PUP list'};
+function etMs(day,tm){const d=new Date(day+'T'+tm+':00Z');if(isNaN(d))return NaN;
+  const f=z=>new Date(d.toLocaleString('en-US',{timeZone:z}));return d.getTime()+(f('UTC')-f('America/New_York'))}
+function kickedOff(id){const l=liveOf(id);if(l&&l.state&&l.state!=='pre')return true;const p=byId[id];
+  if(!p||!G[id]||!G[id].next||WEEK!==DATA.week)return false;const k=KICK[p.t];if(!k||!k[1]||!k[2])return false;const t=etMs(k[1],k[2]);return !isNaN(t)&&Date.now()>=t}
+function luApp(){const a=irApp();return a==='your league app'?'your league app':a}
+function lineupAlerts(LU){if(!LU||!S||!myTeam())return [];const out=[],app=luApp(),used=new Set();
+  const elig=x=>x.el||ELIG[x.label]||[x.label],pj=id=>G[id]?G[id].projNext||0:0;
+  const pickTxt=x=>{const pos=elig(x).map(p=>p==='DST'?'defense':p==='K'?'kicker':p);return (pos[0]==='RB'?'an ':'a ')+(pos.length>1?pos.slice(0,-1).join(', ')+' or '+pos.slice(-1):pos[0])};
+  const ok=id=>{const g=G[id];return g&&g.next&&!LU_BAD[stOf(id)]&&!kickedOff(id)};
+  const best=(x,skip)=>LU.bench.filter(id=>byId[id]&&elig(x).includes(byId[id].pos)&&ok(id)&&!used.has(id)&&id!==skip).sort((a,b)=>pj(b)-pj(a))[0];
+  LU.slots.forEach((x,i)=>{const lab=x.label==='SF'?'superflex':x.label;
+    if(!x.p){const b=best(x);if(b){used.add(b);out.push({i,kind:'empty',k:`lu-${WEEK}-${i}-empty-${b}`,sub:b,msg:`Your ${lab} is empty. Start ${byId[b].n} in ${app}.`})}
+      else out.push({i,kind:'empty',k:`lu-${WEEK}-${i}-empty`,msg:`Your ${lab} is empty. Pick up ${pickTxt(x)} in ${app}.`});return}
+    const id=x.p.id;if(kickedOff(id))return;const s=stOf(id),bye=G[id]&&!G[id].next,why=bye?'is on bye':LU_BAD[s];
+    if(why){const b=best(x,id);if(b)used.add(b);out.push({i,kind:bye?'bye':'out',k:`lu-${WEEK}-${i}-${bye?'bye':s}-${id}`,start:id,sub:b,msg:`${x.p.n} ${why}. ${b?`Start ${byId[b].n} in ${app}.`:`Pick up ${pickTxt(x)} in ${app}.`}`});return}
+    const sp=pj(id),b=best(x,id);if(!b)return;const bp=pj(b);
+    if(bp>=sp+LU_GAP&&bp>=sp*LU_X){used.add(b);out.push({i,kind:'bench',k:`lu-${WEEK}-${i}-bench-${id}-${b}`,start:id,sub:b,msg:`Start ${byId[b].n} over ${x.p.n} at ${lab} in ${app} (${f1(bp)} vs ${f1(sp)} projected).`})}});
+  return out}
 function renderTeam(){
   const me=myTeam(),st=teamStats(),mine=st.rows.find(r=>r.T.id===S.me),RL=realLineup(S.me);
   const IRS=irState(me),act=activeOf(me);
-  const LU=RL?{slots:RL.slots,bench:act.filter(id=>!RL.slots.some(x=>x.p&&x.p.id===id)).sort((a,b)=>nextV(b)-nextV(a)),total:sum(RL.slots.filter(x=>x.p),x=>G[x.p.id].projNext),real:true}:lineup(act,nextV);
+  const LU=myLineup(me,RL),LA=lineupAlerts(LU),flag=new Set(LA.map(a=>a.i));
   const started=LU.slots.filter(x=>x.p&&liveOf(x.p.id)),actual=sum(started,x=>liveOf(x.p.id).pts);
   $('team-title').textContent=me.name;$('team-kicker').textContent=`${S.league.name||'My League'} · Week ${WEEK}`;
   const sim=simulate();const byes=me.players.filter(id=>!G[id].next).length,tags=me.players.filter(id=>G[id].tag).length;
@@ -988,18 +1022,19 @@ function renderTeam(){
    <div class="tile"><div class="lab">Playoff odds</div><div class="val">${sim?pct(sim[S.me].playoff):'-'}</div><div class="sub">Record ${recTxt(S.me)} · power rank #${mine.rank}</div></div>
    <div class="tile"><div class="lab">Weakest spot</div><div class="val">${weak}</div><div class="sub">${sgn(mine.rel[weak])} pts/wk vs. league average</div></div>
    <div class="tile"><div class="lab">Byes and alerts</div><div class="val">${byes}<span class="muted" style="font-size:20px"> / ${tags}</span></div><div class="sub">Players on bye · buy/sell alerts</div></div>`;
-  const row=(label,p)=>p?`<div class="lrow" data-open="${p.id}"><span class="slot">${label}</span><div class="pl">${av(p)}<div class="meta"><span style="display:flex;gap:6px;align-items:center;min-width:0"><button class="pname" data-open="${p.id}">${esc(p.n)}</button>${tagHtml(p.id,label!=='BN')}${irPill(p.id,IRS)}</span><span class="psub">${p.pos}${V.posRank[p.id]} · ${liveOf(p.id)?liveTxt(p.id)+(liveOf(p.id).state==='post'?'':' live'):oppHtml(p.id)}</span></div></div>${lprojHtml(p.id)}</div>`
-    :`<div class="lrow" style="cursor:default"><span class="slot">${label}</span><span class="empty">Empty. Add a player who fits this slot.</span><span></span></div>`;
-  $('lineup').innerHTML=LU.slots.map(s=>row(s.label,s.p)).join('');
+  const row=(label,p,i)=>p?`<div class="lrow${flag.has(i)?' lu-flag':''}" data-open="${p.id}"><span class="slot">${label}</span><div class="pl">${av(p)}<div class="meta"><span style="display:flex;gap:6px;align-items:center;min-width:0"><button class="pname" data-open="${p.id}">${esc(p.n)}</button>${tagHtml(p.id,label!=='BN')}${irPill(p.id,IRS)}</span><span class="psub">${p.pos}${V.posRank[p.id]} · ${liveOf(p.id)?liveTxt(p.id)+(liveOf(p.id).state==='post'?'':' live'):oppHtml(p.id)}</span></div></div>${lprojHtml(p.id)}</div>`
+    :`<div class="lrow${flag.has(i)?' lu-flag':''}" style="cursor:default"><span class="slot">${label}</span><span class="empty">Empty. Add a player who fits this slot.</span><span></span></div>`;
+  $('lineup').innerHTML=LU.slots.map((s,i)=>row(s.label,s.p,i)).join('');
+  const lb=$('lu-alert');if(lb){lb.hidden=!LA.length;lb.innerHTML=LA.map(a=>`<p class="lu-a" role="status"><i aria-hidden="true">!</i><span>${esc(a.msg)}</span></p>`).join('')}
   $('lineup-total').textContent=f1(started.length?actual:LU.total);$('lineup-total-lab').textContent=started.length?'Score so far':LU.real?'Projected total · your lineup':'Projected total';$('lineup-total-sub').textContent=started.length?'proj '+f1(LU.total):'';
   $('bench').innerHTML=LU.bench.length?LU.bench.map(id=>row('BN',byId[id])).join(''):'<p class="empty">No bench players yet.</p>';
-  $('roster-count').textContent=`${act.length} of ${rosterSize()} roster spots filled${IRS.ir.length?`, plus ${IRS.ir.length} on IR`:''}.`;
   renderIR(me,IRS);
   const mx=Math.max(4,...POS.map(x=>Math.abs(mine.rel[x])));
   $('strength').innerHTML=POS.map(x=>{const d=mine.rel[x],w=Math.abs(d)/mx*50;return `<div class="strow"><span class="lbl">${x}</span><div class="track"><i style="${d>=0?`left:50%;width:${w}%;background:var(--ink)`:`left:${50-w}%;width:${w}%;background:var(--accent)`}"></i></div><span class="v">${sgn(d)}</span></div>`}).join('');
   renderFix(mine);renderStartSit();renderMatchup();renderOppCard();
 }
-function weakList(r){const s=S.league.slots,sc=x=>Math.max(1,s[x]||0);return POS.filter(x=>x!=='QB'||(s.QB||0)>0||s.SFLEX).sort((a,b)=>r.rel[a]/sc(a)-r.rel[b]/sc(b))}
+/* weakest spot: only QB, RB, WR and TE; never kicker or defense */
+function weakList(r){const s=S.league.slots,sc=x=>Math.max(1,s[x]||0);return POS.filter(x=>x!=='K'&&x!=='DST'&&(x!=='QB'||(s.QB||0)>0||s.SFLEX)).sort((a,b)=>r.rel[a]/sc(a)-r.rel[b]/sc(b))}
 function dropFor(addId){const me=myTeam(),after=[...me.players,addId],base=lineup(after,projV).total,bench=lineup(me.players,projV).bench;
   const same=bench.filter(id=>byId[id].pos===byId[addId].pos&&tv(id)<tv(addId)).sort((a,b)=>tv(a)-tv(b));if(same.length)return same[0];
   let best=null,bc=Infinity;
@@ -1089,11 +1124,8 @@ function renderFix(mine){
   const me=myTeam(),before=lineup(me.players,projV).total,wl=weakList(mine),focus=wl.filter((x,i)=>i===0||mine.rel[x]<0).slice(0,2);
   const faFor=pos=>POOL.filter(p=>p.pos===pos&&!OWN[p.id]).map(p=>{const drop=dropFor(p.id);return {p,drop,g:drop?lineup(me.players.filter(x=>x!==drop).concat(p.id),projV).total-before:0}}).sort((a,b)=>b.g-a.g||V.pts[b.p.id]-V.pts[a.p.id]).slice(0,2);
   const faRow=({p,drop,g})=>`<div class="fa-row">${plCell(p,`${p.pos}${V.posRank[p.id]} · ${f1(V.pts[p.id])} pts/G · ${oppHtml(p.id)}${roleTag(p.id)?' '+roleTag(p.id):''}`)}${g>.05?`<span class="gain">+${f1(g)}/wk</span>`:'<span class="note">Depth</span>'}<button class="btn small" data-swap="${p.id}|${drop}">Swap</button>${drop?`<div class="swap">Drop <button class="pname" data-open="${drop}">${esc(byId[drop].n)}</button><span>${byId[drop].pos}${V.posRank[drop]} · ${f1(V.pts[drop])} pts/G</span></div>`:''}</div>`;
-  const trades=allTrades();let forWeak=pickDiverse(trades.filter(t=>t.get.some(id=>focus.includes(byId[id].pos))),1);if(!forWeak.length)forWeak=pickDiverse(trades,1);
-  $('fix-card').innerHTML=`<div class="fix-head"><b>${focus.join(' · ')}</b><span>${focus.length>1?'Weakest positions':'Weakest position'}: ${focus.map(x=>`${x}, ${f1(Math.abs(mine.rel[x]))} pts/wk below the league average`).join('; ')}. Recommended moves below.</span></div>
-   ${focus.map(x=>{const f=faFor(x);return `<h4>Waiver options · ${x}</h4>${f.length?f.map(faRow).join(''):'<p class="empty">No waiver options improve this position.</p>'}`}).join('')}
-   <h4>Best trade target</h4>${forWeak.length?`<div class="fix-trades">${(()=>{const u=new Set();return forWeak.map(t=>tradeCardHtml(t,tradeTitle(t,focus,u),true))})().join('')}</div>`:'<p class="empty">No balanced trades available for this position right now.</p>'}
-   <p class="note fix-more" style="margin:10px 0 0"><a href="#trade-ideas">More trade ideas in Trades →</a></p>`;
+  $('fix-card').innerHTML=`<div class="fix-head"><b>${focus.join(' · ')}</b><span>${focus.length>1?'Weakest positions':'Weakest position'}: ${focus.map(x=>`${x}, ${f1(Math.abs(mine.rel[x]))} pts/wk below the league average`).join('; ')}. Waiver options below.</span></div>
+   ${focus.map(x=>{const f=faFor(x);return `<h4>Waiver options · ${x}</h4>${f.length?f.map(faRow).join(''):'<p class="empty">No waiver options improve this position.</p>'}`}).join('')}`;
 }
 
 /* ===== RANKINGS ===== */
@@ -1648,15 +1680,19 @@ function renderMatchup(){const el=$('matchup');const oid=oppOf(S.me,WEEK);
   const me=myTeam(),O=teamById(oid),A=weekLine(me.players,WEEK,S.me),Bm=weekLine(O.players,WEEK,oid),pw=lineP(A,Bm,WEEK),f=pickVal(WEEK);
   const act=lu=>sum(lu.slots.filter(x=>x.p&&liveOf(x.p.id)),x=>liveOf(x.p.id).pts),anyLive=[...A.lu.slots,...Bm.lu.slots].some(x=>x.p&&liveOf(x.p.id)),aA=act(A.lu),aB=act(Bm.lu);
   const cell=(id,v,win,al)=>{const l=id&&liveOf(id);return `<td class="${al} num ${win?'win':''}">${l?`<b>${f1(l.pts)}</b><small>${l.state==='post'?'final':'proj '+f1(v)}</small>`:f1(v)}</td>`};
-  const rows=A.lu.slots.map((x,i)=>{const o=Bm.lu.slots[i],a=x.p?f(x.p.id):0,b=o&&o.p?f(o.p.id):0;
+  const nSlots=A.lu.slots.length,rows=A.lu.slots.map((x,i)=>{const o=Bm.lu.slots[i],a=x.p?f(x.p.id):0,b=o&&o.p?f(o.p.id):0;
     const sub=id=>liveOf(id)?`${byId[id].pos} · ${liveTxt(id)} ${f1(liveOf(id).pts)} pts`:`${byId[id].pos} · ${oppHtml(id)}`;
-    return `<tr><td>${x.p?plCell(x.p,sub(x.p.id)):'<span class="empty">Empty</span>'}</td>${cell(x.p&&x.p.id,a,a>=b,'r')}<td class="mu-slot">${x.label}</td>${cell(o&&o.p&&o.p.id,b,b>a,'')}<td>${o&&o.p?plCell(o.p,sub(o.p.id)):'<span class="empty">Empty</span>'}</td></tr>`}).join('');
+    return `<tr${i>=MU_PEEK?' class="mu-more"':''}><td>${x.p?plCell(x.p,sub(x.p.id)):'<span class="empty">Empty</span>'}</td>${cell(x.p&&x.p.id,a,a>=b,'r')}<td class="mu-slot">${x.label}</td>${cell(o&&o.p&&o.p.id,b,b>a,'')}<td>${o&&o.p?plCell(o.p,sub(o.p.id)):'<span class="empty">Empty</span>'}</td></tr>`}).join('');
   el.innerHTML=`<div class="card-h"><h2>Week ${WEEK} matchup</h2><span class="note">${A.lu.real?'Your real lineups · ':''}${LIVE&&LIVE.week===WEEK&&Object.values(LIVE.games).some(g=>g.state!=='pre')?`<span class="live-dot${LIVE.live?' on':''}"></span>${LIVE.live?'Live':'Updated'} · ${new Date(LIVE.updated).toLocaleTimeString([], {hour:'numeric',minute:'2-digit'})} · points so far plus the rest of each game projected`:''}</span></div>
    <div class="mu-head"><div class="mu-team"><span class="mu-name"><i class="tsq" style="background:${teamColor(S.me)}"></i>${esc(me.name)}</span><span class="note">${recTxt(S.me)}</span><b class="num">${f1(anyLive?aA:A.m)}</b>${anyLive?`<span class="mu-proj">proj ${f1(A.m)}</span>`:''}</div>
     <div class="mu-mid"><div class="mu-pct">${wpPct(pw)}</div><div class="note">chance you win</div></div>
     <div class="mu-team r"><span class="mu-name"><i class="tsq" style="background:${teamColor(oid)}"></i>${esc(O.name)}</span><span class="note">${recTxt(oid)}</span><b class="num">${f1(anyLive?aB:Bm.m)}</b>${anyLive?`<span class="mu-proj">proj ${f1(Bm.m)}</span>`:''}</div></div>
    <div class="mu-bar"><i style="width:${pw*100}%;background:${teamColor(S.me)}"></i><i style="width:${(1-pw)*100}%;background:${versusColor(teamColor(S.me),teamColor(oid))}"></i></div>
-   <details class="mu-details"><summary>Position-by-position comparison</summary><div class="mu-table"><table><thead><tr><th>You</th><th class="r">${anyLive?'Pts':'Proj'}</th><th style="text-align:center">Slot</th><th>${anyLive?'Pts':'Proj'}</th><th>${esc(O.name)}</th></tr></thead><tbody>${rows}</tbody></table></div></details>`}
+   <div class="mu-peek${MU_ALL||nSlots<=MU_PEEK?' open':''}" id="mu-peek"><div class="mu-peek-h">Position by position</div><div class="mu-table"><table><thead><tr><th>You</th><th class="r">${anyLive?'Pts':'Proj'}</th><th style="text-align:center">Slot</th><th>${anyLive?'Pts':'Proj'}</th><th>${esc(O.name)}</th></tr></thead><tbody>${rows}</tbody></table></div>
+    ${nSlots>MU_PEEK?`<button type="button" class="mu-all" data-mu-all aria-expanded="${MU_ALL}" aria-controls="mu-peek">${MU_ALL?'Show fewer':`See all ${nSlots} positions`}<svg viewBox="0 0 20 20" width="14" height="14" aria-hidden="true"><path d="M5 7.5 10 12.5 15 7.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>`:''}</div>`}
+/* matchup peek: the first few slots, then "See all N positions" opens the rest */
+var MU_PEEK=3,MU_ALL=false;
+document.addEventListener('click',e=>{const b=e.target.closest&&e.target.closest('[data-mu-all]');if(!b)return;MU_ALL=!MU_ALL;renderMatchup();if(!MU_ALL){const el=$('matchup');if(el.getBoundingClientRect().top<0)el.scrollIntoView({block:'start'})}});
 function dialSvg(x){const r=86,c=Math.PI*r,len=c*Math.max(0,Math.min(1,x));
   return `<svg viewBox="0 0 200 116" class="dial" aria-hidden="true"><path d="M14 104 A86 86 0 0 1 186 104" class="dial-bg"/><path d="M14 104 A86 86 0 0 1 186 104" class="dial-fg" style="stroke-dasharray:${len} ${c}"/></svg>`}
 function seedBars(o,P,n){const mx=Math.max(...o.seed,.01);return `<div class="seedwrap"><div class="seedbars" title="How often they finish in each spot">${o.seed.map((x,i)=>`<i class="${i<P?'in':''}" style="height:${Math.max(4,x/mx*100)}%"></i>`).join('')}</div><div class="seedax"><span>1st</span><span>${n}th</span></div></div>`}
@@ -1813,7 +1849,7 @@ async function espnImport(id,creds){
     (d.teams||[]).forEach((t,i)=>{const o=(t.record&&t.record.overall)||{};real.rec[i]={w:o.wins||0,l:o.losses||0,t:o.ties||0,pf:o.pointsFor||0}});
     const ESPN_SLOT={0:'QB',2:'RB',4:'WR',6:'TE',16:'DST',17:'K',23:'FLEX',3:'FLEX',5:'FLEX',7:'SF'};
     real.lineupWeek=d.scoringPeriodId||null;real.lineups={};
-    (d.teams||[]).forEach((t,i)=>{const L=((t.roster&&t.roster.entries)||[]).filter(e=>ESPN_SLOT[e.lineupSlotId]).map(e=>{const pl=e.playerPoolEntry&&e.playerPoolEntry.player,q=pl&&findExact(pl.fullName);return {label:ESPN_SLOT[e.lineupSlotId],id:q?q.id:null}});
+    (d.teams||[]).forEach((t,i)=>{const L=((t.roster&&t.roster.entries)||[]).filter(e=>ESPN_SLOT[e.lineupSlotId]).map(e=>{const pl=e.playerPoolEntry&&e.playerPoolEntry.player,q=pl&&findExact(pl.fullName);return {label:ESPN_SLOT[e.lineupSlotId],el:SLOT_EL['e'+e.lineupSlotId],id:q?q.id:null}});
       L.sort((a,b)=>SLOT_ORDER.indexOf(a.label)-SLOT_ORDER.indexOf(b.label));if(L.length)real.lineups[i]=L});
     real.src={type:'espn',league:String(id),priv:!!creds,rid:Object.fromEntries((d.teams||[]).map((t,i)=>[t.id,i]))};if(creds)IMP.espnCreds=creds;
     applyImport((st.name)||'ESPN League',teams,sc,slots,'ESPN',real,(()=>{const a=st.acquisitionSettings||{},dr=st.draftSettings||{};return {irOk:['IR','PUP','O'],format:dr.keeperCount>0?'keeper':'redraft',waiver:a.isUsingAcquisitionBudget?'faab':'priority',budget:a.acquisitionBudget||100}})());readEspnWeek(d)}
@@ -1832,7 +1868,7 @@ function applyImport(name,teams,sc,slots,src,real,extra){
   if(S.real&&S.real.src)setTimeout(syncNow,0);
   let mi=teams.findIndex(t=>t.mine);
   if(mi<0&&prev&&prev.meRef!=null&&S.real&&S.real.src){const t=S.real.src.rid[prev.meRef];const k=S.teams.findIndex(x=>x.id===t);if(k>=0)mi=k}
-  S.me=S.teams[mi>=0?mi:0].id;S.log=prev&&prev.snap.log||[];S.noLeague=false;S.imported={name,src};S.leagueKey=key;upsertLeague();S.onboarded=true;IMP.open=undefined;hubSel=S.me;bump();buildLeagueForm();toast('Imported '+name);if(location.hash!=='#team')location.hash='team';else render();window.scrollTo({top:0,behavior:'smooth'});
+  S.me=S.teams[mi>=0?mi:0].id;S.log=prev&&prev.snap.log||[];S.noLeague=false;S.imported={name,src};S.leagueKey=key;upsertLeague();dropDupLeagues(key);S.onboarded=true;IMP.open=undefined;hubSel=S.me;bump();buildLeagueForm();toast('Imported '+name);if(location.hash!=='#team')location.hash='team';else go('team');window.scrollTo({top:0,behavior:'smooth'});
   impMsg(`<div class="callout buy"><b>Imported ${esc(name)}.</b> ${teams.length} teams and your scoring are loaded.${miss?` ${miss} players aren't in TradeMetric's player list yet and were skipped.`:''}${mi<0?' Pick your team in Team rosters and press "This is my team".':''}</div>`)}
 
 /* ===== AI scouting report ===== */
@@ -1976,12 +2012,14 @@ function applyTheme(){if(themePref)document.documentElement.setAttribute('data-t
 $('theme-btn').addEventListener('click',()=>{themePref=isDark()?'light':'dark';acctSet('theme',themePref);applyTheme()});
 
 /* ===== Routing & events ===== */
+/* Draft tools are off during the season (no Draft tab); offseason mode switches them back on */
+var DRAFT_ON=false;
 const TABS=['team','news','trade','rankings','hub','season','league','draft','help','welcome','signin','account'];let tab='team';
 /* tabs that need a league: with none, they show the import prompt */
 const NEED_LG=['team','trade','season'];
 function howLink(k){return `<a class="how how-wrap" href="#help-${k}">How this works</a>`}
 const TAB_ALIAS={players:['rankings','rank'],waivers:['rankings','waiv'],values:['rankings','vals']};
-function go(t){let helpSec=null;if(t&&t.startsWith('help-')){helpSec=t.slice(5);t='help'}if(t&&t.startsWith('account-')){ACC_TAB=t.slice(8);t='account'}else if(t==='account')ACC_TAB='profile';if(t!==tab||t==='account'){ACC_EDIT=null;ACC_MSG=null}if(t==='trade-ideas'||t==='trade-builder'){setTrView(t==='trade-ideas'?'ideas':'build');t='trade'}if(TAB_ALIAS[t]){plView=TAB_ALIAS[t][1];t=TAB_ALIAS[t][0]}if(t==='helper'){if(USER)openAI();t=TABS.includes(tab)?tab:'team';history.replaceState(null,'','#'+t)}if(!USER&&t!=='signin')t='signin';tab=TABS.includes(t)?t:'team';if(S&&S.noLeague&&NEED_LG.includes(tab))tab='welcome';document.body.dataset.tab=tab;if(tab!=='welcome'&&S&&!S.onboarded){S.onboarded=true;save()}document.querySelectorAll('.nav button').forEach(b=>{if(b.dataset.tab===tab)b.setAttribute('aria-current','page');else b.removeAttribute('aria-current')});
+function go(t){let helpSec=null;if(t&&t.startsWith('help-')){helpSec=t.slice(5);t='help'}if(t&&t.startsWith('account-')){ACC_TAB=t.slice(8);t='account'}else if(t==='account')ACC_TAB='profile';if(t!==tab||t==='account'){ACC_EDIT=null;ACC_MSG=null}if(t==='trade-ideas'||t==='trade-builder'){setTrView(t==='trade-ideas'?'ideas':'build');t='trade'}if(TAB_ALIAS[t]){plView=TAB_ALIAS[t][1];t=TAB_ALIAS[t][0]}if(t==='draft'&&!DRAFT_ON){t='team';history.replaceState(null,'','#team')}if(t==='helper'){if(USER)openAI();t=TABS.includes(tab)?tab:'team';history.replaceState(null,'','#'+t)}if(!USER&&t!=='signin')t='signin';tab=TABS.includes(t)?t:'team';if(S&&S.noLeague&&NEED_LG.includes(tab))tab='welcome';document.body.dataset.tab=tab;if(tab!=='welcome'&&S&&!S.onboarded){S.onboarded=true;save()}document.querySelectorAll('.nav button').forEach(b=>{if(b.dataset.tab===tab)b.setAttribute('aria-current','page');else b.removeAttribute('aria-current')});
   TABS.forEach(x=>$('v-'+x).hidden=x!==tab);render();window.scrollTo(0,0);if(tab==='help')openHelp(helpSec)}
 function render(){({team:renderTeam,news:tmnRender,rankings:renderPlayers,draft:renderDraft,help:()=>{},trade:renderTrade,hub:renderHub,season:renderSeason,welcome:renderWelcome,league:fillLeagueForm,signin:renderSignin,account:renderAccount})[tab]();renderAlerts();if(openId&&!$('scrim').hidden)openCard(openId);queueBalance()}
 document.querySelectorAll('.nav button').forEach(b=>b.addEventListener('click',()=>{location.hash=b.dataset.hash||b.dataset.tab}));
@@ -2041,8 +2079,6 @@ document.addEventListener('dragover',e=>{const d=e.target.closest&&e.target.clos
 document.addEventListener('dragleave',e=>{const d=e.target.closest&&e.target.closest('#drop');if(d)d.classList.remove('over')});
 document.addEventListener('drop',e=>{const d=e.target.closest&&e.target.closest('#drop');if(d){e.preventDefault();d.classList.remove('over');const f=e.dataTransfer.files[0];if(f&&f.type.startsWith('image/'))readScreenshot(f)}});
 document.addEventListener('paste',e=>{if(tab!=='hub')return;const f=[...(e.clipboardData&&e.clipboardData.files||[])].find(x=>x.type.startsWith('image/'));if(f)readScreenshot(f)});
-$('add-btn').addEventListener('click',()=>{const p=findByName($('add-player').value);if(!p){toast('No player found with that name');return}const from=OWN[p.id];if(from===S.me){toast(p.n+' is already on your team');return}assign(p.id,S.me);$('add-player').value='';toast(from?`Moved ${p.n} from ${teamById(from).name}`:'Added '+p.n);render()});
-$('add-player').addEventListener('keydown',e=>{if(e.key==='Enter')$('add-btn').click()});
 $('targets').addEventListener('keydown',e=>{const r=e.target.closest&&e.target.closest('tr[data-get]');if(!r||e.target!==r||(e.key!=='Enter'&&e.key!==' '))return;e.preventDefault();r.click()});
 $('trade-reset').addEventListener('click',()=>{TD.give=[];TD.get=[];renderTrade()});
 $('refresh-trades').addEventListener('click',()=>{sugSkip+=3;if(sugSkip>=Math.max(3,sugPool))sugSkip=0;renderTrade()});
@@ -2097,7 +2133,7 @@ function ssoMark(p){return `<span class="sso-ic sso-${p.id}" aria-hidden="true">
 function lsGet(k){try{return localStorage.getItem(k)}catch(e){return null}}
 function lsSet(k,v){try{localStorage.setItem(k,v)}catch(e){}}
 function lsDel(k){try{localStorage.removeItem(k)}catch(e){}}
-function adoptState(st){S=st;const dropped=dropSample();if(!S.teams||!S.teams.length)S.teams=makeTeams((S.league&&S.league.teams)||12);setPool();SCHED=null;LIVE_LU=null;acctApply();recompute();buildLeagueForm();hubSel=S.me;if(tab==='welcome'&&!S.noLeague)location.hash='team';else if(S.noLeague&&NEED_LG.includes(tab))go(tab);leagueSwitcher();render();if(dropped)setTimeout(save,0);if(S.real&&S.real.src)loadPlatform().then(()=>{recompute();render();syncSavedLeagues()});else syncSavedLeagues()}
+function adoptState(st){S=st;const dropped=dropSample();if(dedupeLeagues())setTimeout(()=>{try{save()}catch(e){}},0);if(!S.teams||!S.teams.length)S.teams=makeTeams((S.league&&S.league.teams)||12);setPool();SCHED=null;LIVE_LU=null;acctApply();recompute();buildLeagueForm();hubSel=S.me;if(tab==='welcome'&&!S.noLeague)location.hash='team';else if(S.noLeague&&NEED_LG.includes(tab))go(tab);leagueSwitcher();render();if(dropped)setTimeout(save,0);if(S.real&&S.real.src)loadPlatform().then(()=>{recompute();render();syncSavedLeagues()});else syncSavedLeagues()}
 /* ---- Saving to the account ----
    The server's copy is the real one. Opening the site on any device loads it and replaces whatever that browser had
    cached. Changes made here are sent a moment later, but only if nobody else saved in between (CLOUD.rev is the
@@ -2553,6 +2589,17 @@ function meRefOf(){const src=S.real&&S.real.src;if(!src)return null;const k=Obje
 function upsertLeague(){S.leagues=S.leagues||[];if(!S.leagueKey)S.leagueKey=leagueKeyOf();const snap={};lkeys().forEach(k=>snap[k]=clone(S[k]));
   const e={key:S.leagueKey,name:(S.league&&S.league.name)||'My League',src:S.imported?S.imported.src:'Manual',meRef:meRefOf(),snap,at:Date.now()};
   const i=S.leagues.findIndex(x=>x.key===e.key);if(i>=0)S.leagues[i]=e;else{S.leagues.push(e);setTimeout(leagueSwitcher,0)}}
+/* Duplicate leagues: the same platform AND league ID is one league (a Sleeper and an ESPN league that share a
+   number are not). Re-importing replaces the old copy; duplicates already saved are cleaned up on load, newest kept. */
+function leagueIdOf(e){const r=e&&e.snap&&e.snap.real&&e.snap.real.src;return r&&r.type&&r.league!=null?String(r.type).toLowerCase()+':'+String(r.league).trim():(e&&e.key)}
+function dropDupLeagues(keepKey){const L=S.leagues||[],keep=L.find(x=>x.key===keepKey);if(!keep)return 0;const id=leagueIdOf(keep),n=L.length;
+  S.leagues=L.filter(x=>x===keep||leagueIdOf(x)!==id);return n-S.leagues.length}
+function dedupeLeagues(){const L=S.leagues||[];if(L.length<2)return 0;const best={};
+  L.forEach(x=>{const id=leagueIdOf(x),b=best[id];if(!b||(x.at||0)>(b.at||0))best[id]=x});
+  const keepSet=new Set(Object.values(best)),n=L.length;S.leagues=L.filter(x=>keepSet.has(x));if(S.leagues.length===n)return 0;
+  if(!S.leagues.some(x=>x.key===S.leagueKey)){const cur=L.find(x=>x.key===S.leagueKey),k=cur?best[leagueIdOf(cur)]:S.leagues[0];
+    if(k){lkeys().forEach(f=>S[f]=clone(k.snap[f]));if(S.league&&!S.league.sc)S.league.sc={...BASE_SC};S.leagueKey=k.key}}
+  return n-S.leagues.length}
 function saveCurrentLeague(){if(S&&!S.noLeague&&S.teams&&S.teams.length)upsertLeague()}
 function switchLeague(key){if(key===S.leagueKey)return;saveCurrentLeague();const e=(S.leagues||[]).find(x=>x.key===key);if(!e)return;
   lkeys().forEach(k=>S[k]=clone(e.snap[k]));S.noLeague=false;if(!S.league.sc)S.league.sc={...BASE_SC};S.league.sc={...BASE_SC,...S.league.sc};S.leagueKey=key;
@@ -2570,7 +2617,7 @@ function renderLeagueList(){const el=$('league-list');if(!el)return;const L=S.le
 document.addEventListener('change',e=>{if(e.target.id!=='league-switch'&&e.target.id!=='hub-league')return;const v=e.target.value;if(v==='__add'){leagueSwitcher();renderLeagueList();location.hash='hub';setTimeout(()=>{IMP.open=true;renderImport();const c=$('import-card');if(c)c.scrollIntoView({behavior:'smooth',block:'start'})},50);return}switchLeague(v)});
 document.addEventListener('click',e=>{const t=e.target;if(!t.closest)return;const sw=t.closest('[data-lswitch]');if(sw){switchLeague(sw.dataset.lswitch);return}const rm=t.closest('[data-lremove]');if(rm)removeLeague(rm.dataset.lremove)});
 /* first run: register the league already loaded */
-if(S.noLeague){}else if(!S.leagues||!S.leagues.length){S.leagueKey=leagueKeyOf();upsertLeague();save()}else if(!S.leagueKey)S.leagueKey=leagueKeyOf();
+if(S.noLeague){}else if(!S.leagues||!S.leagues.length){S.leagueKey=leagueKeyOf();upsertLeague();save()}else{if(!S.leagueKey)S.leagueKey=leagueKeyOf();if(dedupeLeagues()){setPool();save()}}
 leagueSwitcher();
 
 /* ===== Problem reports =====
@@ -2952,10 +2999,14 @@ function alertsLive(){const raw=alertsList(),now=Date.now(),m={...alertTimes()},
   if(ch)acctSet('alertT',m);
   const L=raw.filter(a=>!alertExpired(m[a.k],now));return {L,seen:new Set(L.filter(a=>m[a.k]&&m[a.k].s).map(a=>a.k))}}
 function alertsList(){const me=S&&myTeam&&myTeam();if(!me||!V||!G)return [];const out=[],RL=realLineup(S.me),lu=RL||lineup(me.players,projV),st=new Set(lu.slots.filter(x=>x.p).map(x=>x.p.id));
+  /* lineup alerts first: empty slots, starters who can't play, obvious bench upgrades (fix it in Sleeper/ESPN) */
+  const LA=lineupAlerts(myLineup(me,RL)),laStart=new Set(LA.map(a=>a.start).filter(Boolean));
+  LA.forEach(a=>out.push({k:a.k,lvl:'bad',t:a.kind==='empty'?'Empty lineup slot':a.kind==='bench'?'Lineup fix':'Starter can\'t play',d:a.msg,open:a.sub||a.start||''}));
   me.players.forEach(id=>{const p=byId[id],g=G[id];if(!p||!g)return;const s=stOf(id);
-    if(st.has(id)&&s&&s!=='Q')out.push({k:`out-${WEEK}-${id}-${s}`,lvl:'bad',t:`${p.n}: ${ST_LABEL[s].toLowerCase()}`,d:RL?'He is in your starting lineup. Swap him out.':'One of your usual starters. Your lineup on My Team already works around him.',open:id});
+    if(laStart.has(id)){}
+    else if(st.has(id)&&s&&s!=='Q')out.push({k:`out-${WEEK}-${id}-${s}`,lvl:'bad',t:`${p.n}: ${ST_LABEL[s].toLowerCase()}`,d:RL?'He is in your starting lineup. Swap him out.':'One of your usual starters. Your lineup on My Team already works around him.',open:id});
     else if(st.has(id)&&s==='Q')out.push({k:`q-${WEEK}-${id}`,lvl:'warn',t:`${p.n} is questionable`,d:'Check his status before kickoff and have a backup ready.',open:id});
-    if(st.has(id)&&!g.next)out.push({k:`bye-${WEEK}-${id}`,lvl:'warn',t:`${p.n} is on bye in Week ${WEEK}`,d:RL?'He is in your starting lineup. Start someone else.':'One of your usual starters. Your lineup on My Team already works around him.',open:id});
+    if(st.has(id)&&!g.next&&!laStart.has(id))out.push({k:`bye-${WEEK}-${id}`,lvl:'warn',t:`${p.n} is on bye in Week ${WEEK}`,d:RL?'He is in your starting lineup. Start someone else.':'One of your usual starters. Your lineup on My Team already works around him.',open:id});
     if(g.tag==='sell')out.push({k:`sell-${WEEK}-${id}`,lvl:'info',t:`Sell-high window: ${p.n}`,d:g.sellWhy||'He is scoring above what his role supports.',open:id})});
   const IRS=irState(me);
   if(IRS.open)IRS.cand.slice(0,IRS.open).forEach(id=>out.push({k:`ir-${id}-${stOf(id)}`,lvl:'warn',t:`Move ${byId[id].n} to IR`,d:`He is ${IR_WHY[stOf(id)]||'injured'} and you have an open IR slot. Move him there in ${irApp()} to free a roster spot.`,open:id}));

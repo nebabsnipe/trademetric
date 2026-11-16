@@ -26,7 +26,7 @@
   // More sheet
   const scrim=document.createElement('div');scrim.className='m-sheet-scrim';
   const sheet=document.createElement('div');sheet.className='m-sheet';sheet.setAttribute('role','dialog');sheet.setAttribute('aria-label','More');
-  const LINKS=[['season','Season Sim'],['hub','League'],['draft','Draft'],['account','Account'],['help','How it works']];
+  const LINKS=[['season','Season Sim'],['hub','League'],['account','Account'],['help','How it works']];
   sheet.innerHTML=LINKS.map(([t,l])=>`<a href="#${t}" data-m="${t}">${svg(IC[t])}${l}</a>`).join('')+`<button type="button" data-m="theme">${svg(IC.theme)}Dark mode<small></small></button>`;
   document.body.append(scrim,sheet);
   const isDark=()=>{const t=document.documentElement.getAttribute('data-theme');return t?t==='dark':matchMedia('(prefers-color-scheme: dark)').matches};
