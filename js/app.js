@@ -1718,7 +1718,7 @@ function seedBars(o,P,n){const mx=Math.max(...o.seed,.01);return `<div class="se
 function renderSeason(){
   const sim=simulate(),me=S.me;$('season-kicker').textContent=`${S.league.name||'My League'} · ${N_SIM.toLocaleString()} simulated seasons`;
   if(!sim){$('sim-hero').innerHTML='<div class="card"><p class="empty" style="margin:0">Add at least two teams in League Hub.</p></div>';$('sim-race').innerHTML=$('sim-need').innerHTML=$('road').innerHTML=$('tiebreak').innerHTML='';return}
-  const rec=records(),o=sim[me],ids=S.teams.map(T=>T.id),n=ids.length,P=sim.P,ord=[...ids].sort((a,b)=>sim[b].playoff-sim[a].playoff||sim[b].wins-sim[a].wins),myRank=ord.indexOf(me)+1;
+  const rec=records(),o=sim[me],ids=S.teams.map(T=>T.id),n=ids.length,P=sim.P,ord=[...ids].sort((a,b)=>sim[b].playoff-sim[a].playoff||sim[b].wins-sim[a].wins),myRank=ord.indexOf(me)+1,gw=t=>rec[t].w+rec[t].t/2,std=[...ids].sort((a,b)=>gw(b)-gw(a)||rec[b].pf-rec[a].pf);
   const tone=o.playoff>=.6?'good':o.playoff>=.3?'mid':'bad',left=REG_WEEKS-(sim.P0||PLAYED);
   /* hero: dial */
   $('sim-hero').innerHTML=`<div class="card sim-hero"><div class="dial-wrap ${tone}">${dialSvg(o.playoff)}<div class="dial-num"><b>${pct(o.playoff)}</b><span>playoff odds</span></div></div>
@@ -1729,7 +1729,7 @@ function renderSeason(){
   const bar=x=>`<div class="pr-bar"><i style="width:${Math.max(1.5,x*100)}%"></i></div>`;
   $('sim-race').innerHTML=`<div class="card-h"><h2>Playoff race</h2><span class="note">Top ${P} of ${n} make the playoffs</span></div>
     <div class="race2"><div class="r2 r2-h"><span>#</span><span>Team</span><span class="r2-odds">Playoff odds</span>${P===6?'<span class="r2-c r2-bye">Bye</span>':''}<span class="r2-c">Title</span><span class="r2-c r2-pw">Proj.</span></div>
-    ${ord.map((t,i)=>{const T=teamById(t),x=sim[t],cls=x.playoff>=.75?'hi':x.playoff>=.35?'md':'lo';return `${i===P?`<div class="r2-cut"><span>Playoff line</span></div>`:''}
+    ${std.map((t,i)=>{const T=teamById(t),x=sim[t],cls=x.playoff>=.75?'hi':x.playoff>=.35?'md':'lo';return `${i===P?`<div class="r2-cut"><span>Playoff line</span></div>`:''}
       <div class="r2${t===me?' me':''}${P===6?'':' nobye'}"><span class="r2-rk">${i+1}</span>
         <span class="r2-team"><i class="tsq" style="background:${teamColor(t)}"></i><span class="r2-nm"><b>${esc(T.name)}</b><small>${recTxt(t)} · ${f1(rec[t].pf)} pts</small></span>${t===me?'<span class="tag mine">You</span>':''}</span>
         <span class="r2-odds ${cls}">${bar(x.playoff)}<b>${pct(x.playoff)}</b></span>${P===6?`<span class="r2-c r2-bye">${pct(x.bye)}</span>`:''}<span class="r2-c">${pct(x.title)}</span><span class="r2-c r2-pw">${Math.round(x.wins)}-${REG_WEEKS-Math.round(x.wins)}</span></div>`}).join('')}</div>
