@@ -2760,12 +2760,28 @@ function accLeagues(){const L=S.leagues||[],me=typeof myTeam==='function'&&S.tea
     ${list}<div class="acc-sec-f"><a class="btn primary" href="#hub">Manage leagues</a><a class="btn" href="#league">League settings</a></div></section>
     ${typeof tmnNotifHtml==='function'?tmnNotifHtml():''}
     <section class="card acc-sec"><header class="acc-sec-h"><h2>Sync</h2></header>${accRow('Cloud save',sync)}</section>`}
-function accPlan(){const p=planOf();
-  return `<section class="acc-plans">
-      <div class="card acc-plan cur"><div class="acc-plan-top"><span class="acc-badge plan">Current plan</span></div><h3>${esc(p.name)}</h3><div class="acc-price">${esc(p.price)}</div><p>${esc(p.blurb)}</p>
-        <ul class="acc-feat"><li>Trade analyzer and Trade Score</li><li>Rankings, waivers and Season Sim</li><li>League sync for Sleeper and ESPN</li><li>AI Helper</li></ul></div>
-      <div class="card acc-plan next"><div class="acc-plan-top"><span class="acc-badge soon">Coming soon</span></div><h3>Pro</h3><div class="acc-price muted">Pricing to come</div><p>Paid plans coming soon.</p>
-        <button class="btn" type="button" disabled>Not available yet</button></div></section>
+/* Pricing grid (Annual Savings Pricing Grid layout): Free vs Pro with a Monthly/Annual toggle.
+   Prices are placeholders from the plan in CLAUDE.md; checkout isn't connected, so Pro shows "Free during beta". */
+var PR_ANNUAL=false;
+const PR_TIERS=[
+  {key:'free',name:'Free',monthly:0,annual:0,desc:'Weekly rankings, free for everyone.',feat:['Rankings scored to your league','Player breakdowns and TradeMetric takes']},
+  {key:'pro',name:'Pro',monthly:7,annual:50,desc:'Every tool for winning trades and your league.',feat:['Trade analyzer and Trade Score','Trade ideas for your roster','Season Sim and waivers','News, alerts and big-play banners','League sync for Sleeper and ESPN','AI Helper'],featured:true}];
+const PR_SAVE=Math.round((1-PR_TIERS[1].annual/(PR_TIERS[1].monthly*12))*100);
+const PR_CHECK='<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>';
+function prPrice(t){if(!t.monthly)return '0';const v=PR_ANNUAL?t.annual/12:t.monthly;return Number.isInteger(v)?String(v):v.toFixed(2)}
+function accPricing(){const beta=planOf().key==='free';
+  return `<section class="acc-pricing">
+    <div class="pr-toggle" role="group" aria-label="Billing period"><button type="button" data-pr-bill="m" aria-pressed="${!PR_ANNUAL}">Monthly</button><button type="button" data-pr-bill="a" aria-pressed="${PR_ANNUAL}">Annual <span class="pr-save">-${PR_SAVE}%</span></button></div>
+    <div class="pr-grid">${PR_TIERS.map(t=>`<div class="card pr-card${t.featured?' featured':''}">
+      <div class="pr-card-h"><h3>${t.name}</h3>${t.featured?`<span class="pr-pop">${beta?'Free during beta':'7-day free trial'}</span>`:''}</div>
+      <p class="pr-desc">${t.desc}</p>
+      <div><p class="pr-price"><b>$${prPrice(t)}</b><span>/month</span></p><p class="pr-billed">${PR_ANNUAL&&t.annual?`$${t.annual} billed yearly`:t.monthly?'Billed monthly':'&nbsp;'}</p></div>
+      <ul class="pr-feat">${t.feat.map(f=>`<li>${PR_CHECK}<span>${f}</span></li>`).join('')}</ul>
+      ${t.featured?(beta?'<button class="btn accent" type="button" disabled>Unlocked during beta</button>':'<button class="btn accent" type="button" disabled>Start 7-day free trial</button>'):'<button class="btn" type="button" disabled>Always free</button>'}
+    </div>`).join('')}</div>
+    ${beta?'<p class="pr-note">You have every Pro feature free while TradeMetric is in beta. Paid plans start later.</p>':''}</section>`}
+function accPlan(){
+  return `${accPricing()}
     <section class="card acc-sec"><header class="acc-sec-h"><h2>Billing</h2><p>Payment details and receipts will live here.</p></header>
       ${accRow('Payment method','<span class="note">None on file</span>')}${accRow('Receipts','<span class="note">No receipts yet</span>')}</section>`}
 function accSecurity(){const until=lsGet(UNTIL_KEY),pw=hasPassword(),soc=socialName();
@@ -2797,6 +2813,7 @@ async function accSubmit(kind){if(ACC_BUSY)return;ACC_MSG=null;
       ACC_BUSY=false;ACC_EDIT=null;try{localStorage.removeItem(KEY)}catch(e){}lsDel(UNTIL_KEY);await SB.auth.signOut({scope:'local'}).catch(()=>{});location.hash='signin';location.reload();return}
   }catch(e){accFail(e&&e.message)}}
 document.addEventListener('click',e=>{const t=e.target;if(!t.closest)return;
+  const pb=t.closest('[data-pr-bill]');if(pb){PR_ANNUAL=pb.dataset.prBill==='a';renderAccount();return}
   const ed=t.closest('[data-acc-edit]');if(ed){ACC_EDIT=ed.dataset.accEdit;ACC_MSG=null;UN_STATE=null;renderAccount();return}
   if(t.closest('[data-acc-cancel]')){ACC_EDIT=null;ACC_MSG=null;UN_STATE=null;renderAccount();return}
   if(t.closest('#auth-out')){SB.auth.signOut({scope:'local'}).then(()=>{lsDel(UNTIL_KEY);leaveApp();toast('Signed out. Your leagues are saved.')});return}
