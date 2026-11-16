@@ -2017,8 +2017,24 @@ const SUN='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-wid
 const MOON='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>';
 let themePref=acctGet('theme',null);
 const isDark=()=>themePref?themePref==='dark':matchMedia('(prefers-color-scheme: dark)').matches;
-function applyTheme(){if(themePref)document.documentElement.setAttribute('data-theme',themePref);const d=isDark();$('theme-btn').innerHTML=d?SUN:MOON;$('theme-btn').setAttribute('aria-label',d?'Switch to light mode':'Switch to dark mode')}
-$('theme-btn').addEventListener('click',()=>{themePref=isDark()?'light':'dark';acctSet('theme',themePref);applyTheme()});
+function applyTheme(){if(themePref)document.documentElement.setAttribute('data-theme',themePref);const d=isDark();const b=$('theme-btn');b.innerHTML=d?SUN:MOON;b.dataset.mode=d?'dark':'light';b.setAttribute('aria-label',d?'Switch to light mode':'Switch to dark mode')}
+/* Animated theme toggle (ported from arunachalam's "Animated Theme Toggler"): the new theme is revealed in a circle
+   growing out from the button, and the sun/moon icon fades in with a small spin. cx/cy let another control (the phone
+   menu) start the circle from its own spot. Returns a promise that settles once the theme has actually switched. */
+function toggleTheme(cx,cy){
+  const b=$('theme-btn');b.classList.add('anim');
+  const swap=()=>{themePref=isDark()?'light':'dark';acctSet('theme',themePref);applyTheme()};
+  if(cx==null){const r=b.getBoundingClientRect();if(r.width){cx=r.left+r.width/2;cy=r.top+r.height/2}else{cx=innerWidth/2;cy=innerHeight/2}}
+  if(!document.startViewTransition||matchMedia('(prefers-reduced-motion: reduce)').matches){swap();return Promise.resolve()}
+  const vt=document.startViewTransition(swap);
+  vt.ready.then(()=>{
+    const r=Math.hypot(Math.max(cx,innerWidth-cx),Math.max(cy,innerHeight-cy));
+    document.documentElement.animate({clipPath:[`circle(0px at ${cx}px ${cy}px)`,`circle(${r}px at ${cx}px ${cy}px)`]},{duration:700,easing:'ease-in-out',pseudoElement:'::view-transition-new(root)'});
+  }).catch(()=>{});
+  return vt.updateCallbackDone.catch(()=>{});
+}
+window.tmToggleTheme=toggleTheme;
+$('theme-btn').addEventListener('click',()=>toggleTheme());
 
 /* ===== Routing & events ===== */
 /* Draft tools are off during the season (no Draft tab); offseason mode switches them back on */
