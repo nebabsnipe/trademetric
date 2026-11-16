@@ -71,6 +71,5 @@ All of it lives in `js/polish.js` (loaded last, never changes app.js logic) with
 - Not used: the Colorful-Pricing section (owner decided to keep the current pricing grid). A win-chance ring on the matchup (Magic UI "Animated Circular Progress Bar") shipped briefly and was removed the same day at the owner's request.
 
 ## Scoreboard touches (added 2026-11-16, live on main)
-Owner tried two bigger restyles (a red palette, then a fully "turned up" orange version) and kept only three pieces, then put Season Sim back to normal the same day. Everything else stays exactly as on main, including the My Team tiles and colors.
-- **Matchup:** orange top edge, bigger slanted scores, a thick slanted score bar. The win chance stays plain orange text (no box, owner's call).
+Owner tried two bigger restyles (a red palette, then a fully "turned up" orange version) and kept only three pieces, then put Season Sim and the My Team matchup back to normal the same day; only the trade chart change remains. Everything else stays exactly as on main, including the My Team tiles and colors.
 - **Trade week chart:** playoffs shown as an orange band with an orange top edge and label; bold slanted bar values and week labels.

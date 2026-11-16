@@ -2424,16 +2424,7 @@ body[data-tab="news"] .tmn-chips{display:none}
 .toast-ic.warn{background:var(--warn)}
 
 /* ===================== Scoreboard touches (2026-11, theme-refresh branch) =====================
-   Two spots: the matchup scoreboard and the playoffs band on the trade week chart. */
-
-/* My Team: matchup scoreboard */
-#matchup{border-top:4px solid var(--accent)}
-#matchup .mu-team b{font-size:60px;font-weight:800;letter-spacing:0}
-#matchup .mu-mid{padding-bottom:10px}
-#matchup .mu-pct{font-size:34px}
-#matchup .mu-mid .note{margin-top:4px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;font-size:10.5px}
-#matchup .mu-bar{height:16px;border-radius:4px;gap:3px;margin:16px 0 4px;transform:skewX(-12deg)}
-@media (max-width:560px){#matchup .mu-team b{font-size:36px}#matchup .mu-pct{font-size:24px}#matchup .mu-bar{height:12px}}
+   One spot: the playoffs band on the trade week chart. */
 
 /* Trade rating: playoffs band on the week-by-week chart */
 .wc-po{border:0;border-radius:var(--r-sm);background:color-mix(in srgb,var(--accent) 12%,transparent);box-shadow:inset 0 3px 0 var(--accent)}
