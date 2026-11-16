@@ -1019,14 +1019,6 @@ function lineupAlerts(LU){if(!LU||!S||!myTeam())return [];const out=[],app=luApp
     const sp=pj(id),b=best(x,id);if(!b)return;const bp=pj(b);
     if(bp>=sp+LU_GAP&&bp>=sp*LU_X){used.add(b);out.push({i,kind:'bench',k:`lu-${WEEK}-${i}-bench-${id}-${b}`,start:id,sub:b,msg:`Start ${byId[b].n} over ${x.p.n} at ${lab} in ${app} (${f1(bp)} vs ${f1(sp)} projected).`})}});
   return out}
-/* My Team tiles: projected lineup points for this week and the next few (sparkline), and this week vs. the league average (delta) */
-function tileTrend(me){try{const last=Math.min(REG_WEEKS,WEEK+4),pts=[],lab=[];for(let w=WEEK;w<=last;w++){pts.push(weekLine(me.players,w,S.me).m);lab.push(w)}
-  const all=S.teams.filter(T=>T.players.length).map(T=>weekLine(T.players,WEEK,T.id).m),avg=all.length?sum(all,x=>x)/all.length:null;
-  return {pts,lab,d:avg===null||!pts.length?null:pts[0]-avg}}catch(e){return {pts:[],lab:[],d:null}}}
-function tDelta(d,title){const c=d>=0.05?'up':d<=-0.05?'down':'flat';return `<span class="t-delta ${c}" title="${sgn(d)} ${title}"><svg viewBox="0 0 10 10" width="9" height="9" aria-hidden="true"><path d="${c==='down'?'M5 8.5 1.5 3.5h7z':c==='up'?'M5 1.5 8.5 6.5h-7z':'M1.5 5h7'}" fill="currentColor" stroke="currentColor" stroke-width="${c==='flat'?1.6:0}"/></svg>${sgn(d)}</span>`}
-function tileSpark(v,lab){if(!v||v.length<2)return '';const W=120,H=28,p=2,mn=Math.min(...v),mx=Math.max(...v),rg=mx-mn||1;
-  const xy=v.map((y,i)=>[p+i*(W-2*p)/(v.length-1),H-p-(y-mn)/rg*(H-2*p)]),line=xy.map(([x,y])=>x.toFixed(1)+','+y.toFixed(1)).join(' ');
-  return `<svg class="t-spark" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="Projected points, week ${lab[0]} to ${lab[lab.length-1]}: ${v.map(f1).join(', ')}"><polygon points="${p},${H} ${line} ${(W-p).toFixed(1)},${H}" class="t-area"/><polyline points="${line}" class="t-line"/></svg>`}
 function renderTeam(){
   const me=myTeam(),st=teamStats(),mine=st.rows.find(r=>r.T.id===S.me),RL=realLineup(S.me);
   const IRS=irState(me),act=activeOf(me);
@@ -1035,11 +1027,10 @@ function renderTeam(){
   $('team-title').textContent=me.name;$('team-kicker').textContent=`${S.league.name||'My League'} · Week ${WEEK}`;
   const sim=simulate();const byes=me.players.filter(id=>!G[id].next).length,tags=me.players.filter(id=>G[id].tag).length;
   const weak=weakList(mine)[0];
-  const tk=tileTrend(me),po=sim?sim[S.me].playoff:null,wr=mine.rel[weak];
   $('team-tiles').innerHTML=(started.length?`<div class="tile hot"><div class="lab">Week ${WEEK} score <span class="live-dot${LIVE&&LIVE.live?' on':''}"></span></div><div class="val num">${f1(actual)}</div><div class="sub">Projected ${f1(LU.total)} · ${started.length} of ${LU.slots.filter(x=>x.p).length} playing or done</div></div>`
-     :`<div class="tile hot"><div class="lab"><span>Week ${WEEK} projection</span>${tk.d!==null?tDelta(tk.d,'vs. league average this week'):''}</div><div class="val num">${f1(LU.total)}</div><div class="sub">${LU.real?'Your lineup':'Optimal lineup'}${tk.pts.length>1?` · next ${tk.pts.length} weeks`:''}</div>${tileSpark(tk.pts,tk.lab)}</div>`)+`
-   <div class="tile"><div class="lab">Playoff odds</div><div class="val">${po!==null?pct(po):'-'}</div><div class="sub">Record ${recTxt(S.me)} · power rank #${mine.rank}</div>${po!==null?`<span class="t-meter ${po>=.6?'good':po>=.3?'mid':'bad'}" aria-hidden="true"><i style="width:${Math.round(po*100)}%"></i></span>`:''}</div>
-   <div class="tile"><div class="lab"><span>Weakest spot</span>${Number.isFinite(wr)?tDelta(wr,'points per week vs. league average'):''}</div><div class="val">${weak}</div><div class="sub">${sgn(wr)} pts/wk vs. league average</div></div>
+     :`<div class="tile hot"><div class="lab">Week ${WEEK} projection</div><div class="val num">${f1(LU.total)}</div><div class="sub">${LU.real?'Your lineup':'Optimal lineup'}</div></div>`)+`
+   <div class="tile"><div class="lab">Playoff odds</div><div class="val">${sim?pct(sim[S.me].playoff):'-'}</div><div class="sub">Record ${recTxt(S.me)} · power rank #${mine.rank}</div></div>
+   <div class="tile"><div class="lab">Weakest spot</div><div class="val">${weak}</div><div class="sub">${sgn(mine.rel[weak])} pts/wk vs. league average</div></div>
    <div class="tile"><div class="lab">Byes and alerts</div><div class="val">${byes}<span class="muted" style="font-size:20px"> / ${tags}</span></div><div class="sub">Players on bye · buy/sell alerts</div></div>`;
   const row=(label,p,i)=>p?`<div class="lrow${flag.has(i)?' lu-flag':''}" data-open="${p.id}"><span class="slot">${label}</span><div class="pl">${av(p)}<div class="meta"><span style="display:flex;gap:6px;align-items:center;min-width:0"><button class="pname" data-open="${p.id}">${esc(p.n)}</button>${tagHtml(p.id,label!=='BN')}${irPill(p.id,IRS)}</span><span class="psub">${p.pos}${V.posRank[p.id]} · ${liveOf(p.id)?liveTxt(p.id)+(liveOf(p.id).state==='post'?'':' live'):oppHtml(p.id)}</span></div></div>${lprojHtml(p.id)}</div>`
     :`<div class="lrow${flag.has(i)?' lu-flag':''}" style="cursor:default"><span class="slot">${label}</span><span class="empty">Empty. Add a player who fits this slot.</span><span></span></div>`;

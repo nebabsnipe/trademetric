@@ -2423,83 +2423,29 @@ body[data-tab="news"] .tmn-chips{display:none}
 .toast-ic{flex:none;width:18px;height:18px;border-radius:50%;background:var(--good);color:#fff;display:grid;place-items:center}
 .toast-ic.warn{background:var(--warn)}
 
-/* ===================== Scoreboard restyle (2026-11, theme-refresh branch) =====================
-   Same orange theme, turned up: big slanted Kanit numbers, thick bars, solid blocks for "you".
-   My Team tiles: the key tile is a solid orange block with a sparkline; change badges are solid chips.
-   Matchup: broadcast-style scores and a slanted win-chance block. Season Sim: black stat blocks.
-   Trade week chart: wide square bars, bold labels, playoffs as an orange band. */
-:root{--s1:4px;--s2:8px;--s3:12px;--s4:16px;--s5:20px;--s6:24px;--s8:32px}
-.view{gap:var(--s5)}
-.stack,.grid2,.grid-even{gap:var(--s5)}
-
-/* My Team: tiles */
-.tiles{gap:var(--s3)}
-.tile{display:flex;flex-direction:column;gap:2px;padding:var(--s4);min-height:120px;position:relative;overflow:hidden}
-.tile .lab{display:flex;align-items:center;justify-content:space-between;gap:var(--s2);font-size:11.5px;font-weight:800;letter-spacing:.1em;min-height:20px}
-.tile .lab>span:first-child{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.tile .val{font-family:var(--f-display);font-style:italic;font-weight:800;font-size:40px;line-height:1;margin-top:var(--s1);letter-spacing:0}
-.tile .val.num{font-family:var(--f-display)}
-.tile .sub{font-size:12.5px;font-weight:500}
-.tile.hot{background:var(--accent);border-color:var(--accent);border-left-width:1px;border-radius:var(--r);color:var(--accent-ink)}
-.tile.hot .lab,.tile.hot .sub{color:var(--accent-ink);opacity:.85}
-.tile.hot .lab{opacity:1}
-.t-delta{flex:none;display:inline-flex;align-items:center;gap:3px;padding:2px 7px;border-radius:4px;font:italic 800 12px/1.3 var(--f-display);letter-spacing:.02em;color:#fff;transform:skewX(-8deg)}
-.t-delta.up{background:var(--good)}.t-delta.down{background:var(--bad)}.t-delta.flat{background:var(--muted)}
-.tile.hot .t-delta{background:var(--bar);color:var(--bar-ink)}
-.t-spark{display:block;width:100%;height:34px;margin-top:auto;padding-top:var(--s2);overflow:visible}
-.t-spark .t-line{fill:none;stroke:var(--accent);stroke-width:3;stroke-linejoin:round;stroke-linecap:round;vector-effect:non-scaling-stroke}
-.t-spark .t-area{fill:color-mix(in srgb,var(--accent) 22%,transparent)}
-.tile.hot .t-spark .t-line{stroke:var(--accent-ink)}
-.tile.hot .t-spark .t-area{fill:color-mix(in srgb,var(--accent-ink) 18%,transparent)}
-.t-meter{display:block;height:10px;margin-top:auto;border-radius:3px;background:var(--surface-3);overflow:hidden;transform:skewX(-12deg)}
-.t-meter i{display:block;height:100%;background:var(--accent)}
-.t-meter.good i{background:var(--good)}.t-meter.mid i{background:var(--warn)}.t-meter.bad i{background:var(--bad)}
-.tile:has(.t-meter) .sub,.tile:has(.t-spark) .sub{margin-bottom:var(--s2)}
+/* ===================== Scoreboard touches (2026-11, theme-refresh branch) =====================
+   Only three spots: the matchup scoreboard, the Season Sim playoff race, and the playoffs band on the trade week chart. */
 
 /* My Team: matchup scoreboard */
 #matchup{border-top:4px solid var(--accent)}
 #matchup .mu-team b{font-size:60px;font-weight:800;letter-spacing:0}
 #matchup .mu-mid{padding-bottom:10px}
-#matchup .mu-pct{display:inline-block;padding:4px 14px;background:var(--accent);color:var(--accent-ink);border-radius:4px;transform:skewX(-10deg);font-size:30px}
-#matchup .mu-mid .note{margin-top:6px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;font-size:10.5px}
-#matchup .mu-bar{height:16px;border-radius:4px;gap:3px;margin:var(--s4) 0 var(--s1);transform:skewX(-12deg)}
-@media (max-width:560px){#matchup .mu-team b{font-size:36px}#matchup .mu-pct{font-size:20px;padding:2px 9px}#matchup .mu-bar{height:12px}}
+#matchup .mu-pct{font-size:34px}
+#matchup .mu-mid .note{margin-top:4px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;font-size:10.5px}
+#matchup .mu-bar{height:16px;border-radius:4px;gap:3px;margin:16px 0 4px;transform:skewX(-12deg)}
+@media (max-width:560px){#matchup .mu-team b{font-size:36px}#matchup .mu-pct{font-size:24px}#matchup .mu-bar{height:12px}}
 
-/* Season Sim */
-.sim-hero{border-top:4px solid var(--accent)}
-.dial-bg{stroke-width:24}.dial-fg{stroke-width:24}
-.dial-num b{font-size:76px;font-weight:800}
-.sim-sum h2{font-size:48px;font-weight:800}
-.sim-stats{gap:var(--s2)}
-.sim-stats>div{background:var(--ink);color:var(--bg);border-radius:var(--r-sm);padding:var(--s3) var(--s4)}
-.sim-stats b{font:italic 800 28px/1 var(--f-display);letter-spacing:.01em}
-.sim-stats span{color:var(--bg);opacity:.7;margin-top:4px}
+/* Season Sim: playoff race */
 .r2.me{background:var(--accent-soft);border-radius:var(--r-sm);box-shadow:inset 5px 0 0 var(--accent)}
 .r2-rk{font:italic 800 22px var(--f-display)}
 .r2-odds b{font:italic 800 18px var(--f-display)}
 .pr-bar{height:14px;border-radius:3px;transform:skewX(-12deg)}.pr-bar i{border-radius:3px}
-.r2-cut::before,.cut::before,.rp-cut::before{border-top:3px solid var(--accent)}
-.r2-cut span,.cut span{font-family:var(--f-display);font-style:italic;font-size:12px}
+.r2-cut::before{border-top:3px solid var(--accent)}
 
-/* Trade rating: week-by-week chart */
-.wc-avg b{font-family:var(--f-display);font-style:italic;font-weight:800;font-size:44px;letter-spacing:0}
-.wc-d b{font-family:var(--f-display);font-style:italic;font-weight:800;font-size:26px}
-.wc-z{height:3px;margin-top:-1.5px;border-radius:0;background:var(--ink);opacity:.8}
-.wc-col i{width:min(72%,52px)}
-.wc-col.up i,.wc-col.down i{border-radius:3px}
-.wc-col b{font-family:var(--f-display);font-style:italic;font-weight:800;font-size:14px}
+/* Trade rating: playoffs band on the week-by-week chart */
 .wc-po{border:0;border-radius:var(--r-sm);background:color-mix(in srgb,var(--accent) 12%,transparent);box-shadow:inset 0 3px 0 var(--accent)}
 .wc-po span{top:8px;background:transparent;font-family:var(--f-display);font-style:italic;font-weight:800;font-size:12px;color:var(--accent)}
-.wc-wk span{font-family:var(--f-display);font-style:italic;font-weight:700;font-size:12px}
 .wc-wk.po span{color:var(--accent)}
-
-/* phone */
-@media (max-width:700px){
-  .tiles{gap:var(--s2)}
-  .tile{padding:var(--s3);min-height:0}.tile .val{font-size:32px}.tile .lab{font-size:10.5px;flex-wrap:wrap;row-gap:4px}
-  .tile .lab>span:first-child{white-space:normal;overflow:visible}
-  .t-delta{font-size:11px;padding:1px 6px}
-  .sim-stats{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}
-  .sim-sum h2{font-size:36px}.dial-num b{font-size:64px}
-  .wc-avg b{font-size:34px}.wc-col b{font-size:12px}
-}
+.wc-col b{font-family:var(--f-display);font-style:italic;font-weight:800;font-size:14px}
+.wc-wk span{font-family:var(--f-display);font-style:italic;font-weight:700;font-size:12px}
+@media (max-width:700px){.wc-col b{font-size:12px}}

@@ -70,10 +70,8 @@ All of it lives in `js/polish.js` (loaded last, never changes app.js logic) with
 - **Round 2:** alerts popup items and News cards arrive one after another (Magic UI "Animated List", only when the popup opens or the tab is first shown, not on every refresh); the Live dot ripples (iconiq "Status Dot"); confetti bursts out of a "clinched" banner (Magic UI "Confetti", own small canvas, no library); the toast gets a green check or amber "!" icon and slides up (cnippet "Toast").
 - Not used: the Colorful-Pricing section (owner decided to keep the current pricing grid). A win-chance ring on the matchup (Magic UI "Animated Circular Progress Bar") shipped briefly and was removed the same day at the owner's request.
 
-## Scoreboard restyle test (added 2026-11-16, `theme-refresh` branch only, not on main)
-Owner tried a quieter red "Terrel" palette first and turned it down: the site should stay as aggressive as it is, and stay orange. This version keeps the original orange colors and pushes the bold look further.
-- **My Team tiles:** big slanted numbers; the projection tile is a solid orange block with a change badge (this week vs. league average) and a line of projected points for this week and the next four; playoff odds gets a thick meter; weakest spot shows its gap as a solid badge.
-- **Matchup:** orange top edge, bigger scores, win chance in a slanted orange block, thick slanted score bar. Peek / "see all positions" unchanged.
-- **Season Sim:** bigger dial and headline, stats as solid black blocks (white in dark mode), thick bars, your row with an orange edge.
-- **Trade week chart:** wide bars, bold slanted labels, thick zero line, playoffs as an orange band.
-- References from 21st.dev: progress-metric-card (matchup), analytics-bento (Season Sim), advanced-stats (chart). dashboard-02 and efferd dashboard-2 could not be found there.
+## Scoreboard touches (added 2026-11-16, `theme-refresh` branch only, not on main)
+Owner tried two bigger restyles (a red palette, then a fully "turned up" orange version) and kept only three pieces. Everything else stays exactly as on main, including the My Team tiles and colors.
+- **Matchup:** orange top edge, bigger slanted scores, a thick slanted score bar. The win chance stays plain orange text (no box, owner's call).
+- **Season Sim playoff race:** slanted bold rank and odds numbers, thick slanted bars, your row with an orange edge, a solid orange playoff line.
+- **Trade week chart:** playoffs shown as an orange band with an orange top edge and label; bold slanted bar values and week labels.
