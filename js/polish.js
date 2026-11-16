@@ -2,6 +2,10 @@
    1. sliding highlight on segmented controls (.seg) and the Trade builder / Trade ideas tabs (.tr-tabs)
    2. table rows glide to their new place when a table re-sorts or the rankings re-filter
    3. key numbers (My Team tiles, matchup score and win chance, projected total) roll to their new value
+   4. a ring around the matchup win chance that fills to the number (Magic UI "Animated Circular Progress Bar")
+   5. alert and news lists stagger in one item after another (Magic UI "Animated List")
+   6. confetti when a banner says the week is clinched (Magic UI "Confetti")
+   7. the toast gets an icon and slides up instead of just appearing (cnippet "Toast")
    Everything is skipped when the device asks for reduced motion. */
 (function(){
   const RM=matchMedia('(prefers-reduced-motion: reduce)');
@@ -52,9 +56,58 @@
     }));
   }
 
+
+  /* ---------- 4. win-chance ring ---------- */
+  const RING_C=2*Math.PI*45;let lastRing=null;
+  function ringAll(){
+    document.querySelectorAll('.mu-mid:not(.has-ring)').forEach(mid=>{
+      const pct=mid.querySelector('.mu-pct');if(!pct||busy.has(pct))return;
+      const v=parseFloat(pct.textContent);if(!isFinite(v))return;
+      mid.classList.add('has-ring');
+      const wrap=document.createElement('div');wrap.className='mu-ring';
+      wrap.innerHTML='<svg viewBox="0 0 100 100" aria-hidden="true"><circle class="ring-bg" cx="50" cy="50" r="45"/><circle class="ring-fg" cx="50" cy="50" r="45"/></svg>';
+      mid.insertBefore(wrap,pct);wrap.appendChild(pct);
+      /* first paint fills from empty; later renders sweep from the last value shown */
+      const fg=wrap.querySelector('.ring-fg'),from=still()?v:lastRing==null?0:lastRing;
+      fg.style.transition='none';fg.style.strokeDasharray=`${RING_C*from/100} ${RING_C}`;void fg.getBoundingClientRect();
+      fg.style.transition='';fg.style.strokeDasharray=`${RING_C*v/100} ${RING_C}`;lastRing=v;
+    });
+  }
+
+  /* ---------- 5. lists stagger in ---------- */
+  let lastTab=null,feedDone=false,popOpen=false;
+  const stagger=items=>items.forEach((el,i)=>{if(el.classList.contains('lst-in'))return;el.style.setProperty('--i',Math.min(i,14));el.classList.add('lst-in')});
+  function staggerAll(){
+    const t=document.body.dataset.tab;if(t!==lastTab){lastTab=t;feedDone=false}
+    /* alerts: only when the popup opens, not on every live refresh while it is open */
+    const pop=document.getElementById('alert-pop'),open=!!pop&&!pop.hidden;
+    if(open&&!popOpen)stagger(pop.querySelectorAll('.al-i'));popOpen=open;
+    /* news: the first paint after switching to the tab */
+    const feed=document.getElementById('tmn-feed');
+    if(t==='news'&&feed&&!feedDone){const it=feed.querySelectorAll('.tmn-ev');if(it.length){stagger(it);feedDone=true}}
+  }
+
+  /* ---------- 6. confetti for a clinched week ---------- */
+  function confetti(x,y){
+    if(still())return;
+    const cv=document.createElement('canvas');cv.className='conf-cv';const dpr=Math.min(2,devicePixelRatio||1);
+    cv.width=innerWidth*dpr;cv.height=innerHeight*dpr;document.body.appendChild(cv);const ctx=cv.getContext('2d');ctx.scale(dpr,dpr);
+    const cols=['#FF4F12','#FFC23D','#FFE07A','#FFFFFF','#22A35A','#3A6FE0'],P=[];
+    for(let i=0;i<140;i++){const a=-Math.PI/2+(Math.random()-.5)*Math.PI*.9,s=7+Math.random()*9;
+      P.push({x,y,vx:Math.cos(a)*s,vy:Math.sin(a)*s,w:6+Math.random()*5,h:4+Math.random()*4,r:Math.random()*Math.PI,vr:(Math.random()-.5)*.3,c:cols[i%cols.length],t:0,life:150+Math.random()*60,wob:Math.random()*Math.PI*2})}
+    const t0=performance.now();
+    const step=()=>{ctx.clearRect(0,0,innerWidth,innerHeight);let alive=0;
+      P.forEach(p=>{if(p.t>p.life)return;alive++;p.t++;p.vx*=.96;p.vy=p.vy*.96+.32;p.x+=p.vx+Math.sin(p.wob+p.t*.08)*.6;p.y+=p.vy;p.r+=p.vr;
+        ctx.save();ctx.globalAlpha=Math.max(0,1-p.t/p.life);ctx.translate(p.x,p.y);ctx.rotate(p.r);ctx.fillStyle=p.c;ctx.fillRect(-p.w/2,-p.h/2,p.w,p.h);ctx.restore()});
+      if(alive&&performance.now()-t0<4000)requestAnimationFrame(step);else cv.remove()};
+    requestAnimationFrame(step);
+  }
+  window.tmConfetti=confetti;
+  function confettiAll(){document.querySelectorAll('.tmn-ban.clinch.in:not(.conf-done)').forEach(b=>{b.classList.add('conf-done');const r=b.getBoundingClientRect();confetti(r.left+r.width/2,r.top+r.height/2)})}
+
   /* one debounced pass after any change to the page */
   let queued=false;
-  const pass=()=>{queued=false;segAll();rollAll()};
+  const pass=()=>{queued=false;segAll();ringAll();rollAll();staggerAll();confettiAll()};
   const run=()=>{if(queued)pass()};
   /* animation frames pause in background tabs, so a timer backs the frame up */
   const queue=()=>{if(!queued){queued=true;requestAnimationFrame(run);setTimeout(run,120)}};
@@ -97,4 +150,14 @@
       const tb=document.getElementById('rank-body'),b=snap(tb,true);inRender=true;
       try{return orig.apply(this,arguments)}finally{inRender=false;glide(document.getElementById('rank-body'),b,true)}};
   }
+  /* ---------- 7. toast with an icon and a slide-up ---------- */
+  const T_CHECK='<svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>';
+  const T_BANG='<svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" aria-hidden="true"><path d="M12 6v7M12 17.5v.5"/></svg>';
+  let tT,tHide;
+  window.toast=function(m){const t=document.getElementById('toast');if(!t)return;clearTimeout(tT);clearTimeout(tHide);
+    const warn=/^(type |paste |no |nothing|couldn|can't|could not|.* is already )/i.test(m);
+    t.innerHTML=`<span class="toast-ic${warn?' warn':''}">${warn?T_BANG:T_CHECK}</span><span></span>`;t.lastChild.textContent=m;
+    /* a toast that is already up just swaps its text; a fresh one slides in */
+    if(t.hidden||t.classList.contains('out')){t.classList.remove('in','out');t.hidden=false;void t.offsetWidth;t.classList.add('in')}
+    tT=setTimeout(()=>{t.classList.add('out');tHide=setTimeout(()=>{t.hidden=true;t.classList.remove('in','out')},220)},2400)};
 })();

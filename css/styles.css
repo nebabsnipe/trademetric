@@ -493,7 +493,12 @@ label.btn.shot-btn{display:inline-flex;align-items:center;gap:8px;white-space:no
 .live-tag.in{background:var(--accent);color:#fff}
 .live-tag.post{background:var(--ink);color:var(--surface)}
 .live-dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--muted);margin-right:6px;vertical-align:1px}
-.live-dot.on{background:var(--accent);animation:livepulse 1.4s ease-in-out infinite}
+.live-dot{position:relative}
+.live-dot.on{background:var(--accent)}
+/* rippling rings around the live dot (iconiq "Status Dot") */
+.live-dot.on::before,.live-dot.on::after{content:"";position:absolute;inset:0;border-radius:50%;animation:live-ripple 2.25s ease-out infinite}
+.live-dot.on::after{animation-delay:1.125s}
+@keyframes live-ripple{0%{box-shadow:0 0 0 0 color-mix(in srgb,var(--accent) 50%,transparent)}72%{box-shadow:0 0 0 7px transparent}100%{box-shadow:0 0 0 0 transparent}}
 @keyframes livepulse{50%{opacity:.35}}
 /* phone polish */
 .fa-row .psub{white-space:normal}
@@ -2403,3 +2408,26 @@ body[data-tab="news"] .tmn-chips{display:none}
 /* alerts grouped by day */
 .al-day{font-size:10.5px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);padding:10px 6px 4px}
 .al-day:first-child{padding-top:2px}
+/* win chance drawn as a ring that fills to the number (Magic UI "Animated Circular Progress Bar") */
+.mu-mid.has-ring{display:flex;flex-direction:column;align-items:center;gap:2px;padding-bottom:0}
+.mu-ring{position:relative;width:92px;height:92px;display:grid;place-items:center}
+.mu-ring svg{position:absolute;inset:0;width:100%;height:100%;transform:rotate(-90deg);overflow:visible}
+.mu-ring circle{fill:none;stroke-width:8;stroke-linecap:round}
+.mu-ring .ring-bg{stroke:var(--surface-3)}
+.mu-ring .ring-fg{stroke:var(--accent);transition:stroke-dasharray .9s cubic-bezier(.2,.8,.2,1)}
+.mu-mid.has-ring .mu-pct{font-size:24px;position:relative}
+@media (max-width:560px){.mu-ring{width:62px;height:62px}.mu-ring circle{stroke-width:9}.mu-mid.has-ring .mu-pct{font-size:15px}}
+/* list items arrive one after another (Magic UI "Animated List") */
+@keyframes lst-in{from{opacity:0;transform:translateY(8px) scale(.97)}to{opacity:1;transform:none}}
+.lst-in{animation:lst-in .42s cubic-bezier(.2,.8,.2,1) both;animation-delay:calc(var(--i,0)*45ms)}
+/* confetti canvas for a clinched week (Magic UI "Confetti") */
+.conf-cv{position:fixed;inset:0;width:100vw;height:100vh;pointer-events:none;z-index:95}
+/* toast: icon plus a slide-up in and a fade out (cnippet "Toast") */
+.toast{display:flex;align-items:center;gap:9px;padding:9px 16px 9px 11px}
+.toast[hidden]{display:none}
+@keyframes toast-in{from{opacity:0;transform:translate(-50%,14px) scale(.94)}to{opacity:1;transform:translate(-50%,0) scale(1)}}
+@keyframes toast-out{to{opacity:0;transform:translate(-50%,10px) scale(.97)}}
+.toast.in{animation:toast-in .4s cubic-bezier(.2,.9,.3,1.15)}
+.toast.out{animation:toast-out .2s ease-in forwards}
+.toast-ic{flex:none;width:18px;height:18px;border-radius:50%;background:var(--good);color:#fff;display:grid;place-items:center}
+.toast-ic.warn{background:var(--warn)}
