@@ -1,6 +1,6 @@
 # Players tab — advanced stats
 
-**Status: built and verified on the `advanced-stats` branch, not yet merged to main** (as of 2026-11-08).
+**Status: live on main** (the stat picker, `STATS` and `QUAL` are in `js/app.js`).
 
 ## Summary
 Almost everything was already in the weekly player stats file the site downloads every morning (`targets`, `carries`, `target_share`, `air_yards_share`, `wopr`, `receiving_air_yards`, rushing/receiving TDs). Two new free sources were added in the same pattern as `scripts/update_data.py`: an expected-points file and play-by-play (only nine columns read, for red zone).
@@ -28,6 +28,5 @@ QB/RB/WR/TE only, at least 3 games and a 15% average snap share; expected stats 
 `data/nfl.json` went from 360 KB to 410 KB. Expected and red zone stats stored as season totals.
 
 ## Still open
-1. Merge to main.
-2. Help page explainers for WOPR, xFP and FPOE in `#v-help`.
-3. Use FPOE and WOPR as buy-low / sell-high signals in the trade formula.
+1. Help page explainers for WOPR, xFP and FPOE in `#v-help`.
+2. Use FPOE and WOPR as buy-low / sell-high signals in the trade formula.
