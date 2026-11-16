@@ -1469,8 +1469,8 @@ function bestPickups(){if(BRIEF_CACHE.v===VER)return BRIEF_CACHE.d;const me=myTe
   const d=POOL.filter(p=>!OWN[p.id]&&!isOut(p.id)&&V.pts[p.id]>4).map(p=>{const drop=dropFor(p.id);return {p,drop,g:drop?lineup(me.players.filter(x=>x!==drop).concat(p.id),projV).total-before:0}}).sort((a,b)=>b.g-a.g).slice(0,3);
   BRIEF_CACHE={v:VER,d};return d}
 function renderBriefing(){const el=$('briefing');if(!el)return;const me=myTeam(),items=[];
-  const oid=oppOf(S.me,WEEK);if(oid){const A=weekLine(me.players,WEEK,S.me),Bm=weekLine(teamById(oid).players,WEEK,oid),pw=Phi((A.m-Bm.m)/Math.sqrt(A.sd**2+Bm.sd**2));
-    items.push({k:'Matchup',h:`<p>You're <b>${pct(pw)}</b> to beat ${esc(teamById(oid).name)} this week, ${f1(A.m)} to ${f1(Bm.m)} projected.</p>`,acts:[['Open matchup','goto|team|matchup']]})}
+  const oid=oppOf(S.me,WEEK);if(oid){const A=weekLine(me.players,WEEK,S.me),Bm=weekLine(teamById(oid).players,WEEK,oid),pw=lineP(A,Bm,WEEK);
+    items.push({k:'Matchup',h:`<p>You're <b>${wpPct(pw)}</b> to beat ${esc(teamById(oid).name)} this week, ${f1(A.m)} to ${f1(Bm.m)} projected.</p>`,acts:[['Open matchup','goto|team|matchup']]})}
   const starters=lineup(me.players,projV).slots.filter(x=>x.p).map(x=>x.p.id),worries=[];
   starters.forEach(id=>{const st=stOf(id),g=G[id],n=esc(byId[id].n);if(st&&st!=='Q')worries.push([id,`${n} is ${({O:'out',D:'doubtful',IR:'on injured reserve',PUP:'on the PUP list',SUS:'suspended'})[st]}.`]);else if(st==='Q')worries.push([id,`${n} is questionable${byId[id].inj?' ('+esc(byId[id].inj).toLowerCase()+')':''}.`]);else if(!g.next)worries.push([id,`${n} is on bye.`]);else if(g.next.rank<=4)worries.push([id,`${n} faces a tough ${g.next.opp} defense.`])});
   items.push({k:'Lineup',h:worries.length?`<ul>${worries.slice(0,3).map(w=>`<li>${w[1]}</li>`).join('')}</ul>`:'<p>No lineup concerns. Your starters are healthy and active.</p>',acts:worries.length?[[`View ${byId[worries[0][0]].n}`,'view|'+worries[0][0]]]:[]});
@@ -1581,6 +1581,12 @@ const N_SIM=2000;let REG_WEEKS=14;
 const realPlayed=()=>S.real&&S.real.played!=null?S.real.played:PLAYED;let SCHED=null,REC_CACHE={v:-1},SIM_CACHE={v:-1};
 const Phi=z=>.5*(1+erf(z/Math.SQRT2));
 const pct=x=>Math.round(x*100)+'%';
+/* Chance to win a matchup. It only reads 100% (or 0%) once the result is locked: every starter on both sides has
+   finished his game. Until then it stays between 1% and 99%, however lopsided the projection is. */
+const wkOpen=ids=>!(LIVE&&LIVE.week===WEEK&&LIVE.games)||ids.some(id=>{const p=byId[id],g=p&&LIVE.games[p.t];return g&&g.state!=='post'});
+function winP(d,sd,ids,w){if(w===WEEK&&!wkOpen(ids))return d>0?1:d<0?0:.5;return Math.min(.99,Math.max(.01,Phi(d/(sd||1))))}
+const lineP=(A,B,w)=>winP(A.m-B.m,Math.sqrt(A.sd**2+B.sd**2),[...A.lu.slots,...B.lu.slots].filter(x=>x.p).map(x=>x.p.id),w);
+const wpPct=p=>(p>=1?100:p<=0?0:Math.min(99,Math.max(1,Math.round(p*100))))+'%';
 function schedule(){REG_WEEKS=(S.real&&S.real.regWeeks)||14;const ids=S.teams.map(T=>T.id),key=ids.join()+(S.real?'|R'+S.real.at:'');if(SCHED&&SCHED.key===key)return SCHED.weeks;
   const a=[...ids];if(a.length%2)a.push(null);const n=a.length,rest=a.slice(1),L=rest.length,weeks={};
   for(let w=1;w<=REG_WEEKS;w++){const k=(w-1)%(n-1),rot=[a[0],...rest.slice(L-k),...rest.slice(0,L-k)],pairs=[];for(let i=0;i<n/2;i++)pairs.push([rot[i],rot[n-1-i]]);weeks[w]=pairs}
@@ -1638,7 +1644,7 @@ function renderOppCard(){const el=$('opp-card');if(!el)return;
    :`<p class="empty" style="margin:0">Nothing here yet. Backups who gain work from injuries show up here.</p>`)}
 function renderMatchup(){const el=$('matchup');const oid=oppOf(S.me,WEEK);
   if(!oid){el.innerHTML=`<div class="card-h"><h2>Week ${WEEK} matchup</h2></div><p class="empty">No opponent this week.</p>`;return}
-  const me=myTeam(),O=teamById(oid),A=weekLine(me.players,WEEK,S.me),Bm=weekLine(O.players,WEEK,oid),pw=Phi((A.m-Bm.m)/Math.sqrt(A.sd**2+Bm.sd**2)),f=pickVal(WEEK);
+  const me=myTeam(),O=teamById(oid),A=weekLine(me.players,WEEK,S.me),Bm=weekLine(O.players,WEEK,oid),pw=lineP(A,Bm,WEEK),f=pickVal(WEEK);
   const act=lu=>sum(lu.slots.filter(x=>x.p&&liveOf(x.p.id)),x=>liveOf(x.p.id).pts),anyLive=[...A.lu.slots,...Bm.lu.slots].some(x=>x.p&&liveOf(x.p.id)),aA=act(A.lu),aB=act(Bm.lu);
   const cell=(id,v,win,al)=>{const l=id&&liveOf(id);return `<td class="${al} num ${win?'win':''}">${l?`<b>${f1(l.pts)}</b><small>${l.state==='post'?'final':'proj '+f1(v)}</small>`:f1(v)}</td>`};
   const rows=A.lu.slots.map((x,i)=>{const o=Bm.lu.slots[i],a=x.p?f(x.p.id):0,b=o&&o.p?f(o.p.id):0;
@@ -1646,7 +1652,7 @@ function renderMatchup(){const el=$('matchup');const oid=oppOf(S.me,WEEK);
     return `<tr><td>${x.p?plCell(x.p,sub(x.p.id)):'<span class="empty">Empty</span>'}</td>${cell(x.p&&x.p.id,a,a>=b,'r')}<td class="mu-slot">${x.label}</td>${cell(o&&o.p&&o.p.id,b,b>a,'')}<td>${o&&o.p?plCell(o.p,sub(o.p.id)):'<span class="empty">Empty</span>'}</td></tr>`}).join('');
   el.innerHTML=`<div class="card-h"><h2>Week ${WEEK} matchup</h2><span class="note">${A.lu.real?'Your real lineups · ':''}${LIVE&&LIVE.week===WEEK&&Object.values(LIVE.games).some(g=>g.state!=='pre')?`<span class="live-dot${LIVE.live?' on':''}"></span>${LIVE.live?'Live':'Updated'} · ${new Date(LIVE.updated).toLocaleTimeString([], {hour:'numeric',minute:'2-digit'})} · points so far plus the rest of each game projected`:''}</span></div>
    <div class="mu-head"><div class="mu-team"><span class="mu-name"><i class="tsq" style="background:${teamColor(S.me)}"></i>${esc(me.name)}</span><span class="note">${recTxt(S.me)}</span><b class="num">${f1(anyLive?aA:A.m)}</b>${anyLive?`<span class="mu-proj">proj ${f1(A.m)}</span>`:''}</div>
-    <div class="mu-mid"><div class="mu-pct">${pct(pw)}</div><div class="note">chance you win</div></div>
+    <div class="mu-mid"><div class="mu-pct">${wpPct(pw)}</div><div class="note">chance you win</div></div>
     <div class="mu-team r"><span class="mu-name"><i class="tsq" style="background:${teamColor(oid)}"></i>${esc(O.name)}</span><span class="note">${recTxt(oid)}</span><b class="num">${f1(anyLive?aB:Bm.m)}</b>${anyLive?`<span class="mu-proj">proj ${f1(Bm.m)}</span>`:''}</div></div>
    <div class="mu-bar"><i style="width:${pw*100}%;background:${teamColor(S.me)}"></i><i style="width:${(1-pw)*100}%;background:${versusColor(teamColor(S.me),teamColor(oid))}"></i></div>
    <details class="mu-details"><summary>Position-by-position comparison</summary><div class="mu-table"><table><thead><tr><th>You</th><th class="r">${anyLive?'Pts':'Proj'}</th><th style="text-align:center">Slot</th><th>${anyLive?'Pts':'Proj'}</th><th>${esc(O.name)}</th></tr></thead><tbody>${rows}</tbody></table></div></details>`}
@@ -1673,8 +1679,8 @@ function renderSeason(){
         <span class="r2-odds ${cls}">${bar(x.playoff)}<b>${pct(x.playoff)}</b></span>${P===6?`<span class="r2-c r2-bye">${pct(x.bye)}</span>`:''}<span class="r2-c">${pct(x.title)}</span><span class="r2-c r2-pw">${Math.round(x.wins)}-${REG_WEEKS-Math.round(x.wins)}</span></div>`}).join('')}</div>
     ${howLink('sim')}`;
   renderNeed(sim,rec);
-  let road='';for(let w=WEEK;w<=REG_WEEKS;w++){const oid=oppOf(me,w);if(!oid)continue;const A=weekLine(myTeam().players,w,me),Bm=weekLine(teamById(oid).players,w,oid),p=Phi((A.m-Bm.m)/Math.sqrt(A.sd**2+Bm.sd**2));
-    road+=`<div class="road-row"><span class="slot">Wk ${w}</span><span class="owner"><i style="background:${teamColor(oid)}"></i>${esc(teamById(oid).name)}</span><span class="note">${recTxt(oid)}</span><div class="road-bar"><i class="${p>=.6?'good':p<.4?'bad':''}" style="width:${p*100}%"></i></div><span class="wp ${p>=.6?'good':p<.4?'bad':''}">${pct(p)}</span></div>`}
+  let road='';for(let w=WEEK;w<=REG_WEEKS;w++){const oid=oppOf(me,w);if(!oid)continue;const A=weekLine(myTeam().players,w,me),Bm=weekLine(teamById(oid).players,w,oid),p=lineP(A,Bm,w);
+    road+=`<div class="road-row"><span class="slot">Wk ${w}</span><span class="owner"><i style="background:${teamColor(oid)}"></i>${esc(teamById(oid).name)}</span><span class="note">${recTxt(oid)}</span><div class="road-bar"><i class="${p>=.6?'good':p<.4?'bad':''}" style="width:${p*100}%"></i></div><span class="wp ${p>=.6?'good':p<.4?'bad':''}">${wpPct(p)}</span></div>`}
   $('road').innerHTML=road||'<p class="empty">Regular season is over.</p>';
   /* tiebreaker watch: points for among teams around the playoff line */
   const win=rec2=>rec2.w+rec2.t/2,near=ord.filter(t=>Math.abs(win(rec[t])-win(rec[me]))<=1).sort((a,b)=>Math.abs(rec[a].pf-rec[me].pf)-Math.abs(rec[b].pf-rec[me].pf)).slice(0,6).sort((a,b)=>rec[b].pf-rec[a].pf);

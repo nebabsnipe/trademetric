@@ -47,14 +47,14 @@ function tmnCurMatch(c){const me=myTeam();if(!me)return;const A=weekLine(me.play
   const f=pickVal(WEEK),side=lu=>{const s={now:0,rem:0,ceil:0,live:0,done:0,n:0};lu.slots.forEach(x=>{if(!x.p)return;s.n++;const id=x.p.id,l=liveOf(id),v=f(id)||0;
       if(l){s.now+=l.pts;if(l.state==='post'){s.done++;return}s.live++;const r=Math.max(0,v-l.pts);s.rem+=r;s.ceil+=Math.max(3*r,8*l.rem)}else if(v>0){s.rem+=v;s.ceil+=Math.max(3*v,8)}});return s};
   const a=side(A.lu),b=side(B.lu),sd=Math.sqrt(A.sd**2+B.sd**2)||1;
-  c.opp={id:oid,name:O.name,m:A.m,om:B.m,sd,wp:Phi((A.m-B.m)/sd),now:a.now,onow:b.now,rem:a.rem,orem:b.rem,oceil:b.ceil,started:a.live+a.done+b.live+b.done>0,live:a.live+b.live>0,final:a.n>0&&a.done===a.n&&b.done===b.n}}
+  c.opp={id:oid,name:O.name,m:A.m,om:B.m,sd,wp:lineP(A,B,WEEK),now:a.now,onow:b.now,rem:a.rem,orem:b.rem,oceil:b.ceil,started:a.live+a.done+b.live+b.done>0,live:a.live+b.live>0,final:a.n>0&&a.done===a.n&&b.done===b.n}}
 /* other saved leagues: their own scoring, real lineups when the import has them, otherwise best projected lineup */
 function tmnSnapMatch(c,snap){const sl=(snap.league&&snap.league.slots)||{},real=snap.real;
   const pairs=real&&real.sched&&real.sched[WEEK],pr=pairs&&pairs.find(p=>p.includes(snap.me)),oid=pr?(pr[0]===snap.me?pr[1]:pr[0]):null;
   const luOf=tid=>{const r=real&&real.lineups&&real.lineupWeek===WEEK&&real.lineups[tid];if(r&&r.length)return r.map(x=>x.id).filter(id=>id&&byId[id]);const T=snap.teams.find(t=>t.id===tid);return T?tmnGreedy(T.players,sl,c.sc):[]};
   luOf(snap.me).forEach(id=>c.starters.add(id));if(!oid)return;const O=snap.teams.find(t=>t.id===oid);if(!O)return;luOf(oid).forEach(id=>c.oppStarters.add(id));
   const a=tmnSide([...c.starters],c.sc),b=tmnSide([...c.oppStarters],c.sc),sd=Math.sqrt(a.v+b.v)||1;
-  c.opp={id:oid,name:O.name,m:a.m,om:b.m,sd,wp:Phi((a.m-b.m)/sd),now:a.now,onow:b.now,rem:a.rem,orem:b.rem,oceil:b.ceil,started:a.live+a.done+b.live+b.done>0,live:a.live+b.live>0,final:a.n>0&&a.done===a.n&&b.done===b.n}}
+  c.opp={id:oid,name:O.name,m:a.m,om:b.m,sd,wp:winP(a.m-b.m,sd,[...c.starters,...c.oppStarters],WEEK),now:a.now,onow:b.now,rem:a.rem,orem:b.rem,oceil:b.ceil,started:a.live+a.done+b.live+b.done>0,live:a.live+b.live>0,final:a.n>0&&a.done===a.n&&b.done===b.n}}
 function tmnExp(id,sc){const p=byId[id];if(!p)return null;const proj=BYE[p.t]===WEEK||isOut(id)?0:Math.max(0,projPts(p,sc)),gm=LIVE&&LIVE.week===WEEK&&LIVE.games&&LIVE.games[p.t];
   if(!gm||gm.state==='pre')return {now:0,m:proj,rem:proj,rf:1,pre:true,proj};
   const now=tmnPts(id,sc);if(gm.state==='post')return {now,m:now,rem:0,rf:0,post:true,proj};
@@ -134,7 +134,7 @@ const tmnN=x=>String(Math.round((+x||0)*10)/10);
 const tmnShort=n=>{const w=String(n||'').replace(/\s+(Jr\.?|Sr\.?|II|III|IV)$/,'').split(' ');return w.length>1?w.slice(1).join(' '):n};
 /* the details a headline can use */
 function tmnVars(p,c,extra){const gm=p&&LIVE&&LIVE.games&&LIVE.games[p.t],o=c&&c.opp;
-  return {p:p?p.n:'',last:p?tmnShort(p.n):'',nick:gm&&gm.opp&&typeof NICK!=='undefined'?NICK[gm.opp]||gm.opp:'',team:c?c.team:'',opp:o?o.name:'',wp:o?Math.round(o.wp*100)+'%':'',...extra}}
+  return {p:p?p.n:'',last:p?tmnShort(p.n):'',nick:gm&&gm.opp&&typeof NICK!=='undefined'?NICK[gm.opp]||gm.opp:'',team:c?c.team:'',opp:o?o.name:'',wp:o?wpPct(o.wp):'',...extra}}
 
 /* ---------- detection: runs after every live update ---------- */
 async function tmnTick(){try{
@@ -171,7 +171,7 @@ async function tmnTick(){try{
         sub:`${c.team} ${f1(o.now)} – ${f1(o.onow)} ${o.name}${o.final?' · final':` · up ${f1(o.now-o.onow)} with ${Math.round(o.orem)} projected left on their side`}`,head:tmnHead(who?'clinch':'clinch0',ck,tmnVars(who,c,{}))},fresh)}
     if(!clinched&&pv&&o.started&&pv.mu<=0&&mu>0&&o.rem+o.orem<=TMN_R.late&&star&&at-(pv.swingAt||0)>10*60e3){const k='swing:'+c.key+':'+star.k;
       tmnAdd({k,type:'swing',cls:'swing',pid:star.pid,lkey:c.key,leagues:[{key:c.key,name:c.name,st:true,wp0:pv.wp,wp1:o.wp}],at,
-        sub:`Now projected to win by ${f1(mu)} · ${f1(o.now)}–${f1(o.onow)} with about ${Math.round(o.rem+o.orem)} pts left to play`,head:tmnHead('swing',k,tmnVars(byId[star.pid],c,{wp0:pv.wp!=null?Math.round(pv.wp*100)+'%':'',kind:star.kind}))},fresh);(TMN.prev[c.key]=TMN.prev[c.key]||{}).swingAt=at}
+        sub:`Now projected to win by ${f1(mu)} · ${f1(o.now)}–${f1(o.onow)} with about ${Math.round(o.rem+o.orem)} pts left to play`,head:tmnHead('swing',k,tmnVars(byId[star.pid],c,{wp0:pv.wp!=null?wpPct(pv.wp):'',kind:star.kind}))},fresh);(TMN.prev[c.key]=TMN.prev[c.key]||{}).swingAt=at}
     new Set([...c.oppStarters,...(TMN.prevOpp&&TMN.prevOpp[c.key]||[])]).forEach(id=>{const p=byId[id],gm=p&&LIVE.games[p.t];if(!gm||gm.state!=='in'||c.roster.has(id))return;const s=stOf(id),was=TMN.prevStat[id];
       if((s==='O'||s==='IR')&&was!==undefined&&was!=='O'&&was!=='IR'&&!TMN.fired.has('oinj:'+id)){const k='oinj:'+id;tmnAdd({k,type:'oinj',cls:'oinj',pid:id,leagues:[{key:c.key,name:c.name,st:true,wp0:pv?pv.wp:null,wp1:o.wp}],at,
         sub:`${o.name} started him. ${NOTES[id]&&NOTES[id].note?NOTES[id].note:'Ruled out during the game.'}`,head:tmnHead('oinj',k,tmnVars(p,c,{}))},fresh)}})});
@@ -264,7 +264,7 @@ function tmnPump(){clearTimeout(TMN.timer);if(TMN.showing||!TMN.queue.length)ret
 TMN.gapFor=TMN_R.gap;
 function tmnBody(ev,big){const p=ev.pid&&byId[ev.pid],[lbl,tone]=TMN_LBL[ev.cls]||['News','accent'];
   const lg=ev.leagues.map(l=>{const d=l.wp0!=null&&l.wp1!=null&&!l.bench?Math.round((l.wp1-l.wp0)*100):null;
-    return `<span class="tmn-lchip${l.bench?' bench':''}${l.their?' their':''}">${esc(l.name)}${l.bench?' · bench':''}${l.wp1!=null&&!l.bench?` · <b>${Math.round(l.wp1*100)}%</b>${d?` <em class="${d>0?'up':'dn'}">${d>0?'+':'−'}${Math.abs(d)}</em>`:''}`:''}</span>`}).join('');
+    return `<span class="tmn-lchip${l.bench?' bench':''}${l.their?' their':''}">${esc(l.name)}${l.bench?' · bench':''}${l.wp1!=null&&!l.bench?` · <b>${wpPct(l.wp1)}</b>${d?` <em class="${d>0?'up':'dn'}">${d>0?'+':'−'}${Math.abs(d)}</em>`:''}`:''}</span>`}).join('');
   if(ev.type==='mytrade')return `<div class="tmn-b-av">${p?av(p,big?'lg':''):''}</div>
     <div class="tmn-b-main"><span class="tmn-lbl accent">${ev.how==='move'?'Your player changed teams':'Your player was traded'}</span><h3>${esc(ev.head)}</h3><p><span class="tmn-tr-route">${ev.from?`<b>${esc(ev.from)}</b><i aria-hidden="true">→</i>`:''}<b>${esc(ev.to)}</b></span> ${esc(ev.sub)}</p></div>`;
   if(ev.type==='top')return `<div class="tmn-b-av tmn-top-av"><i class="tmn-rays" aria-hidden="true"></i>${p?av(p,big?'lg':''):''}<span class="tmn-medal">#1</span></div>
@@ -641,7 +641,7 @@ const tmnRail=(t,day)=>day?`<div class="tmn-ev-rail"><time datetime="${t?new Dat
 const tmnMulti=()=>!!(S.leagues&&S.leagues.length>1);
 function tmnEvCard(e,clip,old){const [lbl,tone]=TMN_LBL[e.cls]||['News','accent'],p=e.pid&&byId[e.pid];
   const lg=(e.leagues||[]).filter(l=>tmnMulti()||l.bench||l.their||l.wp1!=null).map(l=>{const d=l.wp0!=null&&l.wp1!=null&&!l.bench?Math.round((l.wp1-l.wp0)*100):null;
-    return `<span class="tmn-lchip${l.bench?' bench':''}${l.their?' their':''}">${esc(l.name)}${l.bench?' · bench':''}${l.wp1!=null&&!l.bench?` · <b>${Math.round(l.wp1*100)}%</b>${d?` <em class="${d>0?'up':'dn'}">${d>0?'▲':'▼'}${Math.abs(d)}</em>`:''}`:''}</span>`}).join('');
+    return `<span class="tmn-lchip${l.bench?' bench':''}${l.their?' their':''}">${esc(l.name)}${l.bench?' · bench':''}${l.wp1!=null&&!l.bench?` · <b>${wpPct(l.wp1)}</b>${d?` <em class="${d>0?'up':'dn'}">${d>0?'▲':'▼'}${Math.abs(d)}</em>`:''}`:''}</span>`}).join('');
   const showPts=e.pts!=null&&(e.type==='play'||e.type==='opp'),big=e.cls==='game'||e.cls==='gameX';
   const v=clip?`<div class="tmn-vid">${tmnClipThumb(clip)}</div>`:'';
   const gm=p&&!old&&LIVE&&LIVE.week===WEEK&&LIVE.games&&LIVE.games[p.t],sc=tmnScOf(e),now=p&&!old&&gm?tmnPts(e.pid,sc):null;
