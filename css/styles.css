@@ -2408,15 +2408,6 @@ body[data-tab="news"] .tmn-chips{display:none}
 /* alerts grouped by day */
 .al-day{font-size:10.5px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);padding:10px 6px 4px}
 .al-day:first-child{padding-top:2px}
-/* win chance drawn as a ring that fills to the number (Magic UI "Animated Circular Progress Bar") */
-.mu-mid.has-ring{display:flex;flex-direction:column;align-items:center;gap:2px;padding-bottom:0}
-.mu-ring{position:relative;width:92px;height:92px;display:grid;place-items:center}
-.mu-ring svg{position:absolute;inset:0;width:100%;height:100%;transform:rotate(-90deg);overflow:visible}
-.mu-ring circle{fill:none;stroke-width:8;stroke-linecap:round}
-.mu-ring .ring-bg{stroke:var(--surface-3)}
-.mu-ring .ring-fg{stroke:var(--accent);transition:stroke-dasharray .9s cubic-bezier(.2,.8,.2,1)}
-.mu-mid.has-ring .mu-pct{font-size:24px;position:relative}
-@media (max-width:560px){.mu-ring{width:62px;height:62px}.mu-ring circle{stroke-width:9}.mu-mid.has-ring .mu-pct{font-size:15px}}
 /* list items arrive one after another (Magic UI "Animated List") */
 @keyframes lst-in{from{opacity:0;transform:translateY(8px) scale(.97)}to{opacity:1;transform:none}}
 .lst-in{animation:lst-in .42s cubic-bezier(.2,.8,.2,1) both;animation-delay:calc(var(--i,0)*45ms)}

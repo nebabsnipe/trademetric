@@ -2,7 +2,6 @@
    1. sliding highlight on segmented controls (.seg) and the Trade builder / Trade ideas tabs (.tr-tabs)
    2. table rows glide to their new place when a table re-sorts or the rankings re-filter
    3. key numbers (My Team tiles, matchup score and win chance, projected total) roll to their new value
-   4. a ring around the matchup win chance that fills to the number (Magic UI "Animated Circular Progress Bar")
    5. alert and news lists stagger in one item after another (Magic UI "Animated List")
    6. confetti when a banner says the week is clinched (Magic UI "Confetti")
    7. the toast gets an icon and slides up instead of just appearing (cnippet "Toast")
@@ -57,23 +56,6 @@
   }
 
 
-  /* ---------- 4. win-chance ring ---------- */
-  const RING_C=2*Math.PI*45;let lastRing=null;
-  function ringAll(){
-    document.querySelectorAll('.mu-mid:not(.has-ring)').forEach(mid=>{
-      const pct=mid.querySelector('.mu-pct');if(!pct||busy.has(pct))return;
-      const v=parseFloat(pct.textContent);if(!isFinite(v))return;
-      mid.classList.add('has-ring');
-      const wrap=document.createElement('div');wrap.className='mu-ring';
-      wrap.innerHTML='<svg viewBox="0 0 100 100" aria-hidden="true"><circle class="ring-bg" cx="50" cy="50" r="45"/><circle class="ring-fg" cx="50" cy="50" r="45"/></svg>';
-      mid.insertBefore(wrap,pct);wrap.appendChild(pct);
-      /* first paint fills from empty; later renders sweep from the last value shown */
-      const fg=wrap.querySelector('.ring-fg'),from=still()?v:lastRing==null?0:lastRing;
-      fg.style.transition='none';fg.style.strokeDasharray=`${RING_C*from/100} ${RING_C}`;void fg.getBoundingClientRect();
-      fg.style.transition='';fg.style.strokeDasharray=`${RING_C*v/100} ${RING_C}`;lastRing=v;
-    });
-  }
-
   /* ---------- 5. lists stagger in ---------- */
   let lastTab=null,feedDone=false,popOpen=false;
   const stagger=items=>items.forEach((el,i)=>{if(el.classList.contains('lst-in'))return;el.style.setProperty('--i',Math.min(i,14));el.classList.add('lst-in')});
@@ -107,7 +89,7 @@
 
   /* one debounced pass after any change to the page */
   let queued=false;
-  const pass=()=>{queued=false;segAll();ringAll();rollAll();staggerAll();confettiAll()};
+  const pass=()=>{queued=false;segAll();rollAll();staggerAll();confettiAll()};
   const run=()=>{if(queued)pass()};
   /* animation frames pause in background tabs, so a timer backs the frame up */
   const queue=()=>{if(!queued){queued=true;requestAnimationFrame(run);setTimeout(run,120)}};
