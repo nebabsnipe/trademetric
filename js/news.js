@@ -612,7 +612,7 @@ function tmnRenderBody(Ls){const el=$('tmn-feed');if(!el)return;Ls=Ls||tmnLeague
     const tp=[...tops].sort((a,b)=>(b.overall-a.overall)||(b.pts-a.pts));
     html=(tp.length?`<div class="tmn-tops">${tmnTopCard(tp[0])}${tp.length>1?`<div class="tmn-tops-more">${tp.slice(1).map(tmnTopMini).join('')}</div>`:''}</div>`:'')+tl(all,act)
       +(cut&&!all.length&&!tops.length&&all0.length?`<div class="card tmn-empty"><h2>${sh.mine?'Nothing about your team yet':'No league news right now'}</h2><p class="note">${sh.mine?'League news is switched off. Turn <b>League</b> back on in the rail to see trades, signings and injuries around the league.':'Your team is switched off. Turn <b>Yours</b> back on in the rail to see your players.'}</p></div>`:'')
-      +(!picked.length&&TMN.artBusy?'<p class="note tmn-loading"><span class="spin"></span> Pulling the latest on your players…</p>':'')
+      +(!picked.length&&TMN.artBusy?(typeof skel==='function'?skel(3,true):'<p class="note tmn-loading"><span class="spin"></span> Pulling the latest on your players…</p>'):'')
       +(act&&(TMN.fail.lg||TMN.fail.art)&&!(TMN.lgn&&TMN.lgn.items.length&&TMN.art)?'<p class="note tmn-loading">Some news didn\'t load. Trying again in a minute.</p>':'')}
   const empty={all:['Nothing yet this week','Everything about your team lands here as it happens, plus the trades, signings and big injuries around the league that move fantasy value.'],
     team:['Nothing yet this week','Big plays, injury news, role changes and results for your players show up here as they happen, from outlets all over the web.'],

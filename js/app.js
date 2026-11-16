@@ -1923,7 +1923,7 @@ function openCard(id){if(openId!==id)delete SORTS['log-table'];openId=id;const p
   const nx=g.next;
   $('modal').setAttribute('aria-label','Player card');$('modal').innerHTML=`<div class="mhead" style="${tcVars(p.t)}"><button class="mclose" id="mclose" aria-label="Close">×</button>${av(p,'lg')}<div style="position:relative;z-index:1;min-width:0"><h2>${esc(p.n)}</h2><div class="msub"><span>${p.pos} · ${p.t}</span><span>Bye Wk ${BYE[p.t]||'—'}</span>${stOf(id)?`<span class="tag" style="background:rgba(0,0,0,.4);color:#fff">${ST_LABEL[stOf(id)]}</span>`:''}${tagFull(id)}${OWN[id]!==S.me?followBtn(id):''}</div></div></div>
    <div class="mbody">
-    <div class="mstats"><div><b>#${V.rank[id]}</b><span>Overall</span></div><div><b>${p.pos}${V.posRank[id]}</b><span>Position</span></div><div><b>${(x=>x.k==='bye'?'—':f1(x.v))(nextWk(id))}</b><span>${wkLab(nextWk(id))}</span></div><div><b>${f1(g.season)}</b><span>Avg pts</span></div><div><b>${f1(g.last3)}</b><span>Last 3</span></div></div>
+    <div class="mstats"><div><b>#${V.rank[id]}</b><span>Overall</span></div><div><b>${p.pos}${V.posRank[id]}</b><span>Position</span></div><div><b>${(x=>x.k==='bye'?'—':f1(x.v))(nextWk(id))}</b><span>${wkLab(nextWk(id))}</span></div><div><b>${f1(g.season)}</b><span>Avg pts</span></div><div><b>${f1(g.last3)}</b><span>Last 3</span></div></div>${sparkHtml(g)}
     ${muBanner(p,g)}
     ${outlookHtml(p,g)}
     ${g.buy?`<div class="callout buy"><b>Why buy him</b><ul class="reasons">${g.buy.map(x=>`<li>${esc(x)}</li>`).join('')}</ul></div>`:''}
@@ -2524,7 +2524,7 @@ function renderFeed(){
   const list=feedPlayers();buildClips(list);
   /* top: featured clip + up next + watch button */
   const top=$('feed-top');
-  if(!FEED)top.innerHTML=`<div class="card hl-loading"><span class="spin"></span> Loading clips and news...</div>`;
+  if(!FEED)top.innerHTML=`<div class="card">${skel(3,true)}</div>`;
   else if(!CLIPS.length)top.innerHTML=`<div class="card hl-empty">No play clips yet for these players. They show up here as games are played.</div>`;
   else{const f=CLIPS[0],up=CLIPS.slice(1,5),fp=f.player?byId[f.player]:null;
     top.innerHTML=`<div class="card hl-feature"><div class="hl-feat-main">${thumbHtml(f,'lg')}</div>
@@ -2550,20 +2550,20 @@ function renderFeed(){
   const seenN=new Set(),allNews=[];list.forEach(({id})=>playerNews(byId[id]).forEach(a=>{if(!seenN.has(a.title)){seenN.add(a.title);allNews.push({...a,pid:id})}}));
   allNews.sort((a,b)=>Date.parse(b.at||0)-Date.parse(a.at||0));
   $('feed-side').innerHTML=`<div class="card hl-newscard"><div class="card-h"><h2>News</h2><span class="note">${allNews.length?allNews.length+' stories':''}</span></div>
-    ${!FEED?'<p class="note">Loading...</p>':allNews.length?`<ul class="hl-news">${allNews.slice(0,15).map(a=>`<li><span class="hl-ntag">${esc(byId[a.pid].n)}</span><a href="${esc(a.url||'#')}" target="_blank" rel="noopener">${esc(a.title)}</a>${a.desc&&a.desc!==a.title?`<p>${esc(a.desc.length>160?a.desc.slice(0,157)+'...':a.desc)}</p>`:''}<span class="note">${a.at?ago(a.at):''}</span></li>`).join('')}</ul>`:'<p class="note">No news for these players right now.</p>'}</div>`}
+    ${!FEED?skel(4):allNews.length?`<ul class="hl-news">${allNews.slice(0,15).map(a=>`<li><span class="hl-ntag">${esc(byId[a.pid].n)}</span><a href="${esc(a.url||'#')}" target="_blank" rel="noopener">${esc(a.title)}</a>${a.desc&&a.desc!==a.title?`<p>${esc(a.desc.length>160?a.desc.slice(0,157)+'...':a.desc)}</p>`:''}<span class="note">${a.at?ago(a.at):''}</span></li>`).join('')}</ul>`:'<p class="note">No news for these players right now.</p>'}</div>`}
 function followPanelHtml(){const ft=S.followTeams||[],teams=Object.keys(NICK).sort((a,b)=>teamName(a).localeCompare(teamName(b))),rec=recommendedFollows();
   return `<div class="card hl-follow"><div class="card-h"><h2>Teams you follow</h2></div><p class="note" style="margin:-4px 0 10px">Their top fantasy players join your feed.</p>
       <div class="team-chips">${ft.map(t=>`<span class="tchip" style="${tcVars(t)}"><i></i>${esc(teamName(t))}<button data-fteam="${t}" aria-label="Unfollow ${esc(teamName(t))}">×</button></span>`).join('')}
       <select id="team-add" aria-label="Follow a team"><option value="">+ Follow a team</option>${teams.filter(t=>!ft.includes(t)).map(t=>`<option value="${t}">${esc(teamName(t))} (${t})</option>`).join('')}</select></div>
     <div class="card-h" style="margin-top:20px"><h2>Recommended</h2></div><p class="note" style="margin:-4px 0 10px">Most highlight clips the last two weeks.</p>
-    ${!FEED?'<p class="note">Loading...</p>':rec.length?`<div class="rec-list">${rec.map(r=>{const p=byId[r.id];return `<div class="rec">${av(p,'sm')}<div class="rec-who"><button class="pname" data-open="${p.id}">${esc(p.n)}</button><span class="psub">${p.pos} · ${p.t} · ${r.n} clip${r.n>1?'s':''}</span></div>${followBtn(p.id,false).replace('follow-btn','follow-btn light')}</div>`}).join('')}</div>`:'<p class="note">No clips yet. Check back after the games.</p>'}</div>`}
+    ${!FEED?skel(4):rec.length?`<div class="rec-list">${rec.map(r=>{const p=byId[r.id];return `<div class="rec">${av(p,'sm')}<div class="rec-who"><button class="pname" data-open="${p.id}">${esc(p.n)}</button><span class="psub">${p.pos} · ${p.t} · ${r.n} clip${r.n>1?'s':''}</span></div>${followBtn(p.id,false).replace('follow-btn','follow-btn light')}</div>`}).join('')}</div>`:'<p class="note">No clips yet. Check back after the games.</p>'}</div>`}
 document.addEventListener('click',e=>{const t=e.target;if(!t.closest)return;
   const f=t.closest('[data-follow]');if(f){e.preventDefault();e.stopPropagation();toggleFollow(f.dataset.follow);if(openId&&!$('scrim').hidden)openCard(openId);return}
   const gt=t.closest('[data-goto]');if(gt){location.hash=gt.dataset.goto;return}
   const fte=t.closest('[data-fteam]');if(fte){toggleTeam(fte.dataset.fteam);return}},true);
 document.addEventListener('change',e=>{if(e.target.id==='team-add'&&e.target.value)toggleTeam(e.target.value)});
 /* highlights on the player card */
-function cardHighlights(id){const p=byId[id];if(!FEED){loadFeed();return `<h4>Highlights</h4><p class="note">Loading clips...</p>`}
+function cardHighlights(id){const p=byId[id];if(!FEED){loadFeed();return `<h4>Highlights</h4>${skel(2,true)}`}
   const vids=playerVideos(p);
   return `<h4>Highlights</h4>${vids.length?`<div class="hl-clips card-clips">${vids.map((v,i)=>`<a class="hthumb sm" href="${esc(v.url||'#')}" target="_blank" rel="noopener" title="${esc(v.title)} (opens on ${clipOut(v)})"><span class="vimg${v.thumb?'':' noimg'}" style="${tcVars(p.t)}">${v.thumb?`<img src="${esc(v.thumb)}" alt="" loading="lazy" decoding="async" onerror="this.remove()">`:''}<span class="vplay" aria-hidden="true"></span>${srcBadge(v)}</span><span class="vtitle">${v.game?'<span class="vtag">Game</span>':''}${esc(v.title)}</span><span class="note">Week ${v.week}${v.at?' · '+ago(v.at):''} · ${clipOut(v)} ↗</span></a>`).join('')}</div>`
     :`<p class="note">No clips of his plays from this week or last week yet.</p>`}<p class="note" style="margin:8px 0 0"><a href="${nflUrl(p)}" target="_blank" rel="noopener">More on NFL.com ↗</a></p>`}
@@ -2836,8 +2836,18 @@ const NEWS={};
 const PRAC_TXT={DNP:'Did not practice',LP:'Limited',FP:'Full practice'};
 function pracHtml(id){const L=PRAC[id];if(!L||!L.length)return '';
   return `<div class="prac"><span class="lab2">Practice reports</span>${L.slice().reverse().map(([w,c,inj,gs])=>`<div class="prac-row"><span class="prac-wk">Wk ${w}</span><span class="pchip ${(c||'na').toLowerCase()}">${PRAC_TXT[c]||'No report'}</span><span class="prac-inj">${esc(inj&&!/not injury related/i.test(inj)?inj:inj?'Rest day':'')}</span>${gs?`<span class="prac-gs ${gs==='Out'?'bad':gs==='Questionable'?'warn':''}">${esc(gs)}</span>`:''}</div>`).join('')}</div>`}
+/* shimmer placeholder rows while something loads; thumb=true adds an image block on the left */
+function skel(n,thumb){return `<div class="sk-list" role="status" aria-label="Loading">${Array.from({length:n||3},(_,i)=>`<div class="sk-row">${thumb?'<i class="sk-bar t"></i>':''}<span><i class="sk-bar ${i%2?'w2':'w3'}"></i><i class="sk-bar w2"></i></span></div>`).join('')}</div>`}
+/* weekly points as a small line chart: dashed line = season average, filled dot = latest game */
+function sparkHtml(g){const pts=g.pts.map((v,i)=>({v,w:g.log[i]&&g.log[i].w})).filter(x=>x.v!==null&&x.v!==undefined);if(pts.length<2)return '';
+  const W=240,H=44,pad=4,mx=Math.max(...pts.map(x=>x.v),1),lo0=Math.min(...pts.map(x=>x.v)),mn=Math.max(0,lo0-(mx-lo0)*.25),X=i=>pad+i*(W-2*pad)/(pts.length-1),Y=v=>H-pad-(v-mn)/(mx-mn||1)*(H-2*pad);
+  const line=pts.map((x,i)=>`${i?'L':'M'}${X(i).toFixed(1)} ${Y(x.v).toFixed(1)}`).join(''),av=avg(pts.map(x=>x.v)),hi=pts.reduce((a,b)=>b.v>a.v?b:a),lo=pts.reduce((a,b)=>b.v<a.v?b:a);
+  return `<div class="wkspark"><span class="wkspark-lab">Weekly<br>points</span><svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="Weekly points: ${pts.map(x=>`Week ${x.w} ${f1(x.v)}`).join(', ')}">
+    <path class="sp-area" d="${line}L${X(pts.length-1).toFixed(1)} ${H}L${X(0).toFixed(1)} ${H}Z"/><line class="sp-avg" x1="0" x2="${W}" y1="${Y(av).toFixed(1)}" y2="${Y(av).toFixed(1)}"/><path class="sp-line" d="${line}"/>
+    ${pts.map((x,i)=>`<path class="sp-pt${i===pts.length-1?' last':''}" d="M${X(i).toFixed(1)} ${Y(x.v).toFixed(1)}h0"><title>Week ${x.w}: ${f1(x.v)} pts</title></path>`).join('')}</svg>
+    <span class="wkspark-rng">High <b>${f1(hi.v)}</b> · Wk ${hi.w}<br>Low <b>${f1(lo.v)}</b> · Wk ${lo.w}</span></div>`}
 function newsHtml(id){const n=NEWS[id];
-  if(!n||n.loading)return `<div class="nws-load"><span class="spin"></span> Loading news from ESPN, CBS, Yahoo, RotoBaller and more...</div>`;
+  if(!n||n.loading)return skel(3);
   if(n.error)return `<p class="note">News couldn't load right now. <button class="linkish" data-news-retry="${id}">Try again</button></p>`;
   if(!n.items.length)return `<p class="note">No recent news stories about ${esc(byId[id].n)} in the last three weeks.</p>`;
   return `<div class="nws">${n.items.slice(0,4).map(x=>`<article class="nw"><h5>${esc(x.title)}</h5>${x.summary?`<p>${esc(x.summary)}</p>`:''}
@@ -3048,7 +3058,11 @@ function alertsList(){const me=S&&myTeam&&myTeam();if(!me||!V||!G)return [];cons
 function renderAlerts(){const b=$('alert-btn');if(!b)return;const {L,seen}=USER?alertsLive():{L:[],seen:new Set()},n=L.filter(a=>!seen.has(a.k)).length+(USER&&typeof tmnUnread==='function'&&tab!=='news'?tmnUnread():0);
   const c=$('alert-n');c.hidden=!n;c.textContent=n>9?'9+':n;b.setAttribute('aria-label',n?`Alerts, ${n} new`:'Alerts');
   const pop=$('alert-pop');if(!pop.hidden)paintAlerts(L,seen)}
-function paintAlerts(L,seen){const nn=typeof tmnUnread==='function'?tmnUnread():0;$('alert-pop').innerHTML=`<div class="al-h"><b>Alerts</b><span class="note">Week ${WEEK}</span></div>${nn?`<a class="al-news" href="#news"><b>${nn} new in News</b><span>Big plays from your players →</span></a>`:''}${L.length?`<div class="al-list">${L.map(a=>`<button class="al-i ${a.lvl}${seen.has(a.k)?'':' new'}" data-open="${a.open}"><i>${a.m?a.m:''}</i><span><b>${esc(a.t)}</b><span>${esc(a.d)}</span></span></button>`).join('')}</div>`:'<p class="empty" style="margin:0">All clear. Nothing needs your attention right now.</p>'}`}
+function paintAlerts(L,seen){const nn=typeof tmnUnread==='function'?tmnUnread():0;$('alert-pop').innerHTML=`<div class="al-h"><b>Alerts</b><span class="note">Week ${WEEK}</span></div>${nn?`<a class="al-news" href="#news"><b>${nn} new in News</b><span>Big plays from your players →</span></a>`:''}${L.length?`<div class="al-list">${alertDays(L).map(([day,A])=>`<div class="al-day">${day}</div>`+A.map(a=>`<button class="al-i ${a.lvl}${seen.has(a.k)?'':' new'}" data-open="${a.open}"><i>${a.m?a.m:''}</i><span><b>${esc(a.t)}</b><span>${esc(a.d)}</span></span></button>`).join('')).join('')}</div>`:'<p class="empty" style="margin:0">All clear. Nothing needs your attention right now.</p>'}`}
+/* alerts split into Today / Yesterday / weekday by when each first showed up; most important first inside each day */
+function alertDays(L){const m=alertTimes(),now=new Date(),d0=new Date(now.getFullYear(),now.getMonth(),now.getDate()).getTime(),D=864e5,out=new Map();
+  L.forEach(a=>{const c=(m[a.k]&&m[a.k].c)||Date.now(),k=c>=d0?0:Math.ceil((d0-c)/D);(out.get(k)||out.set(k,[]).get(k)).push(a)});
+  return [...out.keys()].sort((a,b)=>a-b).map(k=>[k===0?'Today':k===1?'Yesterday':new Date(d0-k*D).toLocaleDateString([], {weekday:'long'}),out.get(k)])}
 function toggleAlerts(open){const pop=$('alert-pop'),b=$('alert-btn');open=open??pop.hidden;pop.hidden=!open;b.setAttribute('aria-expanded',open);
   if(open){const {L,seen}=alertsLive();paintAlerts(L,seen);if(L.some(a=>!seen.has(a.k))){const m={...alertTimes()},now=Date.now();L.forEach(a=>{m[a.k]={...(m[a.k]||{c:now}),s:(m[a.k]&&m[a.k].s)||now}});acctSet('alertT',m)}$('alert-n').hidden=true}}
 
