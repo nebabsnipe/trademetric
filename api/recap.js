@@ -445,6 +445,7 @@ export async function buildRecap({ league, year, teamId, creds }) {
       mine: myTrades,
       podium,
       best, worst, defining, fleece,
+      network: graded.map(d => d.pair), // one [teamId, teamId] per trade, for the share card
     },
     waivers,
     standingsByWeek,

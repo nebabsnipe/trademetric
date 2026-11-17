@@ -170,3 +170,12 @@ The card list is now the 12-card build prompt (league trades, your trades + podi
 - **In-progress seasons:** the recap uses finished weeks only and says `seasonComplete: false`.
 - **Empty states:** the response has a `cards` list saying which cards have real data; the slideshow skips the rest.
 - **Manager grade:** blends final finish, start/sit accuracy, trade results and waiver value. Provisional until the owner approves it. The blend can be set with the `RECAP_GRADE_W` environment variable and is never shown on the site.
+
+## Build notes — Phase 2 (slideshow), Nov 2026
+
+- **Page:** `recap.html` + `css/recap.css` + `js/recap.js` (all classes `rc-`). Open as `/recap?league=<id>&year=<yyyy>`; with no league it uses the signed-in user's current ESPN league. The script also reads `/recap/<id>/<yyyy>` paths, but that address needs a one-line rewrite in `vercel.json` (not added yet).
+- **Look:** copied from the approved reference file; the design is 390×844 and is scaled to fit the window (centred column on desktop).
+- **Skipped cards:** the API's `cards` list decides which cards appear; the progress bar and counter only count those.
+- **Save image / Share:** the share card is redrawn onto a canvas (no libraries) and saved as a PNG; Share uses the phone's share sheet when it can, otherwise saves the image.
+- **Local testing:** on localhost only, `&dev=<espnTeamId>` builds the recap straight from the league's public data without signing in.
+- **Not done yet:** a link to the recap from the site's Recap tab, and a public link/preview image for sharing (only the image is shareable for now).

@@ -1,0 +1,435 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex">
+<meta name="theme-color" content="#0d0d0d">
+<title>Season Recap · TradeMetric</title>
+<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png?v=2">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png?v=2">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Kanit:ital,wght@0,700;0,800;1,700;1,800;1,900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/css/recap.css?v=1">
+</head>
+<body>
+<div id="rc-stage">
+<div id="rc-root" style="--rc-ga: #7c3aed; --rc-gb: #2563eb; width: 390px; height: 844px; position: relative; overflow: hidden; background: #0d0d0d; color: #f4f4f5; font-family: Inter, system-ui, sans-serif; border-radius: 28px">
+
+  <!-- Loading and access screens -->
+  <div class="rc-if" data-if="gate">
+    <div class="rc-gate">
+      <div class="rc-k" style="font-size: 18px; color: #fafafa">TM</div>
+      <div class="rc-lbl"><span data-v="gateLbl">Season Recap</span></div>
+      <div class="rc-k" style="font-size: 40px"><span data-v="gateTitle">Building your recap</span></div>
+      <div class="rc-if" data-if="gateLoading"><p class="rc-pulse">Running every trade through the grade…</p></div>
+      <div class="rc-if" data-if="gateMsg" hidden><p><span data-v="gateMsg"></span></p></div>
+      <div class="rc-if" data-if="gateBtn" hidden><a class="rc-btn" data-gate-link href="/">TradeMetric</a></div>
+    </div>
+  </div>
+
+  <!-- Backgrounds -->
+  <div class="rc-if" data-if="bgAurora" hidden>
+    <div aria-hidden="true" style="position: absolute; inset: 0; overflow: hidden">
+      <div class="rc-blob" style="width: 320px; height: 320px; left: -90px; top: 80px; background: var(--rc-ga); opacity: .45"></div>
+      <div class="rc-blob" style="width: 280px; height: 280px; right: -110px; bottom: 120px; background: var(--rc-gb); opacity: .35; animation-delay: -4s"></div>
+    </div>
+  </div>
+  <div class="rc-if" data-if="bgGrid" hidden>
+    <div aria-hidden="true" class="rc-grid" style="position: absolute; inset: 0"></div>
+    <div aria-hidden="true" style="position: absolute; inset: 0; background: radial-gradient(420px circle at 50% 30%, var(--rc-ga), transparent 70%); opacity: .22"></div>
+  </div>
+  <div class="rc-if" data-if="bgStadium" hidden>
+    <div aria-hidden="true" style="position: absolute; inset: 0; background: radial-gradient(260px 180px at 18% 0%, rgba(255,255,255,.16), transparent 70%), radial-gradient(260px 180px at 82% 0%, rgba(255,255,255,.14), transparent 70%), radial-gradient(500px 300px at 50% 110%, var(--rc-ga), transparent 70%)"></div>
+  </div>
+
+  <div class="rc-if" data-if="ready" hidden>
+  <!-- Top bar -->
+  <div style="position: absolute; left: 0; right: 0; top: 0; padding: 14px 16px 0; z-index: 7; display: flex; flex-direction: column; gap: 12px">
+    <div style="display: flex; gap: 4px">
+      <template data-for="segs">
+        <div style="height: 3px; flex: 1; background: rgba(255,255,255,.2); border-radius: 2px; overflow: hidden"><div style="height: 100%; background: #fafafa; width: {{s.w}}"></div></div>
+      </template><div class="rc-if"></div>
+    </div>
+    <div style="display: flex; align-items: center; gap: 10px">
+      <a href="/" class="rc-k" style="font-size: 18px; color: #fafafa; text-decoration: none">TM</a>
+      <div style="flex: 1"></div>
+      <button data-act="prev" aria-label="Previous card" style="width: 44px; height: 44px; margin: -10px -6px; padding: 0; border: 0; background: transparent; color: #e4e4e7; cursor: pointer; display: flex; align-items: center; justify-content: center"><span style="width: 30px; height: 30px; border-radius: 50%; border: 1px solid #3f3f46; background: rgba(0,0,0,.4); display: flex; align-items: center; justify-content: center"><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path class="rc-ic" d="M15 5l-7 7 7 7"></path></svg></span></button>
+      <div style="font-size: 12px; color: #a1a1aa; font-variant-numeric: tabular-nums; min-width: 44px; text-align: center"><span data-v="counter"></span></div>
+      <button data-act="next" aria-label="Next card" style="width: 44px; height: 44px; margin: -10px -6px; padding: 0; border: 0; background: transparent; color: #e4e4e7; cursor: pointer; display: flex; align-items: center; justify-content: center"><span style="width: 30px; height: 30px; border-radius: 50%; border: 1px solid #3f3f46; background: rgba(0,0,0,.4); display: flex; align-items: center; justify-content: center"><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path class="rc-ic" d="M9 5l7 7-7 7"></path></svg></span></button>
+      <button data-act="togglePause" aria-label="Pause" style="width: 44px; height: 44px; margin: -10px -10px -10px 0; border: 0; background: transparent; color: #e4e4e7; cursor: pointer; display: flex; align-items: center; justify-content: center">
+        <div class="rc-if" data-if="paused" hidden>
+          <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path class="rc-icf" d="M7 4l13 8-13 8z"></path></svg>
+        </div>
+        <div class="rc-if" data-if="playing" hidden>
+          <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path class="rc-icf" d="M6 4h4v16H6zM14 4h4v16h-4z"></path></svg>
+        </div>
+      </button>
+    </div>
+  </div>
+
+  <!-- Tap zones -->
+  <button data-act="prev" aria-label="Previous card" style="position: absolute; left: 0; top: 70px; bottom: 0; width: 35%; border: 0; background: transparent; z-index: 5; cursor: w-resize"></button>
+  <button data-act="next" aria-label="Next card" style="position: absolute; right: 0; top: 70px; bottom: 0; width: 65%; border: 0; background: transparent; z-index: 5; cursor: e-resize"></button>
+  </div>
+
+  <!-- CARD 1: League trades -->
+  <div class="rc-if" data-if="s1" hidden>
+    <div style="position: absolute; inset: 0; padding: 0 28px; display: flex; flex-direction: column; justify-content: center; gap: 18px; pointer-events: none">
+      <div class="rc-lbl rc-fu">The <span data-v="year"></span> season, graded</div>
+      <div class="rc-k rc-fu rc-d1" style="font-size: 34px">Your league made</div>
+      <div class="rc-k" style="font-size: 180px; color: #fafafa; font-weight: 900; font-variant-numeric: tabular-nums; text-shadow: 0 0 60px rgba(167,139,250,.35)"><span data-v="n1"></span></div>
+      <div class="rc-k rc-fu rc-d2" style="font-size: 34px"><span data-v="tradesWord"></span> this season.</div>
+      <div class="rc-fu rc-d6" style="font-size: 15px; color: #a1a1aa; max-width: 290px; line-height: 1.5"><span data-v="s1Sub"></span></div>
+    </div>
+  </div>
+
+  <!-- CARD 2: Personal + podium -->
+  <div class="rc-if" data-if="s2" hidden>
+    <div style="position: absolute; inset: 0; padding: 96px 24px 40px; display: flex; flex-direction: column; gap: 6px; pointer-events: none">
+      <div class="rc-lbl rc-fu">Trade volume</div>
+      <div class="rc-k rc-fu rc-d1" style="font-size: 34px">You were involved in</div>
+      <div style="display: flex; align-items: baseline; gap: 12px">
+        <div class="rc-k" style="font-size: 120px; font-weight: 900; color: #fbbf24; font-variant-numeric: tabular-nums"><span data-v="n2"></span></div>
+        <div class="rc-k rc-fu rc-d2" style="font-size: 30px">of them.</div>
+      </div>
+      <div class="rc-lbl rc-fu rc-d3" style="margin-top: 18px">Most active traders</div>
+      <div style="flex: 1; display: flex; align-items: flex-end; justify-content: center; gap: 10px">
+        <template data-for="podium">
+          <div style="flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 8px; visibility: {{p.vis}}">
+            <div class="rc-fu {{p.dIn}}" style="display: flex; flex-direction: column; align-items: center; gap: 6px; position: relative; max-width: 100%; overflow-wrap: anywhere">
+              <svg class="rc-crown" width="34" height="26" viewBox="0 0 34 26" aria-hidden="true" style="color: #fbbf24; display: {{p.crown}}"><path class="rc-icf" d="M2 8l7 6 8-12 8 12 7-6-3 16H5z"></path></svg>
+              <div style="width: {{p.av}}px; height: {{p.av}}px; border-radius: 50%; background: {{p.avBg}}; border: 2px solid {{p.avBd}}; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: {{p.avFs}}px; box-shadow: {{p.avGlow}}">{{p.ini}}</div>
+              <div style="font-size: 13px; font-weight: 600; text-align: center">{{p.name}}</div>
+              <div style="font-size: 12px; color: {{p.cc}}">{{p.count}}</div>
+            </div>
+            <div class="rc-rise {{p.dRise}}" style="width: 100%; height: {{p.h}}px; border-radius: 10px 10px 0 0; background: {{p.stepBg}}; border-top: {{p.stepBt}}; display: flex; justify-content: center; padding-top: {{p.pt}}px; box-sizing: border-box"><span class="rc-k" style="font-size: {{p.fs}}px; color: {{p.nc}}">{{p.place}}</span></div>
+          </div>
+        </template><div class="rc-if"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- CARD 3: Best trade -->
+  <div class="rc-if" data-if="s3" hidden>
+    <div data-tight="best" style="position: absolute; inset: 0; padding: 100px 24px 40px; display: flex; flex-direction: column; gap: 14px; pointer-events: none">
+      <div class="rc-lbl rc-fu" style="color: #4ade80">Verdict · Week <span data-v="bestWeek"></span></div>
+      <div class="rc-k rc-fu rc-d1" style="font-size: 46px">Your best trade</div>
+      <div class="rc-lbl rc-fu rc-d1" style="margin-top: 8px">You gave</div>
+      <template data-for="bestGave">
+        <div class="rc-chip rc-sl {{c.d}}" style="display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: 12px; background: #141417; border: 1px solid #2a2a30">
+          <span style="font-size: 11px; font-weight: 800; padding: 4px 7px; border-radius: 6px; background: #27272a; color: #d4d4d8">{{c.pos}}</span>
+          <div style="flex: 1"><div style="font-weight: 600; font-size: 15px">{{c.name}}</div><div style="font-size: 12px; color: #a1a1aa">{{c.ppw}} pts/wk after the deal</div></div>
+        </div>
+      </template><div class="rc-if"></div>
+      <div class="rc-lbl rc-fu" data-dl="bestGotLbl" style="margin-top: 6px">You got</div>
+      <template data-for="bestGot">
+        <div class="rc-chip rc-sr {{c.d}} rc-beamG" style="display: flex; align-items: center; gap: 12px; padding: 14px; border-radius: 12px">
+          <span style="font-size: 11px; font-weight: 800; padding: 4px 7px; border-radius: 6px; background: #14532d; color: #bbf7d0">{{c.pos}}</span>
+          <div style="flex: 1"><div style="font-weight: 700; font-size: 17px">{{c.name}}</div><div style="font-size: 12px; color: #86efac">{{c.ppw}} pts/wk after the deal</div></div>
+        </div>
+      </template><div class="rc-if"></div>
+      <div style="display: flex; align-items: center; gap: 18px; margin-top: 18px">
+        <div class="rc-stamp" data-stamp="best" style="width: 112px; height: 112px; flex: none; border: 4px solid #4ade80; border-radius: 14px; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 40px rgba(74,222,128,.35), inset 0 0 22px rgba(74,222,128,.18)"><span class="rc-k" style="font-size: 64px; color: #4ade80; font-weight: 900"></span></div>
+        <div class="rc-fu rc-d8" style="display: flex; flex-direction: column; gap: 6px">
+          <div class="rc-k" style="font-size: 24px; line-height: 1.05"><span data-v="bestLine"></span></div>
+          <div style="font-size: 13px; color: #a1a1aa"><span data-v="bestSub"></span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- CARD 4: Worst trade -->
+  <div class="rc-if" data-if="s4" hidden>
+    <div data-tight="worst" style="position: absolute; inset: 0; padding: 100px 24px 40px; display: flex; flex-direction: column; gap: 14px; pointer-events: none">
+      <div class="rc-lbl rc-fu" style="color: #f87171">Verdict · Week <span data-v="worstWeek"></span></div>
+      <div class="rc-k rc-fu rc-d1" style="font-size: 46px">Your worst trade</div>
+      <div class="rc-lbl rc-fu rc-d1" style="margin-top: 8px">You gave</div>
+      <template data-for="worstGave">
+        <div class="rc-chip rc-sl {{c.d}}" style="display: flex; align-items: center; gap: 12px; padding: 14px; border-radius: 12px; background: #141417; border: 1px solid #7f1d1d">
+          <span style="font-size: 11px; font-weight: 800; padding: 4px 7px; border-radius: 6px; background: #450a0a; color: #fecaca">{{c.pos}}</span>
+          <div style="flex: 1"><div style="font-weight: 700; font-size: 17px">{{c.name}}</div><div style="font-size: 12px; color: #fca5a5">{{c.ppw}} pts/wk after the deal</div></div>
+        </div>
+      </template><div class="rc-if"></div>
+      <div class="rc-lbl rc-fu" data-dl="worstGotLbl" style="margin-top: 6px">You got</div>
+      <template data-for="worstGot">
+        <div class="rc-chip rc-sr {{c.d}}" style="display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: 12px; background: #141417; border: 1px solid #2a2a30">
+          <span style="font-size: 11px; font-weight: 800; padding: 4px 7px; border-radius: 6px; background: #27272a; color: #d4d4d8">{{c.pos}}</span>
+          <div style="flex: 1"><div style="font-weight: 600; font-size: 15px">{{c.name}}</div><div style="font-size: 12px; color: #a1a1aa">{{c.ppw}} pts/wk after the deal</div></div>
+        </div>
+      </template><div class="rc-if"></div>
+      <div style="display: flex; align-items: center; gap: 18px; margin-top: 18px">
+        <div class="rc-wince" data-stamp="worst" style="width: 112px; height: 112px; flex: none; border: 4px solid #f87171; border-radius: 14px; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 34px rgba(248,113,113,.3), inset 0 0 22px rgba(248,113,113,.15)"><span class="rc-k" style="font-size: 72px; color: #f87171; font-weight: 900"></span></div>
+        <div class="rc-fu rc-d8" style="display: flex; flex-direction: column; gap: 6px">
+          <div class="rc-k" style="font-size: 26px; line-height: 1.05">Hindsight is 20/20.</div>
+          <div style="font-size: 13px; color: #a1a1aa"><span data-v="worstSub"></span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- CARD 5: Defining trade -->
+  <div class="rc-if" data-if="s5" hidden>
+    <div style="position: absolute; inset: 0; padding: 100px 24px 40px; display: flex; flex-direction: column; gap: 14px; pointer-events: none">
+      <div class="rc-lbl rc-fu" style="color: #fbbf24">Week <span data-v="defWeek"></span></div>
+      <div class="rc-k rc-fu rc-d1" style="font-size: 42px">The trade that defined your season</div>
+      <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-top: 6px">
+        <div class="rc-sl rc-d2" style="padding: 12px; border-radius: 12px; background: #141417; border: 1px solid #2a2a30; display: flex; flex-direction: column; gap: 4px">
+          <div class="rc-lbl" style="font-size: 10px">Gave</div>
+          <template data-for="defGave">
+            <div style="font-weight: 600; font-size: 15px">{{c.name}}</div>
+            <div style="font-size: 12px; color: #a1a1aa">{{c.meta}}</div>
+          </template><div class="rc-if"></div>
+        </div>
+        <div class="rc-sr rc-d3 rc-beamY" style="padding: 12px; border-radius: 12px; display: flex; flex-direction: column; gap: 4px">
+          <div class="rc-lbl" style="font-size: 10px; color: #fbbf24">Got</div>
+          <template data-for="defGot">
+            <div style="font-weight: 700; font-size: 15px">{{c.name}}</div>
+            <div style="font-size: 12px; color: #fcd34d">{{c.meta}}</div>
+          </template><div class="rc-if"></div>
+        </div>
+      </div>
+      <div class="rc-fu rc-d4" style="margin-top: 26px; display: flex; align-items: center; justify-content: center; gap: 22px">
+        <div style="display: flex; flex-direction: column; align-items: center; gap: 4px">
+          <div class="rc-lbl">Before</div>
+          <div class="rc-k" style="font-size: 92px; color: #71717a; font-weight: 900"><span data-v="defFrom"></span></div>
+        </div>
+        <svg width="64" height="40" viewBox="0 0 64 40" aria-hidden="true" style="color: #fbbf24"><path class="rc-ic" d="M4 20h52M42 6l14 14-14 14" style="stroke-width: 4"></path></svg>
+        <div class="rc-pop rc-d6" style="display: flex; flex-direction: column; align-items: center; gap: 4px">
+          <div class="rc-lbl" style="color: #fbbf24"><span data-v="finishLbl"></span></div>
+          <div class="rc-k" style="font-size: 92px; color: #fbbf24; font-weight: 900; text-shadow: 0 0 40px rgba(251,191,36,.4)"><span data-v="defTo"></span></div>
+        </div>
+      </div>
+      <div class="rc-fu rc-d7" style="text-align: center; font-size: 15px; color: #d4d4d8; line-height: 1.5"><span data-v="defLine"></span></div>
+    </div>
+  </div>
+
+  <!-- CARD 6: Biggest fleece -->
+  <div class="rc-if" data-if="s6" hidden>
+    <div style="position: absolute; inset: 0; padding: 100px 24px 40px; display: flex; flex-direction: column; gap: 14px; pointer-events: none">
+      <div class="rc-lbl rc-fu" style="color: #f87171">League-wide · Week <span data-v="flWeek"></span></div>
+      <div class="rc-k rc-fu rc-d1" style="font-size: 54px">The biggest fleece</div>
+      <div class="rc-fu rc-d1" style="font-size: 14px; color: #a1a1aa">The most lopsided trade in your league this season.</div>
+      <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0; margin-top: 10px; border-radius: 14px; overflow: hidden; border: 1px solid #2a2a30">
+        <div class="rc-sl rc-d2" style="padding: 16px 14px; background: #141417; display: flex; flex-direction: column; gap: 10px; border-right: 1px dashed #3f3f46">
+          <div style="font-size: 12px; font-weight: 700; color: #a1a1aa"><span data-v="flWinName"></span> got</div>
+          <template data-for="flWin">
+            <div style="font-weight: 700; font-size: 16px">{{c.name}}</div>
+            <div style="font-size: 12px; color: #86efac">{{c.ppw}} pts/wk after</div>
+          </template><div class="rc-if"></div>
+          <div class="rc-stamp" data-stamp="flWin" style="align-self: flex-start; border: 3px solid #4ade80; border-radius: 10px; padding: 4px 12px; box-shadow: 0 0 26px rgba(74,222,128,.3)"><span class="rc-k" style="font-size: 40px; font-weight: 900; color: #4ade80"></span></div>
+        </div>
+        <div class="rc-sr rc-d3" style="padding: 16px 14px; background: #141417; display: flex; flex-direction: column; gap: 10px">
+          <div style="font-size: 12px; font-weight: 700; color: #a1a1aa"><span data-v="flLoseName"></span> got</div>
+          <template data-for="flLose">
+            <div style="font-weight: 700; font-size: 16px">{{c.name}}</div>
+            <div style="font-size: 12px; color: #fca5a5">{{c.ppw}} pts/wk after</div>
+          </template><div class="rc-if"></div>
+          <div class="rc-wince" data-stamp="flLose" style="align-self: flex-start; border: 3px solid #f87171; border-radius: 10px; padding: 4px 16px; box-shadow: 0 0 26px rgba(248,113,113,.3)"><span class="rc-k" style="font-size: 40px; font-weight: 900; color: #f87171"></span></div>
+        </div>
+      </div>
+      <div class="rc-fu rc-d6" style="display: flex; flex-direction: column; gap: 8px; margin-top: 10px">
+        <div style="display: flex; justify-content: space-between; font-size: 12px; font-weight: 700; color: #a1a1aa"><span style="color: #4ade80"><span data-v="flWinPct"></span>%</span><span>Value after the deal</span><span style="color: #f87171"><span data-v="flLosePct"></span>%</span></div>
+        <div style="height: 10px; border-radius: 5px; background: #7f1d1d; overflow: hidden; display: flex"><div class="rc-grow rc-d6" data-bar="fleece" style="width: 74%; background: #4ade80"></div></div>
+      </div>
+      <div class="rc-k rc-fu rc-d7" style="font-size: 24px; margin-top: 10px; line-height: 1.1">Daylight robbery. No refunds.</div>
+    </div>
+  </div>
+
+  <!-- CARD 7: Waivers -->
+  <div class="rc-if" data-if="s7" hidden>
+    <div style="position: absolute; inset: 0; padding: 100px 24px 40px; display: flex; flex-direction: column; gap: 14px; pointer-events: none">
+      <div class="rc-if" data-if="waiverMine" hidden>
+        <div class="rc-lbl rc-fu" style="color: #4ade80">Waiver wire</div>
+        <div class="rc-k rc-fu rc-d1" style="font-size: 46px">Your best waiver add</div>
+        <div class="rc-sr rc-d2 rc-beamG" style="margin-top: 14px; padding: 20px; border-radius: 16px; display: flex; flex-direction: column; gap: 14px">
+          <div style="display: flex; align-items: center; gap: 12px">
+            <span style="font-size: 11px; font-weight: 800; padding: 4px 7px; border-radius: 6px; background: #14532d; color: #bbf7d0"><span data-v="wPos"></span></span>
+            <div style="flex: 1"><div style="font-weight: 700; font-size: 20px"><span data-v="wName"></span></div><div style="font-size: 13px; color: #a1a1aa"><span data-v="wMeta"></span></div></div>
+          </div>
+          <div style="display: flex; align-items: baseline; gap: 10px">
+            <div class="rc-k" style="font-size: 76px; font-weight: 900; color: #4ade80; font-variant-numeric: tabular-nums"><span data-v="n7"></span></div>
+            <div style="font-size: 14px; color: #a1a1aa; line-height: 1.3">points for you<br>after pickup</div>
+          </div>
+        </div>
+        <div class="rc-fu rc-d6" style="font-size: 14px; color: #a1a1aa"><span data-v="wRank"></span></div>
+      </div>
+      <div class="rc-if" data-if="waiverTop" hidden>
+        <div class="rc-lbl rc-fu" style="color: #4ade80">Waiver wire</div>
+        <div class="rc-k rc-fu" style="font-size: 40px"><span data-v="wTopTitle"></span></div>
+        <div style="display: flex; flex-direction: column; gap: 8px; margin-top: 12px">
+          <template data-for="wTop">
+            <div class="{{w.cls}}" style="display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: 12px; background: {{w.bg}}; border: 1px solid {{w.bd}}">
+              <div class="rc-k" style="font-size: 26px; width: 22px; color: {{w.rc}}">{{w.rank}}</div>
+              <div style="flex: 1; min-width: 0"><div style="font-weight: 700; font-size: 15px">{{w.player}}</div><div style="font-size: 12px; color: #a1a1aa">{{w.mgr}} · Wk {{w.wk}}</div></div>
+              <div style="font-weight: 800; font-size: 15px; font-variant-numeric: tabular-nums">{{w.pts}}</div>
+            </div>
+          </template><div class="rc-if"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- CARD 8: Timelapse -->
+  <div class="rc-if" data-if="s8" hidden>
+    <div aria-hidden="true" class="rc-grid" style="position: absolute; inset: 0; opacity: .6"></div>
+    <div aria-hidden="true" style="position: absolute; inset: 0; background: radial-gradient(460px circle at 50% 45%, rgba(139,92,246,.22), transparent 70%)"></div>
+    <div style="position: absolute; inset: 0; padding: 100px 20px 40px; display: flex; flex-direction: column; gap: 12px; pointer-events: none">
+      <div class="rc-lbl rc-fu" style="color: #a78bfa">Standings timelapse</div>
+      <div class="rc-k rc-fu rc-d1" style="font-size: 36px">Here's how your season unfolded</div>
+      <div style="display: flex; align-items: baseline; justify-content: space-between; margin-top: 4px">
+        <div class="rc-k" style="font-size: 40px; color: #c4b5fd; font-variant-numeric: tabular-nums"><span data-v="raceWeek"></span></div>
+        <div style="font-size: 13px; color: #a1a1aa"><span data-v="raceYou"></span></div>
+      </div>
+      <div data-race style="position: relative; height: 312px">
+        <template data-for="bars">
+          <div style="position: absolute; left: 0; right: 0; height: 22px; top: {{b.top}}px; transition: top .45s cubic-bezier(.2,.8,.2,1); display: flex; align-items: center; gap: 8px">
+            <div style="width: 18px; font-size: 11px; font-weight: 700; color: #71717a; text-align: right; font-variant-numeric: tabular-nums">{{b.rank}}</div>
+            <div style="width: 104px; font-size: 12px; font-weight: {{b.fw}}; color: {{b.tc}}; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">{{b.name}}</div>
+            <div style="flex: 1; height: 14px; display: flex; align-items: center; gap: 6px">
+              <div style="height: 14px; border-radius: 3px; width: {{b.w}}%; background: {{b.col}}; box-shadow: {{b.glow}}"></div>
+              <div style="font-size: 11px; color: #a1a1aa; font-variant-numeric: tabular-nums; white-space: nowrap">{{b.rec}}</div>
+            </div>
+          </div>
+        </template><div class="rc-if"></div>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 6px; min-height: 64px">
+        <template data-for="callouts">
+          <div class="rc-fu" style="padding: 10px 12px; border-radius: 10px; background: rgba(139,92,246,.14); border: 1px solid rgba(167,139,250,.4); font-size: 13px; font-weight: 600; color: #ede9fe">{{co.text}}</div>
+        </template><div class="rc-if"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- CARD 9: Best weeks -->
+  <div class="rc-if" data-if="s9" hidden>
+    <div style="position: absolute; inset: 0; padding: 100px 24px 40px; display: flex; flex-direction: column; gap: 14px; pointer-events: none">
+      <div class="rc-lbl rc-fu">Scoreboard</div>
+      <div class="rc-k rc-fu rc-d1" style="font-size: 50px">Your best weeks</div>
+      <div class="rc-fu rc-d2" style="margin-top: 10px; padding: 18px; border-radius: 16px; background: #141417; border: 1px solid #fbbf24; display: flex; flex-direction: column; gap: 6px; box-shadow: 0 0 40px rgba(251,191,36,.15)">
+        <div class="rc-lbl" style="color: #fbbf24"><span data-v="bw1Lbl"></span></div>
+        <div style="display: flex; align-items: flex-end; justify-content: space-between; gap: 10px">
+          <div><div style="font-size: 12px; font-weight: 700; color: #d4d4d8">You</div><div class="rc-k" style="font-size: 60px; font-weight: 900; font-variant-numeric: tabular-nums"><span data-v="n9"></span></div></div>
+          <div style="font-size: 12px; font-weight: 800; color: #a1a1aa; padding-bottom: 14px">VS</div>
+          <div style="text-align: right; min-width: 0"><div style="font-size: 12px; font-weight: 700; color: #a1a1aa"><span data-v="bw1Opp"></span></div><div class="rc-k" data-bw1score style="font-size: 38px; color: #a1a1aa; padding-bottom: 6px"><span data-v="bw1OppScore"></span></div></div>
+        </div>
+        <div class="rc-if" data-if="bw1Top" hidden><div style="font-size: 14px; color: #fde68a"><span data-v="bw1TopLine"></span></div></div>
+      </div>
+      <template data-for="bwRest">
+        <div class="rc-fu {{r.d}}" style="padding: 14px 18px; border-radius: 14px; background: #141417; border: 1px solid #2a2a30; display: flex; align-items: center; gap: 14px">
+          <div class="rc-k" style="font-size: 36px; color: #d4d4d8">{{r.me}}</div>
+          <div style="flex: 1; min-width: 0; font-size: 13px; color: #a1a1aa; line-height: 1.4"><span style="color: {{r.wc}}; font-weight: 700">Week {{r.wk}} · {{r.res}}</span><br>vs {{r.opp}}</div>
+          <div class="rc-k" style="font-size: 26px; color: {{r.oc}}">{{r.os}}</div>
+        </div>
+      </template><div class="rc-if"></div>
+    </div>
+  </div>
+
+  <!-- CARD: Biggest beatdown -->
+  <div class="rc-if" data-if="sBeat" hidden>
+    <div style="position: absolute; inset: 0; padding: 100px 24px 40px; display: flex; flex-direction: column; gap: 14px; pointer-events: none">
+      <div class="rc-lbl rc-fu" style="color: #f87171">Week <span data-v="bdWeek"></span> · No mercy</div>
+      <div class="rc-k rc-fu rc-d1" style="font-size: 50px">Biggest beatdown</div>
+      <div style="display: flex; align-items: baseline; gap: 10px; margin-top: 6px">
+        <div class="rc-k" style="font-size: 100px; font-weight: 900; color: #f87171; font-variant-numeric: tabular-nums; text-shadow: 0 0 44px rgba(248,113,113,.35)">+<span data-v="nBeat"></span></div>
+        <div class="rc-fu rc-d2" style="font-size: 14px; color: #a1a1aa; line-height: 1.3">point<br>margin</div>
+      </div>
+      <div class="rc-fu rc-d3" style="display: flex; flex-direction: column; gap: 6px; margin-top: 10px">
+        <div style="display: flex; justify-content: space-between; font-size: 14px; font-weight: 700"><span>You</span><span style="font-variant-numeric: tabular-nums"><span data-v="bdMe"></span></span></div>
+        <div style="height: 18px; border-radius: 5px; background: #1f1f23; overflow: hidden"><div class="rc-grow rc-d4" style="height: 100%; width: 100%; background: #f87171; border-radius: 5px"></div></div>
+      </div>
+      <div class="rc-fu rc-d4" style="display: flex; flex-direction: column; gap: 6px">
+        <div style="display: flex; justify-content: space-between; gap: 10px; font-size: 14px; font-weight: 700; color: #a1a1aa"><span style="min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis"><span data-v="bdOpp"></span></span><span style="font-variant-numeric: tabular-nums"><span data-v="bdOppScore"></span></span></div>
+        <div style="height: 18px; border-radius: 5px; background: #1f1f23; overflow: hidden"><div class="rc-grow rc-d5" data-bar="beat" style="height: 100%; width: 52%; background: #52525b; border-radius: 5px"></div></div>
+      </div>
+      <div class="rc-k rc-fu rc-d7" style="font-size: 28px; margin-top: 14px; line-height: 1.05">It was over by Sunday afternoon.</div>
+      <div class="rc-fu rc-d8" style="font-size: 13px; color: #a1a1aa">Your largest win of the season.</div>
+    </div>
+  </div>
+
+  <!-- CARD 10: Clutch -->
+  <div class="rc-if" data-if="s10" hidden>
+    <div style="position: absolute; inset: 0; padding: 100px 24px 40px; display: flex; flex-direction: column; gap: 14px; pointer-events: none">
+      <div class="rc-lbl rc-fu">Clutch</div>
+      <div class="rc-k rc-fu rc-d1" style="font-size: 46px">You showed up when it mattered</div>
+      <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-top: 10px">
+        <div class="rc-if" data-if="clClose" hidden>
+          <div class="rc-fu rc-d2" data-span="clClose" style="padding: 16px; border-radius: 14px; background: #141417; border: 1px solid #2a2a30; display: flex; flex-direction: column; gap: 4px">
+            <div class="rc-k" style="font-size: 52px; font-weight: 900"><span data-v="clCloseRec"></span></div>
+            <div style="font-size: 12px; color: #a1a1aa">in games decided by under 10 pts</div>
+          </div>
+        </div>
+        <div class="rc-if" data-if="clElim" hidden>
+          <div class="rc-fu rc-d3" data-span="clElim" style="padding: 16px; border-radius: 14px; background: #141417; border: 1px solid #2a2a30; display: flex; flex-direction: column; gap: 4px">
+            <div class="rc-k" style="font-size: 52px; font-weight: 900; color: #fbbf24"><span data-v="clElimRec"></span></div>
+            <div style="font-size: 12px; color: #a1a1aa">in elimination games</div>
+          </div>
+        </div>
+      </div>
+      <div class="rc-if" data-if="clCome" hidden>
+        <div class="rc-fu rc-d5" style="padding: 18px; border-radius: 16px; background: #141417; border: 1px solid #4ade80; display: flex; flex-direction: column; gap: 6px">
+          <div class="rc-lbl" style="color: #4ade80">Biggest comeback · Week <span data-v="clComeWeek"></span></div>
+          <div class="rc-k" style="font-size: 30px; line-height: 1.05"><span data-v="clComeLine"></span></div>
+          <div class="rc-if" data-if="clComePlayer" hidden><div style="font-size: 13px; color: #a1a1aa"><span data-v="clComeSub"></span></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- FINAL: Share card -->
+  <div class="rc-if" data-if="s11" hidden>
+    <div style="position: absolute; inset: 0; padding: 84px 20px 28px; display: flex; flex-direction: column; gap: 14px; pointer-events: none">
+      <div class="rc-fu" data-share-card style="position: relative; border-radius: 22px; overflow: hidden; background: #0a0a0c; border: 1px solid #27272a; display: flex; flex-direction: column">
+        <div style="position: relative; height: 200px">
+          <svg width="350" height="200" viewBox="0 0 350 200" aria-hidden="true" style="position: absolute; inset: 0"><path class="rc-edges" data-edges d=""></path></svg>
+          <template data-for="nodes">
+            <div class="rc-pop" style="position: absolute; left: {{nd.x}}px; top: {{nd.y}}px; width: {{nd.s}}px; height: {{nd.s}}px; margin: {{nd.m}}px 0 0 {{nd.m}}px; border-radius: 50%; background: {{nd.bg}}; border: 1.5px solid {{nd.bd}}; display: flex; align-items: center; justify-content: center; font-size: 9px; font-weight: 800; color: {{nd.tc}}; animation-delay: {{nd.d}}; box-shadow: {{nd.glow}}">{{nd.ini}}</div>
+          </template><div class="rc-if"></div>
+          <div style="position: absolute; left: 18px; top: 16px; display: flex; flex-direction: column; gap: 2px">
+            <div class="rc-lbl" style="font-size: 10px; max-width: 150px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis"><span data-v="leagueName"></span></div>
+            <div class="rc-k" style="font-size: 26px">Recap <span data-v="year"></span></div>
+          </div>
+        </div>
+        <div style="padding: 0 18px 18px; display: flex; flex-direction: column; gap: 12px">
+          <div style="display: flex; align-items: center; gap: 10px">
+            <div style="width: 36px; height: 36px; border-radius: 50%; background: #f5b301; color: #111; display: flex; align-items: center; justify-content: center; font-weight: 800"><span data-v="avLetter"></span></div>
+            <div style="flex: 1; min-width: 0"><div style="font-weight: 700; font-size: 15px"><span data-v="mgrName"></span></div><div style="font-size: 12px; color: #a1a1aa; white-space: nowrap; overflow: hidden; text-overflow: ellipsis"><span data-v="teamName"></span></div></div>
+            <div style="display: flex; align-items: center; gap: 8px">
+              <div style="font-size: 10px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: #a1a1aa; text-align: right; line-height: 1.3">Manager<br>grade</div>
+              <div data-stamp="mgr" style="border: 3px solid #fbbf24; border-radius: 10px; padding: 2px 10px; transform: rotate(-6deg); box-shadow: 0 0 22px rgba(251,191,36,.3)"><span class="rc-k" style="font-size: 30px; font-weight: 900; color: #fbbf24"></span></div>
+            </div>
+          </div>
+          <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px">
+            <div style="padding: 10px; border-radius: 10px; background: #141417"><div class="rc-k" style="font-size: 26px"><span data-v="smTrades"></span></div><div style="font-size: 10px; color: #a1a1aa"><span data-v="smTradesLbl"></span></div></div>
+            <div style="padding: 10px; border-radius: 10px; background: #141417"><div class="rc-k" style="font-size: 26px"><span data-v="smHigh"></span></div><div style="font-size: 10px; color: #a1a1aa">high score</div></div>
+            <div style="padding: 10px; border-radius: 10px; background: #141417"><div class="rc-k" style="font-size: 26px; color: #fbbf24"><span data-v="finalOrd"></span></div><div style="font-size: 10px; color: #a1a1aa"><span data-v="standingLbl"></span></div></div>
+            <div class="rc-if" data-if="smBp" hidden><div style="grid-column: 1 / -1; padding: 10px 12px; border-radius: 10px; background: #141417; display: flex; align-items: center; gap: 10px"><div style="width: 78px; font-size: 10px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: #a1a1aa">Best player</div><div style="flex: 1; min-width: 0; font-weight: 700; font-size: 14px"><span data-v="smBpName"></span></div><div class="rc-k" style="font-size: 18px"><span data-v="smBpPpw"></span>/wk</div></div></div>
+            <div class="rc-if" data-if="smBt" hidden><div style="grid-column: 1 / -1; padding: 10px 12px; border-radius: 10px; background: #141417; display: flex; align-items: center; gap: 10px"><div style="width: 78px; font-size: 10px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: #a1a1aa">Best trade</div><div style="flex: 1; min-width: 0; font-weight: 700; font-size: 14px"><span data-v="smBtLabel"></span></div><div class="rc-k" data-grade-color style="font-size: 18px; color: #4ade80"><span data-v="smBtGrade"></span></div></div></div>
+            <div class="rc-if" data-if="smBd" hidden><div style="grid-column: 1 / -1; padding: 10px 12px; border-radius: 10px; background: #141417; display: flex; align-items: center; gap: 10px"><div style="width: 78px; font-size: 10px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: #a1a1aa">Biggest beatdown</div><div style="flex: 1; min-width: 0; font-weight: 700; font-size: 14px"><span data-v="smBdLabel"></span></div><div class="rc-k" style="font-size: 18px; color: #f87171">+<span data-v="smBdMargin"></span></div></div></div>
+          </div>
+          <div style="display: flex; justify-content: space-between; align-items: center; padding-top: 4px">
+            <div class="rc-k" style="font-size: 16px">TradeMetric</div>
+            <div style="font-size: 12px; color: #a1a1aa">trademetric.app</div>
+          </div>
+        </div>
+      </div>
+      <div class="rc-fu rc-d7" style="display: flex; gap: 10px; pointer-events: auto; position: relative; z-index: 6">
+        <button data-act="saveImage" style="flex: 1; height: 48px; border-radius: 12px; border: 0; background: #fafafa; color: #0d0d0d; font: 700 15px Inter, sans-serif; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px">
+          <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path class="rc-ic" d="M12 3v12M7 10l5 5 5-5M5 21h14"></path></svg>Save image</button>
+        <button data-act="shareImage" style="flex: 1; height: 48px; border-radius: 12px; border: 1px solid #3f3f46; background: #18181b; color: #fafafa; font: 700 15px Inter, sans-serif; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px">
+          <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path class="rc-ic" d="M4 12v8h16v-8M12 3v13M7 8l5-5 5 5"></path></svg>Share</button>
+      </div>
+      <div style="display: flex; justify-content: center; pointer-events: auto; position: relative; z-index: 6">
+        <button data-act="replay" style="height: 44px; padding: 0 16px; border: 0; background: transparent; color: #a1a1aa; font: 600 13px Inter, sans-serif; cursor: pointer">Watch again</button>
+      </div>
+      <div class="rc-if" data-if="toast" hidden>
+        <div class="rc-fu" style="position: absolute; left: 50%; bottom: 96px; transform: translateX(-50%); padding: 10px 14px; border-radius: 10px; background: #27272a; font-size: 13px; white-space: nowrap"><span data-v="toastText"></span></div>
+      </div>
+    </div>
+  </div>
+
+</div>
+</div>
+<script src="/js/recap.js?v=1"></script>
+</body>
+</html>
