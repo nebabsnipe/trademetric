@@ -155,3 +155,18 @@ Not a music app. A front office analytics room.
 - **Timelapse animation library**: lightweight canvas lib vs. custom SVG?
 - **URL**: `/recap/[leagueId]/[year]` works for now, update if name changes
 - **Auto-play vs. tap-to-advance**: auto-play with pause, or manual only?
+
+---
+
+## Build notes — Phase 1 (data), Nov 2026
+
+The card list is now the 12-card build prompt (league trades, your trades + podium, best, worst, defining trade, biggest fleece, waivers, standings timelapse, best weeks, biggest beatdown, clutch, share card). The approved look is the reference file `recap-reference.html` (not in the repo yet).
+
+- **Endpoint:** `api/recap.js` → `GET /api/recap?league=<id>&year=<yyyy>` with the user's sign-in token. It reads the user's own saved leagues to confirm the league is theirs and which team is theirs. Private leagues: `POST` with the ESPN codes (used for the request only, never stored). ESPN only for now; Sleeper returns "unsupported".
+- **Trades:** ESPN only shows what was in an accepted trade to league members, so trades are rebuilt by following each player's owner over time (draft, pickups, drops, lineup moves, weekly rosters). A move between two teams with no pickup in between is a trade, and it is only counted if it matches a real accepted trade between those teams (vetoed trades never move players, so they drop out).
+- **Trade grades:** what each side's players scored after the deal, measured against a replacement-level player at the same position each week. "Biggest fleece" = the league trade with the most lopsided split.
+- **Player-level weekly scores:** confirmed, ESPN returns them (used for "top player" on best weeks, best player, waiver points).
+- **Comeback:** uses NFL kickoff times to work out the score as each game window started ("down X going into Monday night").
+- **In-progress seasons:** the recap uses finished weeks only and says `seasonComplete: false`.
+- **Empty states:** the response has a `cards` list saying which cards have real data; the slideshow skips the rest.
+- **Manager grade:** blends final finish, start/sit accuracy, trade results and waiver value. Provisional until the owner approves it. The blend can be set with the `RECAP_GRADE_W` environment variable and is never shown on the site.
