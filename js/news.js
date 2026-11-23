@@ -675,7 +675,7 @@ function tmnRankCard(e){const p=byId[e.pid];if(!p)return '';const one=e.type==='
       <div class="tmn-ev-main"><div class="tmn-b-av tmn-rank-av">${av(p)}<span class="tmn-rmedal">${one?1:2}</span></div><div class="tmn-ev-txt"><h3>${esc(e.head)}</h3>${e.sub?`<p>${esc(e.sub)}</p>`:''}
         ${tmnMulti()||(e.leagues||[]).some(l=>l.bench)?`<div class="tmn-lgs">${(e.leagues||[]).map(l=>`<span class="tmn-lchip${l.bench?' bench':''}">${esc(l.name)}${l.bench?' · bench':''}</span>`).join('')}</div>`:''}</div></div></div></article>`}
 /* recaps: each story's biggest takeaway as its title plus a few key points, written once per story by /api/news */
-const TMN_RC_LS='tm-news-recap-v3';try{localStorage.removeItem('tm-news-recap-v2')}catch(e){}   /* v3: recaps now come from the shared server store, the same text for everyone */
+const TMN_RC_LS='tm-news-recap-v4';try{localStorage.removeItem('tm-news-recap-v2');localStorage.removeItem('tm-news-recap-v3')}catch(e){}   /* v3: recaps come from the shared server store, the same text for everyone. v4: they also carry the story's kind (the card label) */
 function tmnRecaps(){if(TMN.rc)return TMN.rc;try{TMN.rc=JSON.parse(localStorage.getItem(TMN_RC_LS)||'null')}catch(e){}TMN.rc=TMN.rc||{};return TMN.rc}
 async function tmnLoadRecaps(list){const R=tmnRecaps();TMN.rcTried=TMN.rcTried||new Set();
   const todo=list.filter(x=>(x.type==='art'||x.type==='lg'||x.type==='trade')&&x.url&&!R[x.url]&&!TMN.rcTried.has(x.url)).slice(0,30);if(!todo.length||TMN.rcBusy)return;
@@ -699,7 +699,70 @@ async function tmnLoadLeague(){if(TMN.lgBusy||(TMN.lgn&&Date.now()-TMN.lgn.at<10
     if(j&&Array.isArray(j.items)){ok=true;TMN.lgn={at:Date.now(),items:j.items};try{localStorage.setItem(TMN_LG_LS,JSON.stringify(TMN.lgn))}catch(e){}}
     else tmnFail('lg','status '+r.status)}catch(e){tmnFail('lg',e)}
   TMN.lgBusy=false;tmnLoadState('lg',ok);if(tab==='news'&&(TMN.f==='all'||TMN.f==='team')&&$('tmn-feed'))tmnRenderBody()}
-const TMN_LGK={trade:['Trade','accent'],inj:['Injury','bad'],move:['Roster move','muted'],role:['Depth chart','warn']};
+/* LGKIND-START  The label for a league story that isn't a trade, an injury or a depth-chart change.
+   This block is kept word for word the same in api/news.js and js/news.js (scripts/test-news-kind.mjs checks it).
+   "move" (Roster move) only when the move happens to the named player, with the move word next to his name in the
+   headline or the first sentence: signed, released, waived, claimed, cut, placed on IR, activated, reinstated, retired,
+   or suspended for a set number of games. A move by someone else in the story, an old suspension, a possible one, or a
+   figure of speech ("retire the celebration", "released a statement") doesn't count. Otherwise: "disc" (ejected, fined,
+   suspension under review), "game" (what he did in a game), "team" (quotes, coach and team-outlook stories), or "news". */
+function lgKind(title, desc, names, at) {
+  const low = s => String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+  const nz = s => (' ' + low(s) + ' ').replace(/['’`]/g, '').replace(/\b([a-z])\.(?=[\sa-z]|$)/g, '$1').replace(/\b(jr|sr|st|vs|no)\./g, '$1')
+    .replace(/[.!?;:]+(?=\s|$)|\s[-–—]+\s|[–—]/g, ' | ').replace(/,/g, ' , ').replace(/[^a-z0-9|,]+/g, ' ').replace(/\s+/g, ' ').trim();
+  const d = String(desc || ''), fm = /^[\s\S]{20,}?[a-z0-9)"’'%]{2}[.!?]["’']?(?=\s+[A-Z"“]|\s*$)/.exec(d), first = (fm ? fm[0] : d).slice(0, 320);
+  const S = nz(title) + ' | ' + nz(first);
+  const yr = new Date(at && !isNaN(Date.parse(at)) ? at : Date.now()).getFullYear();
+  const nm = [];
+  (names || []).forEach(n => { const w = nz(n).replace(/[^a-z0-9 ]/g, '').replace(/ (jr|sr|ii|iii|iv)$/, '').trim().split(' ').filter(Boolean);
+    if (w.length) { nm.push(w.join(' ')); if (w.length > 1 && w[w.length - 1].length > 2) nm.push(w[w.length - 1]); } });
+  const NM = nm.length ? '(?:' + nm.join('|') + ')' : '[a-z]+', SUF = '(?: (?:jr|sr|ii|iii|iv))?';
+  const AUX = '(?:(?:has|had|have|was|were|is|are|will|be|been|being|gets|got|to|officially|reportedly|now|also|just|expected|set) ){0,4}';
+  const FILL = '(?:(?:the|veteran|former|pro|bowl|all|star|rookie|backup|starting|starter|wr|rb|qb|te|k|fb|wide|receiver|wideout|running|back|quarterback|tight|end|kicker|free|agent|their|his|standout|injured|struggling|embattled|longtime|second|third|fourth|year|[a-z0-9]+ time|ex [a-z0-9]+|cardinals|falcons|ravens|bills|panthers|bears|bengals|browns|cowboys|broncos|lions|packers|texans|colts|jaguars|chiefs|raiders|chargers|rams|dolphins|vikings|patriots|saints|giants|jets|eagles|steelers|49ers|niners|seahawks|buccaneers|bucs|titans|commanders) ){0,5}';
+  const NUM = '(?:\\d+|one|two|three|four|five|six|seven|eight|nine|ten|multiple|several)';
+  const LEN = '(?:' + NUM + ' (?:[a-z]+ )?(?:games?|weeks?)|indefinitely|(?:rest|remainder) of|for the (?:season|year))';
+  const NOBJ = '(?! (?:(?:a|an|his|the|new|this|that|its|their) )?(?:[a-z]+ )?(?:statement|video|apology|footage|photos?|report|details|song|album|book|trailer|schedule|list|chart|rankings?|autographs?|jerseys?|footballs?)\\b)';
+  const SIGNQ = '(?= (?:[a-z0-9]+ ){0,5}?(?:with|by|deal|contract|extension|year|squad|roster|tender|offer)\\b)';
+  const WAS = '(?:was|were|been|being|be|gets|got|is|are) (?:officially |reportedly |being |now )?';
+  const plain = [
+    '\\b' + NM + SUF + ' ' + AUX + '(?:(?:re )?sign(?:s|ed|ing)?' + SIGNQ + '|released' + NOBJ + '|waived|claimed(?= (?:off|by)\\b)|cut(?= by\\b)|activated|reinstated|placed on (?:ir|injured reserve|reserve|the [a-z ]{0,24}list)|retir(?:e|es|ed|ing)(?= (?:\\||from|after|at|following|as)\\b|$)|announc(?:es|ed) (?:his )?retirement)',
+    '\\b' + NM + SUF + ' ' + AUX + WAS + '(?:cut|claimed|signed|released' + NOBJ + '|waived)\\b',
+    '\\b(?:(?:re )?sign(?:s|ed|ing)?|releas(?:e|es|ed|ing)|waiv(?:e|es|ed|ing)|cut(?:s|ting)?|claim(?:s|ed|ing)?|activat(?:e|es|ed|ing)|reinstat(?:e|es|ed|ing)|add(?:s|ed|ing)?|part(?:s|ed|ing)? ways with|mov(?:e|es|ed|ing) on from) ' + FILL + NM + '\\b',
+    '\\bplac(?:e|es|ed|ing) ' + FILL + NM + SUF + ' (?:[a-z]+ ){0,2}?on (?:ir|injured reserve|reserve|the )',
+  ];
+  const susp = [
+    '\\b' + NM + SUF + ' ' + AUX + 'suspended (?:[a-z0-9]+ ){0,5}?' + LEN,
+    '\\bsuspend(?:s|ed|ing)? ' + FILL + NM + SUF + ' (?:[a-z0-9]+ ){0,5}?' + LEN,
+    '\\b' + NM + SUF + ' (?:[a-z]+ ){0,5}?' + NUM + ' game (?:suspension|ban)\\b',
+    '\\b' + NUM + ' game (?:suspension|ban) (?:for|to) ' + FILL + NM + '\\b',
+  ];
+  const old = t => /\b(last (season|year|spring|summer|offseason|month)|years? ago|previously|back in)\b/.test(t) || (t.match(/\b20\d\d\b/g) || []).some(y => +y < yr);
+  const unsure = t => /\b(could|may|might|possible|possibly|potential|faces?|facing|risks?|whether|if)\b/.test(t);
+  const hit = (list, bad) => list.some(src => { const re = new RegExp(src, 'g'); let m;
+    while ((m = re.exec(S))) { const a = S.lastIndexOf('|', m.index) + 1, b = S.indexOf('|', m.index + m[0].length), seg = S.slice(a, b < 0 ? S.length : b);
+      if (!bad(seg)) return true; if (!m[0].length) re.lastIndex++; }
+    return false; });
+  if (hit(plain, old) || hit(susp, t => old(t) || unsure(t))) return 'move';
+  const D1 = /\b(ejected|ejection|disqualified|fined|fine of|unsportsmanlike|arrested|charged with|disciplin\w+|league review|under review)\b|\$[\d,.]+k? fine/;
+  const D2 = /\bsuspen(d|ds|ded|sion|sions)\b/;
+  const QUOTE = /\b(says?|said|told|tells|explains?|admits?|address(es|ed)?|reacts?|responds?|insists?|believes?|voices?|confidence|confident|comments?|complain\w*|blasts?|criticiz\w+)\b/;
+  const GAME = /\b(touchdowns?|tds?|yards?|yds|catch(es)?|caught|receptions?|carries|rush(ed|es|ing)|threw|throws?|scor(ed|es|ing)|interceptions?|sacks?|fumbles?|stat line|backflip\w*|celebrat\w+|hurdl\w+|highlights?|wins?|won|loss|lost|loses|beats?|victory|defeat(ed|s)?|overtime|comeback|game-winn\w+|walk-off|blowout|\d{1,2}-\d{1,2})\b/;
+  const TEAM = /\b(says?|said|told|tells|explains?|believes?|thinks?|confident|expects?|admits?|address(es|ed)?|press conference|presser|reporters|coach(es|ing)?|coordinator|gm|general manager|front office|owner|locker room|outlook|plans?|future|comments?|reacts?|responds?|insists?|praises?|defends?|interview|offense)\b/;
+  const tl = low(title), fl = tl + ' ' + low(first);
+  const disc = t => D1.test(t) || (D2.test(t) && !old(nz(t)));
+  if (disc(tl)) return 'disc';
+  if (QUOTE.test(tl)) return 'team';
+  if (GAME.test(tl)) return 'game';
+  if (TEAM.test(tl)) return 'team';
+  if (disc(fl)) return 'disc';
+  if (GAME.test(fl)) return 'game';
+  if (TEAM.test(fl)) return 'team';
+  return 'news';
+}
+/* LGKIND-END */
+const TMN_LGK={trade:['Trade','accent'],inj:['Injury','bad'],move:['Roster move','muted'],role:['Depth chart','warn'],disc:['Discipline','warn'],game:['Game recap','muted'],team:['Team news','muted'],news:['News','muted']};
+/* trades, injuries and depth-chart stories keep the server's label; everything else is one group, labeled for the matched player */
+const tmnLgGrp=k=>k==='trade'||k==='inj'||k==='role'?k:'move';
 function tmnLeagueNews(Ls,picked){const raw=TMN.lgn&&TMN.lgn.items;if(!raw||!raw.length)return [];
   const rk=id=>(typeof V!=='undefined'&&V&&V.rank&&V.rank[id])||999;
   if(!TMN.lgIdx||TMN.lgIdx.n!==POOL.length){const L=POOL.filter(p=>p.pos!=='DST'&&p.pos!=='K'&&rk(p.id)<=TMN_TRADE_TOP).map(p=>[norm(p.n),p.id]).filter(x=>x[0].includes(' '));
@@ -710,8 +773,8 @@ function tmnLeagueNews(Ls,picked){const raw=TMN.lgn&&TMN.lgn.items;if(!raw||!raw
     let pid=null;const ath=(a.athletes||[]).map(norm).find(n=>by[n]);if(ath)pid=by[ath];
     if(!pid){const h=normT(a.title);const hit=L.filter(([n])=>wordIn(h,n)).sort((x,y)=>rk(x[1])-rk(y[1]))[0];if(hit)pid=hit[1]}
     if(!pid){const h=normT(String(a.desc||'').slice(0,220));const hit=L.filter(([n])=>wordIn(h,n)).sort((x,y)=>rk(x[1])-rk(y[1]))[0];if(hit)pid=hit[1]}
-    if(!pid||(a.kind==='inj'&&rk(pid)>150)||(a.kind!=='trade'&&rk(pid)>220)||out.some(o=>o.pid===pid&&o.kind===a.kind))return;
-    const x={type:'lg',k:'lg:'+a.url,kind:a.kind,pid,yours:mine.has(pid),title:a.title,desc:a.desc,url:a.url,outlet:a.outlet,img:a.img,at,leagues:[],pay:!!a.pay};
+    if(!pid||(a.kind==='inj'&&rk(pid)>150)||(a.kind!=='trade'&&rk(pid)>220)||out.some(o=>o.pid===pid&&o.g===tmnLgGrp(a.kind)))return;
+    const g=tmnLgGrp(a.kind),x={type:'lg',k:'lg:'+a.url,g,kind:g==='move'?lgKind(a.title,a.desc,[byId[pid].n],a.at):a.kind,pid,yours:mine.has(pid),title:a.title,desc:a.desc,url:a.url,outlet:a.outlet,img:a.img,at,leagues:[],pay:!!a.pay};
     if((picked||[]).some(o=>tmnSameStory(o,x))||out.some(o=>tmnSameStory(o,x)))return;
     seen.add(a.url);out.push(x)});
   const tr=out.filter(x=>x.kind==='trade'),rest=out.filter(x=>x.kind!=='trade').sort((a,b)=>b.at-a.at).slice(0,14);
@@ -784,7 +847,9 @@ function tmnTradeCard(x){const p=byId[x.pid];if(!p)return '';const rc=x.url&&tmn
     +(x.yours?`<p class="tmn-mytr-n">Still on your roster.</p>`:'');
   return tmnStoryShell({x,p,cls:'tmn-trade'+(x.yours?' tmn-mytr':'')+(rc?' recap':''),tone:'accent',lbl:x.yours?(mv?'Your player changed teams':'Your player was traded'):(mv?'New team':'Trade'),
     right:`<span class="tmn-right">${route}${x.yours?'':tmnOwnChip(x)}</span>`,body,link:!!x.url,pay:!!(x.url&&x.pay)})}
-function tmnLeagueCard(x){const p=byId[x.pid],[lbl,tone]=TMN_LGK[x.kind]||['League news','muted'],rc=tmnRecaps()[x.url];
+/* the label: the recap's own read of the story when it has one (it read the whole thing), else the keyword guess */
+const TMN_RC_K=['move','disc','game','team','news','inj','role'];   /* never 'trade': a trade label needs a verified trade */
+function tmnLeagueCard(x){const p=byId[x.pid],rc=tmnRecaps()[x.url],kind=x.g==='move'&&rc&&TMN_RC_K.includes(rc.k)?rc.k:x.kind,[lbl,tone]=TMN_LGK[kind]||['News','muted'];
   return tmnStoryShell({x,p,cls:'tmn-lgn'+(rc?' recap':''),tone,lbl,right:tmnOwnChip(x),body:tmnBodyOf(p,x,rc,''),link:true,pay:!!x.pay})}
 /* a story or a video: the whole card is the link */
 function tmnStoryCard(x){const p=byId[x.pid],inj=x.kind==='inj',vid=x.type==='vid',tone=inj?'warn':'muted',rc=tmnRecaps()[x.url],st=stOf(x.pid);
