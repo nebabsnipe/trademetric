@@ -464,6 +464,20 @@ async function loadLive(){
       liveSave();liveStatus();if(typeof tmnTick==='function'&&Object.values(j.games).every(g=>g.state==='post')){recompute();await tmnTick()}if(checkRollover()){setTimeout(loadLive,500);await loadPlatform()}recompute();if(Object.values(j.games).some(g=>g.state==='post'))loadProjNext();const a=document.activeElement;if(!(a&&/INPUT|TEXTAREA|SELECT/.test(a.tagName)))render();if(typeof tmnTick==='function')tmnTick();LIVE_FAST=!!(j.live||Object.values(j.games).some(g=>g.state==='pre'&&Date.parse(g.start)-Date.now()<30*60e3));if(LIVE_FAST)next=15e3}}}catch(e){}
   LIVE_TIMER=setTimeout(()=>{if(document.hidden)document.addEventListener('visibilitychange',loadLive,{once:true});else loadLive()},next)}
 const liveOf=id=>G[id]&&G[id].live;
+/* Where a player's game stands this week, decided in one place: 'final' | 'live' | 'upcoming'.
+   From the live feed's game state (ESPN scoreboard: pre / in / post) and its kickoff time. A player who already has
+   points, or whose kickoff time has passed, is never 'upcoming' even if the feed still says pre-game (a stale copy).
+   No game this week (bye) or ruled out counts as 'final': he won't add points. */
+const GS_OUT=['O','IR','PUP','SUS'];
+function getGameState(id){const p=byId[id],g=G[id];if(!p||!g)return 'final';
+  const gm=LIVE&&LIVE.week===WEEK&&LIVE.games?LIVE.games[p.t]:null,l=liveOf(id);
+  if(!gm&&!g.next)return 'final';
+  if(GS_OUT.includes(stOf(id)))return 'final';
+  if(gm&&gm.state==='post')return 'final';
+  if(gm&&gm.state==='in')return 'live';
+  if(l&&l.pts>0)return 'live';
+  if(gm&&gm.start&&Date.parse(gm.start)<=Date.now())return 'live';
+  return 'upcoming'}
 /* last live scores and real lineups, kept in this browser so a reload opens on them instead of
    projections for the couple of seconds before /api/live and the platform answer */
 const LIVE_LS='tm-live-cache';
@@ -1698,19 +1712,29 @@ function renderMatchup(){const el=$('matchup');const oid=oppOf(S.me,WEEK);
   if(!oid){el.innerHTML=`<div class="card-h"><h2>Week ${WEEK} matchup</h2></div><p class="empty">No opponent this week.</p>`;return}
   const me=myTeam(),O=teamById(oid),A=weekLine(me.players,WEEK,S.me),Bm=weekLine(O.players,WEEK,oid),pw=lineP(A,Bm,WEEK),f=pickVal(WEEK);
   const act=lu=>sum(lu.slots.filter(x=>x.p&&liveOf(x.p.id)),x=>liveOf(x.p.id).pts),anyLive=[...A.lu.slots,...Bm.lu.slots].some(x=>x.p&&liveOf(x.p.id)),aA=act(A.lu),aB=act(Bm.lu);
-  const cell=(id,v,win,al)=>{const l=id&&liveOf(id);return `<td class="${al} num ${win?'win':''}">${l?`<b>${f1(l.pts)}</b><small>${l.state==='post'?'final':'proj '+f1(v)}</small>`:f1(v)}</td>`};
-  const nSlots=A.lu.slots.length,rows=A.lu.slots.map((x,i)=>{const o=Bm.lu.slots[i],a=x.p?f(x.p.id):0,b=o&&o.p?f(o.p.id):0;
-    const sub=id=>liveOf(id)?`${byId[id].pos} · ${liveTxt(id)} ${f1(liveOf(id).pts)} pts`:`${byId[id].pos} · ${oppHtml(id)}`;
-    return `<tr${i>=MU_PEEK?' class="mu-more"':''}><td>${x.p?plCell(x.p,sub(x.p.id)):'<span class="empty">Empty</span>'}</td>${cell(x.p&&x.p.id,a,a>=b,'r')}<td class="mu-slot">${x.label}</td>${cell(o&&o.p&&o.p.id,b,b>a,'')}<td>${o&&o.p?plCell(o.p,sub(o.p.id)):'<span class="empty">Empty</span>'}</td></tr>`}).join('');
+  const cell=(id,v,win,al)=>{const l=id&&liveOf(id);return `<td class="${al} num ${win?'win':''}">${l?`<b>${f1(l.pts)}</b><small>${l.state==='post'?'final':'proj '+f1(v)}</small>`:anyLive&&id&&getGameState(id)==='upcoming'?`<span>${f1(v)}</span><small>proj</small>`:f1(v)}</td>`};
+  /* each side's game state (one helper), shown as a colored bar on the row's outer edge plus a light tint */
+  const gsOf=s=>s&&s.p?getGameState(s.p.id):'',cnt=slots=>{const c={live:0,upcoming:0,final:0};slots.forEach(s=>{const k=gsOf(s);if(k)c[k]++});return `${c.live} playing · ${c.upcoming} left · ${c.final} done`};
+  const prev=MU_GS||{},seen={};
+  const nSlots=A.lu.slots.length,rows=A.lu.slots.map((x,i)=>{const o=Bm.lu.slots[i],a=x.p?f(x.p.id):0,b=o&&o.p?f(o.p.id):0,ga=gsOf(x),gb=gsOf(o);
+    const sub=id=>liveOf(id)?`${byId[id].pos} · ${liveTxt(id)} ${f1(liveOf(id).pts)} pts`:getGameState(id)==='live'?`${byId[id].pos} · <span class="live-tag in">Live</span>`:`${byId[id].pos} · ${oppHtml(id)}`;
+    /* a row whose state changed since the last refresh starts in its old colors and fades to the new ones */
+    const k=`${x.p?x.p.id:'-'}|${o&&o.p?o.p.id:'-'}`,was=prev[k];seen[k]=[ga,gb];const from=(was&&(was[0]!==ga||was[1]!==gb))?` data-gs-to="${ga||'none'} ${gb||'none'}"`:'';
+    const ca=was&&was[0]!==ga?was[0]:ga,cb=was&&was[1]!==gb?was[1]:gb;
+    return `<tr class="${i>=MU_PEEK?'mu-more ':''}${ca?'gsa-'+ca:''} ${cb?'gsb-'+cb:''}"${from}><td>${x.p?plCell(x.p,sub(x.p.id)):'<span class="empty">Empty</span>'}</td>${cell(x.p&&x.p.id,a,a>=b,'r')}<td class="mu-slot">${x.label}</td>${cell(o&&o.p&&o.p.id,b,b>a,'')}<td>${o&&o.p?plCell(o.p,sub(o.p.id)):'<span class="empty">Empty</span>'}</td></tr>`}).join('');
+  MU_GS=seen;
   el.innerHTML=`<div class="card-h"><h2>Week ${WEEK} matchup</h2>${muStatus(A,Bm)}</div>
    <div class="mu-head"><div class="mu-team"><span class="mu-name"><i class="tsq" style="background:${teamColor(S.me)}"></i>${esc(me.name)}</span><span class="note">${recTxt(S.me)}</span><b class="num">${f1(anyLive?aA:A.m)}</b>${anyLive?`<span class="mu-proj">proj ${f1(A.m)}</span>`:''}</div>
     <div class="mu-mid"><div class="mu-pct">${wpPct(pw)}</div><div class="note">chance you win</div></div>
     <div class="mu-team r"><span class="mu-name"><i class="tsq" style="background:${teamColor(oid)}"></i>${esc(O.name)}</span><span class="note">${recTxt(oid)}</span><b class="num">${f1(anyLive?aB:Bm.m)}</b>${anyLive?`<span class="mu-proj">proj ${f1(Bm.m)}</span>`:''}</div></div>
    <div class="mu-bar"><i style="width:${pw*100}%;background:${teamColor(S.me)}"></i><i style="width:${(1-pw)*100}%;background:${versusColor(teamColor(S.me),teamColor(oid))}"></i></div>
-   <div class="mu-peek${MU_ALL||nSlots<=MU_PEEK?' open':''}" id="mu-peek"><div class="mu-peek-h">Position by position</div><div class="mu-table"><table><thead><tr><th>You</th><th class="r">${anyLive?'Pts':'Proj'}</th><th style="text-align:center">Slot</th><th>${anyLive?'Pts':'Proj'}</th><th>${esc(O.name)}</th></tr></thead><tbody>${rows}</tbody></table></div>
-    ${nSlots>MU_PEEK?`<button type="button" class="mu-all" data-mu-all aria-expanded="${MU_ALL}" aria-controls="mu-peek">${MU_ALL?'Show fewer':`See all ${nSlots} positions`}<svg viewBox="0 0 20 20" width="14" height="14" aria-hidden="true"><path d="M5 7.5 10 12.5 15 7.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>`:''}</div>`}
+   <div class="mu-peek${MU_ALL||nSlots<=MU_PEEK?' open':''}" id="mu-peek"><div class="mu-peek-h">Position by position</div><div class="mu-legend" aria-hidden="true"><span class="gs-up">Yet to play</span><span class="gs-live">Playing</span><span class="gs-done">Done</span></div><div class="mu-counts"><span>You: ${cnt(A.lu.slots)}</span><span><span class="cn-full">${esc(O.name)}</span><span class="cn-short">Opp</span>: ${cnt(Bm.lu.slots)}</span></div><div class="mu-table"><table><thead><tr><th>You</th><th class="r">${anyLive?'Pts':'Proj'}</th><th style="text-align:center">Slot</th><th>${anyLive?'Pts':'Proj'}</th><th>${esc(O.name)}</th></tr></thead><tbody>${rows}</tbody></table></div>
+    ${nSlots>MU_PEEK?`<button type="button" class="mu-all" data-mu-all aria-expanded="${MU_ALL}" aria-controls="mu-peek">${MU_ALL?'Show fewer':`See all ${nSlots} positions`}<svg viewBox="0 0 20 20" width="14" height="14" aria-hidden="true"><path d="M5 7.5 10 12.5 15 7.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>`:''}</div>`;if(el.querySelector("tr[data-gs-to]")){void getComputedStyle(el.querySelector("tr[data-gs-to] td")).backgroundColor;el.offsetHeight;muGsFlip()}}
 /* matchup peek: the first few slots, then "See all N positions" opens the rest */
-var MU_PEEK=3,MU_ALL=false;
+var MU_PEEK=3,MU_ALL=false,MU_GS={};
+/* after a refresh, rows that changed state are drawn once in their old colors, then switched, so the color change animates */
+function muGsFlip(){document.querySelectorAll('#matchup tr[data-gs-to]').forEach(tr=>{const [a,b]=tr.dataset.gsTo.split(' ');tr.removeAttribute('data-gs-to');
+  tr.className=tr.className.replace(/\bgs[ab]-\w+/g,'').trim()+(a!=='none'?' gsa-'+a:'')+(b!=='none'?' gsb-'+b:'')})}
 document.addEventListener('click',e=>{const b=e.target.closest&&e.target.closest('[data-mu-all]');if(!b)return;MU_ALL=!MU_ALL;renderMatchup();if(!MU_ALL){const el=$('matchup');if(el.getBoundingClientRect().top<0)el.scrollIntoView({block:'start'})}});
 function dialSvg(x){const r=86,c=Math.PI*r,len=c*Math.max(0,Math.min(1,x));
   return `<svg viewBox="0 0 200 116" class="dial" aria-hidden="true"><path d="M14 104 A86 86 0 0 1 186 104" class="dial-bg"/><path d="M14 104 A86 86 0 0 1 186 104" class="dial-fg" style="stroke-dasharray:${len} ${c}"/></svg>`}
