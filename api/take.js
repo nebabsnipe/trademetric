@@ -195,6 +195,18 @@ Reply with only JSON: {"take":"...","outlook":"growing|steady|threatened"}`;
   return take.length >= 40 ? { take, outlook } : null;
 }
 
+/* stored outlooks for many players at once (memory first, then one database read for the rest) */
+async function outlooksOf(ids) {
+  const out = {}, need = [];
+  ids.forEach(id => { const c = mem.get(id); if (c && c.outlook && Date.now() - c.made < MAX_AGE_MS) out[id] = c.outlook; else need.push(id); });
+  if (need.length && SUPA_SERVICE) {
+    try {
+      const r = await fetch(`${SUPA_URL}/rest/v1/player_takes?player_id=in.(${need.map(encodeURIComponent).join(',')})&select=player_id,outlook,updated_at`, { headers: svc() });
+      if (r.ok) (await r.json()).forEach(x => { if (OUTLOOKS.includes(x.outlook) && Date.now() - Date.parse(x.updated_at) < MAX_AGE_MS) out[x.player_id] = x.outlook; });
+    } catch { }
+  }
+  return out;
+}
 const inflight = new Map();
 async function takeFor(id, p, body, uid) {
   const now = Date.now();
@@ -218,6 +230,17 @@ async function takeFor(id, p, body, uid) {
 
 export default async function handler(req, res) {
   res.setHeader('Cache-Control', 'private, no-store');
+  const q = req.query || {};
+  if (req.method === 'GET' && q.outlooks) {
+    /* Read only, for the offseason News feed's impact line: the role outlook of takes that already exist.
+       GET /api/take?outlooks=id,id,...  (Pro) -> {ok:true, items:{[id]:'growing'|'steady'|'threatened'}}
+       Never writes a take: players with no take yet are simply left out. */
+    const u = await userOf(req);
+    if (!u) return res.status(401).json({ ok: false, code: 'signin' });
+    if (!u.pro) return res.status(403).json({ ok: false, code: 'pro' });
+    const ids = [...new Set(String(q.outlooks).split(',').map(s => s.trim()).filter(s => /^[a-z0-9-]{1,80}$/.test(s)))].slice(0, 80);
+    return res.status(200).json({ ok: true, items: await outlooksOf(ids) });
+  }
   if (req.method !== 'POST') return res.status(405).json({ ok: false, code: 'method' });
   const user = await userOf(req);
   if (!user) return res.status(401).json({ ok: false, code: 'signin' });

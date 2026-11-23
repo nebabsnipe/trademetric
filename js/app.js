@@ -1752,9 +1752,9 @@ $('theme-btn').addEventListener('click',()=>{themePref=isDark()?'light':'dark';t
 const TABS=['team','news','trade','rankings','hub','season','league','draft','help','welcome','signin','account','home','tmrank','recap','drafttools','leaguefit'];let tab='team';
 function howLink(k){return `<a class="how how-wrap" href="#help-${k}">How this works</a>`}
 const TAB_ALIAS={players:['rankings','rank'],waivers:['rankings','waiv'],values:['rankings','vals']};
-function go(t){let helpSec=null;if(t&&t.startsWith('help-')){helpSec=t.slice(5);t='help'}if(t&&t.startsWith('account-')){ACC_TAB=t.slice(8);t='account'}else if(t==='account')ACC_TAB='profile';if(t!==tab||t==='account'){ACC_EDIT=null;ACC_MSG=null}if(t==='trade-ideas'||t==='trade-builder'){setTrView(t==='trade-ideas'?'ideas':'build');t='trade'}if(TAB_ALIAS[t]){plView=TAB_ALIAS[t][1];t=TAB_ALIAS[t][0]}if(t==='helper'){if(USER)openAI();t=TABS.includes(tab)?tab:'team';history.replaceState(null,'','#'+t)}if(!USER&&t!=='signin'&&!TMO_PUBLIC.includes(t))t='signin';tab=TABS.includes(t)?t:'team';document.body.dataset.tab=tab;if(tab!=='welcome'&&S&&!S.onboarded){S.onboarded=true;save()}document.querySelectorAll('.nav button').forEach(b=>{if(b.dataset.tab===tab)b.setAttribute('aria-current','page');else b.removeAttribute('aria-current')});
+function go(t){let helpSec=null;if(t&&t.startsWith('help-')){helpSec=t.slice(5);t='help'}if(t&&t.startsWith('account-')){ACC_TAB=t.slice(8);t='account'}else if(t==='account')ACC_TAB='profile';if(t!==tab||t==='account'){ACC_EDIT=null;ACC_MSG=null}if(t==='trade-ideas'||t==='trade-builder'){setTrView(t==='trade-ideas'?'ideas':'build');t='trade'}if(TAB_ALIAS[t]){plView=TAB_ALIAS[t][1];t=TAB_ALIAS[t][0]}if(t==='helper'){if(USER)openAI();t=TABS.includes(tab)?tab:'team';history.replaceState(null,'','#'+t)}if(!USER&&t!=='signin'&&!tmoPublic(t))t='signin';tab=TABS.includes(t)?t:'team';document.body.dataset.tab=tab;if(tab!=='welcome'&&S&&!S.onboarded){S.onboarded=true;save()}document.querySelectorAll('.nav button').forEach(b=>{if(b.dataset.tab===tab)b.setAttribute('aria-current','page');else b.removeAttribute('aria-current')});
   TABS.forEach(x=>$('v-'+x).hidden=x!==tab);render();window.scrollTo(0,0);if(tab==='help')openHelp(helpSec)}
-function render(){tmoApplyMode();({home:renderOffHome,tmrank:renderTmRank,recap:renderProTab,drafttools:renderProTab,leaguefit:renderProTab,team:renderTeam,news:tmnRender,rankings:renderPlayers,draft:renderDraft,help:()=>{},trade:renderTrade,hub:renderHub,season:renderSeason,welcome:renderWelcome,league:fillLeagueForm,signin:renderSignin,account:renderAccount})[tab]();renderAlerts();if(openId&&!$('scrim').hidden)openCard(openId);queueBalance()}
+function render(){tmoApplyMode();({home:renderOffHome,tmrank:renderTmRank,recap:renderProTab,drafttools:renderProTab,leaguefit:renderProTab,team:renderTeam,news:()=>tmoMode()==='off'?renderOffNews():tmnRender(),rankings:renderPlayers,draft:renderDraft,help:()=>{},trade:renderTrade,hub:renderHub,season:renderSeason,welcome:renderWelcome,league:fillLeagueForm,signin:renderSignin,account:renderAccount})[tab]();renderAlerts();if(openId&&!$('scrim').hidden)openCard(openId);queueBalance()}
 document.querySelectorAll('.nav button').forEach(b=>b.addEventListener('click',()=>{location.hash=b.dataset.hash||b.dataset.tab}));
 window.addEventListener('hashchange',()=>{closeCard();go(location.hash.slice(1))});
 function loadTrade(str){setTrView('build');const [g,r]=str.split('|');TD.give=g?g.split(','):[];TD.get=r?r.split(','):[];closeCard();if(tab==='trade')renderTrade();else location.hash='trade';setTimeout(()=>$('rating').scrollIntoView({behavior:'smooth',block:'center'}),60)}
@@ -1846,7 +1846,7 @@ if(!S||!S.league||!S.teams){S={league:{name:'Sample League',teams:12,sc:{...PRES
 else{S.league.sc={...BASE_SC,...S.league.sc};if(S.league.slots.DST===undefined)S.league.slots.DST=1;if(S.league.slots.K===undefined)S.league.slots.K=1;setPool();recompute();if(S.example&&S.league.slots.K&&!S.teams.some(T=>T.players.some(id=>byId[id]&&byId[id].pos==='K')))exampleLeague()}
 buildLeagueForm();
 S.chat=(S.chat||[]).filter(x=>x.status==='done'||x.status==='error');
-var INTENDED=location.hash.slice(1);go(TMO_PUBLIC.includes(INTENDED)?INTENDED:!INTENDED&&tmoMode()==='off'?'home':'signin');
+var INTENDED=location.hash.slice(1);go(tmoPublic(INTENDED)?INTENDED:!INTENDED&&tmoMode()==='off'?'home':'signin');
 loadLive();loadProj();loadMarket();
 
 /* ===== Accounts (Supabase): TradeMetric's own sign-in page, social sign-in, email codes, league saved to the cloud =====
@@ -1975,7 +1975,7 @@ function enterApp(){stopConfirmWatch();document.body.classList.remove('signed-ou
   let t=INTENDED&&TABS.includes(INTENDED.replace(/-.*/,''))&&INTENDED!=='signin'?INTENDED:tmoHomeTab();INTENDED=null;if(!S.onboarded)t='welcome';
   if(location.hash.slice(1)===t)go(t);else location.hash=t}
 function showSignin(){if(tab!=='signin'){if(location.hash==='#signin')go('signin');else location.hash='signin'}else renderSignin()}
-function leaveApp(){stopConfirmWatch();document.body.classList.add('signed-out');USER=null;PROFILE=null;PROFILE_OK=false;AUTH_MODE='in';AUTH_MSG=null;ACC_EDIT=null;if(TMO_PUBLIC.includes(tab))render();else showSignin();acctUI()}
+function leaveApp(){stopConfirmWatch();document.body.classList.add('signed-out');USER=null;PROFILE=null;PROFILE_OK=false;AUTH_MODE='in';AUTH_MSG=null;ACC_EDIT=null;if(tmoPublic(tab))render();else showSignin();acctUI()}
 function authFail(t){AUTH_BUSY=false;AUTH_MSG={bad:true,html:esc(friendly(t))};renderSignin()}
 function authNote(h){AUTH_BUSY=false;AUTH_MSG={bad:false,html:h};renderSignin()}
 /* Everything that happens once someone is signed in, however they got there (form, code, link, Google, another tab). */
@@ -2622,7 +2622,7 @@ document.addEventListener('click',e=>{if(SSD_EAT&&e.target.closest&&e.target.clo
 /* ===== Alerts (bell in the top bar) ===== */
 const ALERT_LS='tm-alerts-seen';
 function seenAlerts(){try{return new Set(JSON.parse(localStorage.getItem(ALERT_LS)||'[]'))}catch(e){return new Set()}}
-function alertsList(){const me=S&&myTeam&&myTeam();if(!me||!V||!G)return [];const out=[],RL=realLineup(S.me),lu=RL||lineup(me.players,projV),st=new Set(lu.slots.filter(x=>x.p).map(x=>x.p.id));
+function alertsList(){if(tmoMode()==='off')return typeof ofnAlerts==='function'?ofnAlerts():[];const me=S&&myTeam&&myTeam();if(!me||!V||!G)return [];const out=[],RL=realLineup(S.me),lu=RL||lineup(me.players,projV),st=new Set(lu.slots.filter(x=>x.p).map(x=>x.p.id));
   me.players.forEach(id=>{const p=byId[id],g=G[id];if(!p||!g)return;const s=stOf(id);
     if(st.has(id)&&s&&s!=='Q')out.push({k:`out-${WEEK}-${id}-${s}`,lvl:'bad',t:`${p.n}: ${ST_LABEL[s].toLowerCase()}`,d:RL?'He is in your starting lineup. Swap him out.':'One of your usual starters. Your lineup on My Team already works around him.',open:id});
     else if(st.has(id)&&s==='Q')out.push({k:`q-${WEEK}-${id}`,lvl:'warn',t:`${p.n} is questionable`,d:'Check his status before kickoff and have a backup ready.',open:id});
@@ -2638,10 +2638,10 @@ function alertsList(){const me=S&&myTeam&&myTeam();if(!me||!V||!G)return [];cons
   if(typeof tmnTop==='function'){const cut=Date.now()-5*864e5;tmnTop().items.filter(e=>(e.type==='top'||e.type==='second')&&(e.at||0)>cut&&byId[e.pid]).sort((a,b)=>(a.type==='top'?0:1)-(b.type==='top'?0:1)||b.pts-a.pts).slice(0,3)
     .forEach(e=>{const one=e.type==='top';top.push({k:`rank-${e.k}`,lvl:one?'n1':'n2',m:one?1:2,t:e.head,d:`${one?(e.overall?'#1 scorer in the NFL':'#1 '+(e.pos||'')+' in the NFL'):'#2 '+(e.pos||'')+' in the NFL'} · Week ${e.week} · ${f1(e.pts)} pts`,open:e.pid})})}
   return [...top,...out]}
-function renderAlerts(){const b=$('alert-btn');if(!b)return;const L=USER?alertsList():[],seen=seenAlerts(),n=L.filter(a=>!seen.has(a.k)).length+(USER&&typeof tmnUnread==='function'&&tab!=='news'?tmnUnread():0);
+function renderAlerts(){const b=$('alert-btn');if(!b)return;const L=USER?alertsList():[],seen=seenAlerts(),n=L.filter(a=>!seen.has(a.k)).length+(USER&&tmoMode()!=='off'&&typeof tmnUnread==='function'&&tab!=='news'?tmnUnread():0);
   const c=$('alert-n');c.hidden=!n;c.textContent=n>9?'9+':n;b.setAttribute('aria-label',n?`Alerts, ${n} new`:'Alerts');
   const pop=$('alert-pop');if(!pop.hidden)paintAlerts(L,seen)}
-function paintAlerts(L,seen){const nn=typeof tmnUnread==='function'?tmnUnread():0;$('alert-pop').innerHTML=`<div class="al-h"><b>Alerts</b><span class="note">Week ${WEEK}</span></div>${nn?`<a class="al-news" href="#news"><b>${nn} new in News</b><span>Big plays from your players →</span></a>`:''}${L.length?`<div class="al-list">${L.map(a=>`<button class="al-i ${a.lvl}${seen.has(a.k)?'':' new'}" data-open="${a.open}"><i>${a.m?a.m:''}</i><span><b>${esc(a.t)}</b><span>${esc(a.d)}</span></span></button>`).join('')}</div>`:'<p class="empty" style="margin:0">All clear. Nothing needs your attention right now.</p>'}`}
+function paintAlerts(L,seen){const off=tmoMode()==='off',nn=!off&&typeof tmnUnread==='function'?tmnUnread():0;$('alert-pop').innerHTML=`<div class="al-h"><b>Alerts</b><span class="note">${off?'Players you follow':'Week '+WEEK}</span></div>${nn?`<a class="al-news" href="#news"><b>${nn} new in News</b><span>Big plays from your players →</span></a>`:''}${L.length?`<div class="al-list">${L.map(a=>`<button class="al-i ${a.lvl}${seen.has(a.k)?'':' new'}" data-open="${a.open}"><i>${a.m?a.m:''}</i><span><b>${esc(a.t)}</b><span>${esc(a.d)}</span></span></button>`).join('')}</div>`:'<p class="empty" style="margin:0">All clear. Nothing needs your attention right now.</p>'}`}
 function toggleAlerts(open){const pop=$('alert-pop'),b=$('alert-btn');open=open??pop.hidden;pop.hidden=!open;b.setAttribute('aria-expanded',open);
   if(open){const L=alertsList(),seen=seenAlerts();paintAlerts(L,seen);try{localStorage.setItem(ALERT_LS,JSON.stringify([...new Set([...seen,...L.map(a=>a.k)])].slice(-300)))}catch(e){}$('alert-n').hidden=true}}
 

@@ -16,6 +16,8 @@ var TMO={rows:null,pos:'ALL',view:'all',q:'',open:null,limit:100,market:null,tak
 /* Pro tools that have a tab in the offseason nav. Signed out they show a locked page; signed in, a Coming soon page. */
 var TMO_PRO_TABS=['recap','drafttools','leaguefit'];
 var TMO_PUBLIC=['home','tmrank'].concat(TMO_PRO_TABS);
+/* public without sign-in: the offseason pages, plus News while in offseason mode (js/offnews.js) */
+function tmoPublic(t){return TMO_PUBLIC.includes(t)||(t==='news'&&tmoMode()==='off')}
 var TMO_IS_PREVIEW=!/(^|\.)trademetric\.app$/.test(location.hostname);
 
 /* ---------- mode ---------- */

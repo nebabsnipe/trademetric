@@ -191,6 +191,25 @@ const MOVE = [
 ];
 const RUMOR = /\b(could|might|would|interest(ed)? in|rumou?rs?|potential|candidates?|should|predict|trade targets?|ideas|deadline (buyers|sellers)|what if|mock)\b/i;
 function moveOf(t) { for (const [k, re] of MOVE) if (re.test(t || '')) return k; return null; }
+/* Offseason News: the moves that change fantasy value between seasons. Order matters: a coach who retires is a
+   coach change, a re-signing is a contract, and a trade story that mentions an injury is still a trade. */
+const COACH = '(head coach|offensive coordinator|oc|play-?caller)';
+const OFF_MOVE = [
+  ['coach', new RegExp(`\\b(hire[sd]?|hiring|to hire|fire[sd]?|firing|dismiss(es|ed)?|part(s|ed)? ways with|promot(e|es|ed|ing)|finaliz\\w* (a )?deal with|agree(s|d)? to terms with)\\b[^.]{0,70}\\b${COACH}\\b|\\b${COACH}\\b[^.]{0,40}\\b(fired|hired|dismissed|let go|steps? down|stepping down|resigns?|resigned|retires?|retiring|leaves|leaving)\\b|\\bnam(e|es|ed|ing) [\\w'. -]{2,40}?(as )?((its|their|the|new) )*${COACH}\\b`, 'i')],
+  ['retire', /\b(retires?|retired|retiring|retirement|calls? it a career|hangs? (it|them|up)( up)?)\b/i],
+  ['susp', /\b(suspended|suspension|suspends|banned for)\b/i],
+  ['trade', MOVE[0][1]],
+  ['contract', /\b(re-signs?|re-signed|re-signing|extension|extends|extended|restructur\w*|franchise tag\w*|transition tag\w*|tags?|tagged|fifth-year option|holdout|holds out|holding out)\b/i],
+  ['release', /\b(release|released|releases|releasing|waived|waives|waiving|cut by|cuts|parts? ways with|parted ways with)\b/i],
+  ['sign', /\b(signs?|signed|signing|agrees? to (terms|a deal|a contract)|agreed to (terms|a deal)|lands with|joins|claimed off waivers|claims [\w'. -]{2,40} off waivers)\b/i],
+  ['inj', /\b(season-ending|out for the (season|year)|torn (acl|achilles)|tears? (his )?(acl|achilles)|ruptured|(place|placed|places|lands|goes|put|puts) [\w'. -]{0,40}?on (injured reserve|ir)\b|undergoes? surgery|surgery on)\b/i],
+];
+/* offseason rumor words the in-season list doesn't catch: talk about moves that haven't happened */
+const OFF_RUMOR = /\b(expected to|likely to|eyeing|eyes|linked to|in talks|considering|meeting with|meets with|visit(s|ing|ed)? with|top targets?|plans to|hopes to|wants to|open to|landing spots?|projections?|predictions?|winners and losers|best available|should)\b/i;
+function offKindOf(t) { for (const [k, re] of OFF_MOVE) if (re.test(t || '')) return k; return null; }
+const TEAM_NICK = { ARI: 'Cardinals', ATL: 'Falcons', BAL: 'Ravens', BUF: 'Bills', CAR: 'Panthers', CHI: 'Bears', CIN: 'Bengals', CLE: 'Browns', DAL: 'Cowboys', DEN: 'Broncos', DET: 'Lions', GB: 'Packers', HOU: 'Texans', IND: 'Colts', JAX: 'Jaguars', KC: 'Chiefs', LV: 'Raiders', LAC: 'Chargers', LAR: 'Rams', MIA: 'Dolphins', MIN: 'Vikings', NE: 'Patriots', NO: 'Saints', NYG: 'Giants', NYJ: 'Jets', PHI: 'Eagles', PIT: 'Steelers', SF: '49ers', SEA: 'Seahawks', TB: 'Buccaneers', TEN: 'Titans', WAS: 'Commanders' };
+/* NFL teams a headline names, in the order it names them */
+function teamsIn(t) { const s = String(t || ''); return Object.entries(TEAM_NICK).map(([k, n]) => [k, s.search(new RegExp('\\b' + n + '\\b', 'i'))]).filter(x => x[1] >= 0).sort((a, b) => a[1] - b[1]).map(x => x[0]); }
 function kindOf(x) {
   const t = x.title || '', d = x.desc || '';
   if (FLUFF.test(t)) return null;
@@ -361,6 +380,32 @@ export default async function handler(req, res) {
     out.sort((a, b) => Date.parse(b.at || 0) - Date.parse(a.at || 0));
     const v = { updated: new Date().toISOString(), items: out.slice(0, 80) };
     cache.set('league', { at: Date.now(), v });
+    res.setHeader('Cache-Control', 'public, max-age=0, s-maxage=600');
+    return res.status(200).json(v);
+  }
+  /* offseason mode for the offseason News tab (js/offnews.js): moves only, from the shared outlets, no rumors.
+     GET /api/news?off=1[&days=30]  (default 14 days, at most 30)
+     -> {items:[{kind,title,desc,url,outlet,outlets,at,img,athletes,teams,pay}]}
+     kind: trade, sign, release, retire, coach (HC or OC change), inj (season-ending), susp, contract.
+     outlets = every outlet that ran the same story; the client counts it as verified at two or more. No AI. */
+  if (q.off) {
+    const days = Math.min(30, Math.max(1, parseInt(q.days, 10) || 14)), ck = 'off:' + days;
+    const c = cache.get(ck);
+    if (c && Date.now() - c.at < 10 * 60e3) { res.setHeader('Cache-Control', 'public, max-age=0, s-maxage=600'); return res.status(200).json(c.v); }
+    const got = await Promise.all(SHARED.map(async s => {
+      try { const txt = await getText(s.url, 5 * 60e3); return s.kind === 'espn' ? parseESPN(txt) : parseRSS(txt, s.src); } catch { return []; }
+    }));
+    const cutoff = Date.now() - days * 864e5, out = [];
+    for (const i of got.flat().sort((a, b) => (!!a.pay - !!b.pay) || (!!b.desc - !!a.desc) || ((RANK[a.src] ?? 5) - (RANK[b.src] ?? 5)))) {
+      if (!i.title || !i.url || (i.at && Date.parse(i.at) < cutoff) || FLUFF.test(i.title) || RUMOR.test(i.title) || OFF_RUMOR.test(i.title)) continue;
+      const kind = offKindOf(i.title) || offKindOf(String(i.desc || '').slice(0, 260)); if (!kind) continue;
+      const d = out.find(o => o.kind === kind && similar(o.title, i.title, new Set()));
+      if (d) { if (i.outlet && !d.outlets.includes(i.outlet)) d.outlets.push(i.outlet); if (!d.img && i.img) d.img = i.img; if (d.pay && !i.pay) Object.assign(d, { url: i.url, outlet: i.outlet, pay: false, desc: clip(i.desc, 700) || d.desc }); continue; }
+      out.push({ kind, title: i.title, desc: clip(i.desc, 700), url: i.url, outlet: i.outlet, outlets: [i.outlet], at: i.at, img: i.img || null, athletes: i.athletes || [], teams: teamsIn(i.title + ' ' + String(i.desc || '').slice(0, 200)), pay: !!i.pay });
+    }
+    out.sort((a, b) => Date.parse(b.at || 0) - Date.parse(a.at || 0));
+    const v = { updated: new Date().toISOString(), days, items: out.slice(0, 150) };
+    cache.set(ck, { at: Date.now(), v });
     res.setHeader('Cache-Control', 'public, max-age=0, s-maxage=600');
     return res.status(200).json(v);
   }

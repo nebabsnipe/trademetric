@@ -35,6 +35,31 @@ Built on branch **`offseason-mode`** (Vercel preview). Not merged to main. A **P
 
 ---
 
+## Offseason News (built 2026-11-23, not deployed yet)
+
+The News tab in offseason mode. Code in `js/offnews.js`; the in-season News (`js/news.js`) is untouched.
+
+- **Tabs:** Feed · Following · Moves. Injuries, Clips, big plays, #1/#2 finishes and banners are hidden in offseason mode.
+- **Phase line** in the left column, from `TMN_PHASES` in `js/offnews.js` ("Free agency opens in 12 days"). The 2027 dates are estimates from past years: update them when the NFL announces them.
+- **Server:** `GET /api/news?off=1` (in `api/news.js`). Kinds: trade, sign, release, retire, coach (head coach or offensive coordinator), inj (season-ending), susp, contract. No rumors. Last 14 days by default; the page asks for 30 so Moves can use it. Each story lists every outlet that ran it. No AI.
+- **Feed:** players you follow first (orange dot), then league-wide news for players in the TradeMetric top 300 (coaching changes always count). Followed = your follows plus everyone on your saved league rosters (no kickers or defenses).
+- **Pro impact line** on each player story: his TM rank now, the change since the day before the move (from the daily snapshots in `data/tmhist.json`), and his role outlook (Growing / Steady / Threatened) when a TradeMetric take already exists. The feed never writes a take (`GET /api/take?outlooks=` only reads stored ones). Signed out: a locked line with "Sign in free".
+- **Moves tab:** confirmed transactions for TradeMetric top-300 players in the last 30 days, with position filters. A tap opens the player's row in the Rankings.
+- **Alerts** (the bell) for players you follow: traded, new team, signed, released, retired, season-ending injury, suspended, or a head coach or offensive coordinator change on his team.
+- **Verification:** a trade, signing or release is never shown until it is backed by a team change in the nightly data (`moves`, or the new `txn` list of signings and releases) or by two outlets. Every alert must be verified the same way.
+- **Nav:** News is in the offseason nav after Rankings. Phone bottom bar: Home · Rankings · News · More.
+- **Access:** the Feed and Moves are public (like the Rankings). Following, alerts and the impact line need sign-in (Pro, free during the beta).
+
+### Data added
+- `txn` in `data/nfl.json` (`scripts/update_data.py`): players who joined a team from no team, or dropped off the player list, `[id, from or '', to or '', date, name, pos]`, kept 30 days. A player who only dropped off the list is never shown without a story, since that can also mean the data lost him.
+- `data/tmhist.json` (`scripts/tm_snapshot.mjs`, run by the daily job): one rankings snapshot per day, kept 32 days. The script loads `js/offseason.js` as is, so no score details are copied anywhere.
+
+### Not verified yet
+- Tested in a browser with sample stories (the local server has no `/api`). Real story matching and the kind sorting need a read-through on the preview.
+- The daily job runs on `main`, so snapshots and `txn` only build up once this is merged. Until then the preview has one snapshot, so rank changes won't show there.
+
+---
+
 ## TradeMetric take (built 2026-11-14)
 
 A short AI-written read on each player, shown in the breakdown panel next to the score bars.

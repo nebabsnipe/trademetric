@@ -11,7 +11,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600;700;800&family=Kanit:ital,wght@0,700;0,800;1,600;1,700;1,800&display=swap">
 <meta name="description" content="Fantasy football trades, rankings and lineup advice built on your league's exact settings.">
-<link rel="stylesheet" href="css/styles.css?v=21">
+<link rel="stylesheet" href="css/styles.css?v=24">
 </head>
 <body class="signed-out">
 <div class="topbar">
@@ -26,7 +26,7 @@
       <button data-tab="drafttools" class="off-only pro-tab">Draft Tools</button>
       <button data-tab="leaguefit" class="off-only pro-tab">League Fit</button>
       <button data-tab="team">My Team</button>
-      <button data-tab="news">News</button>
+      <button data-tab="news" class="off-too">News</button>
       <button data-tab="rankings" data-hash="players">Players</button>
       <button data-tab="trade">Trades</button>
       <button data-tab="season"><span class="lbl-l">Season Sim</span><span class="lbl-s">Sim</span></button>
@@ -347,7 +347,7 @@
 <script>
 /* Load the stats snapshot, then start the app */
 fetch('data/nfl.json',{cache:'no-cache'}).then(r=>r.json()).then(d=>{
-  window.NFL_DATA=d;const n=document.createElement('script');n.src='js/news.js?v=14';n.onload=n.onerror=()=>{const o=document.createElement('script');o.src='js/offseason.js?v=5';o.onload=o.onerror=()=>{const s=document.createElement('script');s.src='js/app.js?v=13';s.onload=()=>{const m=document.createElement('script');m.src='js/mobile.js?v=3';document.body.appendChild(m)};document.body.appendChild(s)};document.body.appendChild(o)};document.body.appendChild(n);
+  window.NFL_DATA=d;const n=document.createElement('script');n.src='js/news.js?v=14';n.onload=n.onerror=()=>{const o=document.createElement('script');o.src='js/offseason.js?v=6';o.onload=o.onerror=()=>{const f=document.createElement('script');f.src='js/offnews.js?v=4';f.onload=f.onerror=()=>{const s=document.createElement('script');s.src='js/app.js?v=14';s.onload=()=>{const m=document.createElement('script');m.src='js/mobile.js?v=3';document.body.appendChild(m)};document.body.appendChild(s)};document.body.appendChild(f)};document.body.appendChild(o)};document.body.appendChild(n);
 }).catch(()=>{document.body.insertAdjacentHTML('afterbegin','<p style="padding:20px;font-family:sans-serif">Could not load player data. Refresh to try again.</p>')});
 </script>
 </body>

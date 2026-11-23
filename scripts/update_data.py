@@ -422,6 +422,27 @@ try:
             moves.append([p[0],a,b,datetime.date.today().isoformat()])
 except Exception as e:print('moves skipped',e,file=sys.stderr)
 d['moves']=moves;print(len(moves),'team changes in the last 30 days',file=sys.stderr)
+# Signings and releases (offseason News, js/offnews.js): a player who joined a team from no team, or left a team for
+# no team. Same shape as moves, with '' for "no team". Kept apart from moves so the in-season trade cards are unchanged.
+txn=[m for m in (PREV.get('txn') or []) if m[3]>=(datetime.date.today()-datetime.timedelta(days=30)).isoformat()]
+# The player list only has players on a team, so a release shows up as a player who dropped off the list, and a
+# signing as one who came onto it (or moved from no team to a team). Name and position are kept so a released player
+# can still be shown. [player key, from team or '', to team or '', ISO date, name, position]. Only counted as proof
+# together with a story about the move (see js/offnews.js).
+try:
+    _prev=PREV.get('players') or []
+    _NFL=set(d['sched'].keys())
+    if len(_prev)>200:                      # skip on a first run or a broken previous file
+        _was={p[0]:(p[3] if p[3] in _NFL else '') for p in _prev};_now={p[0]:(p[3] if p[3] in _NFL else '') for p in d['players']}
+        _info={p[0]:(p[1],p[2]) for p in _prev+list(d['players'])}
+        def _add(pid,a,b):
+            if a!=b and (a=='' or b=='') and not any(m[0]==pid and m[1]==a and m[2]==b for m in txn):
+                n,pos=_info.get(pid,('',''));txn.append([pid,a,b,datetime.date.today().isoformat(),n,pos])
+        for pid,b in _now.items():_add(pid,_was.get(pid,''),b)
+        for pid,a in _was.items():
+            if pid not in _now:_add(pid,a,'')
+except Exception as e:print('signings skipped',e,file=sys.stderr)
+d['txn']=txn;print(len(txn),'signings and releases in the last 30 days',file=sys.stderr)
 
 json.dump(d,open(OUT,'w'),separators=(',',':'))
 print('wrote',OUT,file=sys.stderr)
