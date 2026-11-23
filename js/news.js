@@ -520,8 +520,15 @@ function tmnStories(Ls){const ids=[];Ls.forEach(c=>{if(TMN.lg!=='all'&&c.key!==T
       add({type:'vid',kind:k,pid,title:v.title,desc:'',url:v.url,outlet:v.src==='espn'?'ESPN':chName(v)+' on YouTube',also:[],img:v.thumb,at:Date.parse(v.at||0),dur:v.dur})})}
   return out.sort((a,b)=>b.at-a.at)}
 /* the Feed's share: about 70% injury news, 30% role news, at most 3 per player */
+/* An injury story only gets in when it is real injury news: the player has a status right now (Q, D, O, IR...) or the
+   story itself reports a big one (ruled out, IR, surgery...) before the status catches up. Out: "overcame an injury
+   scare" stories about healthy players, and stories the recap read as something else (a trade, a game, a team
+   story, old news) or as fluff, even when an injury word is in the headline. */
+const TMN_INJ_NOT=['trade','game','team','news','disc'];
+function tmnRealInj(x){const rc=tmnRecaps()[x.url];if(rc&&(rc.fluff||TMN_INJ_NOT.includes(rc.k)))return false;
+  return !!stOf(x.pid)||TMN_BIG_INJ.test((x.title||'')+' '+String(x.desc||'').slice(0,300))}
 function tmnPickStories(all){const per={},ok=x=>(per[x.pid]=(per[x.pid]||0)+1)<=3,hurt=x=>stOf(x.pid)?1:0;
-  const inj=all.filter(x=>x.kind==='inj').sort((a,b)=>hurt(b)-hurt(a)||b.at-a.at).filter(ok).slice(0,17);
+  const inj=all.filter(x=>x.kind==='inj'&&tmnRealInj(x)).sort((a,b)=>hurt(b)-hurt(a)||b.at-a.at).filter(ok).slice(0,17);
   const role=all.filter(x=>x.kind==='role').filter(ok).slice(0,Math.max(4,Math.ceil(inj.length*3/7)));
   return [...inj,...role].map(x=>({...x,k:'s:'+x.url})).sort((a,b)=>b.at-a.at)}
 function tmnStoriesFor(pid,all){return all.filter(x=>x.pid===pid&&x.type==='art')}
@@ -609,7 +616,7 @@ function tmnRenderBody(Ls){const el=$('tmn-feed');if(!el)return;Ls=Ls||tmnLeague
   const whose=e=>e.type==='lg'||e.type==='trade'?(e.yours?'mine lg':'lg'):e.type==='opp'||e.type==='oinj'?'opp':'mine';
   const tl=(list,act)=>list.length?`<ol class="tmn-tl${act?' act':''}">${tmnGroups(list).map((g,i)=>`<li class="tmn-day"><span>${g.label}<small>${esc(g.sub)}</small></span>${i===0?`<em class="tmn-newest">Newest first<b aria-hidden="true">↓</b></em>`:''}</li>${g.items.map(e=>`<li class="${act?whose(e):''}">${card(e)}</li>`).join('')}`).join('')}</ol>`:'';
   let html='';
-  if(f==='inj'){const arts=stories.filter(x=>x.kind==='inj'&&stOf(x.pid));
+  if(f==='inj'){const arts=stories.filter(x=>x.kind==='inj'&&stOf(x.pid)&&tmnRealInj(x));
     html=sec('injup','Latest updates',injUp.length?'Newest first':'',tl(injUp))
       +sec('inj','Your injured players',injList.length?'Every league, starters and bench':'',injList.length?`<div class="tmn-injg">${injList.map(x=>tmnInjCard(x,tmnStoriesFor(x.id,arts))).join('')}</div>`:'')
       +sec('opp','Injury opportunities',opps.length?`Who gets the work while they're out${Ls.length>1?` · ownership in ${esc(S.league&&S.league.name||'this league')}`:''}`:'',opps.length?`<div class="tmn-opg">${opps.map(x=>tmnOppCard(x,Ls)).join('')}</div>`:'')}
