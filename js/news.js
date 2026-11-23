@@ -702,10 +702,10 @@ function tmnRankCard(e){const p=byId[e.pid];if(!p)return '';const one=e.type==='
 const TMN_RC_LS='tm-news-recap-v5';try{['v2','v3','v4'].forEach(v=>localStorage.removeItem('tm-news-recap-'+v))}catch(e){}   /* v3: recaps come from the shared server store, the same text for everyone. v4: they also carry the story's kind (the card label). v5: and a fluff flag */
 function tmnRecaps(){if(TMN.rc)return TMN.rc;try{TMN.rc=JSON.parse(localStorage.getItem(TMN_RC_LS)||'null')}catch(e){}TMN.rc=TMN.rc||{};return TMN.rc}
 async function tmnLoadRecaps(list){const R=tmnRecaps();TMN.rcTried=TMN.rcTried||new Set();
-  const todo=list.filter(x=>(x.type==='art'||x.type==='lg'||x.type==='trade')&&x.url&&!R[x.url]&&!TMN.rcTried.has(x.url)).slice(0,30);if(!todo.length||TMN.rcBusy)return;
+  const todo=list.filter(x=>(x.type==='art'||x.type==='lg'||x.type==='trade')&&x.url&&(!R[x.url]||tmnRcPts(R[x.url]).length<(R[x.url].pts||[]).length)&&!TMN.rcTried.has(x.url)).slice(0,30);if(!todo.length||TMN.rcBusy)return;
   TMN.rcBusy=true;todo.forEach(x=>TMN.rcTried.add(x.url));
   try{const r=await fetch('/api/news?recap=1',{method:'POST',headers:{'content-type':'application/json'},
-      body:JSON.stringify({items:todo.map(x=>{const p=byId[x.pid];return {u:x.url,n:p&&p.n,pos:p&&p.pos,t:p&&p.t,title:x.title,desc:x.desc||'',outlet:x.outlet,pay:!!x.pay,...(x.type==='trade'||x.kind==='trade'?{f:'trade',from:x.from||'',to:x.to||''}:{})}})})});
+      body:JSON.stringify({items:todo.map(x=>{const p=byId[x.pid];return {u:x.url,n:p&&p.n,pos:p&&p.pos,t:p&&p.t,ctx:tmnCtx(p),title:x.title,desc:x.desc||'',outlet:x.outlet,pay:!!x.pay,...(x.type==='trade'||x.kind==='trade'?{f:'trade',from:x.from||'',to:x.to||''}:{})}})})});
     const j=r.ok?await r.json():null;
     if(j&&j.items&&Object.keys(j.items).length){Object.assign(R,j.items);
       const keys=Object.keys(R);if(keys.length>400)keys.slice(0,keys.length-400).forEach(k=>delete R[k]);
@@ -886,7 +886,35 @@ const tmnSrcOf=x=>x.outlet&&x.outlet!=='Google News'?x.outlet:tmnHost(x.url);
 function tmnOwnChip(x){const ow=x.yours?'mine':typeof OWN==='undefined'||OWN[x.pid]==null?'fa':OWN[x.pid]===S.me?'mine':'other';
   const T=ow==='other'&&S.teams&&S.teams.find(t=>t.id===OWN[x.pid]);
   return ow==='mine'?'<span class="tmn-own mine">Your team</span>':ow==='fa'?'<span class="tmn-own fa" data-go-waivers="1">Free agent ↗</span>':`<span class="tmn-own">${esc(T?T.name:'Rostered')}</span>`}
-function tmnBodyOf(p,x,rc,fallback){return rc?`<h3>${esc(tmnTitleFor(p,rc.t))}</h3>${rc.pts.length?`<ul class="tmn-pts">${rc.pts.map(t=>`<li>${esc(t)}</li>`).join('')}</ul>`:''}`
+/* a recap point that only says the story had no details is never shown (the server writes those stories again) */
+const TMN_RC_EMPTY=/\b(headline only|no (supporting |further |additional |other )?(details?|information|text|context)|details? (are |were )?(not |un)available)\b/i;
+const tmnRcPts=rc=>(rc.pts||[]).filter(t=>!TMN_RC_EMPTY.test(t));
+/* his last three games (newest first) plus his season average, sent with a story so a headline-only recap can back
+   the headline up with what he has actually done lately */
+function tmnGameTxt(pos,g){const r=v=>Math.round(v||0),T=(n,w)=>n?`${n} ${w}${n===1?'':'s'}`:'';
+  const pass=`${g.cmp||0} comp, ${r(g.pyd)} pass yds`+(g.ptd?`, ${T(g.ptd,'pass TD')}`:'')+(g.int?`, ${T(g.int,'INT')}`:'');
+  const rush=`${T(g.ratt,'carry').replace('carrys','carries')||'0 carries'}, ${r(g.ryd)} rush yds`+(g.rtd?`, ${T(g.rtd,'rush TD')}`:'');
+  const rec=`${T(g.tgt,'target')||'0 targets'}, ${g.rec||0} catches, ${r(g.recyd)} rec yds`+(g.rectd?`, ${T(g.rectd,'rec TD')}`:'');
+  const parts=pos==='QB'?[pass,g.ryd?rush:'']:pos==='RB'?[rush,g.tgt?rec:'']:[rec,g.ratt?rush:''];
+  return parts.filter(Boolean).join(', ')+(g.snap&&g.snap<100?`, ${r(g.snap)}% of snaps`:'')}
+function tmnCtx(p){if(!p||!['QB','RB','WR','TE'].includes(p.pos)||typeof genLog!=='function')return '';let L=[];
+  try{L=genLog(p).log}catch(e){return ''}
+  const last=L.filter(g=>!g.bye).slice(-3).reverse().map(g=>`Week ${g.w} ${g.home?'vs':'at'} ${g.opp}: ${g.dnp?'did not play':tmnGameTxt(p.pos,g)}`);
+  const r=v=>Math.round(v||0),d=v=>(v||0).toFixed(1);
+  const avg=p.pos==='QB'?`${r(p.pyd)} pass yds, ${d(p.ptd)} pass TDs, ${r(p.ryd)} rush yds`:p.pos==='RB'?`${d(p.ratt)} carries, ${r(p.ryd)} rush yds, ${d(p.tgt)} targets`:`${d(p.tgt)} targets, ${d(p.rec)} catches, ${r(p.recyd)} rec yds`;
+  /* the situation around him, so a short story can be explained, not just backed by numbers */
+  const sit=[],dc=typeof DEPTH!=='undefined'&&DEPTH[p.id];if(dc&&dc[0])sit.push(`${p.pos}${dc[0]} on the ${p.t} depth chart`);
+  const st=stOf(p.id);if(st)sit.push(`his status: ${ST_LABEL[st]||st}`);
+  const pr=typeof PRAC!=='undefined'&&PRAC[p.id];if(pr&&pr.length){const z=pr[pr.length-1];if(z&&z[1])sit.push(`latest practice (Week ${z[0]}): ${z[1]==='FP'?'full':z[1]==='LP'?'limited':z[1]==='DNP'?'did not practice':z[1]}${z[2]?` (${z[2]})`:''}`)}
+  const sn=L.filter(g=>!g.bye&&!g.dnp&&g.snap).map(g=>g.snap);if(sn.length>=5){const a3=sn.slice(-3).reduce((a,b)=>a+b,0)/3,a0=sn.slice(0,-3).reduce((a,b)=>a+b,0)/(sn.length-3);
+    if(Math.abs(a3-a0)>=8)sit.push(`snap share ${a3>a0?'up':'down'} lately: ${r(a3)}% over his last 3 games vs ${r(a0)}% before`)}
+  const out=Object.values(byId).filter(q=>q.t===p.t&&q.id!==p.id&&['QB','RB','WR','TE'].includes(q.pos)&&['O','IR','PUP','D','SUS'].includes(stOf(q.id))&&((typeof V!=='undefined'&&V&&V.rank&&V.rank[q.id])||999)<300)
+    .slice(0,3).map(q=>`${q.n} (${q.pos}, ${ST_LABEL[stOf(q.id)]||stOf(q.id)})`);if(out.length)sit.push(`teammates hurt or out: ${out.join(', ')}`);
+  const mv=typeof DATA!=='undefined'&&(DATA.moves||[]).find(m=>m[0]===p.id);if(mv)sit.push(`traded or moved from ${mv[1]} to ${mv[2]} on ${mv[3]}`);
+  const nx=typeof OPP!=='undefined'&&OPP[p.t]&&OPP[p.t][WEEK];if(nx){const dr=typeof defRank==='function'?defRank(nx.opp,p.pos):0;
+    sit.push(`next game: Week ${WEEK} ${nx.home?'vs':'at'} ${nx.opp}${dr?`, whose defense ranks ${ord(dr)} of 32 at stopping ${p.pos}s (1st is toughest)`:''}`)}else sit.push(`Week ${WEEK}: bye`);
+  return [...last,`Season average per game: ${avg}`,...sit].join('; ')}
+function tmnBodyOf(p,x,rc,fallback){const pts=rc?tmnRcPts(rc):[];return rc?`<h3>${esc(tmnTitleFor(p,rc.t))}</h3>${pts.length?`<ul class="tmn-pts">${pts.map(t=>`<li>${esc(t)}</li>`).join('')}</ul>`:''}`
   :`<h3>${esc(x.title?tmnTitleFor(p,x.title):fallback)}</h3>${x.desc&&x.desc!==x.title?`<p class="tmn-clamp">${esc(x.desc)}</p>`:''}`}
 function tmnStoryShell({x,p,cls,tone,lbl,right,body,link,pay,vid,inj}){const io=tmnInjOut(inj);if(io)cls+=' inj-out';
   const src=pay?`${esc(x.outlet||'Subscriber story')} · key facts here`:link?`${esc(tmnSrcOf(x))}${x.also&&x.also.length?` +${x.also.length}`:''}`:'';

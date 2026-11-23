@@ -273,7 +273,7 @@ function kindOf(x) {
    reading without clicking through. One Claude call per batch of up to 12 stories, cached per story URL. */
 const RECAPS = new Map();
 async function recapBatch(list) {
-  const body = list.map((x, i) => `[${i}] Player: ${x.n} (${x.pos || '?'}, ${x.t || '?'}) · ${x.outlet || 'unknown outlet'}${x.f === 'trade' ? ' · TRADE' + (x.from && x.to ? ` (${x.from} to ${x.to})` : '') : ''}${x.pay ? ' · SUBSCRIBER-ONLY' : ''}\nHeadline: ${x.title}\nText: ${x.desc || '(headline only)'}`).join('\n\n');
+  const body = list.map((x, i) => `[${i}] Player: ${x.n} (${x.pos || '?'}, ${x.t || '?'}) · ${x.outlet || 'unknown outlet'}${x.f === 'trade' ? ' · TRADE' + (x.from && x.to ? ` (${x.from} to ${x.to})` : '') : ''}${x.pay ? ' · SUBSCRIBER-ONLY' : ''}${x.ctx ? `\nWhat we know about him (recent games newest first, then his situation): ${x.ctx}` : ''}\nHeadline: ${x.title}\nText: ${x.desc || '(headline only)'}`).join('\n\n');
   const prompt = `You write the news feed of a fantasy football app. For each story below, write a recap so a fantasy manager gets the news at face value without opening the article.
 
 - "title": the single biggest takeaway for the named player as a plain statement, under 85 characters. It must start with the player's name (full name, or last name if the full title would run long) and say what is happening to him, even when the original headline is about someone else, a team or a coach (for example "Achane ruled out Sunday with a high ankle sprain; Week 12 return possible" or "Jeanty out-snapped Mitchell 41-22 and got 9 of 11 red-zone touches" or "Pittman traded from the Colts to the Steelers for a 2027 3rd"). When a story is marked as a trade, the title says who he was traded from and to, and the points cover what was sent back and how his role changes. No clickbait, no questions, no outlet names.
@@ -285,7 +285,7 @@ async function recapBatch(list) {
   "trade", "injury" or "role" (depth chart, snaps, usage) when that is what the story is.
   "news": none of the above.
 - "fluff": true only when the story is just color with nothing a fantasy manager needs to know: a celebration (a backflip, a dance), a gesture, an outfit, a fan or social-media reaction, and nothing new about his health, role, playing time, discipline, contract or team. An injury, ejection or fine that happened during a celebration is real news, not fluff. Otherwise false.
-- "points": 1 to 3 short bullet points, each under 95 characters, with the other key facts: numbers, injury details, practice status, timelines, who is affected. The last point may be the fantasy takeaway, but only when it follows directly from the facts given. If the story is only a headline with no text, return just one point or an empty array; never add anything the headline and text do not say.
+- "points": 1 to 3 short bullet points, each under 95 characters, with the other key facts: numbers, injury details, practice status, timelines, who is affected. The last point may be the fantasy takeaway, but only when it follows directly from the facts given. If the story is only a headline, or has very little text, still write 2 or 3 points that describe what is going on, like a beat writer explaining it to a reader: what the headline is saying and WHY it is happening (his role and spot on the depth chart, snap share changes, teammates who are hurt or out, a trade or move, practice status), and what it means for him next (his next opponent and how tough that defense is). Write these as plain explanation, not a stat list. When the headline makes a claim about how he is playing (he is becoming a starter, breaking out, heating up, slumping, losing work), say in words how he has been trending and back it up with numbers that show the progression from earlier games to his latest ones (for example "Ward has found a rhythm: after topping 200 passing yards once in his first five starts, he threw for 304 and 231 with 4 TDs in his last two"). Otherwise use only the one or two numbers that best support a point. Never write that there are no details, that it is headline only, or that information is unavailable. Word each one for that player and story; don't reuse a stock phrase. Never add facts that the headline, the text or what we know about him do not give.
 
 A story marked SUBSCRIBER-ONLY can't be opened by the reader (it's behind a paywall), so its title and points are all they get: put every key fact from the headline and text into them, and give 2 or 3 points whenever the text has that much.
 
@@ -307,14 +307,17 @@ ${body}`;
 const cleanLine = (s, n) => String(s || '').replace(/\s+/g, ' ').trim().slice(0, n);
 /* v4: recaps also carry the story's kind (the card label), so everything written before is redone once */
 const rk = x => (x.pay ? 'v5p|' : 'v5|') + x.u;   /* v5: plus a fluff flag */
+/* old recaps that said "headline only / no details" instead of describing the story: written again */
+const RC_EMPTY = /\b(headline only|no (supporting |further |additional |other )?(details?|information|text|context)|details? (are |were )?(not |un)available)\b/i;
+const rcBad = v => !v || !v.t || (v.pts || []).some(p => RC_EMPTY.test(p));
 const RC_KIND = { move: 'move', discipline: 'disc', disc: 'disc', game: 'game', team: 'team', news: 'news', trade: 'trade', injury: 'inj', inj: 'inj', role: 'role' };
 async function recapAll(items) {
   const out = {}, todo = [];
-  items.forEach(x => { const c = RECAPS.get(rk(x)); if (c && Date.now() - c.at < 7 * 864e5) out[x.u] = c.v; else todo.push(x); });
+  items.forEach(x => { const c = RECAPS.get(rk(x)); if (c && Date.now() - c.at < 7 * 864e5 && !rcBad(c.v)) out[x.u] = c.v; else todo.push(x); });
   /* a story someone else already had recapped: read it from the shared store instead of paying to write it again */
   if (todo.length && sharedOn()) {
     const got = await recapsGet(todo.map(rk));
-    for (let i = todo.length - 1; i >= 0; i--) { const v = got[rk(todo[i])]; if (v && v.t) { RECAPS.set(rk(todo[i]), { at: Date.now(), v }); out[todo[i].u] = v; todo.splice(i, 1); } }
+    for (let i = todo.length - 1; i >= 0; i--) { const v = got[rk(todo[i])]; if (!rcBad(v)) { RECAPS.set(rk(todo[i]), { at: Date.now(), v }); out[todo[i].u] = v; todo.splice(i, 1); } }
   }
   if (todo.length && API_KEY) {
     const made = {};
@@ -322,7 +325,7 @@ async function recapAll(items) {
     await Promise.all(chunks.map(async ch => {
       const arr = await recapBatch(ch); if (!arr) return;
       arr.forEach(a => { const x = a && ch[a.i]; if (!x || !a.title) return;
-        const v = { t: cleanLine(a.title, 110), pts: (Array.isArray(a.points) ? a.points : []).map(p => cleanLine(p, 140)).filter(Boolean).slice(0, 3) };
+        const v = { t: cleanLine(a.title, 110), pts: (Array.isArray(a.points) ? a.points : []).map(p => cleanLine(p, 140)).filter(p => p && !RC_EMPTY.test(p)).slice(0, 3) };
         const k = RC_KIND[String(a.kind || '').toLowerCase().trim()]; if (k) v.k = k; if (a.fluff === true) v.fluff = 1;
         RECAPS.set(rk(x), { at: Date.now(), v }); out[x.u] = v; made[rk(x)] = v; });
     }));
@@ -346,7 +349,7 @@ export default async function handler(req, res) {
     const items = raw.slice(0, 30).filter(x => x && typeof x.u === 'string' && /^https?:/.test(x.u) && x.title).map(x => ({
       u: x.u.slice(0, 600), n: cleanLine(x.n, 60), pos: cleanLine(x.pos, 4), t: cleanLine(x.t, 4),
       title: cleanLine(x.title, 220), desc: cleanLine(x.desc, 900), outlet: cleanLine(x.outlet, 60),
-      pay: !!x.pay, f: x.f === 'trade' ? 'trade' : '', from: cleanLine(x.from, 4), to: cleanLine(x.to, 4) }));
+      pay: !!x.pay, f: x.f === 'trade' ? 'trade' : '', from: cleanLine(x.from, 4), to: cleanLine(x.to, 4), ctx: cleanLine(x.ctx, 1000) }));
     const v = await recapAll(items);
     return res.status(200).json({ ai: true, items: v, err: Object.keys(v).length < items.length ? LAST_ERR : undefined });
   }
