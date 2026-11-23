@@ -955,7 +955,9 @@ function hueOf(hex){const n=parseInt(hex.slice(1),16),r=(n>>16&255)/255,g=(n>>8&
 function versusColor(a,b){const d=Math.abs(hueOf(a)-hueOf(b));return Math.min(d,360-d)<40?'var(--ink)':b}
 function ownerHtml(id,withAssign=true){const o=OWN[id];if(o){const T=teamById(o);return `<span class="owner${o===S.me?' me':''}"><i style="background:${teamColor(o)}"></i>${esc(o===S.me?T.name+' (you)':T.name)}</span>`}
   return withAssign?`<select class="assign" data-assign="${id}" aria-label="Add to a team"><option value="">+ Add to team</option>${S.teams.map(T=>`<option value="${T.id}">${esc(T.name)}${T.id===S.me?' (you)':''}</option>`).join('')}</select>`:'<span class="note">Free agent</span>'}
-function plCell(p,sub){return `<div class="pl">${av(p,'sm')}<div class="meta"><button class="pname" data-open="${p.id}">${esc(p.n)}</button><span class="psub">${sub??`${p.t} · ${oppHtml(p.id)}`}</span></div></div>`}
+/* his jersey with the injury badge (js/news.js) when he's ruled out or doubtful */
+const avInj=(p,cls='')=>{const m=typeof tmnInjMark==='function'?tmnInjMark(p.id):null;return m?`<span class="av-inj">${av(p,cls)}${tmnInjBadge(m)}</span>`:av(p,cls)};
+function plCell(p,sub,inj){return `<div class="pl">${inj?avInj(p,'sm'):av(p,'sm')}<div class="meta"><button class="pname" data-open="${p.id}">${esc(p.n)}</button><span class="psub">${sub??`${p.t} · ${oppHtml(p.id)}`}</span></div></div>`}
 let toastT;function toast(m){const t=$('toast');t.textContent=m;t.hidden=false;clearTimeout(toastT);toastT=setTimeout(()=>t.hidden=true,2400)}
 const norm=s=>s.toLowerCase().replace(/[.'’]/g,'').replace(/\b(jr|sr|ii|iii|iv)\b/g,'').replace(/[^a-z ]/g,' ').replace(/\s+/g,' ').trim();
 /* Exact full-name match only. Used for anything automatic (league imports, syncing, live stats, injuries),
@@ -1046,7 +1048,7 @@ function renderTeam(){
    <div class="tile"><div class="lab">Playoff odds</div><div class="val">${sim?pct(sim[S.me].playoff):'-'}</div><div class="sub">Record ${recTxt(S.me)} · power rank #${mine.rank}</div></div>
    <div class="tile"><div class="lab">Weakest spot</div><div class="val">${weak}</div><div class="sub">${sgn(mine.rel[weak])} pts/wk vs. league average</div></div>
    <div class="tile"><div class="lab">Byes and alerts</div><div class="val">${byes}<span class="muted" style="font-size:20px"> / ${tags}</span></div><div class="sub">Players on bye · buy/sell alerts</div></div>`;
-  const row=(label,p,i)=>p?`<div class="lrow${flag.has(i)?' lu-flag':''}" data-open="${p.id}"><span class="slot">${label}</span><div class="pl">${av(p)}<div class="meta"><span style="display:flex;gap:6px;align-items:center;min-width:0"><button class="pname" data-open="${p.id}">${esc(p.n)}</button>${tagHtml(p.id,label!=='BN')}${irPill(p.id,IRS)}</span><span class="psub">${p.pos}${V.posRank[p.id]} · ${liveOf(p.id)?liveTxt(p.id)+(liveOf(p.id).state==='post'?'':' live'):oppHtml(p.id)}</span></div></div>${lprojHtml(p.id)}</div>`
+  const row=(label,p,i)=>p?`<div class="lrow${flag.has(i)?' lu-flag':''}" data-open="${p.id}"><span class="slot">${label}</span><div class="pl">${avInj(p)}<div class="meta"><span style="display:flex;gap:6px;align-items:center;min-width:0"><button class="pname" data-open="${p.id}">${esc(p.n)}</button>${tagHtml(p.id,label!=='BN')}${irPill(p.id,IRS)}</span><span class="psub">${p.pos}${V.posRank[p.id]} · ${liveOf(p.id)?liveTxt(p.id)+(liveOf(p.id).state==='post'?'':' live'):oppHtml(p.id)}</span></div></div>${lprojHtml(p.id)}</div>`
     :`<div class="lrow${flag.has(i)?' lu-flag':''}" style="cursor:default"><span class="slot">${label}</span><span class="empty">Empty. Add a player who fits this slot.</span><span></span></div>`;
   $('lineup').innerHTML=LU.slots.map((s,i)=>row(s.label,s.p,i)).join('');
   const lb=$('lu-alert');if(lb){lb.hidden=!LA.length;lb.innerHTML=LA.map(a=>`<p class="lu-a" role="status"><i aria-hidden="true">!</i><span>${esc(a.msg)}</span></p>`).join('')}
@@ -1721,7 +1723,7 @@ function renderMatchup(){const el=$('matchup');const oid=oppOf(S.me,WEEK);
     /* a row whose state changed since the last refresh starts in its old colors and fades to the new ones */
     const k=`${x.p?x.p.id:'-'}|${o&&o.p?o.p.id:'-'}`,was=prev[k];seen[k]=[ga,gb];const from=(was&&(was[0]!==ga||was[1]!==gb))?` data-gs-to="${ga||'none'} ${gb||'none'}"`:'';
     const ca=was&&was[0]!==ga?was[0]:ga,cb=was&&was[1]!==gb?was[1]:gb;
-    return `<tr class="${i>=MU_PEEK?'mu-more ':''}${ca?'gsa-'+ca:''} ${cb?'gsb-'+cb:''}"${from}><td>${x.p?plCell(x.p,sub(x.p.id)):'<span class="empty">Empty</span>'}</td>${cell(x.p&&x.p.id,a,a>=b,'r')}<td class="mu-slot">${x.label}</td>${cell(o&&o.p&&o.p.id,b,b>a,'')}<td>${o&&o.p?plCell(o.p,sub(o.p.id)):'<span class="empty">Empty</span>'}</td></tr>`}).join('');
+    return `<tr class="${i>=MU_PEEK?'mu-more ':''}${ca?'gsa-'+ca:''} ${cb?'gsb-'+cb:''}"${from}><td>${x.p?plCell(x.p,sub(x.p.id),1):'<span class="empty">Empty</span>'}</td>${cell(x.p&&x.p.id,a,a>=b,'r')}<td class="mu-slot">${x.label}</td>${cell(o&&o.p&&o.p.id,b,b>a,'')}<td>${o&&o.p?plCell(o.p,sub(o.p.id),1):'<span class="empty">Empty</span>'}</td></tr>`}).join('');
   MU_GS=seen;
   el.innerHTML=`<div class="card-h"><h2>Week ${WEEK} matchup</h2>${muStatus(A,Bm)}</div>
    <div class="mu-head"><div class="mu-team"><span class="mu-name"><i class="tsq" style="background:${teamColor(S.me)}"></i>${esc(me.name)}</span><span class="note">${recTxt(S.me)}</span><b class="num">${f1(anyLive?aA:A.m)}</b>${anyLive?`<span class="mu-proj">proj ${f1(A.m)}</span>`:''}</div>
