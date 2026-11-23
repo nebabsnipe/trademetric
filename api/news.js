@@ -194,6 +194,10 @@ const RUMOR = /\b(could|might|would|interest(ed)? in|rumou?rs?|potential|candida
 const TR_WORD = /\b(traded|dealt|acquired?|acquires|acquiring)\b/i;
 const TR_RUMOR = /\b(could|might|would|may|interest(ed)?\s+in|potential(ly)?|talks?|rumou?rs?|considering|exploring|shopping|candidates?|trade targets?|speculat\w*|eyeing|linked)\b/i;
 function moveOf(t) { for (const [k, re] of MOVE) if (re.test(t || '')) return k; return null; }
+/* A story that is only about a celebration (a backflip, a dance) tells a fantasy manager nothing, so it stays out.
+   Only for stories labeled game, team or news: an injury, ejection or fine that happened on a celebration is real news. */
+const CELEB = /\b(backflip\w*|celebrat(es?|ed|ions?|ing|ory)|(touchdown|td|end zone|sack) dance|dance moves|griddy|somersault\w*|cartwheel\w*)\b/i;
+const celebOnly = (kind, title) => (kind === 'game' || kind === 'team' || kind === 'news') && CELEB.test(title || '');
 /* LGKIND-START  The label for a league story that isn't a trade, an injury or a depth-chart change.
    This block is kept word for word the same in api/news.js and js/news.js (scripts/test-news-kind.mjs checks it).
    "move" (Roster move) only when the move happens to the named player, with the move word next to his name in the
@@ -280,11 +284,12 @@ async function recapBatch(list) {
   "team": a coach, quarterback or team-outlook story, quotes, a press conference.
   "trade", "injury" or "role" (depth chart, snaps, usage) when that is what the story is.
   "news": none of the above.
+- "fluff": true only when the story is just color with nothing a fantasy manager needs to know: a celebration (a backflip, a dance), a gesture, an outfit, a fan or social-media reaction, and nothing new about his health, role, playing time, discipline, contract or team. An injury, ejection or fine that happened during a celebration is real news, not fluff. Otherwise false.
 - "points": 1 to 3 short bullet points, each under 95 characters, with the other key facts: numbers, injury details, practice status, timelines, who is affected. The last point may be the fantasy takeaway, but only when it follows directly from the facts given. If the story is only a headline with no text, return just one point or an empty array; never add anything the headline and text do not say.
 
 A story marked SUBSCRIBER-ONLY can't be opened by the reader (it's behind a paywall), so its title and points are all they get: put every key fact from the headline and text into them, and give 2 or 3 points whenever the text has that much.
 
-Use only facts in the headline and text. Reply with only a JSON array like [{"i":0,"title":"...","kind":"...","points":["...","..."]}].
+Use only facts in the headline and text. Reply with only a JSON array like [{"i":0,"title":"...","kind":"...","fluff":false,"points":["...","..."]}].
 
 ${body}`;
   const ctl = new AbortController(); const t = setTimeout(() => ctl.abort(), 25000);
@@ -301,7 +306,7 @@ ${body}`;
 }
 const cleanLine = (s, n) => String(s || '').replace(/\s+/g, ' ').trim().slice(0, n);
 /* v4: recaps also carry the story's kind (the card label), so everything written before is redone once */
-const rk = x => (x.pay ? 'v4p|' : 'v4|') + x.u;
+const rk = x => (x.pay ? 'v5p|' : 'v5|') + x.u;   /* v5: plus a fluff flag */
 const RC_KIND = { move: 'move', discipline: 'disc', disc: 'disc', game: 'game', team: 'team', news: 'news', trade: 'trade', injury: 'inj', inj: 'inj', role: 'role' };
 async function recapAll(items) {
   const out = {}, todo = [];
@@ -318,7 +323,7 @@ async function recapAll(items) {
       const arr = await recapBatch(ch); if (!arr) return;
       arr.forEach(a => { const x = a && ch[a.i]; if (!x || !a.title) return;
         const v = { t: cleanLine(a.title, 110), pts: (Array.isArray(a.points) ? a.points : []).map(p => cleanLine(p, 140)).filter(Boolean).slice(0, 3) };
-        const k = RC_KIND[String(a.kind || '').toLowerCase().trim()]; if (k) v.k = k;
+        const k = RC_KIND[String(a.kind || '').toLowerCase().trim()]; if (k) v.k = k; if (a.fluff === true) v.fluff = 1;
         RECAPS.set(rk(x), { at: Date.now(), v }); out[x.u] = v; made[rk(x)] = v; });
     }));
     if (sharedOn()) await recapsPut(made);
@@ -330,7 +335,7 @@ async function recapAll(items) {
 const clip = (s, n) => { s = String(s || ''); if (s.length <= n) return s; const c = s.slice(0, n); const k = Math.max(c.lastIndexOf('. '), c.lastIndexOf(' ')); return c.slice(0, k > n * .6 ? k + 1 : n).trim() + '…'; };
 const cache = new Map();
 
-export { lgKind, recapAll };
+export { lgKind, recapAll, celebOnly };
 
 export default async function handler(req, res) {
   const q = req.query || {};
@@ -431,6 +436,7 @@ export default async function handler(req, res) {
       /* the same stories get in as before; a story let in by a move word is then labeled by what it really is */
       let kind = moveOf(i.title) || moveOf(i.desc.slice(0, 260)); if (!kind) continue;
       if (kind === 'move') kind = lgKind(i.title, i.desc, i.athletes, i.at);
+      if (celebOnly(kind, i.title)) continue;
       if (out.some(o => similar(o.title, i.title, new Set()))) continue;
       out.push({ kind, title: i.title, desc: clip(i.desc, 700), url: i.url, outlet: i.outlet, at: i.at, img: i.img || null, athletes: i.athletes || [], pay: !!i.pay });
     }
@@ -441,6 +447,7 @@ export default async function handler(req, res) {
     try { items = await archiveMerge('league_news', items, { days: 7, max: 300, same: (a, b) => similar(a.title, b.title, new Set()) }); } catch { }
     /* stories saved before the labels changed get the new ones too */
     items.forEach(x => { if (x && x.kind !== 'trade' && x.kind !== 'inj' && x.kind !== 'role') x.kind = lgKind(x.title, x.desc, x.athletes, x.at); });
+    items = items.filter(x => !celebOnly(x.kind, x.title));
     const v = { updated: new Date().toISOString(), items };
     cache.set('league', { at: Date.now(), v });
     res.setHeader('Cache-Control', 'public, max-age=0, s-maxage=600');

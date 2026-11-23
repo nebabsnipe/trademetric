@@ -675,7 +675,7 @@ function tmnRankCard(e){const p=byId[e.pid];if(!p)return '';const one=e.type==='
       <div class="tmn-ev-main"><div class="tmn-b-av tmn-rank-av">${av(p)}<span class="tmn-rmedal">${one?1:2}</span></div><div class="tmn-ev-txt"><h3>${esc(e.head)}</h3>${e.sub?`<p>${esc(e.sub)}</p>`:''}
         ${tmnMulti()||(e.leagues||[]).some(l=>l.bench)?`<div class="tmn-lgs">${(e.leagues||[]).map(l=>`<span class="tmn-lchip${l.bench?' bench':''}">${esc(l.name)}${l.bench?' · bench':''}</span>`).join('')}</div>`:''}</div></div></div></article>`}
 /* recaps: each story's biggest takeaway as its title plus a few key points, written once per story by /api/news */
-const TMN_RC_LS='tm-news-recap-v4';try{localStorage.removeItem('tm-news-recap-v2');localStorage.removeItem('tm-news-recap-v3')}catch(e){}   /* v3: recaps come from the shared server store, the same text for everyone. v4: they also carry the story's kind (the card label) */
+const TMN_RC_LS='tm-news-recap-v5';try{['v2','v3','v4'].forEach(v=>localStorage.removeItem('tm-news-recap-'+v))}catch(e){}   /* v3: recaps come from the shared server store, the same text for everyone. v4: they also carry the story's kind (the card label). v5: and a fluff flag */
 function tmnRecaps(){if(TMN.rc)return TMN.rc;try{TMN.rc=JSON.parse(localStorage.getItem(TMN_RC_LS)||'null')}catch(e){}TMN.rc=TMN.rc||{};return TMN.rc}
 async function tmnLoadRecaps(list){const R=tmnRecaps();TMN.rcTried=TMN.rcTried||new Set();
   const todo=list.filter(x=>(x.type==='art'||x.type==='lg'||x.type==='trade')&&x.url&&!R[x.url]&&!TMN.rcTried.has(x.url)).slice(0,30);if(!todo.length||TMN.rcBusy)return;
@@ -774,11 +774,45 @@ function tmnLeagueNews(Ls,picked){const raw=TMN.lgn&&TMN.lgn.items;if(!raw||!raw
     if(!pid){const h=normT(a.title);const hit=L.filter(([n])=>wordIn(h,n)).sort((x,y)=>rk(x[1])-rk(y[1]))[0];if(hit)pid=hit[1]}
     if(!pid){const h=normT(String(a.desc||'').slice(0,220));const hit=L.filter(([n])=>wordIn(h,n)).sort((x,y)=>rk(x[1])-rk(y[1]))[0];if(hit)pid=hit[1]}
     if(!pid||(a.kind==='inj'&&rk(pid)>150)||(a.kind!=='trade'&&rk(pid)>220)||out.some(o=>o.pid===pid&&o.g===tmnLgGrp(a.kind)))return;
-    const g=tmnLgGrp(a.kind),x={type:'lg',k:'lg:'+a.url,g,kind:g==='move'?lgKind(a.title,a.desc,[byId[pid].n],a.at):a.kind,pid,yours:mine.has(pid),title:a.title,desc:a.desc,url:a.url,outlet:a.outlet,img:a.img,at,leagues:[],pay:!!a.pay};
+    /* an injury card is only for the player's own injury: not someone else's mentioned in his story, and not when the recap read it as something else */
+    if(a.kind==='inj'){const rc=tmnRecaps()[a.url];if(!lgInjHis(a.title,a.desc,byId[pid].n)||(rc&&['game','team','news','disc'].includes(rc.k)))return}
+    const g=tmnLgGrp(a.kind),kd=g==='move'?lgKind(a.title,a.desc,[byId[pid].n],a.at):a.kind;
+    /* nothing a manager needs: a celebration story, or one the recap read as pure color */
+    if(g==='move'){const rc=tmnRecaps()[a.url];if((rc&&rc.fluff&&kd!=='move')||(['game','team','news'].includes(kd)&&TMN_CELEB.test(a.title||'')))return}
+    const x={type:'lg',k:'lg:'+a.url,g,kind:kd,pid,yours:mine.has(pid),title:a.title,desc:a.desc,url:a.url,outlet:a.outlet,img:a.img,at,leagues:[],pay:!!a.pay};
     if((picked||[]).some(o=>tmnSameStory(o,x))||out.some(o=>tmnSameStory(o,x)))return;
     seen.add(a.url);out.push(x)});
+/* LGINJ-START  Is the big injury in a league story this player's own? A story gets tagged "inj" when its headline or
+   opening has a phrase like "season-ending" or "out for the season", but that can be someone else's injury mentioned
+   in passing ("Skattebo vowed, after Aidan Hutchinson's season-ending injury, to stop doing backflips"). It is his
+   unless another person is named between his name (or the start of the sentence, when he isn't in it) and the phrase. */
+function lgInjHis(title, desc, name) {
+  const RE = /\b(season-ending|out for the (season|year)|torn (acl|achilles)|tears? (his )?(acl|achilles)|(places?|placed|placing|puts?|lands?|goes|going) [\w'. -]{0,40}?on (injured reserve|ir)\b|to (injured reserve|ir)\b|out (\d+|several|multiple) (weeks|games)|weeks? to (heal|recover)|ruptured)\b/gi;
+  const key = w => String(w || '').replace(/[.'’]/g, '').toLowerCase();
+  const mine = key(name).split(/\s+/).filter(w => w.length > 1 && !/^(jr|sr|ii|iii|iv)$/.test(w)), last = mine[mine.length - 1] || '';
+  const TEAM = /^(cardinals|falcons|ravens|bills|panthers|bears|bengals|browns|cowboys|broncos|lions|packers|texans|colts|jaguars|chiefs|raiders|chargers|rams|dolphins|vikings|patriots|saints|giants|jets|eagles|steelers|49ers|niners|seahawks|buccaneers|bucs|titans|commanders)$/;
+  const PLACE = /^(new|los|las|san|green|kansas|tampa|super|pro|injured|week|monday|tuesday|wednesday|thursday|friday|saturday|sunday|hall|the|nfl|nfc|afc|sources?|report|after|when|while|with|but|and|for|coach|gm|owner|dr|doctor|trainer|agent|insider)$/;
+  const his = w => mine.includes(key(w)), team = w => TEAM.test(key(w)) || TEAM.test(key(w) + 's');
+  const someoneElse = b => {
+    let m; const P = /\b([A-Z][A-Za-z.-]+?)(?:['’]s|s['’])(?=\s|$)/g, N = /\b([A-Z][a-z]+) ([A-Z][A-Za-z'’-]+)\b(?! (?:said|says|told|announced|confirmed|reported|reports)\b)/g;
+    while ((m = P.exec(b))) if (!his(m[1]) && !his(m[1] + 's') && !team(m[1])) return true;
+    while ((m = N.exec(b))) { const w2 = m[2].replace(/['’]s?$/, ''); if (!his(m[1]) && !his(w2) && !team(m[1]) && !team(w2) && !PLACE.test(key(m[1]))) return true; N.lastIndex = m.index + m[1].length; }
+    return false; };
+  const text = String(title || '') + '. ' + String(desc || '').slice(0, 260);
+  let any = false;
+  for (const s of text.match(/[^.!?;:—–]+/g) || []) {
+    let m; RE.lastIndex = 0;
+    while ((m = RE.exec(s))) { any = true;
+      const before = s.slice(0, m.index), at = last ? before.toLowerCase().lastIndexOf(last) : -1;
+      if (!someoneElse(at < 0 ? before : before.slice(at + last.length))) return true; }
+  }
+  return !any;   /* no such phrase where we can see it: leave the story alone */
+}
+/* LGINJ-END */
   const tr=out.filter(x=>x.kind==='trade'),rest=out.filter(x=>x.kind!=='trade').sort((a,b)=>b.at-a.at).slice(0,14);
   return [...rest,...tr].sort((a,b)=>b.at-a.at)}
+/* celebration-only stories (a backflip, a dance) stay out: same rule as the server, for stories already saved in the browser */
+const TMN_CELEB=/\b(backflip\w*|celebrat(es?|ed|ions?|ing|ory)|(touchdown|td|end zone|sack) dance|dance moves|griddy|somersault\w*|cartwheel\w*)\b/i;
 /* Trades of top-500 players (overall fantasy rank, kickers and defenses aside). Two sources: team changes the nightly data update saw (DATA.moves: [id, from, to, day]),
    and trade stories from the outlets. Each trade gets one card. It carries a story about that trade when there is a
    good one (from the shared outlets, else /api/news?trades= searches for it); with none it still shows, without a link. */
