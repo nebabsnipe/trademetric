@@ -17,7 +17,7 @@ async function j(url) {
 }
 
 let injCache = { at: 0, data: null };
-async function injuries() {
+export async function injuries() {
   if (injCache.data && Date.now() - injCache.at < 5 * 60e3) return injCache.data;
   const all = await j('https://api.sleeper.app/v1/players/nfl');
   const out = [];
@@ -38,7 +38,7 @@ const SEASON_OVER = /season[- ]ending|out for the (?:rest of the |remainder of t
 
 /* ESPN injury notes (Rotowire-style), with practice participation through the week */
 let noteCache = { at: 0, data: null };
-async function notes() {
+export async function notes() {
   if (noteCache.data && Date.now() - noteCache.at < 60e3) return noteCache.data;
   const d = await j('https://site.api.espn.com/apis/site/v2/sports/football/nfl/injuries');
   const out = [];
@@ -57,7 +57,7 @@ async function notes() {
 
 /* Injury status history, kept on the server (see api/_shared.js): record what changed since the last look, then
    hand back the last 8 days of changes. Costs two or three quick database calls, at most once every 90 seconds. */
-const ESPN_ST = s => { s = String(s || '').toLowerCase(); return /injured reserve|^ir$/.test(s) ? 'IR' : /physically unable|pup/.test(s) ? 'PUP' : /suspen/.test(s) ? 'SUS' : /^out$/.test(s) ? 'O' : /doubtful/.test(s) ? 'D' : /questionable|day-to-day/.test(s) ? 'Q' : ''; };
+export const ESPN_ST = s => { s = String(s || '').toLowerCase(); return /injured reserve|^ir$/.test(s) ? 'IR' : /physically unable|pup/.test(s) ? 'PUP' : /suspen/.test(s) ? 'SUS' : /^out$/.test(s) ? 'O' : /doubtful/.test(s) ? 'D' : /questionable|day-to-day/.test(s) ? 'Q' : ''; };
 let logCache = { at: 0, data: null };
 async function injuryLog(inj, note) {
   if (!sharedOn()) return null;

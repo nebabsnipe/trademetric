@@ -22,11 +22,14 @@ Fantasy football trades, rankings and lineup advice built on your league's exact
 | `scripts/yt_channels.py` | Finds each team's official YouTube channel ID (runs in the daily job, writes `data/yt_channels.json`) |
 | `api/players.js` | Compact Sleeper player list used to sync rosters in the background |
 | `api/_shared.js` | The shared news store: injury status history, story recaps and the league news archive, saved in Supabase so they are built once and sent to everyone (see "Shared news store" below) |
+| `api/push.js`, `api/_push.js` | Push notifications: saving devices, the test button, and the scheduled injury check with all its rules. See `docs/push-notifications.md` |
+| `sw.js`, `manifest.webmanifest`, `js/push.js` | The push-only service worker, the Home Screen app details, and the Push notifications card in Account |
 | `api/espn.js` | Reads private ESPN leagues with the user's espn_s2 and SWID codes (never stored) |
 | `supabase/schema.sql` | Table that stores each user's saved league. Run once in Supabase's SQL Editor |
 | `supabase/accounts.sql` | Usernames, username sign-in and the wrong-password lockout. Run once after schema.sql |
 | `supabase/accounts_v2.sql` | Usernames for social sign-in, username changes, plans, account deletion. Run once after accounts.sql |
 | `supabase/shared.sql` | Tables for the shared news store. Run once after accounts_v2.sql |
+| `supabase/push.sql` | Devices that have notifications on, and the record of what was sent. Run once after shared.sql |
 | `supabase/email/` | TradeMetric-branded confirmation and password-reset emails to paste into Supabase |
 | `scripts/update_data.py` | Downloads fresh stats, injuries, schedules, betting lines and expert rankings |
 

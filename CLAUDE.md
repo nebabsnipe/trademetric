@@ -15,7 +15,7 @@ TradeMetric (trademetric.app) is a paid fantasy football trade analyzer. Hosted 
 - The owner isn't a programmer: explain changes in plain words, not code terms.
 
 ## Feature plans and history
-Longer plans and build notes are in `docs/`: offseason mode, season recap, trade visuals, advanced stats, accounts, account sync, and a running feature-notes list. Read the relevant one before working on that area, and update it when something ships or a decision changes.
+Longer plans and build notes are in `docs/`: offseason mode, season recap, trade visuals, advanced stats, accounts, account sync, push notifications, and a running feature-notes list. Read the relevant one before working on that area, and update it when something ships or a decision changes.
 
 ## Hard rules — never break these
 - **Never name other fantasy sites or data sources** anywhere on the site.
