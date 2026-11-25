@@ -1709,7 +1709,8 @@ function renderMatchup(){const el=$('matchup');const oid=oppOf(S.me,WEEK);
   const act=lu=>sum(lu.slots.filter(x=>x.p&&liveOf(x.p.id)),x=>liveOf(x.p.id).pts),anyLive=[...A.lu.slots,...Bm.lu.slots].some(x=>x.p&&liveOf(x.p.id)),aA=act(A.lu),aB=act(Bm.lu);
   const cell=(id,v,win,al)=>{const l=id&&liveOf(id);return `<td class="${al} num ${win?'win':''}">${l?`<b>${f1(l.pts)}</b><small>${l.state==='post'?'final':'proj '+f1(v)}</small>`:anyLive&&id&&getGameState(id)==='upcoming'?`<span>${f1(v)}</span><small>proj</small>`:f1(v)}</td>`};
   /* each side's game state (one helper), shown as a colored bar on the row's outer edge plus a light tint */
-  const gsOf=s=>s&&s.p?getGameState(s.p.id):'',cnt=slots=>{const c={live:0,upcoming:0,final:0};slots.forEach(s=>{const k=gsOf(s);if(k)c[k]++});return `${c.live} playing · ${c.upcoming} left · ${c.final} done`};
+  /* a ruled-out or bye player isn't 'done' before his team has actually played: leave him out of the counts and colors */
+  const gsOf=s=>{if(!s||!s.p)return '';const k=getGameState(s.p.id),gm=LIVE&&LIVE.week===WEEK&&LIVE.games?LIVE.games[s.p.t]:null;return k==='final'&&!(gm&&gm.state==='post')&&!liveOf(s.p.id)?'':k},cnt=slots=>{const c={live:0,upcoming:0,final:0};slots.forEach(s=>{const k=gsOf(s);if(k)c[k]++});return `${c.live} playing · ${c.upcoming} left · ${c.final} done`};
   const prev=MU_GS||{},seen={};
   const nSlots=A.lu.slots.length,rows=A.lu.slots.map((x,i)=>{const o=Bm.lu.slots[i],a=x.p?f(x.p.id):0,b=o&&o.p?f(o.p.id):0,ga=gsOf(x),gb=gsOf(o);
     const sub=id=>liveOf(id)?`${byId[id].pos} · ${liveTxt(id)} ${f1(liveOf(id).pts)} pts`:getGameState(id)==='live'?`${byId[id].pos} · <span class="live-tag in">Live</span>`:`${byId[id].pos} · ${oppHtml(id)}`;
