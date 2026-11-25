@@ -61,7 +61,7 @@ export async function weekClips(get, wk) {
       const who = (v.categories || []).filter(c => c && (c.type === 'athlete' || c.athleteId || c.athlete))
         .map(c => (c.athlete && c.athlete.description) || c.description || '').filter(Boolean).map(norm);
       const url = v.links && v.links.web && (v.links.web.href || (v.links.web.self && v.links.web.self.href));
-      if (who.length && url && (v.headline || v.title)) out.push({ title: String(v.headline || v.title).slice(0, 140), url, who });
+      if (url && (v.headline || v.title)) out.push({ title: String(v.headline || v.title).slice(0, 140), url, who, t: ' ' + norm(v.headline || v.title) + ' ' });
     }
   }));
   out.seen = seen;
@@ -165,8 +165,10 @@ export async function leagueWeek(lg, wk, get, memo, clips) {
     const w = lg.type === 'espn' ? await espnWeek(lg, wk.season, wk.week, get) : lg.type === 'sleeper' ? await sleeperWeek(lg, wk.season, wk.week, get, memo) : { ok: false, why: 'unknown platform' };
     if (!w.ok) return w;
     w.perf = w.players.filter(standout).sort((a, b) => b.pts - a.pts).slice(0, RULES.maxPerf);
-    const mine = new Set(w.players.map(p => norm(p.name)));
-    w.clips = (clips || []).filter(c => c.who.some(n => mine.has(n))).map(c => ({ ...c, player: w.players.find(p => c.who.includes(norm(p.name))).name }));
+    // a clip is about your player when the league tagged him in it, or his full name is in its title
+    const named = w.players.filter(p => p.pos !== 'D/ST' && norm(p.name).includes(' '));
+    const about = c => named.find(p => c.who.includes(norm(p.name)) || (c.t || '').includes(' ' + norm(p.name) + ' '));
+    w.clips = (clips || []).map(c => ({ c, p: about(c) })).filter(x => x.p).map(({ c, p }) => ({ title: c.title, url: c.url, who: c.who, player: p.name }));
     return w;
   } catch (e) { return { ok: false, why: 'league not readable (' + (e && e.status || 'error') + ')' }; }
 }

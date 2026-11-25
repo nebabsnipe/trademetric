@@ -311,6 +311,8 @@ eq([w.result.won, w.result.me, w.result.record], [true, 131.4, '8-4'], 'ESPN wee
 eq(w.perf.map(p => p.name), ['Star Receiver', 'Bench Guy'], 'ESPN week: standout games (38.4, and a bench player at 30.2)');
 eq(w.tops.map(p => p.name), ['Star Receiver'], 'ESPN week: #1 WR when he tops the whole position');
 eq(w.clips.map(c => c.player), ['Star Receiver'], 'ESPN week: his highlight clip');
+w = await W8.leagueWeek({ type: 'espn', id: '5', rid: 1 }, wk12, espnWk({ winner: 'HOME' }, sortedKona), memoF(), [{ title: 'Okay Runner breaks a 40-yard run', url: 'https://x/a', who: [], t: ' okay runner breaks a 40 yard run ' }, { title: 'Another Runner scores', url: 'https://x/b', who: [], t: ' another runner scores ' }]);
+eq(w.clips.map(c => c.player), ['Okay Runner'], 'ESPN week: a clip with his full name in the title counts; other players\' clips do not');
 w = await W8.leagueWeek({ type: 'espn', id: '5', rid: 1 }, wk12, espnWk({ winner: 'HOME' }, () => ({ players: [20, 45, 30, 38.4, 10].map((p, i) => ({ player: { id: 80 + i, stats: [{ scoringPeriodId: 12, statSourceId: 0, appliedTotal: p }] } })) })), memoF(), []);
 eq(w.tops.length, 0, 'ESPN week: scores that do not come back in order: no #1 claim');
 w = await W8.leagueWeek({ type: 'espn', id: '5', rid: 1 }, wk12, espnWk({ winner: 'HOME' }, () => ({ players: [{ player: { id: 77, stats: [{ scoringPeriodId: 12, statSourceId: 0, appliedTotal: 41 }] } }, ...[38.4, 30.2, 29, 27].map((p, i) => ({ player: { id: 10 + i, stats: [{ scoringPeriodId: 12, statSourceId: 0, appliedTotal: p }] } }))] })), memoF(), []);
