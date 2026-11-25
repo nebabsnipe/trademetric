@@ -9,7 +9,8 @@ const PUSH_TYPES=[
   ['plays','Big plays','A long run or catch, or a huge game from one of your starters'],
   ['inj','Injuries and status changes','When one of your players is questionable, doubtful, out or on injured reserve',true],
   ['trade','Trades involving your players','When a player on your team is traded in the NFL'],
-  ['lineup','Lineup alerts','An empty starting spot, or a clearly better option on your bench'],
+  ['dl','Trade deadlines','A week out, 3 days out, and a last call on deadline day',true],
+  ['lineup','Lineup fixes','Before kickoff: an empty starting spot, a starter who is out or on bye, or a bench player projected 5+ points more',true],
   ['top','#1 finishes','When your player outscores everyone at his position']];
 const PUSH_ID_LS='tm-push-device',PUSH_SEEN_LS='tm-push-seen',PUSH_HINT_LS='tm-push-ios-hint';
 const pushLs=(k,v)=>{try{if(v===undefined)return localStorage.getItem(k);if(v===null)localStorage.removeItem(k);else localStorage.setItem(k,v)}catch(e){}return null};
@@ -105,7 +106,7 @@ function pushHtml(){if(typeof USER==='undefined'||!USER)return '';if(!PUSH.loade
     ${pushDeviceRow()}${PUSH.msg?`<p class="auth-msg bad" role="alert">${esc(PUSH.msg)}</p>`:''}
     <h3 class="push-h">What to send</h3>
     <ul class="tmn-nl push-types">${PUSH_TYPES.map(([k,t,n,live])=>`<li><span class="acc-lg-t"><b>${t}${live?'':' <span class="push-soon">Coming soon</span>'}</b><span class="note">${n}</span></span><label class="tmn-sw sm"><input type="checkbox" data-push-type="${k}" ${pushTypeOn(k)?'checked':''}><i aria-hidden="true"></i><span class="sr">${t}</span></label></li>`).join('')}</ul>
-    <p class="note tmn-nl-f">These apply to every device on your account. Injury alerts pause from 11pm to 8am your time.</p>
+    <p class="note tmn-nl-f">These apply to every device on your account. Alerts pause from 11pm to 8am your time.</p>
     ${others?`<h3 class="push-h">Your devices</h3><ul class="tmn-nl push-devs">${D.map(d=>`<li><span class="acc-lg-t"><b>${esc(d.label||'Device')}${d.id===here&&pushOnHere()?' <span class="pill-ok">This device</span>':''}</b><span class="note">Added ${esc(pushWhen(d.created_at))} · last used ${esc(pushWhen(d.last_used_at))}</span></span><button class="btn small" type="button" data-push-rm="${esc(d.id)}">Remove</button></li>`).join('')}</ul>`:''}</section>`}
 
 /* ---- events ---- */

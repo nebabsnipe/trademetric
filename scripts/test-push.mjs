@@ -78,4 +78,32 @@ t('quiet hours: 11pm to 8am in the user\'s time zone', () => {
   assert.equal(isQuiet('America/Los_Angeles', at('2026-11-23T04:30:00Z')), false); // 8:30pm
   assert.equal(isQuiet('Not/AZone', at('2026-11-23T04:30:00Z')), true);           // unknown: treated as Eastern
 });
+/* ---- trade deadlines and lineup fixes (api/_alerts.js) ---- */
+const { deadlineNotice, lineupIssues } = await import('../api/_alerts.js');
+const H = 36e5, D = 864e5, L0 = { key: 'sleeper:1', name: 'Home League' };
+t('deadline: a week out, 3 days out, final day, and nothing after it passes', () => {
+  assert.match(deadlineNotice(L0, now + 6.2 * D, now, 'America/New_York').title, /Trade deadline in 6 days/);
+  assert.match(deadlineNotice(L0, now + 2.5 * D, now, 'America/New_York').k, /:d3$/);
+  const f = deadlineNotice(L0, now + 5 * H, now, 'America/New_York');
+  assert.match(f.title, /^Last day to trade: Home League$/); assert.equal(f.url, '/#trade');
+  assert.equal(deadlineNotice(L0, now + 9 * D, now, 'America/New_York'), null);
+  assert.equal(deadlineNotice(L0, now - H, now, 'America/New_York'), null);
+});
+const G = { BUF: { start: now + 2 * H, state: 'pre' }, KC: { start: now + 2 * H, state: 'pre' }, LAR: { start: now + 2 * H, state: 'pre' }, DAL: { start: now - H, state: 'in' }, MIA: { start: now + 30 * H, state: 'pre' } };
+const P = (id, pos, team, pj, bad) => ({ id, n: id, pos, team, pj, bad: bad || null });
+const slot = (label, el, p) => ({ label, el, p });
+t('lineup: empty slot, starter out, starter on bye', () => {
+  const L = { app: 'Sleeper', slots: [slot('RB', ['RB'], P('A', 'RB', 'KC', 10, 'is out')), slot('TE', ['TE'], P('T', 'TE', 'NYJ', 6)), slot('FLEX', ['RB', 'WR', 'TE'], null)], bench: [P('B', 'RB', 'LAR', 9)] };
+  const out = lineupIssues(L, G, now, 12).map(x => x.k);
+  assert.deepEqual(out, ['12:0:out:A', '12:1:bye:T', '12:2:empty']);
+});
+t('lineup: bench swap only when 5+ more AND about double, close to kickoff, and never once a game started', () => {
+  const mk = (sp, bp, team = 'BUF') => ({ app: 'ESPN', slots: [slot('WR', ['WR'], P('S', 'WR', team, sp))], bench: [P('B', 'WR', 'KC', bp)] });
+  assert.equal(lineupIssues(mk(4, 12), G, now, 12).length, 1);          // 8 more and 3x: yes
+  assert.equal(lineupIssues(mk(10, 16), G, now, 12).length, 0);         // 6 more but not double: no
+  assert.equal(lineupIssues(mk(4, 8), G, now, 12).length, 0);           // double but only 4 more: no
+  assert.equal(lineupIssues(mk(4, 12, 'DAL'), G, now, 12).length, 0);   // his game already started: no
+  assert.equal(lineupIssues(mk(4, 12, 'MIA'), G, now, 12).length, 0);   // kickoff more than 3 hours away: not yet
+});
+
 console.log(`\n${n} checks passed`);

@@ -5,7 +5,7 @@
 //   POST /api/push/subscribe    turn notifications on for this device (signed-in)
 //   POST /api/push/unsubscribe  remove a device (this one, or any of the account's by id)
 //   POST /api/push/test         send a test notification to every device on the account
-//   GET  /api/push/cron         the scheduled injury check. Needs the CRON_SECRET; nobody else can run it.
+//   GET  /api/push/cron         the scheduled check (injuries, trade deadlines, lineup fixes). Needs the CRON_SECRET.
 //
 // Signed-in routes act as the user (their own sign-in token, checked by Supabase), so the database's
 // row-level security is what guarantees people only ever see and change their own devices.
@@ -14,6 +14,7 @@ import { timingSafeEqual } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { sharedOn, rest, statusTrack } from './_shared.js';
 import { injuries, notes, ESPN_ST } from './live.js';
+import { weekInfo, alertsFor } from './_alerts.js';
 import { pushOn, vapidPublicKey, canPush, sendToDevices, RULES, norm, isQuiet, userRosters, injuryEvents, injuryPayload, summaryPayload, planSends } from './_push.js';
 
 const SUPA = (process.env.SUPABASE_URL || 'https://rltmfnmgbfgecbaevfvc.supabase.co').replace(/\/+$/, '');
@@ -153,32 +154,42 @@ async function cron(req, res) {
   ]);
   if (!Array.isArray(logRows) || !players) return res.status(502).json({ error: 'data' });
   const log = logRows.map(r => ({ ...r, at: Date.parse(r.at) }));
-  if (!log.some(r => ['Q', 'D', 'O', 'IR'].includes(r.st))) return res.status(200).json({ ok: true, ...stats });
+  const anyInj = log.some(r => ['Q', 'D', 'O', 'IR'].includes(r.st));
+  // trade deadlines and lineup fixes (api/_alerts.js): this week's games, read once for everyone
+  const W = await weekInfo(now);
+  stats.deadline = 0; stats.lineup = 0;
 
   const preview = [];
   for (let i = 0; i < uids.length; i += 40) {
     const chunk = uids.slice(i, i + 40);
-    const [states, sentRows, plans] = await Promise.all([
+    const [states, sentRows, plans, oldRows] = await Promise.all([
       rest(`user_state?user_id=${inList(chunk)}&select=user_id,${STATE_COLS}`, { ms: 8000 }),
       rest(`push_sent?user_id=${inList(chunk)}&sent_at=gte.${encodeURIComponent(new Date(now - 26 * 3600e3).toISOString())}&select=user_id,key,kind,sent_at&limit=5000`, { ms: 8000 }),
       rest(`profiles?id=${inList(chunk)}&select=id,plan`, { ms: 8000 }),
+      // deadline and lineup notices: what was already sent in the last 8 days (their stages and weeks last longer than a day)
+      W ? rest(`push_sent?user_id=${inList(chunk)}&kind=in.(dl,lineup)&sent_at=gte.${encodeURIComponent(new Date(now - 8 * 864e5).toISOString())}&select=user_id,key&limit=5000`, { ms: 8000 }) : [],
     ]);
     if (!Array.isArray(states) || !Array.isArray(sentRows)) continue;      // can't check for repeats: send nothing
     const planOf = Object.fromEntries((Array.isArray(plans) ? plans : []).map(p => [p.id, p.plan]));
     for (const st of states) {
       const uid = st.user_id, devices = byUser[uid];
       if (!canPush(planOf[uid])) continue;
-      if (((st.acct && st.acct.push && st.acct.push.off) || []).includes('inj')) continue;      // the Injuries switch
-      const { roster, src } = userRosters(st, players);
+      const offKinds = (st.acct && st.acct.push && st.acct.push.off) || [];
       const mineSent = sentRows.filter(r => r.user_id === uid), had = new Set(mineSent.map(r => r.key));
-      const events = injuryEvents({ roster, src, log, cur, now }).filter(e => !had.has(e.key));
-      if (!events.length) continue;
+      if (Array.isArray(oldRows)) oldRows.forEach(r => { if (r.user_id === uid) had.add(r.key); });
+      const { roster, src } = userRosters(st, players);
+      const events = anyInj && !offKinds.includes('inj') ? injuryEvents({ roster, src, log, cur, now }).filter(e => !had.has(e.key)) : [];   // the Injuries switch
+      if (isQuiet(devices[0].tz, now)) { stats.quiet += events.length; continue; }               // everything waits until 8am
+      // deadline notices and lineup fixes go out as their own notifications (one per league at most)
+      const extraJobs = W ? (await alertsFor(st, W, devices[0].tz, offKinds)).filter(a => a.keys.some(k => !had.has(k))) : [];
+      if (!events.length && !extraJobs.length) continue;
       stats.events += events.length;
-      if (isQuiet(devices[0].tz, now)) { stats.quiet += events.length; continue; }               // they wait until 8am
       const lastHour = mineSent.filter(r => r.kind !== 'test' && now - Date.parse(r.sent_at) < 3600e3).length;
-      const { solo, rest: extra, hold } = planSends(events, lastHour);
+      const { solo, rest: extra, hold } = planSends(events, lastHour + extraJobs.length);
       stats.held += hold.length;
-      const jobs = solo.map(e => ({ keys: [e], kind: 'inj', payload: injuryPayload(e) }));
+      const jobs = extraJobs.map(a => ({ keys: a.keys.filter(k => !had.has(k)).map(key => ({ key })), kind: a.kind, payload: a.payload }));
+      if (lastHour > RULES.perHour + 1) jobs.length = 0;                                              // over the hourly limit: wait for the next check
+      jobs.push(...solo.map(e => ({ keys: [e], kind: 'inj', payload: injuryPayload(e) })));
       if (extra.length) jobs.push({ keys: extra, kind: extra.length > 1 ? 'summary' : 'inj', payload: extra.length > 1 ? summaryPayload(extra) : injuryPayload(extra[0]) });
       for (const job of jobs) {
         if (dry) { preview.push({ user: uid.slice(0, 8), ...job.payload }); continue; }
@@ -188,7 +199,7 @@ async function cron(req, res) {
         const landed = await rest('push_sent?on_conflict=user_id,key', { method: 'POST', body: rows, prefer: 'resolution=ignore-duplicates,return=representation' });
         if (!Array.isArray(landed) || landed.length !== rows.length) continue;
         const out = await sendToDevices(devices, job.payload);
-        stats.sent += out.sent ? 1 : 0; if (job.kind === 'summary') stats.summaries++;
+        stats.sent += out.sent ? 1 : 0; if (job.kind === 'summary') stats.summaries++; if (out.sent && job.kind === 'dl') stats.deadline++; if (out.sent && job.kind === 'lineup') stats.lineup++;
         if (out.gone.length) { stats.removed += out.gone.length; await rest(`push_subscriptions?id=${inList(out.gone)}`, { method: 'DELETE', prefer: 'return=minimal' }); }
         // nothing got through (a temporary problem at the push service): forget it so the next check tries again
         if (!out.sent && out.gone.length < devices.length) await rest(`push_sent?user_id=eq.${uid}&key=${inList(rows.map(r => r.key))}`, { method: 'DELETE', prefer: 'return=minimal' });

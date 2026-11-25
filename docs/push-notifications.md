@@ -1,9 +1,8 @@
 # Push notifications
 
-Status (2026-11-23): **built on the `push-notifications` branch, not live.** The foundation is in and one real
-notification type works end to end in code: injuries / status changes. The other types have switches but send
-nothing yet. Still to do by hand before it works anywhere: the Vercel keys, `supabase/push.sql`, and choosing
-the schedule (below).
+Status (2026-11-25): **live on main.** Three kinds send for real: injuries / status changes, trade deadlines and
+lineup fixes. Big plays, trades and #1 finishes still have "Coming soon" switches. Setup done: Vercel keys,
+`supabase/push.sql`, and the 15-minute schedule (Supabase scheduler, secret kept in Supabase Vault, see below).
 
 Real notifications on the lock screen or desktop, even with the site closed. Standard Web Push, sent straight
 to each browser's own push service. No third-party push company.
@@ -19,6 +18,7 @@ to each browser's own push service. No third-party push company.
 | `api/_push.js` | The send helper (`sendToDevices`) and every rule: confirmation, wording, quiet hours, the hourly limit, the Pro check (`canPush`) |
 | `supabase/push.sql` | `push_subscriptions` (one row per device, tied to the account) and `push_sent` (what was sent, so nothing repeats) |
 | `supabase/push_cron.sql` | The proposed 15-minute schedule. Not run yet |
+| `api/_alerts.js` | Trade deadline and lineup-fix rules for the scheduled check (added 2026-11-25) |
 | `scripts/test-push.mjs` | Checks the rules. `node scripts/test-push.mjs` |
 
 ## One-time setup
@@ -72,9 +72,23 @@ Add `?dry=1` to see what it would send without sending.
 Side benefit: the check also records status changes in `status_log` (the same history the News tab reads), so
 the history no longer depends on someone having the site open.
 
+## Trade deadlines and lineup fixes (added 2026-11-25)
+
+Part of the same scheduled check (`/api/push/cron`), rules in `api/_alerts.js`, switches `dl` and `lineup` in
+`S.acct.push.off`. Same quiet hours, no-repeat records (`push_sent`, kinds `dl` / `lineup`) and hourly limit.
+- **Deadlines:** about a week out, about 3 days out, and a last call in the final 24 hours, per saved league. The
+  deadline is the one the site already reads at import/sync (`league.tdl`): ESPN's exact time, or for Sleeper the
+  end of that week's last game. Tapping opens the Trades tab.
+- **Lineup fixes:** only when some game kicks off within 3 hours. Read straight from Sleeper/ESPN: an empty
+  starting slot, a starter who is out / on IR / suspended / on bye, or a bench player projected 5+ points more
+  and about double the starter (the site's rule), only for players whose game hasn't started; bench swaps only
+  within 3 hours of that starter's kickoff. One notification per league ("Plus 2 more"). Tapping opens My Team.
+- Private ESPN leagues: deadline notices only (their login codes stay in the browser).
+- Checked with `node scripts/test-push.mjs` and a full run of the scheduled check with every outside service faked.
+
 ## Not done yet
 
-- Big plays, trades, lineup alerts and #1 finishes: the switches exist (marked "Coming soon") but nothing
+- Big plays, trades and #1 finishes: the switches exist (marked "Coming soon") but nothing
   sends them. Trades must go through the same verification as trade alerts before any push.
 - Tested so far: the rules (script), the server route's access checks, a real encrypted send to a push service
   (dead address -> device removed), and the card in every state at desktop and phone widths, light and dark.
