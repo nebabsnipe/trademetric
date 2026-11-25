@@ -39,11 +39,11 @@
   /* "c46.n28.a38.m4.p5.t1": the ?v= numbers of the files this page loaded, so each report says which version it came from */
   var BUILD = '';
   var build = function () {
-    var v = {}, keys = { 'css/styles.css': 'c', 'js/news.js': 'n', 'js/app.js': 'a', 'js/mobile.js': 'm', 'js/polish.js': 'p', 'js/telemetry.js': 't' };
+    var v = {}, keys = { 'css/styles.css': 'c', 'js/news.js': 'n', 'js/app.js': 'a', 'js/mobile.js': 'm', 'js/polish.js': 'p', 'js/deadline.js': 'd', 'js/telemetry.js': 't' };
     var txt = [].map.call(document.querySelectorAll('link[rel=stylesheet],script'), function (el) { return (el.getAttribute('href') || el.getAttribute('src') || '') + ' ' + (el.src ? '' : el.textContent); }).join(' ');
     var re = /((?:css|js)\/[a-z]+\.(?:css|js))\?v=(\d+)/g, m;
     while ((m = re.exec(txt))) if (keys[m[1]]) v[keys[m[1]]] = m[2];
-    BUILD = ['c', 'n', 'a', 'm', 'p', 't'].filter(function (k) { return v[k]; }).map(function (k) { return k + v[k]; }).join('.') || 'unknown';
+    BUILD = ['c', 'n', 'a', 'd', 'm', 'p', 't'].filter(function (k) { return v[k]; }).map(function (k) { return k + v[k]; }).join('.') || 'unknown';
     return BUILD;
   };
   build();

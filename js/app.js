@@ -549,7 +549,7 @@ function rosterChanged(T,ids){const a=[...T.players].sort().join(),b=[...ids].so
 async function syncSleeper(){const src=S.real&&S.real.src;if(!src||src.type!=='sleeper')return false;let changed=false;
   const [rosters,users,lg]=await Promise.all([getJSON(`https://api.sleeper.app/v1/league/${src.league}/rosters`),getJSON(`https://api.sleeper.app/v1/league/${src.league}/users`),getJSON(`https://api.sleeper.app/v1/league/${src.league}`).catch(()=>null)]);
   if(lg&&lg.settings){const n=lg.settings.reserve_slots||0;if(S.league.slots.IR!==n){S.league.slots.IR=n;changed=true}
-    const ok=sleeperIrOk(lg.settings);if((S.league.irOk||[]).join()!==ok.join()){S.league.irOk=ok;changed=true}}
+    const ok=sleeperIrOk(lg.settings);if((S.league.irOk||[]).join()!==ok.join()){S.league.irOk=ok;changed=true}if(setTdl(S.league,sleeperTdl(lg.settings)))changed=true}
   let ids=await sleeperIds();
   /* re-check saved Sleeper-to-player links against Sleeper's real names; drop any that were matched loosely */
   if(ids&&Object.keys(ids).length)for(const [pid,id] of Object.entries(src.pmap)){const x=ids[pid],q=byId[id];if(x&&(!q||norm(q.n)!==norm(x[0])))delete src.pmap[pid]}
@@ -565,6 +565,7 @@ async function syncSleeper(){const src=S.real&&S.real.src;if(!src||src.type!=='s
 function syncEspnRosters(d){const src=S.real&&S.real.src;if(!d||!src||src.type!=='espn')return false;let changed=false;
   const ls=d.settings&&d.settings.rosterSettings&&d.settings.rosterSettings.lineupSlotCounts;if(ls){const n=+ls[21]||0;if(S.league.slots.IR!==n){S.league.slots.IR=n;changed=true}
     if((S.league.irOk||[]).join()!=='IR,PUP,O'){S.league.irOk=['IR','PUP','O'];changed=true}}
+  if(d.settings&&setTdl(S.league,espnTdl(d.settings)))changed=true;
   (d.teams||[]).forEach(t=>{const tid=src.rid[t.id],T=tid&&teamById(tid);if(!T)return;
     const EP={1:'QB',2:'RB',3:'WR',4:'TE',5:'K'};((t.roster&&t.roster.entries)||[]).forEach(e=>{const pl=e.playerPoolEntry&&e.playerPoolEntry.player;if(pl&&EP[pl.defaultPositionId]&&!findExact(pl.fullName,EP[pl.defaultPositionId])){addExtraPlayer(pl.fullName,EP[pl.defaultPositionId]);POOL_DIRTY=true}});if(POOL_DIRTY)setPool();
     const out=((t.roster&&t.roster.entries)||[]).map(e=>e.playerPoolEntry&&e.playerPoolEntry.player).filter(Boolean).map(pl=>{const q=pl.defaultPositionId===16?(byId['dst-'+String(pl.proTeamAbbreviation||'').toLowerCase()]||findExact(pl.fullName)):findExact(pl.fullName);return q&&q.id}).filter(Boolean);
@@ -597,7 +598,7 @@ async function syncSnapSleeper(Z){const src=Z.real.src,L=src.league;let ch=false
     getJSON(`https://api.sleeper.app/v1/league/${L}`).catch(()=>null),getJSON(`https://api.sleeper.app/v1/league/${L}/matchups/${WEEK}`).catch(()=>null)]);
   if(!Array.isArray(rosters))return false;
   if(lg&&lg.settings&&Z.league&&Z.league.slots){const n=lg.settings.reserve_slots||0;if(Z.league.slots.IR!==n){Z.league.slots.IR=n;ch=true}
-    const ok=sleeperIrOk(lg.settings);if((Z.league.irOk||[]).join()!==ok.join()){Z.league.irOk=ok;ch=true}}
+    const ok=sleeperIrOk(lg.settings);if((Z.league.irOk||[]).join()!==ok.join()){Z.league.irOk=ok;ch=true}if(setTdl(Z.league,sleeperTdl(lg.settings)))ch=true}
   const ids=await sleeperIds();
   for(const r of rosters){const tid=src.rid[r.roster_id],T=tid&&Z.teams.find(t=>t.id===tid);if(!T)continue;
     const out=[...new Set((r.players||[]).map(pid=>snapPid(Z,ids,pid)).filter(Boolean))];if(out.length&&rosterChanged(T,out))ch=true;
@@ -612,6 +613,7 @@ async function syncSnapEspn(Z){const src=Z.real.src;let ch=false;Z.real.rec=Z.re
   const creds=src.priv?(IMP.espnCreds||espnSaved()):null;if(src.priv&&!(creds&&creds.s2))return false;
   const d=await espnFetch(src.league,creds,WEEK);if(!d||!Array.isArray(d.teams))return false;
   const ls=d.settings&&d.settings.rosterSettings&&d.settings.rosterSettings.lineupSlotCounts;if(ls&&Z.league&&Z.league.slots){const n=+ls[21]||0;if(Z.league.slots.IR!==n){Z.league.slots.IR=n;ch=true}}
+  if(d.settings&&Z.league&&setTdl(Z.league,espnTdl(d.settings)))ch=true;
   const who=pl=>{if(!pl)return null;const q=pl.defaultPositionId===16?(byId['dst-'+String(pl.proTeamAbbreviation||'').toLowerCase()]||findExact(pl.fullName)):findExact(pl.fullName);return q?q.id:null},lu={};
   d.teams.forEach(t=>{const tid=src.rid[t.id],T=tid&&Z.teams.find(x=>x.id===tid);if(!T)return;const E=(t.roster&&t.roster.entries)||[];
     const out=[...new Set(E.map(e=>who(e.playerPoolEntry&&e.playerPoolEntry.player)).filter(Boolean))];if(out.length&&rosterChanged(T,out))ch=true;
@@ -1363,7 +1365,7 @@ function twClear(){TW.prefs=null;TW.text='';TW.loose=false;TW.err='';sugSkip=0;t
 function renderTrade(){
   $('trade-kicker').textContent=`${S.league.name||'My League'} · ${leagueTagline(S.league)}`;$('tr-intro').innerHTML=TR_INTRO[trView];
   document.querySelectorAll('#tr-seg button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.trv===trView));$('tr-build').hidden=trView!=='build';$('tr-ideas').hidden=trView!=='ideas';
-  twSync();twPaint();const tw=TW.prefs?twIdeas():null,fitOf=new Map((tw||[]).map(x=>[x.t,x.fit]));
+  if(typeof tdlTrade==='function')tdlTrade();twSync();twPaint();const tw=TW.prefs?twIdeas():null,fitOf=new Map((tw||[]).map(x=>[x.t,x.fit]));
   let sug=tw?tw.map(x=>x.t):pickDiverse(allTrades(),3,sugSkip);if(!tw)sugPool=allTrades().length;
   /* fill with alternatives from other teams; they may reuse one of your players, since you'd only make one of these deals */
   if(!tw&&sug.length<3){const used=new Set(sug.map(t=>t.team)),pool=allTrades(true).filter(t=>!used.has(t.team)&&!sug.some(x=>x.get.some(id=>t.get.includes(id))&&x.give.join()===t.give.join()));sug=sug.concat(pickDiverse(pool,3-sug.length,0,true,sug.some(t=>t.give.concat(t.get).some(id=>byId[id].pos==='QB'))?1:0))}
@@ -1844,9 +1846,14 @@ async function sleeperImport(i){
     /* same name: prefer the one on the same NFL team */
     const took=new Set();[true,false].forEach(sameTeam=>cands.forEach(([pid,sp])=>{const q=want.get(norm(sp.full_name));if(took.has(q.id)||(sameTeam&&sp.team!==q.t))return;pmap[pid]=q.id;took.add(q.id)}));rosters.forEach(r=>(r.players||[]).forEach(pid=>{const sp=SLEEPER_PLAYERS[pid];if(sp&&!pmap[pid]&&OFFK.includes(sp.position)){const q=findExact(sp.full_name,sp.position);if(q)pmap[pid]=q.id}}));
     real.src={type:'sleeper',league:lg.league_id,labels:rp.filter(x=>!['BN','IR','TAXI'].includes(x)),rid:Object.fromEntries(rosters.map((r,i)=>[r.roster_id,i])),pmap};
-    applyImport(lg.name,teams,sc,slots,'Sleeper',real,(()=>{const z=lg.settings||{};return {irOk:sleeperIrOk(z),format:['redraft','keeper','dynasty'][z.type]||'redraft',waiver:z.waiver_type===2?'faab':'priority',budget:z.waiver_budget||100}})())}
+    applyImport(lg.name,teams,sc,slots,'Sleeper',real,(()=>{const z=lg.settings||{};return {irOk:sleeperIrOk(z),tdl:sleeperTdl(z),format:['redraft','keeper','dynasty'][z.type]||'redraft',waiver:z.waiver_type===2?'faab':'priority',budget:z.waiver_budget||100}})())}
   catch(e){impMsg(e.blocked?BLOCKED_MSG:`<p class="note" style="color:var(--bad)">Import failed (${esc(e.message)}). Try again.</p>`)}
 }
+/* a league's trade deadline. Sleeper: a week number (the deadline is when that week's last game ends; 99 or 0 = none).
+   ESPN: an exact date and time. Kept on the league as {wk} or {at}; null when there isn't one. */
+function sleeperTdl(z){const w=+(z&&z.trade_deadline)||0;return w>=1&&w<=18?{wk:w}:null}
+function espnTdl(st){const t=+(st&&st.tradeSettings&&st.tradeSettings.deadlineDate)||0;return t>0?{at:t}:null}
+function setTdl(lg,v){if(!lg)return false;if(JSON.stringify(lg.tdl||null)===JSON.stringify(v||null))return false;lg.tdl=v||null;return true}
 /* which injury designations a Sleeper league allows in IR */
 function sleeperIrOk(z){z=z||{};return ['IR','PUP'].concat(z.reserve_allow_out?['O']:[],z.reserve_allow_doubtful?['D']:[],z.reserve_allow_sus?['SUS']:[])}
 const ESPN_KEY='tm-espn-login';
@@ -1897,12 +1904,12 @@ async function espnImport(id,creds){
     (d.teams||[]).forEach((t,i)=>{const L=((t.roster&&t.roster.entries)||[]).filter(e=>ESPN_SLOT[e.lineupSlotId]).map(e=>{const pl=e.playerPoolEntry&&e.playerPoolEntry.player,q=pl&&findExact(pl.fullName);return {label:ESPN_SLOT[e.lineupSlotId],el:SLOT_EL['e'+e.lineupSlotId],id:q?q.id:null}});
       L.sort((a,b)=>SLOT_ORDER.indexOf(a.label)-SLOT_ORDER.indexOf(b.label));if(L.length)real.lineups[i]=L});
     real.src={type:'espn',league:String(id),priv:!!creds,rid:Object.fromEntries((d.teams||[]).map((t,i)=>[t.id,i]))};if(creds)IMP.espnCreds=creds;
-    applyImport((st.name)||'ESPN League',teams,sc,slots,'ESPN',real,(()=>{const a=st.acquisitionSettings||{},dr=st.draftSettings||{};return {irOk:['IR','PUP','O'],format:dr.keeperCount>0?'keeper':'redraft',waiver:a.isUsingAcquisitionBudget?'faab':'priority',budget:a.acquisitionBudget||100}})());readEspnWeek(d)}
+    applyImport((st.name)||'ESPN League',teams,sc,slots,'ESPN',real,(()=>{const a=st.acquisitionSettings||{},dr=st.draftSettings||{};return {irOk:['IR','PUP','O'],tdl:espnTdl(st),format:dr.keeperCount>0?'keeper':'redraft',waiver:a.isUsingAcquisitionBudget?'faab':'priority',budget:a.acquisitionBudget||100}})());readEspnWeek(d)}
   catch(e){impMsg(`<p class="note" style="color:var(--bad)">Couldn't read that ESPN league (${esc(e.message)}).</p>`)}
 }
 function applyImport(name,teams,sc,slots,src,real,extra){window.TMT&&setTimeout(()=>{TMT.ev('league_import_succeeded',{platform:String(src).toLowerCase(),teams:teams.length,private_league:!!(real&&real.src&&real.src.priv)});TMT.people()},0);
   saveCurrentLeague();const key=real&&real.src?real.src.type+':'+real.src.league:'import:'+name,prev=(S.leagues||[]).find(x=>x.key===key);
-  let miss=0;S.league={...S.league,name,sc:{...BASE_SC,...((prev&&prev.snap.league.sc)||{}),...sc},slots:{...BASE_SLOTS,...slots}};S.league.teams=teams.length;if(extra){S.league.irOk=extra.irOk||null;S.league.format=extra.format;S.league.waiver=extra.waiver;S.league.budget=extra.budget}
+  let miss=0;S.league={...S.league,name,sc:{...BASE_SC,...((prev&&prev.snap.league.sc)||{}),...sc},slots:{...BASE_SLOTS,...slots}};S.league.teams=teams.length;if(extra){S.league.irOk=extra.irOk||null;S.league.format=extra.format;S.league.waiver=extra.waiver;S.league.budget=extra.budget;S.league.tdl=extra.tdl||null}
   teams.forEach(t=>t.names.forEach(x=>{if(typeof x==='object'&&!findExact(x.n,x.pos))addExtraPlayer(x.n,x.pos,x.t)}));setPool();
   const res=x=>{const p=typeof x==='object'?findExact(x.n,x.pos,x.t):findExact(x);return p&&p.id};
   S.teams=teams.map((t,i)=>({id:'t'+(i+1),name:t.name,players:[...new Set(t.names.map(x=>{const id=res(x);if(!id)miss++;return id}).filter(Boolean))],ir:[...new Set((t.ir||[]).map(res).filter(Boolean))]}));
@@ -2095,6 +2102,7 @@ document.addEventListener('click',e=>{
   if(d.hjump){const el=$('msg-'+d.hjump);if(el)el.scrollIntoView({behavior:'smooth',block:'start'});return}
   if(d.compare!==undefined){openCompare(d.compare);return}
   if(d.cmp){const [k,id]=d.cmp.split('|');if(CMP){CMP[k]=id;drawCompare()}return}
+  if(d.go&&t.classList.contains('al-i')){toggleAlerts(false);location.hash=d.go;return}
   if(d.open){openCard(d.open);return}
   if(d.hub){hubSel=d.hub;shotState=null;renderHub();$('team-manager').scrollIntoView({behavior:'smooth',block:'start'});return}
   if(t.id==='mclose'){closeCard();return}
@@ -3106,11 +3114,12 @@ function alertsList(){const me=S&&myTeam&&myTeam();if(!me||!V||!G)return [];cons
   if(typeof tmnMyTrades==='function')tmnMyTrades().forEach(x=>{const p=byId[x.pid];if(p)top.push({k:`trade-${x.pid}-${x.to}`,lvl:'trade',t:x.how==='move'?`${p.n} is now with the ${teamName(x.to)}`:`${p.n} was traded to the ${teamName(x.to)}`,d:`${x.from?x.from+' → ':''}${x.to}. Still on your roster; his role and matchups change with the new team.`,open:x.pid})});
   if(typeof tmnTop==='function'){const cut=Date.now()-5*864e5;tmnTop().items.filter(e=>(e.type==='top'||e.type==='second')&&(e.at||0)>cut&&byId[e.pid]).sort((a,b)=>(a.type==='top'?0:1)-(b.type==='top'?0:1)||b.pts-a.pts).slice(0,3)
     .forEach(e=>{const one=e.type==='top';top.push({k:`rank-${e.k}`,lvl:one?'n1':'n2',m:one?1:2,t:e.head,d:`${one?(e.overall?'#1 scorer in the NFL':'#1 '+(e.pos||'')+' in the NFL'):'#2 '+(e.pos||'')+' in the NFL'} · Week ${e.week} · ${f1(e.pts)} pts`,open:e.pid})})}
-  return [...top,...out]}
+  const dl=typeof tdlAlerts==='function'?tdlAlerts():[];
+  return [...dl.filter(a=>a.go),...top,...out,...dl.filter(a=>!a.go)]}
 function renderAlerts(){const b=$('alert-btn');if(!b)return;const {L,seen}=USER?alertsLive():{L:[],seen:new Set()},n=L.filter(a=>!seen.has(a.k)).length+(USER&&typeof tmnUnread==='function'&&tab!=='news'?tmnUnread():0);
   const c=$('alert-n');c.hidden=!n;c.textContent=n>9?'9+':n;b.setAttribute('aria-label',n?`Alerts, ${n} new`:'Alerts');
   const pop=$('alert-pop');if(!pop.hidden)paintAlerts(L,seen)}
-function paintAlerts(L,seen){const nn=typeof tmnUnread==='function'?tmnUnread():0;$('alert-pop').innerHTML=`<div class="al-h"><b>Alerts</b><span class="note">Week ${WEEK}</span></div>${nn?`<a class="al-news" href="#news"><b>${nn} new in News</b><span>Big plays from your players →</span></a>`:''}${L.length?`<div class="al-list">${alertDays(L).map(([day,A])=>`<div class="al-day">${day}</div>`+A.map(a=>`<button class="al-i ${a.lvl}${seen.has(a.k)?'':' new'}" data-open="${a.open}"><i>${a.m?a.m:''}</i><span><b>${esc(a.t)}</b><span>${esc(a.d)}</span></span></button>`).join('')).join('')}</div>`:'<p class="empty" style="margin:0">All clear. Nothing needs your attention right now.</p>'}`}
+function paintAlerts(L,seen){const nn=typeof tmnUnread==='function'?tmnUnread():0;$('alert-pop').innerHTML=`<div class="al-h"><b>Alerts</b><span class="note">Week ${WEEK}</span></div>${nn?`<a class="al-news" href="#news"><b>${nn} new in News</b><span>Big plays from your players →</span></a>`:''}${L.length?`<div class="al-list">${alertDays(L).map(([day,A])=>`<div class="al-day">${day}</div>`+A.map(a=>`<button class="al-i ${a.lvl}${seen.has(a.k)?'':' new'}" ${a.go?`data-go="${a.go}"`:`data-open="${a.open}"`}><i>${a.m?a.m:''}</i><span><b>${esc(a.t)}</b><span>${esc(a.d)}</span></span></button>`).join('')).join('')}</div>`:'<p class="empty" style="margin:0">All clear. Nothing needs your attention right now.</p>'}`}
 /* alerts split into Today / Yesterday / weekday by when each first showed up; most important first inside each day */
 function alertDays(L){const m=alertTimes(),now=new Date(),d0=new Date(now.getFullYear(),now.getMonth(),now.getDate()).getTime(),D=864e5,out=new Map();
   L.forEach(a=>{const c=(m[a.k]&&m[a.k].c)||Date.now(),k=c>=d0?0:Math.ceil((d0-c)/D);(out.get(k)||out.set(k,[]).get(k)).push(a)});
