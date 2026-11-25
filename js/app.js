@@ -2824,7 +2824,7 @@ function accLeagues(){const L=S.leagues||[],me=typeof myTeam==='function'&&S.tea
 /* Pricing grid: Free vs Pro with a Monthly/Annual toggle. Prices come from TM_PRICES in js/plan.js (and the PostHog
    "price-test" flag, off for now). Checkout isn't connected, so Pro says "Coming soon". */
 var PR_ANNUAL=false;
-function prTiers(){const P=typeof tmPrices==='function'?tmPrices():{monthly:5,annual:30,trialDays:7};return [
+function prTiers(){const P=typeof tmPrices==='function'?tmPrices():{monthly:5,annual:40,trialDays:7};return [
   {key:'free',name:'Free',monthly:0,annual:0,desc:'Rankings and top stories, free for everyone.',feat:['Rankings scored to your league','Top news stories around the league','Join a friend\'s mock draft by invite link']},
   {key:'pro',name:'Pro',monthly:P.monthly,annual:P.annual,trial:P.trialDays,desc:'Every tool for winning trades and your league.',feat:typeof TM_PRO_LIST!=='undefined'?TM_PRO_LIST:[],featured:true}]}
 const PR_CHECK='<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>';

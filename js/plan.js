@@ -12,7 +12,7 @@
 
 /* ---- price and plan details (no payments yet: the button says "Coming soon") ---- */
 var TM_PRICES={
-  base:{monthly:5,annual:30,trialDays:7},
+  base:{monthly:5,annual:40,trialDays:7},
   higher:{monthly:7,annual:50,trialDays:7}};      /* the second arm of the PostHog "price-test" flag (off for now) */
 var TM_PRO_LIST=['Trade analyzer, Trade Score and trade ideas','My Team: lineup, matchups and start or sit','Waiver wire, trade values and Season Sim','News on your players, alerts and big-play banners','AI Helper, mock drafts and your season recap'];
 /* what each locked thing is called on the upgrade screen */
@@ -35,7 +35,7 @@ function tmFree(){return !!tmUser()&&!tmIsPro()}
 function tmOpen(){return !tmUser()&&TM_PLAN.beta===false}
 /* the plan's name for the account area and for analytics */
 function tmPlanKey(){if(!tmUser())return 'none';if(TM_PLAN.uid===tmUser().id&&TM_PLAN.plan==='pro')return 'pro';return tmBeta()?'beta':'free'}
-/* prices to show: the "price-test" flag picks one; if it is off or can't load, the $5 / $30 default */
+/* prices to show: the "price-test" flag picks one; if it is off or can't load, the $5 / $40 default */
 function tmPrices(){let v=null;try{v=window.posthog&&posthog.getFeatureFlag?posthog.getFeatureFlag('price-test'):null}catch(e){}
   return {variant:v==='higher'?'higher':'base',...(v==='higher'?TM_PRICES.higher:TM_PRICES.base)}}
 

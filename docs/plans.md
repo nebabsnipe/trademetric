@@ -43,8 +43,8 @@ Refusals: signed out → 401 `signed_out`; free → 403 `pro_required`. During t
 - `supabase/plans.sql` adds `beta_users` (one row per account that existed during the beta) and marks every current account. While the beta is on, the server also marks each account when it opens the site (needs `SUPABASE_SECRET_KEY`, so production only). Run the file once more on the day the switch goes off.
 
 ## Prices
-- `TM_PRICES` in `js/plan.js`: $5 a month, $30 a year, 7-day free trial. The button says "Coming soon".
-- PostHog feature flag `price-test` (off): variant `higher` shows the second price set; anything else, or no flag, shows $5 / $30.
+- `TM_PRICES` in `js/plan.js`: $5 a month, $40 a year, 7-day free trial. The button says "Coming soon".
+- PostHog feature flag `price-test` (off): variant `higher` shows the second price set; anything else, or no flag, shows $5 / $40.
 
 ## Analytics
 `upgrade_screen_shown` (feature, price_variant), `upgrade_button_clicked`, `locked_tab_clicked`. Person properties `plan` (`beta` / `free` / `pro`) and `beta_user`.
