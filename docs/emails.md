@@ -1,6 +1,6 @@
 # Emails
 
-Status (2026-11-25): **built on the `emails` branch, not live.** `EMAIL_LIVE` is off, so every email goes only to
+Status (2026-11-25): **LIVE on main.** `EMAIL_LIVE` is on in Production, so emails go to real recipients. Previews are never live. The one-time announcement went to the 4 real accounts the same day. **The daily check is not scheduled yet** (`supabase/emails_cron.sql` has not been run), so no update emails go out until it is; the owner is choosing the start date. The two `tmtest_*` accounts' addresses are on the block list (`reason = invalid`).
 the owner's own inbox with the intended person shown in the subject.
 
 **2026-11-25 change (owner):** the first plan emailed almost nothing. The owner widened it the same day to a set of

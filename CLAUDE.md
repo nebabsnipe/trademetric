@@ -72,7 +72,7 @@ Longer plans and build notes are in `docs/`: offseason mode, season recap, trade
 - Never emailed: lineup alerts, live big plays, news or rumors, unverified trades.
 - Every fact in an email comes from the league's own data and is left out rather than risk being wrong (e.g. "#1 at his position" only when the whole position could be checked).
 - Every send goes through `sendEmail()` in `api/_email.js`. Never call the email service from anywhere else.
-- `EMAIL_LIVE` stays off (emails go only to the owner) until the owner says to go live. See `docs/emails.md`.
+- `EMAIL_LIVE` is on in Production (live since 2026-11-25), so real people get these emails. Don't switch on new kinds, change the schedule or send to everyone without the owner's say. See `docs/emails.md`.
 
 ## Phone layout
 - A separate phone layout switches automatically from desktop. It should feel app-like (like a native iPhone app), be easy to scroll, and have fewer click-into screens.
