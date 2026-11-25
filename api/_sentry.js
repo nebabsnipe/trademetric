@@ -138,7 +138,8 @@ export function withSentry(handler, route) {
     const json = res.json && res.json.bind(res), end = res.end.bind(res);
     if (json) res.json = b => { ctx.body = b; return json(b); };
     res.end = (...a) => {
-      const needs = ctx.feeds.length || res.statusCode >= 500;
+      // after a crash the crash itself is the report; the platform's own error reply must not count again
+      const needs = !ctx.thrown && (ctx.feeds.length || (res.statusCode >= 500 && res.statusCode < 600));
       if (!needs || ctx.ended) return end(...a);
       ctx.ended = true;
       report(ctx, res).catch(() => {}).finally(() => end(...a));
@@ -147,6 +148,7 @@ export function withSentry(handler, route) {
     try {
       return await als.run(ctx, () => handler(req, res));
     } catch (e) {
+      ctx.thrown = true;
       await report(ctx, null, e).catch(() => {});
       throw e;
     }
