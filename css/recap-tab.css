@@ -1,7 +1,10 @@
 /* Recap tab: the screen before the recap slideshow (js/recap-tab.js). Every class starts with rc-.
    Page colours come from the site's own variables; the phone frame keeps the recap's dark palette so it matches the cards. */
 .rc-tab{--rc-bg:#0d0d0d;--rc-text:#f4f4f5;--rc-muted:#a1a1aa;--rc-panel:#141417;--rc-border:#2a2a30;
-  --rc-fw:300px;--rc-fh:600px;--rc-fs:.7109;--rc-gap:20px;--rc-aw:56px;
+  /* the frame is sized from the window's height so the whole screen fits without scrolling:
+     --rc-vh is the video's height, its width follows from the video's own 390:844 shape, and the slide strip sits under it */
+  --rc-vh:clamp(400px,calc(100vh - 368px),650px);--rc-strip:95px;
+  --rc-fw:calc(var(--rc-vh) * 390 / 844 + 2px);--rc-fh:calc(var(--rc-vh) + var(--rc-strip) + 2px);--rc-fs:.64;--rc-gap:20px;--rc-aw:56px;
   display:flex;flex-direction:column;align-items:center;gap:16px;min-width:0}
 .rc-h{margin:0;font-family:var(--f-display);font-style:italic;font-weight:800;font-size:clamp(34px,4.4vw,46px);letter-spacing:.01em;text-transform:uppercase;line-height:.92;text-align:center}
 .rc-h span{color:var(--accent)}
@@ -43,26 +46,32 @@
 @keyframes rc-flip{0%{opacity:0;transform:scale(.86)}100%{opacity:1;transform:none}}
 
 /* the phone-shaped frame that plays the preview */
-.rc-frame{position:absolute;left:50%;top:0;width:var(--rc-fw);height:var(--rc-fh);margin-left:calc(var(--rc-fw) / -2);border-radius:34px;overflow:hidden;z-index:2;
+.rc-frame{position:absolute;left:50%;top:0;width:var(--rc-fw);height:var(--rc-fh);margin-left:calc(var(--rc-fw) / -2);border-radius:30px;overflow:hidden;z-index:2;display:flex;flex-direction:column;
   border:1px solid var(--rc-border);color:var(--rc-text);
   background-color:var(--rc-bg);background-image:linear-gradient(rgba(255,255,255,.035) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.035) 1px,transparent 1px);background-size:26px 26px;background-position:center;
   box-shadow:0 34px 80px rgba(0,0,0,.5),0 10px 26px rgba(0,0,0,.3)}
-/* the preview is the real recap page at its full 390x844 size, shrunk to the frame's height, so it looks exactly like the recap, only smaller */
-.rc-clip{position:absolute;left:50%;top:50%;width:390px;height:844px;border:0;background:transparent;pointer-events:none;color-scheme:light;
-  transform:translate(-50%,-50%) scale(var(--rc-fs));transform-origin:center}
-.rc-frame::after{content:"";position:absolute;left:0;right:0;bottom:0;height:150px;background:linear-gradient(transparent,rgba(13,13,13,.92) 62%);pointer-events:none}
-.rc-badge{position:absolute;top:14px;right:14px;z-index:2;padding:6px 10px;border-radius:99px;background:rgba(13,13,13,.72);border:1px solid var(--rc-border);color:var(--rc-text);
-  -webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);font-size:10px}
-.rc-save{appearance:none;position:absolute;left:10px;right:10px;bottom:78px;z-index:2;height:44px;border-radius:99px;border:1px solid var(--rc-border);background:rgba(20,20,23,.86);color:var(--rc-text);font:600 13px var(--f-body);cursor:pointer}
+/* the screen: exactly the video's 390:844 shape at the frame's width. The video is never cropped and nothing is drawn over it. */
+.rc-screen{position:relative;flex:none;width:100%;aspect-ratio:390/844;overflow:hidden;background:var(--rc-bg)}
+.rc-vid{position:absolute;inset:0;width:100%;height:100%;border:0;object-fit:contain;pointer-events:none;background:var(--rc-bg)}
+/* after the recap has been watched the screen shows the user's own recap: the real recap page at its full 390x844 size, shrunk to the screen */
+.rc-clip{position:absolute;left:0;top:0;width:390px;height:844px;border:0;background:transparent;pointer-events:none;color-scheme:light;
+  transform:scale(var(--rc-fs));transform-origin:0 0}
+.rc-frame[data-play="video"] .rc-clip,.rc-frame[data-play="clip"] .rc-vid{display:none}
+/* the strip under the video: which league is playing, and the slide-to-play track */
+.rc-strip{position:relative;flex:1;min-height:0;display:flex;flex-direction:column;align-items:stretch;justify-content:space-between;padding:9px 8px 8px;border-top:1px solid var(--rc-border);background:var(--rc-bg)}
+.rc-badge{display:flex;align-items:center;justify-content:center;gap:7px;height:14px;font-size:10px;line-height:1;color:var(--rc-muted);white-space:nowrap}
+.rc-badge::before{content:"";width:6px;height:6px;border-radius:50%;background:var(--accent)}
+.rc-save{appearance:none;position:absolute;left:8px;right:8px;bottom:100%;margin-bottom:8px;z-index:2;height:44px;border-radius:99px;border:1px solid var(--rc-border);background:rgba(20,20,23,.86);color:var(--rc-text);font:600 13px var(--f-body);cursor:pointer}
 
 /* slide to play */
-.rc-track{appearance:none;position:absolute;left:10px;right:10px;bottom:10px;z-index:2;height:58px;padding:0;border-radius:99px;overflow:hidden;
+.rc-track{appearance:none;position:relative;flex:none;z-index:2;height:58px;padding:0;border-radius:99px;overflow:hidden;
   border:1px solid color-mix(in srgb,var(--accent) 40%,transparent);background:rgba(13,13,13,.72);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);
   color:var(--rc-text);font:inherit;cursor:grab;touch-action:none;-webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent;--kx:0px;--p:0}
 .rc-track:active{cursor:grabbing}
 .rc-track:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
-.rc-trail{position:absolute;left:0;top:0;bottom:0;width:calc(var(--kx) + 34px);background:linear-gradient(90deg,transparent,color-mix(in srgb,var(--accent) 35%,transparent));pointer-events:none}
-.rc-tlabel{position:absolute;left:58px;right:52px;top:0;bottom:0;display:grid;place-items:center;font-size:14px;font-weight:600;letter-spacing:.01em;white-space:nowrap;pointer-events:none;
+/* the orange trail only shows once the knob has been moved: at rest the track is empty */
+.rc-trail{position:absolute;left:0;top:0;bottom:0;width:calc(var(--kx) + 34px);background:linear-gradient(90deg,transparent,color-mix(in srgb,var(--accent) 35%,transparent));pointer-events:none;opacity:calc(var(--p) * 8)}
+.rc-tlabel{position:absolute;left:58px;right:52px;top:0;bottom:0;display:grid;place-items:center;font-size:13px;font-weight:600;letter-spacing:.01em;white-space:nowrap;pointer-events:none;
   opacity:calc(1 - var(--p) / .6);
   color:transparent;background:linear-gradient(100deg,rgba(244,244,245,.6) 0 38%,#fff 50%,rgba(244,244,245,.6) 62% 100%) 0 0/250% 100%;-webkit-background-clip:text;background-clip:text;
   animation:rc-shimmer 2.4s linear infinite}
@@ -93,7 +102,7 @@ body[data-tab="recap"].rc-on main{padding-block:18px 24px}
 @media (max-width:1279px){.rc-tab{--rc-gap:12px;--rc-aw:48px}}
 /* phone */
 @media (max-width:699px){
-  .rc-tab{--rc-fw:280px;--rc-fh:590px;--rc-fs:.6991;gap:14px}
+  .rc-tab{--rc-vh:clamp(360px,calc(100vh - 398px),600px);gap:10px}
   .rc-row{width:100vw;gap:0}
   .rc-arrow{display:none}
   .rc-rail::before{width:440px;height:440px}

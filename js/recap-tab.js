@@ -1,6 +1,7 @@
 /* Recap tab: the screen people see before they start the recap slideshow.
-   A phone-shaped frame plays a small, silent loop of the real recap cards (recap.html in its "demo" mode), a slide-to-play
-   track opens the slideshow, and one side card per recap card sits either side (locked until the recap has been watched).
+   A phone-shaped frame plays the approved sample video (media/recap-sample.mp4) until the recap has been watched, then a
+   small silent loop of the user's own recap. A slide-to-play track in a strip under the video opens the slideshow, and
+   one side card per recap card sits either side (locked until the recap has been watched).
    Drawn by renderProTab (js/offseason.js) through rcTabRender. Styles: css/recap-tab.css. */
 (function () {
   // The recap's cards, in order (same names as the slideshow's own card list).
@@ -9,7 +10,7 @@
   var LOCK = '<svg class="rc-lock" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>';
   var CHEV = function (d) { return '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="' + d + '"/></svg>'; };
   var reduce = function () { return window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches; };
-  var T = { el: null, cards: CARDS, off: 0, unlocked: false, track: null, clip: '', mine: false, fresh: false, noReal: '' };
+  var T = { el: null, cards: CARDS, off: 0, unlocked: false, track: null, clip: '', mine: false, fresh: false, noReal: '', inView: true, io: null };
   var SEEN_LS = 'tm-recap-seen';   // this browser's copy of "watched", so the screen does not flash the locked look on load
 
   function season() { var n = new Date(); return n.getMonth() >= 7 ? n.getFullYear() : n.getFullYear() - 1; }
@@ -46,9 +47,23 @@
     if (a !== l) markSeen(k);   // one copy has it and the other does not: bring them level
     return a || l;
   }
-  /* what the frame plays: the user's own league once they have watched it, the sample league before that */
-  function clipSrc() { var l = myLeague(); return T.unlocked && l && T.noReal !== l ? '/recap?reel=1&league=' + encodeURIComponent(l) + '&year=' + season() : '/recap?reel=1&sample=1'; }
-  function setClip() { var f = q('.rc-clip'), u = clipSrc(); if (f && T.clip !== u) { T.clip = u; T.mine = false; f.src = u; badge(); } }
+  /* what the frame plays: the user's own league once they have watched it (a live page, T.clip is its address),
+     and before that the sample video file (T.clip is empty) */
+  function clipSrc() { var l = myLeague(); return T.unlocked && l && T.noReal !== l ? '/recap?reel=1&league=' + encodeURIComponent(l) + '&year=' + season() : ''; }
+  function setClip() {
+    var f = q('.rc-clip'), u = clipSrc(); if (!f) return;
+    if (T.clip !== u) { T.clip = u; T.mine = false; if (u) f.src = u; else f.removeAttribute('src'); badge(); }
+    sync();
+  }
+  /* the sample video only runs while it can be seen: not when the browser tab is hidden, the frame is off screen,
+     another site tab is showing, the slideshow is open on top, or "reduce motion" is on (then the still image stays) */
+  function sync() {
+    var v = q('.rc-vid'), fr = q('.rc-frame'); if (!v || !fr) return;
+    var vid = !T.clip; fr.dataset.play = vid ? 'video' : 'clip';
+    var on = vid && !reduce() && !document.hidden && T.inView && live() && !isOpen();
+    if (on) { if (v.paused) { var p = v.play(); if (p && p.catch) p.catch(function () {}); } }
+    else if (!v.paused) v.pause();
+  }
   function badge() { var b = q('.rc-badge'); if (b) b.textContent = T.mine ? 'Your league' : 'Sample league'; }
   function sideHtml() { var n = T.cards.length; return T.cards.map(function (c, i) { return '<button class="rc-side" type="button" data-rc-card="' + (i + 1) + '"><span class="rc-side-n">' + two(i + 1) + ' / ' + two(n) + '</span><span class="rc-side-t">' + c[1] + '</span><span class="rc-side-s"></span></button>'; }).join(''); }
   function chipHtml() { return T.cards.map(function (c, i) { return '<button class="rc-chip" type="button" data-rc-card="' + (i + 1) + '"><b>' + two(i + 1) + '</b>' + c[1] + '</button>'; }).join(''); }
@@ -71,11 +86,17 @@
         '<div class="rc-rail">' +
           sideHtml() +
           '<div class="rc-frame">' +
-            '<iframe class="rc-clip" title="" tabindex="-1" aria-hidden="true" loading="eager"></iframe>' +
+            /* the screen is exactly the video's shape (390:844); nothing sits on top of it */
+            '<div class="rc-screen">' +
+              '<video class="rc-vid" src="/media/recap-sample.mp4?v=3" poster="/media/recap-sample-poster.jpg?v=1" muted loop playsinline' + (reduce() ? ' preload="none"' : ' autoplay preload="auto"') + ' tabindex="-1" aria-hidden="true" disablepictureinpicture disableremoteplayback></video>' +
+              '<iframe class="rc-clip" title="" tabindex="-1" aria-hidden="true" loading="eager"></iframe>' +
+            '</div>' +
+            '<div class="rc-strip">' +
             '<span class="rc-badge"></span>' +
             '<button class="rc-save" type="button" hidden>Save video</button>' +
             '<button class="rc-track" type="button"><span class="rc-trail"></span><span class="rc-tlabel"></span><span class="rc-ring"></span>' +
               '<span class="rc-knob"><svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true"><path d="M7 4.5v15a1 1 0 0 0 1.5.86l12.5-7.5a1 1 0 0 0 0-1.72L8.5 3.64A1 1 0 0 0 7 4.5z"/></svg></span></button>' +
+            '</div>' +
           '</div>' +
         '</div>' +
         '<button class="rc-arrow" type="button" data-rc-move="1" aria-label="More cards">' + CHEV('M9.5 5.5L16 12l-6.5 6.5') + '</button>' +
@@ -84,6 +105,10 @@
       '<div class="rc-chips" aria-label="Recap cards">' + chipHtml() + '</div>' +
     '</div>';
     T.off = 0; T.clip = '';
+    var v = q('.rc-vid'); v.muted = true; v.defaultMuted = true; v.controls = false;
+    if (T.io) T.io.disconnect();
+    T.inView = true; T.io = null;
+    if ('IntersectionObserver' in window) { T.io = new IntersectionObserver(function (en) { T.inView = en[en.length - 1].isIntersecting; sync(); }, { threshold: .01 }); T.io.observe(q('.rc-frame')); }
     bindTrack(q('.rc-track'));
     paint();
     setClip();
@@ -106,6 +131,7 @@
   /* where each side card sits: four beside the frame on desktop (small, large | large, small), two on tablet, two peeking in on phone */
   function place() {
     var m = mode(), vis = shown(), u = T.unlocked, rail = q('.rc-rail'), fw = q('.rc-frame').offsetWidth || 300;
+    var sw = q('.rc-screen').clientWidth; if (sw) q('.rc-frame').style.setProperty('--rc-fs', (sw / 390).toFixed(4));   // the live page is drawn at 390 wide and shrunk to the screen
     var gap = m === 'desk' ? 20 : m === 'tablet' ? 12 : 20, sL = 1;
     if (m === 'tablet') sL = Math.max(.6, Math.min(1, (rail.clientWidth / 2 - fw / 2 - gap) / 200));
     var xL = fw / 2 + gap + 100 * sL, sS = .75, xS = xL + 100 * sL + gap + 100 * sS, far = xS + 190;
@@ -127,7 +153,7 @@
   }
 
   /* open the slideshow on top of the site (the layer is drawn by js/offseason.js) */
-  function openAt(card) { if (isOpen() || typeof tmoRecapOpen !== 'function') return; tmoRecapOpen(card || 1); }
+  function openAt(card) { if (isOpen() || typeof tmoRecapOpen !== 'function') return; tmoRecapOpen(card || 1); sync(); }
 
   /* ---------- the slide-to-play track ---------- */
   function bindTrack(tr) {
@@ -186,7 +212,7 @@
     if (d.rc === 'clip') {
       var f = q('.rc-clip'); if (!f || e.source !== f.contentWindow) return;
       if (d.ok) { T.mine = !d.sample; badge(); if (d.cards) setCards(d.cards); }
-      else if (T.clip.indexOf('sample=1') < 0) { T.noReal = myLeague(); setClip(); }   // their own recap would not load: keep the sample playing
+      else if (T.clip) { T.noReal = myLeague(); setClip(); }   // their own recap would not load: the sample video plays instead
     } else if (d.rc === 'watched' && d.league) {
       var k = d.league + ':' + d.year;
       markSeen(k);
@@ -222,7 +248,8 @@
     e.preventDefault(); T.track.complete();
   });
   /* back from the slideshow: put the knob back at the start */
-  document.addEventListener('tm-recap-close', function () { if (!T.el || !T.el.isConnected || !T.track) return; T.track.reset(); if (T.fresh) unlock(); });
+  document.addEventListener('tm-recap-close', function () { if (!T.el || !T.el.isConnected || !T.track) return; T.track.reset(); if (T.fresh) unlock(); sync(); });
+  document.addEventListener('visibilitychange', function () { if (T.el && T.el.isConnected) sync(); });
   var rz = 0;
   window.addEventListener('resize', function () { clearTimeout(rz); rz = setTimeout(function () { if (live()) { place(); if (T.track && !T.track.done) T.track.reset(); } }, 80); });
 })();
