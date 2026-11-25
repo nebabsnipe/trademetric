@@ -1428,7 +1428,7 @@ function weekChart(imp,get){const R=imp.rows;if(!R.length)return '';const n=R.le
 function renderRating(partner){
   const el=$('rating');
   if(!TD.give.length||!TD.get.length){el.innerHTML=`<div class="card-h"><h2>Trade rating</h2></div><div class="rt-empty"><b>Build a deal to see it graded</b></div>`;return}
-  const me=myTeam(),fr=fairness(TD.give,TD.get,partner.id),e=fr.e,hm=RATE_MODE==='hm',over=activeOf(me).filter(x=>!TD.give.includes(x)).length+TD.get.length-e.mine.irIn.length-rosterSize();
+  const me=myTeam(),fr=fairness(TD.give,TD.get,partner.id),e=fr.e;window.TMT&&TMT.rated(TD.give.length,TD.get.length,e.gYou);const hm=RATE_MODE==='hm',over=activeOf(me).filter(x=>!TD.give.includes(x)).length+TD.get.length-e.mine.irIn.length-rosterSize();
   const cls=v=>v>=0?'up':'down',row=(l,v,note)=>`<tr><td>${l}${note?`<span class="note"> · ${note}</span>`:''}</td><td class="r num ${cls(v)}">${sgn(v)}</td></tr>`,P=e.parts,rl=realism(e,TD.give,TD.get);
   const gcard=(who,g,big,line,sub,mine)=>`<div class="gcard ${g}${mine?' mine':''}"><span class="gc-who">${who}</span><b class="gc-g">${big}</b><span class="gc-line">${line}</span><span class="gc-sub">${sub}</span></div>`;
   const tile=(l,v,c,sub)=>`<div class="rt-tile"><span>${l}</span><b class="num ${c||''}">${v}</b>${sub?`<em>${sub}</em>`:''}</div>`;
@@ -1811,7 +1811,7 @@ function importGridHtml(){
 function renderImport(){const el=$('import-card');if(!el)return;const open=IMP.open??!S.imported;
   el.innerHTML=`<details class="imp-details" id="imp-details" ${open?'open':''}><summary><div><h2>Import your league</h2><span class="note">${S.imported?`Imported ${esc(S.imported.name)} from ${esc(S.imported.src)}. Open to re-import.`:'Pull in every team, roster and scoring setting at once'}</span></div><span class="chev" aria-hidden="true"></span></summary>${importGridHtml()}</details>`}
 function renderWelcome(){$('wl-import').innerHTML=`<div class="card-h"><h2>Connect your league</h2><span class="note">Teams, rosters and scoring in one step</span></div>${importGridHtml()}`}
-function impMsg(html){IMP.html=html;document.querySelectorAll('.imp-status').forEach(el=>el.innerHTML=html)}
+function impMsg(html){window.TMT&&TMT.imp(html);IMP.html=html;document.querySelectorAll('.imp-status').forEach(el=>el.innerHTML=html)}
 const BLOCKED_MSG=`<div class="callout neutral" style="color:var(--ink)"><b>Can't reach that site from this preview.</b> This version of TradeMetric runs in a locked-down preview that can't connect to other websites. The import is built and will work once TradeMetric runs on its own server. Until then, use a screenshot for each team below.</div>`;
 async function getJSON(url){let r;try{r=await fetch(url)}catch(e){const err=new Error('blocked');err.blocked=true;throw err}if(!r.ok)throw new Error('HTTP '+r.status);return r.json()}
 let SLEEPER_PLAYERS=null;
@@ -1907,7 +1907,7 @@ async function espnImport(id,creds){
     applyImport((st.name)||'ESPN League',teams,sc,slots,'ESPN',real,(()=>{const a=st.acquisitionSettings||{},dr=st.draftSettings||{};return {irOk:['IR','PUP','O'],tdl:espnTdl(st),format:dr.keeperCount>0?'keeper':'redraft',waiver:a.isUsingAcquisitionBudget?'faab':'priority',budget:a.acquisitionBudget||100}})());readEspnWeek(d)}
   catch(e){impMsg(`<p class="note" style="color:var(--bad)">Couldn't read that ESPN league (${esc(e.message)}).</p>`)}
 }
-function applyImport(name,teams,sc,slots,src,real,extra){
+function applyImport(name,teams,sc,slots,src,real,extra){window.TMT&&setTimeout(()=>{TMT.ev('league_import_succeeded',{platform:String(src).toLowerCase(),teams:teams.length,private_league:!!(real&&real.src&&real.src.priv)});TMT.people()},0);
   saveCurrentLeague();const key=real&&real.src?real.src.type+':'+real.src.league:'import:'+name,prev=(S.leagues||[]).find(x=>x.key===key);
   let miss=0;S.league={...S.league,name,sc:{...BASE_SC,...((prev&&prev.snap.league.sc)||{}),...sc},slots:{...BASE_SLOTS,...slots}};S.league.teams=teams.length;if(extra){S.league.irOk=extra.irOk||null;S.league.format=extra.format;S.league.waiver=extra.waiver;S.league.budget=extra.budget;S.league.tdl=extra.tdl||null}
   teams.forEach(t=>t.names.forEach(x=>{if(typeof x==='object'&&!findExact(x.n,x.pos))addExtraPlayer(x.n,x.pos,x.t)}));setPool();
@@ -2088,7 +2088,7 @@ const NEED_LG=['team','trade','season'];
 function howLink(k){return `<a class="how how-wrap" href="#help-${k}">How this works</a>`}
 const TAB_ALIAS={players:['rankings','rank'],waivers:['rankings','waiv'],values:['rankings','vals']};
 function go(t){let helpSec=null;if(t&&t.startsWith('help-')){helpSec=t.slice(5);t='help'}if(t&&t.startsWith('account-')){ACC_TAB=t.slice(8);t='account'}else if(t==='account')ACC_TAB='profile';if(t!==tab||t==='account'){ACC_EDIT=null;ACC_MSG=null}if(t==='trade-ideas'||t==='trade-builder'){setTrView(t==='trade-ideas'?'ideas':'build');t='trade'}if(TAB_ALIAS[t]){plView=TAB_ALIAS[t][1];t=TAB_ALIAS[t][0]}if(t==='draft'&&!DRAFT_ON){t='team';history.replaceState(null,'','#team')}if(t==='helper'){if(USER)openAI();t=TABS.includes(tab)?tab:'team';history.replaceState(null,'','#'+t)}if(!USER&&t!=='signin')t='signin';tab=TABS.includes(t)?t:'team';if(S&&S.noLeague&&NEED_LG.includes(tab))tab='welcome';document.body.dataset.tab=tab;if(tab!=='welcome'&&S&&!S.onboarded){S.onboarded=true;save()}document.querySelectorAll('.nav button').forEach(b=>{if(b.dataset.tab===tab)b.setAttribute('aria-current','page');else b.removeAttribute('aria-current')});
-  TABS.forEach(x=>$('v-'+x).hidden=x!==tab);render();window.scrollTo(0,0);if(tab==='help')openHelp(helpSec)}
+  TABS.forEach(x=>$('v-'+x).hidden=x!==tab);render();window.scrollTo(0,0);if(tab==='help')openHelp(helpSec);window.TMT&&TMT.page(tab)}
 function render(){({team:renderTeam,news:tmnRender,rankings:renderPlayers,draft:renderDraft,help:()=>{},trade:renderTrade,hub:renderHub,season:renderSeason,welcome:renderWelcome,league:fillLeagueForm,signin:renderSignin,account:renderAccount})[tab]();renderAlerts();if(openId&&!$('scrim').hidden)openCard(openId);queueBalance()}
 document.querySelectorAll('.nav button').forEach(b=>b.addEventListener('click',()=>{location.hash=b.dataset.hash||b.dataset.tab}));
 window.addEventListener('hashchange',()=>{closeCard();go(location.hash.slice(1))});
@@ -2359,15 +2359,15 @@ function checkUsername(raw){const u=String(raw||'').trim().toLowerCase();clearTi
   UN_STATE={u,ok:null,text:'Checking...'};paintUn();
   UN_T=setTimeout(async()=>{const {data,error}=await SB.rpc('username_available',{p_username:u});if(!UN_STATE||UN_STATE.u!==u)return;
     UN_STATE=error?{u,ok:null,text:"Can't check that right now"}:{u,ok:data!==false,text:data===false?'Taken. Try another.':'Available'};paintUn()},350)}
-function enterApp(){stopConfirmWatch();document.body.classList.remove('signed-out');setTimeout(syncNow,300);if(typeof tmnTopBanners==='function')setTimeout(()=>{tmnTopCatchUp();tmnTopBanners()},2000);AUTH_MODE='in';AUTH_MSG=null;PENDING=null;AUTH_VALS={};UN_STATE=null;
+function enterApp(){window.TMT&&TMT.people();stopConfirmWatch();document.body.classList.remove('signed-out');setTimeout(syncNow,300);if(typeof tmnTopBanners==='function')setTimeout(()=>{tmnTopCatchUp();tmnTopBanners()},2000);AUTH_MODE='in';AUTH_MSG=null;PENDING=null;AUTH_VALS={};UN_STATE=null;
   let t=INTENDED&&TABS.includes(INTENDED.replace(/-.*/,''))&&INTENDED!=='signin'?INTENDED:'team';INTENDED=null;if(!S.onboarded)t='welcome';
   if(location.hash.slice(1)===t)go(t);else location.hash=t}
 function showSignin(){if(tab!=='signin'){if(location.hash==='#signin')go('signin');else location.hash='signin'}else renderSignin()}
-function leaveApp(){stopConfirmWatch();document.body.classList.add('signed-out');cloudReset();USER=null;PROFILE=null;PROFILE_OK=false;AUTH_MODE='in';AUTH_MSG=null;ACC_EDIT=null;showSignin();acctUI()}
+function leaveApp(){window.TMT&&TMT.reset();stopConfirmWatch();document.body.classList.add('signed-out');cloudReset();USER=null;PROFILE=null;PROFILE_OK=false;AUTH_MODE='in';AUTH_MSG=null;ACC_EDIT=null;showSignin();acctUI()}
 function authFail(t){AUTH_BUSY=false;AUTH_MSG={bad:true,html:esc(friendly(t))};renderSignin()}
 function authNote(h){AUTH_BUSY=false;AUTH_MSG={bad:false,html:h};renderSignin()}
 /* Everything that happens once someone is signed in, however they got there (form, code, link, Google, another tab). */
-async function signedIn(user,fresh){SIGNING=true;USER=user;startSessionClock(fresh);acctUI();cloudReset();cloudPull('signin');try{await loadProfile()}finally{SIGNING=false}if(!USER||USER.id!==user.id)return;
+async function signedIn(user,fresh){SIGNING=true;USER=user;window.TMT&&TMT.auth(user,fresh);startSessionClock(fresh);acctUI();cloudReset();cloudPull('signin');try{await loadProfile()}finally{SIGNING=false}if(!USER||USER.id!==user.id)return;
   if(AUTH_MODE==='recover')return;
   if(!PROFILE&&PROFILE_OK&&!lsGet(SKIP_UN+user.id)){AUTH_MODE='username';AUTH_MSG=null;AUTH_BUSY=false;AUTH_VALS={};UN_STATE=null;showSignin();return}
   if(AUTH_MODE==='confirmed'||AUTH_MODE==='reset'){AUTH_BUSY=false;showSignin();return}
@@ -3158,7 +3158,7 @@ function drRec(k){const B=draftBoard(),taken=drTaken(),mine=drMine(),av2=B.list.
 function drBot(k){const B=draftBoard(),taken=drTaken(),t=drTeamAt(k),ids=DR.picks.filter(x=>x.t===t).map(x=>x.id),r=seed('dr'+k+DR.picks.length+(DR.salt||0));
   const av3=B.list.filter(x=>!taken.has(x.id)),kd=['K','DST'].map(P=>av3.find(x=>byId[x.id].pos===P)).filter(Boolean);
   const c=av3.filter(x=>!['K','DST'].includes(byId[x.id].pos)).slice(0,40).concat(kd).map(x=>({id:x.id,s:x.v*drNeedF(ids,byId[x.id].pos,k)*(.8+.4*r())})).sort((a,b)=>b.s-a.s)[0];return c&&c.id}
-function drPick(id){if(!DR||DR.picks.length>=DR.n*DR.R||drTaken().has(id))return;const k=DR.picks.length;DR.picks.push({id,t:drTeamAt(k),k});saveLive();if(DR.mode==='mock')drRun();else renderDraft()}
+function drPick(id){if(!DR||DR.picks.length>=DR.n*DR.R||drTaken().has(id))return;const k=DR.picks.length;DR.picks.push({id,t:drTeamAt(k),k});saveLive();if(DR.mode==='mock'&&DR.picks.length===DR.n*DR.R&&window.TMT)TMT.ev('mock_draft_finished',{teams:DR.n,rounds:DR.R});if(DR.mode==='mock')drRun();else renderDraft()}
 function drRun(){clearTimeout(DR_TIMER);renderDraft();if(!DR||DR.mode!=='mock'||!DR.started)return;const k=DR.picks.length;if(k>=DR.n*DR.R)return;if(drTeamAt(k)===DR.slot-1){if(DR.fast){DR.fast=false;renderDraft()}return}
   DR_TIMER=setTimeout(()=>{if(!DR||tab!=='draft')return;const id=drBot(k);if(!id)return;DR.picks.push({id,t:drTeamAt(k),k});drRun()},DR.fast?0:140)}
 function renderDraft(){document.querySelectorAll('#dr-seg button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.dr===drView));
