@@ -23,7 +23,7 @@ Fantasy football trades, rankings and lineup advice built on your league's exact
 | `scripts/tm_snapshot.mjs` | Daily TradeMetric Rankings snapshot (runs in the daily job, writes `data/tmhist.json`, kept 32 days) for the offseason News impact line |
 | `scripts/yt_channels.py` | Finds each team's official YouTube channel ID (runs in the daily job, writes `data/yt_channels.json`) |
 | `js/recap-video.js` | The season recap's "Save video": draws a 15-second highlight reel on a canvas and records it in the browser |
-| `js/mockdraft.js`, `css/mockdraft.css` | Mock drafts on the offseason Draft Tools tab: entry page, lobby, draft room, board, results |
+| `js/mockdraft.js`, `css/mockdraft.css` | Mock drafts on the offseason Mock Drafts tab: entry page, lobby, draft room, board, results |
 | `api/draft.js` | Server for mock drafts: rooms, rules, CPU drafting, the pick clock and grades. `node scripts/test-mockdraft.mjs` checks it; add `dump 3` to print three simulated drafts |
 | `supabase/mockdraft.sql` | Tables for mock draft rooms. Run once after accounts_v2.sql |
 | `api/_players.js` (answers `/api/players`, through `api/market.js`) | Compact Sleeper player list used to sync rosters in the background |

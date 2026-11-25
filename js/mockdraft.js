@@ -184,7 +184,7 @@ function mdHomeRender(el){
   const hist=(H&&H.results)||mdAcct('mdHist',[])||[],lob=(H&&H.lobbies)||[],rooms=!H||H.rooms;
   const card=(k,ic,h,p,body)=>`<section class="md-mode" data-md-spot><span class="md-mode-ic md-mode-${k}">${ic}</span><h2>${h}</h2><p>${p}</p>${body}</section>`;
   el.innerHTML=`<div class="md-home">
-    <div class="md-hero"><div><div class="kicker">TradeMetric Pro · Draft Tools</div><h1>Mock drafts</h1>
+    <div class="md-hero"><div><div class="kicker">TradeMetric Pro</div><h1>Mock Drafts</h1>
       <p>Practice against teams that draft like real leagues, with a live clock and a board that fills in. Finish and get your draft graded.</p></div></div>
     ${resume?`<div class="md-resume"><div><b>You have a draft in progress</b><span>${resume.teams} teams · pick ${Math.min(resume.cur+1,resume.total)} of ${resume.total}</span></div><div class="md-resume-b"><button class="btn accent" type="button" data-md="resume">Resume draft</button><button class="btn ghost" type="button" data-md="discard">Discard</button></div></div>`:''}
     <div class="md-modes">
@@ -261,7 +261,7 @@ function mdResume(){return mdBusy(async()=>{const H=MD.home,c=mdAcct('mdSolo',nu
 function mdDiscard(){return mdBusy(async()=>{mdDlgClose();const H=MD.home,id=MD.room?MD.room.id:H&&H.solo?H.solo.room:null;if(id&&!(MD.carry&&!H))await mdApi('abandon',{room:id});MD.carry=null;mdAcctSet('mdSolo',null);MD.home=null;mdLeaveLocal()})}
 function mdLeave(){return mdBusy(async()=>{mdDlgClose();const r=MD.room;if(!r)return;if(r.mode!=='solo'&&r.status!=='done'){await mdApi('leave',{room:r.id});mdPing()}try{if(location.hash.startsWith('#draft/'))history.replaceState(null,'','#drafttools')}catch(e){}MD.home=null;mdLeaveLocal()})}
 function mdAskLeave(){const r=MD.room;if(!r)return;if(r.status==='done'||r.status==='lobby'&&r.mode==='solo')return mdLeave();
-  if(r.mode==='solo')return mdConfirm('Leave this draft?','Your draft is saved. You can pick it up again from Draft Tools.','Leave','leave-yes');
+  if(r.mode==='solo')return mdConfirm('Leave this draft?','Your draft is saved. You can pick it up again from Mock Drafts.','Leave','leave-yes');
   if(r.status==='lobby')return mdConfirm('Leave the room?',r.host===MD.you?'The next person in the room becomes the host.':'Your seat opens up for someone else.','Leave','leave-yes');
   mdConfirm('Leave this draft?','The draft keeps going and your team is picked automatically.','Leave draft','leave-yes')}
 
@@ -523,7 +523,7 @@ function mdUndo(){return mdBusy(async()=>{clearTimeout(MD.revT);const j=await md
 /* ---------- results ---------- */
 function mdResultsRender(el){
   const r=MD.room,res=r.results||[],seat=MD.ui.res==null?(MD.you>=0?MD.you:0):MD.ui.res,g=res[seat],n=r.settings.teams,mine=seat===MD.you;
-  if(!g){el.innerHTML=`<div class="md-results"><p class="note">This draft has no grade yet.</p><button class="btn" type="button" data-md="home">Back to Draft Tools</button></div>`;return}
+  if(!g){el.innerHTML=`<div class="md-results"><p class="note">This draft has no grade yet.</p><button class="btn" type="button" data-md="home">Back to Mock Drafts</button></div>`;return}
   const nm=id=>MD.by[id]?MD.by[id].n:'—',first=!MD.ui.revealed||MD.ui.revealed!==r.id;MD.ui.revealed=r.id;
   const picks=[];for(let k=0;k<MD.picks.length;k++)if(mdSeatAt(k,n)===seat)picks.push(k);
   const bar=(k,l)=>{const p=g.pos[k];return p?`<li><span>${l}</span><span class="md-bar"><i style="--w:${Math.max(6,p.bar)}%"></i></span><b class="md-g md-g-${p.grade[0]}">${p.grade}</b><small>${mdOrd(p.rank)}</small></li>`:''};
@@ -531,7 +531,7 @@ function mdResultsRender(el){
   el.innerHTML=`<div class="md-results${first&&!mdCalm()?' md-reveal':''}">
     <div class="md-res-top"><div><div class="kicker">Draft complete · ${n} teams · ${MD_SC[r.settings.scoring]}</div><h1>${mine?'Your draft grade':esc(s.name)}</h1></div>
       <div class="md-res-act"><select data-md-change="res" aria-label="Team">${r.seats.map((x,i)=>`<option value="${i}"${i===seat?' selected':''}>${i===MD.you?'My team':esc(x.name)}${res[i]?' · '+res[i].grade:''}</option>`).join('')}</select>
-        <button class="btn accent" type="button" data-md="again">Draft again</button><button class="btn" type="button" data-md="share-card">Share</button><button class="btn ghost" type="button" data-md="home">Back to Draft Tools</button></div></div>
+        <button class="btn accent" type="button" data-md="again">Draft again</button><button class="btn" type="button" data-md="share-card">Share</button><button class="btn ghost" type="button" data-md="home">Back to Mock Drafts</button></div></div>
     <div class="md-bento">
       <section class="md-tile md-grade" id="md-grade"><span class="md-grade-l md-g-${g.grade[0]}">${esc(g.grade)}</span><div class="md-grade-m"><b><span data-md-num="${g.rank}">${g.rank}</span>${mdOrd(g.rank).replace(/\d+/,'')} of ${n}</b><span>${mine?'Your team':esc(s.name)} ranks ${mdOrd(g.rank)} in this draft room.</span>${s.strat?`<span class="md-strat">Drafted like: ${esc(s.strat)}</span>`:''}</div></section>
       <section class="md-tile"><h3>Best value</h3>${g.best?`<b class="md-tile-b">${esc(nm(g.best.id))}</b><p>Picked ${mdOrd(g.best.pick)} overall, <span class="md-up-t">${g.best.d} later</span> than his ADP of ${g.best.adp}.</p>`:'<p class="note">No pick fell past his ADP.</p>'}</section>

@@ -21,7 +21,7 @@ Built on branch **`offseason-mode`** (Vercel preview). Not merged to main. A **P
 **Done (2026-11-14, commit d0def9b):**
 - **Player breakdown trimmed.** The panel under a ranking row now has only: the three score bars (Experts, Market, TradeMetric model), expected points per game, and receiving role (WOPR) for RB/WR/TE. Depth chart, offense, points over expected and age were removed from the panel (age stays in the row subtitle). The weights and formula are not shown anywhere.
 - **TradeMetric take** (Pro) in the same panel — see the section below.
-- **Pro tabs in the offseason nav:** Home, Rankings, **Recap** (`#recap`), **Draft Tools** (`#drafttools`, pick values + mock drafts), **League Fit** (`#leaguefit`).
+- **Pro tabs in the offseason nav:** Home, Rankings, **Recap** (`#recap`), **Mock Drafts** (`#drafttools`, pick values + mock drafts), **League Fit** (`#leaguefit`).
   - Signed out: each tab has a small lock; the page says what the tool does with a **Sign in free** button (beta copy).
   - Signed in (Pro): a **Coming soon** page for each tool.
   - Signed in without Pro (after the beta): "See Pro plans" button.
@@ -43,7 +43,7 @@ The live site's changes through 2026-11-25 (account sync, shared news store, New
 
 ## Mock drafts (built 2026-11-25, on the preview branch)
 
-The Draft Tools tab (`#drafttools`) is now the mock draft entry page for anyone signed in. Signed out it stays the locked page, with a small looping board preview. Draft pick values is still Coming soon.
+The Mock Drafts tab (formerly Draft Tools, still `#drafttools`) is now the mock draft entry page for anyone signed in. Signed out it stays the locked page, with a small looping board preview. Draft pick values is still Coming soon.
 
 - **Three ways to draft, one draft room:** Draft vs CPU (starts at once), Draft with friends (private room, invite link `#draft/<code>`), Join an online draft (three public lobbies from presets, 3-minute countdown from the first person in, Quick join, choose your spot). Empty seats are always filled by CPU teams.
 - **Files:** `js/mockdraft.js` (everything on the page), `css/mockdraft.css` (all classes start with `md-`), `api/draft.js` (rooms, rules, CPU drafting, clock, grades), `supabase/mockdraft.sql` (tables), `scripts/test-mockdraft.mjs` (checks). Small hooks: `renderProTab` in `js/offseason.js`, `go()` and `enterApp()` in `js/app.js` (the `#draft/<code>` link), `index.html` (files, FAQ entry "Mock drafts"), `vercel.json` (data files bundled with the function).

@@ -186,7 +186,7 @@ function renderOffHome(){
       <p>The rankings are free. Pro turns them into decisions for your team.${TMO_BETA_PRO?' <b>Free for every account during the beta.</b>':''}</p></div>
       ${pro?`<span class="tmo-pro-on">${TMO_BETA_PRO?'Pro active · free during beta':'Pro active'}</span>`:`<a class="btn accent" href="${signed?'#account':'#signin'}">${signed?'See Pro plans':TMO_BETA_PRO?'Sign in for free Pro':'Sign in to get Pro'}</a>`}
     </div>
-    <div class="tmo-tools">${TOOLS.map(([h,p,k])=>`<div class="tmo-tool"><div class="tmo-tool-h"><h3>${h}</h3>${pro?'':'<span class="tmo-lock">'+TMO_LOCK+'Pro</span>'}</div><p>${p}</p>${k==='trade'||k==='picks'||k==='fit'?'<span class="tmo-soon">Coming soon</span>':k==='recap'?'<a class="tmo-link" href="#recap">Open Recap →</a>':k==='mock'?'<a class="tmo-link" href="#drafttools">Open Draft Tools →</a>':''}</div>`).join('')}</div>
+    <div class="tmo-tools">${TOOLS.map(([h,p,k])=>`<div class="tmo-tool"><div class="tmo-tool-h"><h3>${h}</h3>${pro?'':'<span class="tmo-lock">'+TMO_LOCK+'Pro</span>'}</div><p>${p}</p>${k==='trade'||k==='picks'||k==='fit'?'<span class="tmo-soon">Coming soon</span>':k==='recap'?'<a class="tmo-link" href="#recap">Open Recap →</a>':k==='mock'?'<a class="tmo-link" href="#drafttools">Open Mock Drafts →</a>':''}</div>`).join('')}</div>
   </section>
   ${TMO_IS_PREVIEW&&!TMO_BETA_PRO?`<p class="tmo-dev note">Preview only: <button class="btn small" type="button" data-tmo-pro>${pro?'View as free':'View as Pro'}</button> Consensus and market numbers use this season's rest-of-season data until the offseason feeds are added.</p>`:''}`;
 }
@@ -287,7 +287,7 @@ var TMO_PAGES={
   recap:{nav:'Recap',h:'Season Recap',lead:'Your whole season, card by card. See what won you games, what cost you, and how you stacked up against your league.',
     pts:['Your best and worst trades, graded with what happened after','Your best waiver pickup and the points it added','How your standing moved week to week','A final card you can save and share'],
     cards:[['Trades, graded again','Every deal you made, re-graded with how the players really finished.'],['Your season in numbers','Points for and against, luck, your best week and your worst.'],['A card to share','One clean summary card to drop in your league chat.']]},
-  drafttools:{nav:'Draft Tools',h:'Draft Tools',lead:'Go into your draft with a plan. Know what every pick is worth, and practice until the board stops surprising you.',
+  drafttools:{nav:'Mock Drafts',h:'Mock Drafts',lead:'Go into your draft with a plan. Know what every pick is worth, and practice until the board stops surprising you.',
     pts:['Mock drafts against CPU teams that change strategy every run','Draft with friends from an invite link, or join an online lobby','A live pick clock, a queue and a board that fills in','A draft grade when you finish'],
     cards:[['Mock drafts','Practice from your real draft slot against opponents that draft like real leagues.'],['Draft grade','Finish a mock and see where you won value and where you reached.'],['Pick values (coming soon)','Is 1.04 worth more than 1.07 plus a 3rd? See the answer before you say yes.']]},
   leaguefit:{nav:'League Fit',h:'League Fit',lead:'The TradeMetric Rankings, re-sorted for your league. Your scoring, your roster spots and what your team needs.',

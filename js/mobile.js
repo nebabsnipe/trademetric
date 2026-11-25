@@ -33,7 +33,7 @@
   const scrim=document.createElement('div');scrim.className='m-sheet-scrim';
   const sheet=document.createElement('div');sheet.className='m-sheet';sheet.setAttribute('role','dialog');sheet.setAttribute('aria-label','More');
   // Offseason mode lists the Pro tools (m-off); in-season lists the league pages (m-in). The css shows the right set.
-  const LINKS=[['recap','Recap','m-off'],['drafttools','Draft Tools','m-off'],['leaguefit','League Fit','m-off'],['season','Season Sim','m-in'],['hub','League','m-in'],['account','Account',''],['help','How it works','']];
+  const LINKS=[['recap','Recap','m-off'],['drafttools','Mock Drafts','m-off'],['leaguefit','League Fit','m-off'],['season','Season Sim','m-in'],['hub','League','m-in'],['account','Account',''],['help','How it works','']];
   sheet.innerHTML=LINKS.map(([t,l,c])=>`<a href="#${t}" data-m="${t}"${c?` class="${c}"`:''}>${svg(IC[t])}${l}${c==='m-off'?`<span class="nav-lock">${svg(IC.lock)}Pro</span>`:''}</a>`).join('')+`<button type="button" data-m="theme">${svg(IC.theme)}Dark mode<small></small></button>`;
   document.body.append(scrim,sheet);
   const isDark=()=>{const t=document.documentElement.getAttribute('data-theme');return t?t==='dark':matchMedia('(prefers-color-scheme: dark)').matches};
