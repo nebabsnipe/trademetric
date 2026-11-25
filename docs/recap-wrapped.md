@@ -217,6 +217,7 @@ The card list is now the 12-card build prompt (league trades, your trades + podi
   - **The unlock** plays once, when the slideshow is closed after the last card was reached: side cards fade up left to right, the locks give way to "Open card", the badge flips.
   - **Hooks added to `js/recap.js`:** it tells the site when the last card is reached, and the small preview tells the site which league and cards it is playing (or that it failed).
   - `?unlocked=1` is removed. The hint under the frame says "This one is yours. Pick any card to jump in." until Save video ships, then "Save it, or pick any card" comes back.
+- **Frame preview tidy-up (2026-11-25):** the preview page is loaded at the recap's full 390x844 size and shrunk to the frame, so it looks exactly like the recap. In the preview the TM mark is hidden along with the buttons and counter (the progress bars stay). With "reduce motion" on, the preview stays still on card 1 instead of playing. The preview's address is `/recap?demo=1` (`&sample=1` for the sample league); `?embed=1` was already taken by the full recap that opens on top of the site.
 - **Phase 3 (not started):** the Save video button in the frame stays hidden. Note: a browser-made "Save video" already exists on the slideshow's last card (`js/recap-video.js`).
 
 - **Planned (owner, 2026-11-25):** the landing screen's layout is approved. Its theme and colours will be changed later to feel more like football. Not started; wait for the owner's direction before restyling.

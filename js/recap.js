@@ -14,9 +14,9 @@
   var side = document.getElementById('rc-side');
   var TITLES = { leagueTrades: 'League trades', myTrades: 'Your trades', best: 'Best trade', worst: 'Worst trade', defining: 'Defining trade', fleece: 'Biggest fleece',
     waivers: 'Waiver wire', timelapse: 'Season timelapse', bestWeeks: 'Best weeks', beatdown: 'Biggest beatdown', clutch: 'Clutch', share: 'Your recap card' };
-  if (DEMO) AUTOPLAY = true;
-  // the small preview has no buttons or card counter: nothing in it can be pressed
-  if (DEMO) { all('[data-act]').forEach(function (el) { el.style.visibility = 'hidden'; }); var dc = one('[data-v="counter"]'); if (dc) dc.parentNode.style.visibility = 'hidden'; }
+  // the small preview plays by itself and loops; with "reduce motion" on it stays still on the first card.
+  // It has no buttons, card counter or TM mark (only the progress bars along the top): nothing in it can be pressed.
+  if (DEMO) { all('[data-act]').forEach(function (el) { el.style.visibility = 'hidden'; }); var dc = one('[data-v="counter"]'); if (dc) dc.parentNode.style.visibility = 'hidden'; var dm = one('a.rc-k[href="/"]'); if (dm) dm.style.visibility = 'hidden'; }
 
   // Every possible card, in order. `on` decides whether this recap has real data for it.
   var ALL = [
