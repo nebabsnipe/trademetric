@@ -18,7 +18,7 @@ let DOWN_UNTIL = 0, LAST = '';
 export const sharedState = () => ({ on: !!KEY, err: LAST || undefined });
 
 /* one REST call. Returns parsed JSON (or true for an empty reply), or null on any failure. Never throws. */
-async function rest(path, { method = 'GET', body, prefer, ms = 2500 } = {}) {
+export async function rest(path, { method = 'GET', body, prefer, ms = 2500 } = {}) {
   if (!KEY || Date.now() < DOWN_UNTIL) return null;
   const ctl = new AbortController(), t = setTimeout(() => ctl.abort(), ms);
   try {

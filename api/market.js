@@ -2,6 +2,8 @@
 // at Vercel's edge. The daily data job still saves a copy (data/market.json) as the fallback,
 // along with KeepTradeCut, which only updates daily.
 import players from './_players.js';
+import report from './_report.js';
+import { withSentry } from './_sentry.js';
 
 async function fc(qbs) {
   const r = await fetch(`https://api.fantasycalc.com/values/current?isDynasty=false&numQbs=${qbs}&numTeams=12&ppr=1`, {
@@ -16,9 +18,7 @@ async function fc(qbs) {
   return out;
 }
 
-export default async function handler(req, res) {
-  /* /api/players is served from here too (see the rewrite in vercel.json), to stay inside Vercel's limit of 12 functions */
-  if (req.query && req.query.fn === 'players') return players(req, res);
+async function handler(req, res) {
   try {
     const [one, two] = await Promise.all([fc(1).catch(() => []), fc(2).catch(() => [])]);
     if (one.length < 50 && two.length < 50) throw new Error('empty');
@@ -28,4 +28,15 @@ export default async function handler(req, res) {
     res.setHeader('Cache-Control', 'public, s-maxage=60');
     return res.status(502).json({ error: 'Market values unavailable' });
   }
+}
+
+const market = withSentry(handler, 'market');
+
+/* /api/players and /api/report are served from here too (see the rewrites in vercel.json), to stay inside Vercel's
+   limit of 12 functions. Each keeps its own error-report label. */
+export default function route(req, res) {
+  const fn = req.query && req.query.fn;
+  if (fn === 'players') return players(req, res);
+  if (fn === 'report') return report(req, res);
+  return market(req, res);
 }

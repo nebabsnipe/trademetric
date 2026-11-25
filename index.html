@@ -9,13 +9,19 @@ if(location.hostname==='trademetric-rho.vercel.app')location.replace('https://ww
 <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png?v=3">
 <link rel="icon" type="image/png" sizes="512x512" href="/icon-512.png?v=3">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png?v=3">
+<link rel="manifest" href="/manifest.webmanifest?v=1">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="TradeMetric">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
 <meta name="theme-color" content="#141414">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600;700;800&family=Kanit:ital,wght@0,700;0,800;1,600;1,700;1,800&display=swap">
 <meta name="description" content="Fantasy football trades, rankings and lineup advice built on your league's exact settings.">
-<link rel="stylesheet" href="css/styles.css?v=51">
+<link rel="stylesheet" href="css/styles.css?v=52">
 <link rel="stylesheet" href="css/mockdraft.css?v=6">
 <link rel="stylesheet" href="css/recap-tab.css?v=2">
+<script src="js/telemetry.js?v=4"></script>
 </head>
 <body class="signed-out">
 <div class="topbar">
@@ -114,6 +120,7 @@ if(location.hostname==='trademetric-rho.vercel.app')location.replace('https://ww
   <section class="view" id="v-trade" hidden>
     <div class="hero"><div><div class="kicker" id="trade-kicker"></div><h1>Trades</h1><p id="tr-intro"></p></div></div>
     <div class="tr-tabs" id="tr-seg" role="group" aria-label="Trade views"><button type="button" data-trv="build" aria-pressed="true">Trade builder</button><button type="button" data-trv="ideas" aria-pressed="false">Trade ideas<span class="tr-n" id="tr-n"></span></button></div>
+    <div id="tr-dl" hidden></div>
     <div class="tr-sec" id="tr-build">
       <div class="grid2 grid-trade">
         <div class="stack">
@@ -353,7 +360,7 @@ if(location.hostname==='trademetric-rho.vercel.app')location.replace('https://ww
 <script>
 /* Load the stats snapshot, then start the app */
 fetch('data/nfl.json',{cache:'no-cache'}).then(r=>r.json()).then(d=>{
-  window.NFL_DATA=d;const n=document.createElement('script');n.src='js/news.js?v=29';n.onload=n.onerror=()=>{const o=document.createElement('script');o.src='js/offseason.js?v=17';o.onload=o.onerror=()=>{const f=document.createElement('script');f.src='js/offnews.js?v=5';f.onload=f.onerror=()=>{const k=document.createElement('script');k.src='js/mockdraft.js?v=7';k.onload=k.onerror=()=>{const s=document.createElement('script');s.src='js/app.js?v=40';s.onload=()=>{const m=document.createElement('script');m.src='js/mobile.js?v=6';document.body.appendChild(m);const q=document.createElement('script');q.src='js/polish.js?v=5';document.body.appendChild(q)};document.body.appendChild(s)};document.body.appendChild(k)};document.body.appendChild(f)};document.body.appendChild(o)};document.body.appendChild(n);
+  window.NFL_DATA=d;const n=document.createElement('script');n.src='js/news.js?v=31';n.onload=n.onerror=()=>{const o=document.createElement('script');o.src='js/offseason.js?v=17';o.onload=o.onerror=()=>{const f=document.createElement('script');f.src='js/offnews.js?v=5';f.onload=f.onerror=()=>{const k=document.createElement('script');k.src='js/mockdraft.js?v=7';k.onload=k.onerror=()=>{const s=document.createElement('script');s.src='js/app.js?v=42';s.onload=()=>{const dl=document.createElement('script');dl.src='js/deadline.js?v=1';document.body.appendChild(dl);const m=document.createElement('script');m.src='js/mobile.js?v=7';document.body.appendChild(m);const q=document.createElement('script');q.src='js/polish.js?v=5';document.body.appendChild(q);const u=document.createElement('script');u.src='js/push.js?v=3';document.body.appendChild(u)};document.body.appendChild(s)};document.body.appendChild(k)};document.body.appendChild(f)};document.body.appendChild(o)};document.body.appendChild(n);
 }).catch(()=>{document.body.insertAdjacentHTML('afterbegin','<p style="padding:20px;font-family:sans-serif">Could not load player data. Refresh to try again.</p>')});
 </script>
 </body>

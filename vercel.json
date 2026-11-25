@@ -71,6 +71,24 @@
           "value": "public, max-age=0, must-revalidate"
         }
       ]
+    },
+    {
+      "source": "/sw.js",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-store, max-age=0, must-revalidate"
+        }
+      ]
+    },
+    {
+      "source": "/manifest.webmanifest",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=0, must-revalidate"
+        }
+      ]
     }
   ],
   "redirects": [
@@ -103,6 +121,10 @@
     },
     "api/draft.js": {
       "includeFiles": "data/{nfl,market,tmhist}.json"
+    },
+    "api/push.js": {
+      "maxDuration": 60,
+      "includeFiles": "data/nfl.json"
     }
   },
   "cleanUrls": true,
@@ -118,6 +140,14 @@
     {
       "source": "/api/players",
       "destination": "/api/market?fn=players"
+    },
+    {
+      "source": "/api/report",
+      "destination": "/api/market?fn=report"
+    },
+    {
+      "source": "/api/push/:do",
+      "destination": "/api/push?do=:do"
     }
   ]
 }

@@ -47,6 +47,8 @@ The Mock Drafts tab (formerly Draft Tools, still `#drafttools`) is now the mock 
 
 Finished drafts in **My mock drafts** can be deleted with the trash button on each row (asks to confirm first). This only removes it from your own list; other people in that draft keep theirs.
 
+Live-site changes through 2026-11-25 evening (trade deadline alerts, phone/desktop push alerts, Sentry monitoring, usage tracking) are merged in. To stay at 12 server functions, `/api/report` is now served through `api/market.js` (file `api/_report.js`), the same way `/api/players` is.
+
 - **Three ways to draft, one draft room:** Draft vs CPU (starts at once), Draft with friends (private room, invite link `#draft/<code>`), Join an online draft (three public lobbies from presets, 3-minute countdown from the first person in, Quick join, choose your spot). Empty seats are always filled by CPU teams.
 - **Files:** `js/mockdraft.js` (everything on the page), `css/mockdraft.css` (all classes start with `md-`), `api/draft.js` (rooms, rules, CPU drafting, clock, grades), `supabase/mockdraft.sql` (tables), `scripts/test-mockdraft.mjs` (checks). Small hooks: `renderProTab` in `js/offseason.js`, `go()` and `enterApp()` in `js/app.js` (the `#draft/<code>` link), `index.html` (files, FAQ entry "Mock drafts"), `vercel.json` (data files bundled with the function).
 - **Player order:** "ADP" in the room is the blend of expert rank and market value the rankings already load, adjusted for the room's scoring (and the superflex market numbers in superflex rooms). The source is never named. TM rank and the vs-market chip sit beside it; the pool can be sorted by TM rank with tier dividers. Kickers and defenses are in the data, so they are in the pool, placed in the last three rounds.

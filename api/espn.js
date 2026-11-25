@@ -2,10 +2,11 @@
 // ESPN has no sign-in for outside apps. Private leagues are read with the two
 // login cookies ESPN puts in your browser (espn_s2 and SWID). This function
 // forwards them to ESPN for one request and never stores or logs them.
+import { withSentry } from './_sentry.js';
 
 const VIEWS = ['mTeam', 'mRoster', 'mSettings', 'mMatchupScore'];
 
-export default async function handler(req, res) {
+async function handler(req, res) {
   res.setHeader('Cache-Control', 'no-store');
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
@@ -42,3 +43,5 @@ export default async function handler(req, res) {
     return res.status(502).json({ code: 'upstream', error: "Couldn't reach ESPN. Try again." });
   }
 }
+
+export default withSentry(handler, 'espn');
