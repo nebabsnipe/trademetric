@@ -79,7 +79,7 @@
       dsn: SENTRY_DSN,
       environment: ENV,
       release: 'trademetric@' + BUILD,
-      sendDefaultPii: false,
+      dataCollection: { userInfo: false, httpBodies: [], httpHeaders: { deny: ['forwarded', '-ip', 'remote-', 'via', '-user', 'cookie', 'authorization'] }, cookies: { deny: ['forwarded', '-ip', 'remote-', 'via', '-user'] }, urlQueryParams: { deny: ['forwarded', '-ip', 'remote-', 'via', '-user', 'apikey', 'token'] } },   // no IP addresses or other personal data
       integrations: [Sentry.browserTracingIntegration()],
       tracesSampleRate: 0.05,                                  // 1 in 20 page loads timed; keeps volume low
       tracePropagationTargets: [/^\/api\//],
@@ -100,7 +100,7 @@
         if (ev.request) { if (ev.request.url) ev.request.url = scrub(ev.request.url); delete ev.request.cookies; }
         if (ev.message) ev.message = scrub(ev.message);
         (ev.exception && ev.exception.values || []).forEach(function (x) { x.value = scrub(x.value); });
-        if (ev.user) ev.user = ev.user.id ? { id: ev.user.id } : undefined;   // the Supabase user id only
+        ev.user = ev.user && ev.user.id ? { id: ev.user.id, ip_address: null } : { ip_address: null };   // the Supabase user id only; null stops Sentry from filling in the IP
         return sentryTags(ev);
       },
     });

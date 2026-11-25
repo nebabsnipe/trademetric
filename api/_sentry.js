@@ -52,9 +52,9 @@ async function sdk() {
       dsn: DSN,
       environment: ENV,
       release: SHA ? 'trademetric-api@' + SHA : undefined,
-      sendDefaultPii: false,                                           // no IPs, cookies or headers
+      dataCollection: { userInfo: false, httpBodies: [], httpHeaders: { deny: ['forwarded', '-ip', 'remote-', 'via', '-user', 'cookie', 'authorization'] }, cookies: { deny: ['forwarded', '-ip', 'remote-', 'via', '-user'] }, urlQueryParams: { deny: ['forwarded', '-ip', 'remote-', 'via', '-user', 'apikey', 'token'] } },   // no IP addresses or other personal data
       defaultIntegrations: false,                                      // only what we report by hand
-      beforeSend(ev) { if (ev.request) { delete ev.request.cookies; delete ev.request.headers; delete ev.request.data; } return ev; },
+      beforeSend(ev) { if (ev.request) { delete ev.request.cookies; delete ev.request.headers; delete ev.request.data; } ev.user = { ip_address: null }; return ev; },
     });
     return (Sentry = S);
   }).catch(() => (loading = null));
