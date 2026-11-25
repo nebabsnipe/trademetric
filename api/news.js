@@ -481,4 +481,4 @@ async function handler(req, res) {
 
 /* Free for everyone: the league-wide top stories (league, trades) and their recaps. Pro: news about your own
    players (feed, batch, one player's card). Refused for non-Pro callers once the beta switch is off (api/_plan.js). */
-export default withSentry(proOnly(handler, req => { const q = req.query || {}; return !(q.league || q.trades || q.recap || q.probe); }), 'news');
+export default withSentry(proOnly(handler, req => { const q = req.query || {}; return !(q.league || q.trades || q.recap || q.probe || q.off); }), 'news');
