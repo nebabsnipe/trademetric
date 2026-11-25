@@ -146,14 +146,20 @@ body.md-in-room main.wrap{padding-bottom:0}
 .md-icon .md-snd-on{display:none}.md-icon.md-on .md-snd-on{display:inline}.md-icon.md-on .md-snd-off{display:none}.md-icon.md-on{color:var(--accent)}
 .md-turnbar{display:none}
 
-.md-strip{display:flex;gap:6px;overflow:hidden;flex-shrink:0;-webkit-mask-image:linear-gradient(90deg,#000 88%,transparent);mask-image:linear-gradient(90deg,#000 88%,transparent)}
-.md-strip.md-slide{animation:md-slide .36s var(--md-ease)}
-@keyframes md-slide{from{transform:translateX(64px)}}
-.md-up{display:flex;align-items:center;gap:7px;padding:5px 10px 5px 6px;border-radius:99px;border:1px solid var(--line);background:var(--surface);flex-shrink:0;max-width:170px}
-.md-up>span:not(.md-av){display:flex;flex-direction:column;min-width:0;line-height:1.15}.md-up small{font:600 10px/1.1 var(--f-mono);color:var(--muted)}.md-up b{font-size:11.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.md-up.md-now{border-color:var(--ink);box-shadow:inset 0 0 0 1px var(--ink)}
-.md-up.md-me{background:var(--accent-soft);border-color:color-mix(in srgb,var(--accent) 55%,var(--line))}.md-up.md-me b{color:var(--accent)}
-.md-up.md-done-t{font-weight:600;padding:8px 14px}
+.md-strip{flex-shrink:0;overflow:hidden;border:1px solid var(--line);border-radius:var(--r);background:var(--surface);-webkit-mask-image:linear-gradient(90deg,#000 90%,transparent);mask-image:linear-gradient(90deg,#000 90%,transparent)}
+.md-strip-in{display:flex;align-items:stretch;height:44px}
+.md-strip.md-slide .md-strip-in{animation:md-slide .42s var(--md-ease)}
+@keyframes md-slide{from{transform:translateX(72px);opacity:.6}}
+.md-up{display:flex;flex-direction:column;justify-content:center;gap:3px;flex-shrink:0;min-width:104px;max-width:150px;padding:0 14px;border-right:1px solid var(--line);line-height:1}
+.md-up small{font:600 10px/1 var(--f-mono);letter-spacing:.04em;color:var(--muted);white-space:nowrap}
+.md-up b{font-size:12px;font-weight:600;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.md-up.md-now{background:var(--ink);border-right-color:var(--ink);min-width:132px}
+.md-up.md-now small{color:color-mix(in srgb,var(--surface) 62%,transparent);font-family:var(--f-body);font-weight:700;letter-spacing:.1em;text-transform:uppercase;font-size:9.5px}
+.md-up.md-now b{color:var(--surface);font-size:13px}
+.md-up.md-me{box-shadow:inset 0 -2px 0 var(--accent)}.md-up.md-me small,.md-up.md-me b{color:var(--accent)}
+.md-up.md-now.md-me{background:var(--accent);border-right-color:var(--accent);box-shadow:none}.md-up.md-now.md-me small,.md-up.md-now.md-me b{color:var(--accent-ink)}
+.md-up-rd{display:flex;align-items:center;flex-shrink:0;padding:0 9px;border-right:1px solid var(--line);background:var(--surface-2)}
+.md-up-rd span{font:700 10px/1 var(--f-mono);letter-spacing:.04em;color:var(--muted)}
 
 .md-main{position:relative;flex:1;min-height:0;display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:12px;padding-bottom:12px}
 .md-pool,.md-side{display:flex;flex-direction:column;min-height:0;border:1px solid var(--line);border-radius:var(--r);background:var(--surface);box-shadow:var(--shadow);overflow:hidden}
@@ -316,7 +322,7 @@ body.md-in-room main.wrap{padding-bottom:0}
   .md-top-r{gap:4px}.md-board-btn,#md-sim{display:none}
   .md-top-r{flex-basis:100%;justify-content:flex-end}.md-next{display:inline;order:-1;margin:0 auto 0 0;font-size:12.5px}
   .md-hl{order:3;flex:1 1 100%}.md-hl-in{padding:5px 10px 5px 6px}.md-hl-t b{font-size:15px}.md-top-r{order:4}
-  .md-strip{overflow-x:auto;scrollbar-width:none;padding:8px 12px;border-bottom:1px solid var(--line);background:var(--surface);-webkit-mask-image:none;mask-image:none}.md-strip::-webkit-scrollbar{display:none}
+  .md-strip{overflow-x:auto;scrollbar-width:none;border-radius:0;border-left:0;border-right:0;border-top:0;-webkit-mask-image:none;mask-image:none}.md-strip::-webkit-scrollbar{display:none}.md-strip-in{height:40px}.md-up{min-width:92px;padding:0 12px}
   .md-turnbar{display:block;order:5;padding:9px 12px;background:var(--accent);color:var(--accent-ink);font-weight:700;text-align:center;font-size:13.5px}.md-turnbar[hidden]{display:none}
   .md-main{display:flex;flex-direction:column;gap:0;padding:0}
   .md-pool,.md-side{border:0;border-radius:0;box-shadow:none;flex:1;display:none}
@@ -352,8 +358,9 @@ body.md-in-room main.wrap{padding-bottom:0}
 /* ---------- round 2: jerseys, team tags, the pick headline, favorites, slider, stepper ---------- */
 .md-jy{display:block;width:30px;height:30px;flex-shrink:0}.md-jy svg{display:block;width:100%;height:100%;filter:drop-shadow(0 1px 1px rgba(0,0,0,.2))}
 .md-jy-sm{width:24px;height:24px}.md-jy-lg{width:42px;height:42px}.md-jy-xl{width:52px;height:52px}
-.md-tmc{--tc:#3a3f47;--tt:#fff;display:inline-grid;place-items:center;min-width:32px;height:18px;padding:0 5px;border-radius:4px;background:var(--tc);color:var(--tt);font:700 10px/1 var(--f-body);font-style:normal;letter-spacing:.05em;box-shadow:inset 0 0 0 1px rgba(255,255,255,.16);flex-shrink:0}
-.md-tmc.md-fa{background:var(--surface-3);color:var(--muted)}
+.md-tmc{font:600 10.5px/1 var(--f-body);font-style:normal;letter-spacing:.04em;color:var(--muted);flex-shrink:0}
+.md-tmc::before{content:"·";margin-right:5px;opacity:.6}
+.md-hl-r .md-tmc::before,.md-roster li .md-tmc::before{content:none}
 .md-favm{display:inline-block;margin-left:5px;color:#E8A900;vertical-align:-1px}
 .md-posseg button[data-v="FAV"]{color:#E8A900}
 .md-roster li .md-tmc{margin-left:auto}.md-roster li small{min-width:44px;text-align:right}
@@ -376,7 +383,7 @@ body.md-in-room main.wrap{padding-bottom:0}
 .md-hl-new{animation:md-hl .5s var(--md-spring)}.md-hl-new .md-jy{animation:md-hl-jy .6s var(--md-spring)}
 @keyframes md-hl{from{opacity:0;transform:translateY(-16px) scale(.96)}}
 @keyframes md-hl-jy{from{transform:rotate(-14deg) scale(.5)}}
-.md-top.md-turn .md-hl-in{background:rgba(0,0,0,.2);border-color:rgba(255,255,255,.22);color:#fff}.md-top.md-turn .md-hl small{color:rgba(255,255,255,.8)}
+.md-top.md-turn .md-hl-in{background:rgba(0,0,0,.2);border-color:rgba(255,255,255,.22);color:#fff}.md-top.md-turn .md-hl small,.md-top.md-turn .md-hl .md-tmc{color:rgba(255,255,255,.8)}
 .md-nx{font-weight:700;color:var(--ink)}.md-turn .md-nx{color:inherit}
 /* teams: the usual sizes as chips, anything else on a small stepper */
 .md-teams{display:flex;flex-direction:column;gap:8px}.md-teams .md-seg{display:flex}.md-teams .md-seg button{flex:1}
