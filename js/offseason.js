@@ -186,7 +186,7 @@ function renderOffHome(){
       <p>The rankings are free. Pro turns them into decisions for your team.${TMO_BETA_PRO?' <b>Free for every account during the beta.</b>':''}</p></div>
       ${pro?`<span class="tmo-pro-on">${TMO_BETA_PRO?'Pro active · free during beta':'Pro active'}</span>`:`<a class="btn accent" href="${signed?'#account':'#signin'}">${signed?'See Pro plans':TMO_BETA_PRO?'Sign in for free Pro':'Sign in to get Pro'}</a>`}
     </div>
-    <div class="tmo-tools">${TOOLS.map(([h,p,k])=>`<div class="tmo-tool"><div class="tmo-tool-h"><h3>${h}</h3>${pro?'':'<span class="tmo-lock">'+TMO_LOCK+'Pro</span>'}</div><p>${p}</p>${k==='trade'||k==='picks'?'<span class="tmo-soon">Coming soon</span>':''}</div>`).join('')}</div>
+    <div class="tmo-tools">${TOOLS.map(([h,p,k])=>`<div class="tmo-tool"><div class="tmo-tool-h"><h3>${h}</h3>${pro?'':'<span class="tmo-lock">'+TMO_LOCK+'Pro</span>'}</div><p>${p}</p>${k==='trade'||k==='picks'||k==='fit'?'<span class="tmo-soon">Coming soon</span>':k==='recap'?'<a class="tmo-link" href="#recap">Open Recap →</a>':k==='mock'?'<a class="tmo-link" href="#drafttools">Open Draft Tools →</a>':''}</div>`).join('')}</div>
   </section>
   ${TMO_IS_PREVIEW&&!TMO_BETA_PRO?`<p class="tmo-dev note">Preview only: <button class="btn small" type="button" data-tmo-pro>${pro?'View as free':'View as Pro'}</button> Consensus and market numbers use this season's rest-of-season data until the offseason feeds are added.</p>`:''}`;
 }
@@ -302,12 +302,16 @@ function renderProTab(){
     if(signed){if(code){try{sessionStorage.removeItem('md-join')}catch(e){}MD.join=code}mdRender();return}
     document.body.classList.remove('md-in-room');
   }
-  const chip=pro?'<span class="tmo-soon-chip">Coming soon</span>':`<span class="tmo-lock">${TMO_LOCK}Pro</span>`;
-  const cta=pro?`<p class="tmo-pp-note"><b>You’re in.</b> ${TMO_BETA_PRO?'Pro is free for your account during the beta, and ':'It’s part of your Pro plan, and '}${esc(P.h)} will show up here as soon as it’s ready.</p>
+  const live=key==='recap';/* the Season Recap slideshow is built (recap.html); the other pages are still on the way */
+  const sample=live?'<a class="btn tmo-big" href="/recap?sample=1">See a sample recap</a>':'';
+  const chip=pro?(live?'':'<span class="tmo-soon-chip">Coming soon</span>'):`<span class="tmo-lock">${TMO_LOCK}Pro</span>`;
+  const cta=pro&&live?`<p class="tmo-pp-note"><b>Your recap is ready.</b> It plays like a slideshow, about a minute start to finish. Tap to move through the cards.</p>
+      <div class="tmo-cta"><a class="btn accent tmo-big" href="/recap">Open your recap</a>${sample}</div>`
+    :pro?`<p class="tmo-pp-note"><b>You’re in.</b> ${TMO_BETA_PRO?'Pro is free for your account during the beta, and ':'It’s part of your Pro plan, and '}${esc(P.h)} will show up here as soon as it’s ready.</p>
       <div class="tmo-cta"><a class="btn tmo-big" href="#tmrank">See the rankings</a></div>`
-    :signed?`<p class="tmo-pp-note">${esc(P.h)} is part of TradeMetric Pro.</p><div class="tmo-cta"><a class="btn accent tmo-big" href="#account-plan">See Pro plans</a></div>`
+    :signed?`<p class="tmo-pp-note">${esc(P.h)} is part of TradeMetric Pro.</p><div class="tmo-cta"><a class="btn accent tmo-big" href="#account-plan">See Pro plans</a>${sample}</div>`
     :`<p class="tmo-pp-note">${TMO_BETA_PRO?'<b>Pro is free during the beta.</b> Sign in and it’s yours, no card needed.':'Sign in to get TradeMetric Pro.'}</p>
-      <div class="tmo-cta"><a class="btn accent tmo-big" href="#signin">${TMO_BETA_PRO?'Sign in free':'Sign in'}</a><a class="btn tmo-big" href="#tmrank">See the free rankings</a></div>`;
+      <div class="tmo-cta"><a class="btn accent tmo-big" href="#signin">${TMO_BETA_PRO?'Sign in free':'Sign in'}</a>${sample||'<a class="btn tmo-big" href="#tmrank">See the free rankings</a>'}</div>`;
   el.innerHTML=`<div class="tmo-pp">
     <div class="tmo-pp-main">
       <div class="tmo-pp-k"><span class="kicker">TradeMetric Pro</span>${chip}</div>

@@ -475,12 +475,18 @@
   function params() {
     var q = new URLSearchParams(location.search), m = location.pathname.match(/\/recap\/(\d+)(?:\/(\d{4}))?/);
     var now = new Date(), season = now.getMonth() >= 7 ? now.getFullYear() : now.getFullYear() - 1;
-    return { league: q.get('league') || (m && m[1]) || '', year: +(q.get('year') || (m && m[2]) || season), dev: q.get('dev') };
+    return { league: q.get('league') || (m && m[1]) || '', year: +(q.get('year') || (m && m[2]) || season), dev: q.get('dev'), sample: q.has('sample') };
   }
   function espnCreds() { try { var c = JSON.parse(localStorage.getItem('tm-espn-login') || 'null'); return c && c.s2 && c.swid ? c : null; } catch (e) { return null; } }
 
   async function load() {
     var p = params();
+    // sample recap: a made-up league, so anyone can see what a recap looks like
+    if (p.sample) {
+      var sr = await fetch('/data/recap-sample.json');
+      if (!sr.ok) throw { code: 'upstream' };
+      return sr.json();
+    }
     // local testing only: build straight from the league's public data for a given team
     if (p.dev && /^(localhost|127\.0\.0\.1)$/.test(location.hostname)) {
       window.process = window.process || { env: {} };
