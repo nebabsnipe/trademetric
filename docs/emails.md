@@ -52,8 +52,11 @@ in-site alert or a phone push. **If in doubt, don't email.**
 - **Safety switch.** Unless `EMAIL_LIVE` is `1` **and** it's the real site, every email goes only to the owner's
   address, with `[TEST, for someone@...]` at the start of the subject. Preview deployments are never live.
   Test sends are recorded apart from real ones, so testing never uses up a real send.
-- **From address.** Test sends use `noreply@trademetric.app`. Live sending refuses to start until `EMAIL_FROM` is
-  set on purpose.
+- **From and reply addresses.** The name shown is always TradeMetric. Account emails (welcome, league stopped
+  updating, and the Supabase sign-in codes) come from `support@trademetric.app` and replies go to `support@`. Big
+  moments come from `updates@trademetric.app` and replies also go to `support@`. Override with
+  `EMAIL_FROM_ACCOUNT`, `EMAIL_FROM_UPDATES`, `EMAIL_REPLY_TO`. **`support@` has to be an inbox someone reads
+  before `EMAIL_LIVE` is switched on** (trademetric.app can't receive mail in Resend today).
 - **Failed sends** are reported to Sentry and leave no record, so the next check tries again.
 - **Nothing sends if anything is missing** (database, key, link secret): it fails closed.
 
@@ -79,16 +82,16 @@ Read from the league's own platform on the server. Never a projection or a win c
 1. **Supabase -> SQL Editor:** run `supabase/emails.sql`.
 2. **Vercel -> Settings -> Environment Variables**, Production and Preview:
    `RESEND_API_KEY`, `EMAIL_LINK_SECRET` (a long random value; signs unsubscribe links, so don't change it later),
-   `RESEND_WEBHOOK_SECRET` (from step 3). Before going live also `EMAIL_FROM` and `EMAIL_REPLY_TO`.
-   Optional: `EMAIL_POSTAL` (a mailing address shown in the footer). Already there: `SUPABASE_SECRET_KEY`, `CRON_SECRET`.
+   `RESEND_WEBHOOK_SECRET` (from step 3). Optional: `EMAIL_POSTAL` (a mailing address shown in the footer). Already there: `SUPABASE_SECRET_KEY`, `CRON_SECRET`.
 3. **Resend -> Webhooks -> Add:** endpoint `https://www.trademetric.app/api/email/hook`, events `email.bounced`
    and `email.complained`. Copy its signing secret into `RESEND_WEBHOOK_SECRET`.
 4. **Supabase Auth emails:** Authentication -> Emails. SMTP is already Resend (host `smtp.resend.com`, port `465`,
-   username `resend`, password = a Resend API key, sender name `TradeMetric`). Paste `supabase/email/confirm-signup.html`
+   username `resend`, password = a Resend API key, sender name `TradeMetric`, sender address `support@trademetric.app`). Paste `supabase/email/confirm-signup.html`
    into *Confirm signup* and `reset-password.html` into *Reset password*; the subject line is in the comment at the
    top of each file.
 5. **Schedule:** after merging, run `supabase/emails_cron.sql` (once a day, same password as the push schedule).
-6. **Go live:** set `EMAIL_LIVE` to `1` in Production only, and redeploy.
+6. **Make `support@trademetric.app` a real inbox** that someone reads (e.g. forwarding at the domain host, or Resend receiving).
+7. **Go live:** set `EMAIL_LIVE` to `1` in Production only, and redeploy.
 
 ## Trying it by hand
 

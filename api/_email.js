@@ -13,7 +13,7 @@
 //      to the owner's own address only, with the person it was meant for shown in the subject
 //
 // Needs in Vercel (see docs/emails.md): RESEND_API_KEY, EMAIL_LINK_SECRET, SUPABASE_SECRET_KEY.
-// Optional: EMAIL_LIVE, EMAIL_FROM, EMAIL_REPLY_TO, EMAIL_TEST_TO, EMAIL_POSTAL.
+// Optional: EMAIL_LIVE, EMAIL_FROM_ACCOUNT, EMAIL_FROM_UPDATES, EMAIL_REPLY_TO, EMAIL_TEST_TO, EMAIL_POSTAL.
 
 import { createHmac, createHash, timingSafeEqual } from 'node:crypto';
 import { rest as dbRest, sharedOn } from './_shared.js';
@@ -21,7 +21,12 @@ import { render, LABEL } from './_email_templates.js';
 
 const SITE = 'https://www.trademetric.app';
 const OWNER_ID = '1cf5c595-1619-4ffc-bb69-b042382443f3';        // the site owner's account: where test-mode emails go
-const DEFAULT_FROM = 'noreply@trademetric.app';                 // test sends only. Going live needs EMAIL_FROM set on purpose
+/* Who each kind of email comes from. Account emails (welcome, league stopped updating) come from support@ and
+   replies go to support@. Big moments come from updates@ and replies also go to support@, so nobody who replies
+   is ignored. Override with EMAIL_FROM_ACCOUNT, EMAIL_FROM_UPDATES, EMAIL_REPLY_TO. The name shown is always
+   TradeMetric. The reply inbox has to exist before EMAIL_LIVE is switched on (docs/emails.md). */
+const FROM = { account: 'support@trademetric.app', updates: 'updates@trademetric.app' };
+const REPLY = 'support@trademetric.app';
 
 /* The kinds of email. big = a "big moment" (has a switch, an unsubscribe link and the one-a-day limit).
    rank decides which one wins when two are due on the same day. on:false = built, but not sent yet. */
@@ -134,7 +139,6 @@ export async function sendEmail(user, type, key, data = {}, opts = {}) {
   if (!user.email) return out('no_address');
   if (!io.storeOn()) return out('not_ready');                               // can't check for repeats: send nothing
   if (T.big && linkSecret().length < 16) return out('not_ready');           // no unsubscribe link: send nothing
-  if (live && !process.env.EMAIL_FROM) return out('not_ready');             // the "from" address is chosen on purpose before going live
 
   const blocked = await isBlocked(user.email);
   if (blocked === null) return out('not_ready');
@@ -174,13 +178,13 @@ export async function sendEmail(user, type, key, data = {}, opts = {}) {
   }
   const un = T.big ? unsubUrl(user.id, type) : '';
   const m = render(type, data, { base: siteBase(), unsubUrl: un, postal: process.env.EMAIL_POSTAL || '' });
-  const from = process.env.EMAIL_FROM || DEFAULT_FROM;
+  const from = (T.big ? process.env.EMAIL_FROM_UPDATES : process.env.EMAIL_FROM_ACCOUNT) || (T.big ? FROM.updates : FROM.account);
   const msg = {
     from: /</.test(from) ? from : `TradeMetric <${from}>`,
     to: [to], subject: subjectTag + m.subject, html: m.html, text: m.text,
     tags: [{ name: 'type', value: type }, { name: 'mode', value: live ? 'live' : 'test' }],
   };
-  if (process.env.EMAIL_REPLY_TO) msg.reply_to = process.env.EMAIL_REPLY_TO;
+  msg.reply_to = process.env.EMAIL_REPLY_TO || REPLY;
   if (un) msg.headers = { 'List-Unsubscribe': `<${un}>`, 'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click' };
 
   const idem = createHash('sha256').update([live ? 'live' : 'test', user.id, type, key, rowId].join('|')).digest('hex');

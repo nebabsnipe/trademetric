@@ -259,7 +259,7 @@ async function runCron({ dry = false, only = null, get = getJson } = {}) {
      reset                          forget the owner's test-mode send records, so tests can be run again */
 async function test(q) {
   const what = q.get('what') || 'status';
-  if (what === 'status') return json(200, { ...emailReady(), env: process.env.VERCEL_ENV || 'local', from: !!process.env.EMAIL_FROM, replyTo: !!process.env.EMAIL_REPLY_TO, hook: !!process.env.RESEND_WEBHOOK_SECRET, types: TYPES });
+  if (what === 'status') return json(200, { ...emailReady(), env: process.env.VERCEL_ENV || 'local', hook: !!process.env.RESEND_WEBHOOK_SECRET, types: TYPES });
   if (what === 'render') { const t = q.get('type') || 'welcome'; if (!TEMPLATES.includes(t)) return json(400, { error: 'type' }); return new Response(render(t, SAMPLE[t], { base: siteBase(), unsubUrl: LABEL[t] ? unsubUrl(OWNER_ID, t) : '' }).html, { headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' } }); }
   const acc = await accounts([OWNER_ID]);
   if (!acc || !acc[0]) return json(503, { error: 'not_set_up', detail: 'Run supabase/emails.sql and check SUPABASE_SECRET_KEY.' });

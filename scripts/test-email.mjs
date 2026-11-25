@@ -71,13 +71,14 @@ eq(await st(friend, 'welcome', 'welcome', { name: 'friend' }), 'sent', 'welcome 
 eq(outbox[0].to, ['owner@example.com'], 'test mode: goes to the owner, not the person it was written for');
 ok(outbox[0].subject.startsWith('[TEST, for friend@example.com] '), 'test mode: the intended person is in the subject');
 ok(!outbox[0].headers, 'account email: no unsubscribe header');
-ok(outbox[0].from === 'TradeMetric <noreply@trademetric.app>', 'from name is TradeMetric');
+ok(outbox[0].from === 'TradeMetric <support@trademetric.app>' && outbox[0].reply_to === 'support@trademetric.app', 'account email: from TradeMetric <support@>, replies go to support@');
 
 /* ---- 2. never twice ---- */
 eq(await st(friend, 'welcome', 'welcome', {}), 'duplicate', 'same email a second time is refused');
 eq(outbox.length, 1, 'only one welcome went out');
 const both = await Promise.all([sendEmail(owner, 'clinch', 'espn:1:2026', SAMPLE.clinch), sendEmail(owner, 'clinch', 'espn:1:2026', SAMPLE.clinch)]);
 eq(both.map(r => r.status).sort(), ['duplicate', 'sent'], 'two checks at the same moment: one sends, one is refused');
+ok(outbox[1].from === 'TradeMetric <updates@trademetric.app>' && outbox[1].reply_to === 'support@trademetric.app', 'big moment: from TradeMetric <updates@>, replies go to support@');
 ok(outbox[1].headers['List-Unsubscribe'].includes('/api/email/unsub?t=') && outbox[1].headers['List-Unsubscribe-Post'] === 'List-Unsubscribe=One-Click', 'big moment: one-click unsubscribe headers');
 ok(outbox[1].html.includes('/api/email/unsub?t=') && outbox[1].text.includes('/api/email/unsub?t='), 'big moment: unsubscribe link in the email and its text version');
 
@@ -110,15 +111,13 @@ eq(db.email_sent.length, 0, 'a failed send leaves no record, so it can be tried 
 sendFails = false;
 eq(await st(owner, 'welcome', 'welcome', {}), 'sent', '...and the retry sends');
 process.env.EMAIL_LIVE = '1'; process.env.VERCEL_ENV = 'production';
-eq(await st(owner, 'clinch', 'live1', SAMPLE.clinch), 'not_ready', 'live without a chosen from-address sends nothing');
-process.env.EMAIL_FROM = 'hello@trademetric.app';
 eq(await st(friend, 'clinch', 'live1', SAMPLE.clinch), 'blocked', 'live: still blocked');
 db.email_block = [];
 eq(await st(friend, 'clinch', 'live1', SAMPLE.clinch), 'sent', 'live: sends');
 eq(outbox.at(-1).to, ['friend@example.com'], 'live: goes to the real person');
 ok(!outbox.at(-1).subject.includes('TEST'), 'live: no test tag in the subject');
 eq(db.email_sent.at(-1).live, true, 'live sends are recorded apart from test sends');
-delete process.env.EMAIL_LIVE; delete process.env.VERCEL_ENV; delete process.env.EMAIL_FROM;
+delete process.env.EMAIL_LIVE; delete process.env.VERCEL_ENV;
 const s = process.env.EMAIL_LINK_SECRET; delete process.env.EMAIL_LINK_SECRET;
 eq(await st(owner, 'clinch', 'nolink', SAMPLE.clinch), 'not_ready', 'no link secret: big moments are not sent (no working unsubscribe)');
 process.env.EMAIL_LINK_SECRET = s;
