@@ -178,4 +178,6 @@ The card list is now the 12-card build prompt (league trades, your trades + podi
 - **Skipped cards:** the API's `cards` list decides which cards appear; the progress bar and counter only count those.
 - **Save image / Share:** the share card is redrawn onto a canvas (no libraries) and saved as a PNG; Share uses the phone's share sheet when it can, otherwise saves the image.
 - **Local testing:** on localhost only, `&dev=<espnTeamId>` builds the recap straight from the league's public data without signing in.
-- **Not done yet:** a link to the recap from the site's Recap tab, and a public link/preview image for sharing (only the image is shareable for now).
+- **Recap tab:** the site's Recap tab (offseason mode) now has an "Open your recap" button for signed-in users and a "See a sample recap" button for everyone.
+- **Sample recap:** `/recap?sample=1` plays the slideshow from `data/recap-sample.json`, a made-up 10-team league in the same shape the API returns. No sign-in or league needed, so the preview can always show it.
+- **Not done yet:** a public link/preview image for sharing (only the image is shareable for now).
