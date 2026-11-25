@@ -358,7 +358,7 @@ async function test(q) {
     const memoM = new Map(), memo = (k, fn) => { if (!memoM.has(k)) memoM.set(k, fn().catch(() => null)); return memoM.get(k); };
     const weeks = await Promise.all(mine.map(lg => leagueWeek(lg, wk, getJson, memo, clips)));
     const data = weeklyData(weeks, wk), m = render('weekly', data, { base: siteBase(), unsubUrl: unsubUrl(OWNER_ID, 'weekly') });
-    return json(200, { sends: 'nothing (check only)', week, season, clipsThisWeek: clips.length, leagues: weeks.map((w, i) => ({ league: mine[i].name, ok: w.ok, why: w.why, team: w.team, result: w.result, players: w.players && w.players.length, standouts: w.perf, tops: w.tops, topWhy: w.topWhy, clips: w.clips && w.clips.length })), subject: m.subject, text: m.text });
+    return json(200, { sends: 'nothing (check only)', week, season, clipsThisWeek: clips.length, clipSearch: clips.seen, leagues: weeks.map((w, i) => ({ league: mine[i].name, ok: w.ok, why: w.why, team: w.team, result: w.result, players: w.players && w.players.length, standouts: w.perf, tops: w.tops, topWhy: w.topWhy, topCheck: w.checked, clips: w.clips && w.clips.length })), subject: m.subject, text: m.text });
   }
   if (what === 'check') {
     const st = await io.rest(`user_state?user_id=eq.${OWNER_ID}&select=${STATE_COLS}`, { ms: 8000 });

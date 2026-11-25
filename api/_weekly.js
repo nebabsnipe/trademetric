@@ -52,9 +52,11 @@ export async function recapWeek(get, now) {
 
 /* ---------- highlight clips for a week: the league's official game clips, tagged with the players in them ---------- */
 export async function weekClips(get, wk) {
-  const out = [];
+  const out = [], seen = { games: wk.games.length, read: 0, videos: 0 };
   await Promise.all(wk.games.map(async g => {
     const s = await get(`https://site.api.espn.com/apis/site/v2/sports/football/nfl/summary?event=${g.id}`).catch(() => null);
+    if (s) seen.read++;
+    seen.videos += ((s && s.videos) || []).length;
     for (const v of (s && s.videos) || []) {
       const who = (v.categories || []).filter(c => c && (c.type === 'athlete' || c.athleteId || c.athlete))
         .map(c => (c.athlete && c.athlete.description) || c.description || '').filter(Boolean).map(norm);
@@ -62,11 +64,12 @@ export async function weekClips(get, wk) {
       if (who.length && url && (v.headline || v.title)) out.push({ title: String(v.headline || v.title).slice(0, 140), url, who });
     }
   }));
+  out.seen = seen;
   return out;
 }
 
 /* ---------- standout games ---------- */
-const standout = p => p.pts >= RULES.bigGame || (p.proj > 0 && p.pts >= p.proj * RULES.bigX && p.pts >= RULES.bigMin);
+const standout = p => !['K', 'D/ST'].includes(p.pos) && (p.pts >= RULES.bigGame || (p.proj > 0 && p.pts >= p.proj * RULES.bigX && p.pts >= RULES.bigMin));
 
 /* ---------- ESPN ---------- */
 const espnPts = (x, week, src) => { const s = (x.stats || []).find(z => num(z.scoringPeriodId) === week && num(z.statSourceId) === src && num(z.statSplitTypeId || 1) === 1); return s ? num(s.appliedTotal) : null; };
@@ -101,7 +104,8 @@ async function espnWeek(lg, season, week, get) {
     checked.add(p.pos);
     const filter = { players: { filterSlotIds: { value: [ESPN_SLOT_OF[p.pos]] }, sortAppliedStatTotalForScoringPeriodId: { sortAsc: false, sortPriority: 1, value: week }, limit: 25 } };
     const k = await get(`${base}?view=kona_player_info&scoringPeriodId=${week}`, { 'x-fantasy-filter': JSON.stringify(filter) }).catch(() => null);
-    const list = ((k && k.players) || []).map(z => z.player || z).map(z => ({ id: String(z.id), pts: espnPts(z, week, 0) })).filter(z => z.pts != null);
+    const list = ((k && k.players) || []).map(z => z.player || z).map(z => ({ id: String(z.id), name: z.fullName, pts: espnPts(z, week, 0) })).filter(z => z.pts != null);
+    (out.checked = out.checked || []).push({ pos: p.pos, returned: ((k && k.players) || []).length, top: list.slice(0, 5).map(z => `${z.name} ${z.pts}`) });
     const sorted = list.length >= 5 && list.every((z, i) => i === 0 || z.pts <= list[i - 1].pts + 0.01);
     if (!sorted) { out.topWhy = 'The position\'s scores could not be read in order, so #1 is not claimed.'; continue; }
     for (const q of cands.filter(c => c.pos === p.pos)) {

@@ -36,7 +36,7 @@ checked against the league's own data.
 
 ### What goes in the weekly recap (`api/_weekly.js`)
 - **Matchup:** the league's own final score and your record. A two-week playoff round is reported after its second week.
-- **Standout games:** 28+ points, or 2.2x his projection and at least 12 (the site's big-game rule). Up to 3, bench included (marked).
+- **Standout games:** 28+ points, or 2.2x his projection and at least 12 (the site's big-game rule). Up to 3, bench included (marked). Not for kickers or defenses.
 - **#1 at his position:** only when the whole position's scores for the week could be read **and** agree with the
   league's own number for your player. Otherwise the section is left out. Ties say "co-#1".
 - **Highlights:** the league's official game clips that are tagged with your players. Up to 3. Links only, no images.
