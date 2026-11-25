@@ -173,8 +173,8 @@ export async function verdict(lg, season, get) {
   }
 }
 
-export async function getJson(url) {
-  const r = await fetch(url, { headers: { Accept: 'application/json', 'User-Agent': 'Mozilla/5.0 (TradeMetric league check)' }, signal: AbortSignal.timeout(12000) });
+export async function getJson(url, headers = {}) {
+  const r = await fetch(url, { headers: { Accept: 'application/json', 'User-Agent': 'Mozilla/5.0 (TradeMetric league check)', ...headers }, signal: AbortSignal.timeout(12000) });
   if (!r.ok) { const e = new Error('HTTP ' + r.status); e.status = r.status; throw e; }
   return r.json();
 }

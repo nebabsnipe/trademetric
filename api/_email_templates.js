@@ -5,7 +5,8 @@
 //
 // What gets emailed (the full list, nothing else):
 //   account, always sent      welcome · sync_broke        (sign-in codes come from Supabase, see supabase/email/)
-//   big moments, can be off   clinch · champ · recap · draft
+//   updates, each can be off  weekly (matchup, standout games, #1 at his position, highlights) · injury · deadline
+//                             · clinch · champ · recap · moves · draft
 //   billing, NOT wired yet    trial_ending · receipt · payment_failed · renewal · cancelled
 //
 // render(type, data, ctx) -> { subject, html, text }
@@ -19,7 +20,7 @@ const money = v => (typeof v === 'number' ? '$' + (Number.isInteger(v) ? v : v.t
 const rec = d => [d.wins, d.losses].every(x => Number.isFinite(+x)) ? `${+d.wins}-${+d.losses}${+d.ties ? '-' + +d.ties : ''}` : '';
 
 /* What each kind of email is called in the footer and on the unsubscribe page. */
-export const LABEL = { clinch: 'playoff clinch', champ: 'championship', recap: 'season recap', draft: 'draft season' };
+export const LABEL = { clinch: 'playoff clinch', champ: 'championship', recap: 'season recap', draft: 'draft season', weekly: 'weekly recap', injury: 'injury', deadline: 'trade deadline', moves: 'player moves' };
 
 /* ---- the words ---- each returns { subject, pre, h1, p: [paragraphs], btn: [label, path], code?, foot? } */
 const COPY = {
@@ -71,6 +72,52 @@ const COPY = {
     p: [`Drafts are starting, and the ${d.season ? d.season + ' ' : ''}rankings are up. Bring in this year's league and they're scored to its exact settings.`],
     btn: ['See the rankings', '/#rankings'],
   }),
+
+  weekly: d => {
+    const on = d.on || { matchup: true, perf: true, top: true, clips: true }, sec = [];
+    const M = on.matchup ? d.matchup || [] : [], P = on.perf ? d.perf || [] : [], T = on.top ? d.top || [] : [], C = on.clips ? d.clips || [] : [];
+    const many = new Set([...M, ...P, ...T].map(x => x.league)).size > 1;
+    const res = x => x.won == null ? 'Tie' : x.won ? 'Win' : 'Loss';
+    if (M.length) sec.push({ label: M.length > 1 ? 'Your matchups' : 'Your matchup', rows: M.map(x => ({ tag: x.won == null ? ['T', 'tie'] : x.won ? ['W', 'win'] : ['L', 'loss'], t: `**${x.team}** ${x.won == null ? 'tied' : x.won ? 'beat' : 'lost to'} ${x.oppName}`, s: `${x.league}${x.playoff ? ' · playoffs' : ` · now ${x.record}`}`, v: `${x.me.toFixed(1)}–${x.opp.toFixed(1)}`, plain: `${res(x)}: ${x.team} ${x.me.toFixed(1)}, ${x.oppName} ${x.opp.toFixed(1)} (${x.league}${x.playoff ? ', playoffs' : `, now ${x.record}`})` })) });
+    if (T.length) sec.push({ label: '#1 at his position', rows: T.map(p => ({ t: `**${p.name}** was the ${p.tied ? 'co-' : ''}#1 ${p.pos} of the week`, s: `${p.pos}${p.team ? ' · ' + p.team : ''}${many ? ' · ' + p.league : ''}`, v: `${p.pts.toFixed(1)} pts` })) });
+    if (P.length) sec.push({ label: 'Standout games', rows: P.map(p => ({ t: `**${p.name}**${p.starter ? '' : ' (on your bench)'}`, s: `${p.pos}${p.team ? ' · ' + p.team : ''}${p.proj > 0 ? ` · projected ${p.proj.toFixed(1)}` : ''}${many ? ' · ' + p.league : ''}`, v: `${p.pts.toFixed(1)} pts` })) });
+    if (C.length) sec.push({ label: 'Highlights', rows: C.map(c => ({ t: c.title, s: c.player, href: c.url, play: true })) });
+    const one = M.length === 1 ? M[0] : null;
+    return {
+      subject: one ? `Week ${d.week}: ${one.won == null ? 'a tie' : one.won ? 'you won' : 'you lost'}, ${one.me.toFixed(1)} to ${one.opp.toFixed(1)}` : `Your Week ${d.week} recap`,
+      pre: [one && `${one.team} ${one.won == null ? 'tied' : one.won ? 'beat' : 'lost to'} ${one.oppName}.`, T[0] && `${T[0].name} was the #1 ${T[0].pos}.`, P[0] && `${P[0].name} scored ${P[0].pts.toFixed(1)}.`].filter(Boolean).join(' ') || `Your Week ${d.week} in one place.`,
+      h1: `Week ${d.week} recap`, p: [], sections: sec,
+      btn: ['See your team', '/#team'],
+    };
+  },
+  injury: d => {
+    const L = d.list || [], w = x => x.st === 'IR' ? 'placed on injured reserve' : 'ruled out';
+    return {
+      subject: L.length === 1 ? `${L[0].name} ${w(L[0])}` : `Injury report: ${L.length} of your players`,
+      pre: L.map(x => `${x.name} ${w(x)}`).join('. ') + '.',
+      h1: L.length === 1 ? 'Injury report' : `${L.length} of your players are hurt`, p: [],
+      sections: [{ label: 'Since yesterday', rows: L.map(x => ({ tag: [x.st === 'IR' ? 'IR' : 'OUT', 'loss'], t: `**${x.name}** ${w(x)}`, s: [x.team, x.body, x.leagues && x.leagues.length ? (x.leagues.length === 1 ? x.leagues[0] : `${x.leagues.length} of your leagues`) : ''].filter(Boolean).join(' · ') })) }],
+      btn: ['Check your lineup', '/#team'],
+    };
+  },
+  deadline: d => ({
+    subject: `Trade deadline: ${clip(d.league, 60)}`,
+    pre: `The trade deadline is ${d.when}.`,
+    h1: 'The trade deadline is close',
+    p: [`The trade deadline in **${clip(d.league, 80)}** is **${d.when}**.`, 'If there\'s a deal you\'ve been thinking about, now is the time to make it.'],
+    btn: ['Build a trade', '/#trade'],
+  }),
+  moves: d => {
+    const L = d.list || [];
+    return {
+      subject: L.length === 1 ? `${L[0].name} is now with ${L[0].to}` : `Player moves: ${L.length} of your players`,
+      pre: L.map(x => `${x.name}: ${x.from} to ${x.to}`).join('. ') + '.',
+      h1: L.length === 1 ? 'A player from your team moved' : 'Players from your team moved',
+      p: ['These players from your team are now listed on a new NFL team.'],
+      sections: [{ label: 'New teams', rows: L.map(x => ({ t: `**${x.name}**`, s: `${x.pos}${x.leagues && x.leagues.length ? ' · ' + (x.leagues.length === 1 ? x.leagues[0] : `${x.leagues.length} of your leagues`) : ''}`, v: `${x.from} → ${x.to}` })) }],
+      btn: ['See the rankings', '/#rankings'],
+    };
+  },
 
   /* ---- billing: ready for the payments work, not sent by anything yet ---- */
   trial_ending: d => ({
@@ -147,6 +194,22 @@ export const TEMPLATES = Object.keys(COPY);
 const rich = s => esc(s).replace(/\*\*(.+?)\*\*/g, '<b>$1</b>');
 const plain = s => String(s).replace(/\*\*(.+?)\*\*/g, '$1');
 
+/* a section of rows (the weekly recap, injuries, player moves): a small label, then one row per item */
+const TAG = { win: ['#E3F6EA', '#137A3B', 'tm-win'], loss: ['#FDE7E7', '#B42318', 'tm-loss'], tie: ['#EEF0F3', '#4A4F57', 'tm-tie'] };
+function secHtml(sec) {
+  const row = (r, i) => {
+    const tg = r.tag ? TAG[r.tag[1]] : null;
+    const main = r.href ? `<a class="tm-ink" href="${esc(r.href)}" style="color:#0B0C0E;text-decoration:none;font-weight:600">${r.play ? '<span style="color:#FF4F12">&#9654;</span>&nbsp;' : ''}${esc(r.t)}</a>` : rich(r.t);
+    return `<tr><td class="tm-row" style="padding:11px 0;${i ? 'border-top:1px solid #E2E4E8;' : ''}vertical-align:top">
+${tg ? `<span class="${tg[2]}" style="display:inline-block;min-width:22px;margin:0 8px 0 0;padding:2px 6px;border-radius:6px;background:${tg[0]};color:${tg[1]};font-size:12px;font-weight:700;text-align:center;line-height:18px">${esc(r.tag[0])}</span>` : ''}<span class="tm-ink" style="font-size:15px;line-height:1.45;color:#0B0C0E">${main}</span>
+${r.s ? `<div class="tm-mut" style="margin-top:2px;font-size:13px;line-height:1.45;color:#636872">${esc(r.s)}</div>` : ''}
+</td>${r.v ? `<td class="tm-row tm-ink" align="right" style="padding:11px 0 11px 12px;${i ? 'border-top:1px solid #E2E4E8;' : ''}vertical-align:top;white-space:nowrap;font-family:${F_MONO};font-size:14px;font-weight:600;color:#0B0C0E">${esc(r.v)}</td>` : ''}</tr>`;
+  };
+  return `<div class="tm-mut" style="margin:22px 0 4px;font-size:11.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#636872">${esc(sec.label)}</div>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 6px">${sec.rows.map(row).join('')}</table>`;
+}
+const secText = sec => [sec.label.toUpperCase(), ...sec.rows.map(r => '- ' + (r.plain || [plain(r.t), r.v ? `(${r.v})` : '', r.s ? `· ${r.s}` : '', r.href ? `\n  ${r.href}` : ''].filter(Boolean).join(' '))), ''];
+
 const F_BODY = "Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif";
 const F_HEAD = "Kanit,'Arial Black','Helvetica Neue',Arial,sans-serif";
 const F_MONO = "'IBM Plex Mono',Menlo,Consolas,monospace";
@@ -187,6 +250,10 @@ a{text-decoration:none}
 .tm-code{background:#2B1409!important;color:#F2F3F5!important}
 .tm-btn{background:#FF6A33!important;color:#170700!important}
 .tm-btn-td{background:#FF6A33!important}
+.tm-row{border-color:#22262A!important}
+.tm-win{background:#0F2E1B!important;color:#6FD99A!important}
+.tm-loss{background:#3A1414!important;color:#FF8A80!important}
+.tm-tie{background:#1F2327!important;color:#B4B9C1!important}
 }
 @media (max-width:520px){
 .tm-out{padding:16px 10px!important}
@@ -208,6 +275,7 @@ a{text-decoration:none}
 <tr><td class="tm-pad" style="padding:32px 32px 12px;font-family:${F_BODY}">
 <h1 class="tm-ink tm-h1" style="margin:0 0 14px;font-family:${F_BODY};font-size:25px;line-height:1.2;font-weight:700;letter-spacing:-.01em;color:#0B0C0E">${c.raw ? c.h1 : esc(c.h1)}</h1>
 ${paras.map(P).join('\n')}
+${(c.sections || []).map(secHtml).join('\n')}
 ${c.code ? `<div class="tm-code" style="margin:4px 0 20px;background:#FFEDE4;border-radius:10px;padding:18px 12px;text-align:center;font-family:${F_MONO};font-size:32px;line-height:1.1;font-weight:700;letter-spacing:8px;color:#0B0C0E">${c.code}</div>` : ''}
 ${after.map(P).join('\n')}
 <table role="presentation" cellpadding="0" cellspacing="0" border="0" class="tm-btn-t" style="margin:8px 0 20px"><tr><td class="tm-btn-td" bgcolor="#FF4F12" style="background:#FF4F12;border-radius:10px">
@@ -227,6 +295,7 @@ ${footHtml}${ctx.postal ? `<br><br>${esc(ctx.postal)}` : ''}
     'TRADEMETRIC', '',
     c.h1, '',
     ...paras.map(plain).flatMap(s => [s, '']),
+    ...(c.sections || []).flatMap(secText),
     ...(c.code ? [c.code, ''] : []),
     ...after.map(plain).flatMap(s => [s, '']),
     `${c.btn[0]}: ${url(c.btn[1])}`, '',
@@ -247,6 +316,14 @@ export const SAMPLE = {
   champ: { league: 'Sunday Scaries League', team: 'Gridiron Gurus', season: 2026, score: '142.6 to 118.2' },
   recap: { league: 'Sunday Scaries League', season: 2026 },
   draft: { season: 2027 },
+  weekly: { week: 12, season: 2026,
+    matchup: [{ league: 'Sunday Scaries League', team: 'Gridiron Gurus', won: true, me: 131.4, opp: 118.2, oppName: 'Fourth and Wrong', record: '8-4', playoff: false }],
+    top: [{ name: 'Ja\'Marr Chase', pos: 'WR', team: 'CIN', pts: 38.4, tied: false, league: 'Sunday Scaries League' }],
+    perf: [{ name: 'Ja\'Marr Chase', pos: 'WR', team: 'CIN', pts: 38.4, proj: 17.2, starter: true, league: 'Sunday Scaries League' }, { name: 'Bijan Robinson', pos: 'RB', team: 'ATL', pts: 29.6, proj: 18.0, starter: true, league: 'Sunday Scaries League' }],
+    clips: [{ title: 'Ja\'Marr Chase breaks free for a 64-yard touchdown', url: 'https://www.trademetric.app/#news', player: 'Ja\'Marr Chase' }, { title: 'Bijan Robinson\'s best runs from Week 12', url: 'https://www.trademetric.app/#news', player: 'Bijan Robinson' }] },
+  injury: { list: [{ name: 'Puka Nacua', team: 'LAR', st: 'O', body: 'ankle', leagues: ['Sunday Scaries League'] }, { name: 'Mark Andrews', team: 'BAL', st: 'IR', body: 'shoulder', leagues: ['Sunday Scaries League', 'Work League'] }] },
+  deadline: { league: 'Sunday Scaries League', when: 'Friday, Nov 27 at 3:00 PM ET' },
+  moves: { list: [{ name: 'Tony Pollard', pos: 'RB', from: 'TEN', to: 'KC', leagues: ['Sunday Scaries League'] }, { name: 'Darnell Mooney', pos: 'WR', from: 'ATL', to: 'CHI', leagues: ['Sunday Scaries League'] }] },
   trial_ending: { when: 'Friday, Dec 4', amount: 7, period: 'month', last4: '4242' },
   receipt: { amount: 50, period: 'year', last4: '4242', date: 'Dec 4, 2026', next: 'Dec 4, 2027' },
   payment_failed: { amount: 7, last4: '4242', until: 'Dec 11' },

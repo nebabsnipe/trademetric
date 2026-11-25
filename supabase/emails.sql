@@ -10,7 +10,7 @@
 create table if not exists public.email_sent (
   id        bigint generated always as identity primary key,
   user_id   uuid not null references auth.users(id) on delete cascade,
-  type      text not null,                    -- welcome, sync_broke, clinch, champ, recap, draft
+  type      text not null,                    -- welcome, sync_broke, clinch, champ, recap, draft, weekly, injury, deadline, moves
   key       text not null,
   live      boolean not null default false,
   status    text not null default 'sending',  -- sending -> sent, or capped (dropped by the one-a-day limit)
@@ -20,7 +20,7 @@ create table if not exists public.email_sent (
 );
 create index if not exists email_sent_user_at on public.email_sent (user_id, at desc);
 
--- The switches in Account -> Email. No row means everything is on.
+-- The switches in Account -> Email. No row means the defaults: everything on except injuries.
 create table if not exists public.email_prefs (
   user_id    uuid primary key references auth.users(id) on delete cascade,
   clinch     boolean not null default true,   -- clinched a playoff spot
@@ -29,6 +29,14 @@ create table if not exists public.email_prefs (
   draft      boolean not null default true,   -- draft season reminder
   updated_at timestamptz not null default now()
 );
+-- Added 2026-11-25: the weekly recap's four sections, injuries, trade deadlines and offseason player moves.
+alter table public.email_prefs add column if not exists matchup  boolean not null default true;   -- weekly recap: your matchup result
+alter table public.email_prefs add column if not exists perf     boolean not null default true;   -- weekly recap: standout games
+alter table public.email_prefs add column if not exists top      boolean not null default true;   -- weekly recap: #1 at his position
+alter table public.email_prefs add column if not exists clips    boolean not null default true;   -- weekly recap: highlights
+alter table public.email_prefs add column if not exists inj      boolean not null default false;  -- injuries (off until switched on)
+alter table public.email_prefs add column if not exists deadline boolean not null default true;   -- trade deadline reminder
+alter table public.email_prefs add column if not exists moves    boolean not null default true;   -- offseason player moves
 
 -- Addresses we must stop emailing: a hard bounce or a spam complaint (reported by the email service).
 create table if not exists public.email_block (
@@ -64,8 +72,8 @@ revoke all on public.email_sent, public.email_block, public.email_watch from ano
 -- Email switches: each person can read and change only their own row, and only the four switches.
 revoke all on public.email_prefs from anon, authenticated;
 grant select on public.email_prefs to authenticated;
-grant insert (user_id, clinch, champ, recap, draft) on public.email_prefs to authenticated;
-grant update (clinch, champ, recap, draft) on public.email_prefs to authenticated;
+grant insert (user_id, clinch, champ, recap, draft, matchup, perf, top, clips, inj, deadline, moves) on public.email_prefs to authenticated;
+grant update (clinch, champ, recap, draft, matchup, perf, top, clips, inj, deadline, moves) on public.email_prefs to authenticated;
 drop policy if exists "read own email prefs"   on public.email_prefs;
 drop policy if exists "insert own email prefs" on public.email_prefs;
 drop policy if exists "update own email prefs" on public.email_prefs;

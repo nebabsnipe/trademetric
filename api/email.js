@@ -4,7 +4,8 @@
 //   GET  /api/email/unsub     the page an unsubscribe link opens (no sign-in needed; the link is signed)
 //   POST /api/email/unsub     flips the switch: that page's own request, and the mail app's one-click button
 //   POST /api/email/hook      Resend tells us about a hard bounce or a spam complaint: stop emailing that address
-//   GET  /api/email/cron      the daily check (broken leagues, clinches, titles, the August draft reminder).
+//   GET  /api/email/cron      the daily check (broken leagues, clinches, titles, the weekly recap, injuries, trade
+//                             deadlines, offseason player moves, the August draft reminder).
 //                             Needs the CRON_SECRET. Add ?dry=1 to see what it concludes without sending.
 //   GET  /api/email/test      try things by hand: needs the CRON_SECRET, or on a preview the EMAIL_TEST_KEY
 //
@@ -13,11 +14,16 @@
 // can be checked against the exact bytes Resend sent.
 
 import { createHmac, timingSafeEqual } from 'node:crypto';
-import { leaguesOf } from './_alerts.js';
+import { readFile } from 'node:fs/promises';
+import { leaguesOf, weekInfo } from './_alerts.js';
+import { injuries, notes, ESPN_ST } from './live.js';
+import { kvGet, kvPut } from './_shared.js';
+import { norm } from './_push.js';
+import { recapWeek, weekClips, leagueWeek, weeklyData, injuryData, deadlinesOf, inMovesWindow, trackMoves, movesFor } from './_weekly.js';
 import { reportIssue } from './_sentry.js';
 import { verdict, getJson } from './_league_check.js';
 import { render, SAMPLE, TEMPLATES, LABEL } from './_email_templates.js';
-import { io, TYPES, BIG, sendEmail, sendBiggest, emailReady, isLive, readUnsubToken, unsubUrl, setPrefs, prefsOf, blockAddress, siteBase } from './_email.js';
+import { io, TYPES, SWITCHES, sendEmail, sendBiggest, emailReady, isLive, readUnsubToken, unsubUrl, setPrefs, prefsOf, blockAddress, siteBase } from './_email.js';
 
 const SUPA = (process.env.SUPABASE_URL || 'https://rltmfnmgbfgecbaevfvc.supabase.co').replace(/\/+$/, '');
 const PUB = process.env.SUPABASE_PUBLISHABLE_KEY || 'sb_publishable_AFX79aKgqorAx3zgOyKatw_o_3_ERWG';   // public by design (same one the page uses)
@@ -93,7 +99,7 @@ async function unsub(req, q) {
   if (req.method === 'POST') {
     if (!tok) return json(400, { error: 'bad_link' });
     const all = q.get('all') === '1', on = q.get('on') === '1';
-    const flags = Object.fromEntries((all ? BIG : [tok.type]).map(k => [k, on]));
+    const flags = Object.fromEntries((all ? SWITCHES : TYPES[tok.type].sw).map(k => [k, on]));
     const ok = await setPrefs(tok.userId, flags);
     return json(ok ? 200 : 503, ok ? { ok: true, type: tok.type, label: LABEL[tok.type], all, on } : { error: 'try_again' });
   }
@@ -128,7 +134,7 @@ button:focus-visible,.btn:focus-visible{outline:2px solid var(--acc);outline-off
 (function(){var label=${JSON.stringify(label)},h=document.getElementById('h'),p=document.getElementById('p'),acts=document.getElementById('acts'),all=document.getElementById('all'),undo=document.getElementById('undo');
 function send(extra,done){all.disabled=undo.disabled=true;fetch(location.pathname+location.search+extra,{method:'POST',headers:{'x-tm':'1'}}).then(function(r){return r.ok?r.json():Promise.reject()}).then(function(j){all.disabled=undo.disabled=false;done(j)}).catch(function(){all.disabled=undo.disabled=false;h.textContent='That didn\\'t work';p.textContent='Please try the link again in a minute. Nothing was changed.'})}
 function off(){h.textContent='You\\'re unsubscribed';p.textContent='You won\\'t get '+label+' emails anymore. Account emails, like sign-in codes, are still sent.';acts.hidden=false;all.hidden=false;undo.hidden=false;undo.textContent='Turn '+label+' emails back on'}
-all.onclick=function(){send('&all=1',function(){h.textContent='All of these emails are off';p.textContent='You won\\'t get playoff, championship, recap or draft season emails. Account emails, like sign-in codes, are still sent. You can turn any of them back on in your account.';all.hidden=true;undo.hidden=true})};
+all.onclick=function(){send('&all=1',function(){h.textContent='All of these emails are off';p.textContent='You won\\'t get any update emails: weekly recaps, injuries, trade deadlines, playoff and championship news, player moves or draft reminders. Account emails, like sign-in codes, are still sent. You can turn any of them back on in your account.';all.hidden=true;undo.hidden=true})};
 undo.onclick=function(){send('&on=1',function(){h.textContent='Back on';p.textContent='You\\'ll keep getting '+label+' emails.';all.hidden=true;undo.hidden=true})};
 send('',off)})();
 </script>` : `
@@ -177,7 +183,7 @@ async function hook(req) {
    A clinch or a title is only sent once two checks, a day apart, both say so (email_watch). */
 const seasonAt = now => { const d = new Date(now); return d.getUTCMonth() >= 2 ? d.getUTCFullYear() : d.getUTCFullYear() - 1; };   // Jan and Feb still belong to last season
 const inWindow = (now, season, from, to) => now >= Date.UTC(season, from[0] - 1, from[1]) && now <= Date.UTC(season + (to[2] || 0), to[0] - 1, to[1]);
-const STATE_COLS = ['leagues', 'real', 'league', 'leagueKey', 'me', 'noLeague'].map(k => `${k}:state->${k}`).join(',');
+const STATE_COLS = ['leagues', 'real', 'league', 'leagueKey', 'me', 'noLeague', 'teams', 'notif', 'extraPlayers'].map(k => `${k}:state->${k}`).join(',');
 const dayName = ms => new Intl.DateTimeFormat('en-US', { weekday: 'long', month: 'short', day: 'numeric', timeZone: 'America/New_York' }).format(ms);
 
 async function runCron({ dry = false, only = null, get = getJson } = {}) {
@@ -192,7 +198,7 @@ async function runCron({ dry = false, only = null, get = getJson } = {}) {
   if (!accs || !Array.isArray(states) || !Array.isArray(watches)) return { ...stats, ok: false, error: 'db' };
   const stateOf = Object.fromEntries(states.map(s => [s.user_id, s]));
   const W = new Map(watches.map(w => [`${w.user_id}|${w.kind}|${w.key}`, w]));
-  const memo = new Map(), look = lg => { const k = `${lg.type}:${lg.id}:${lg.rid}`; if (!memo.has(k)) memo.set(k, verdict(lg, season, get)); return memo.get(k); };
+  const vMemo = new Map(), look = lg => { const k = `${lg.type}:${lg.id}:${lg.rid}`; if (!vMemo.has(k)) vMemo.set(k, verdict(lg, season, get)); return vMemo.get(k); };
 
   /* seen again: returns the watch as it now stands. gone: forget it. Neither writes anything on a dry run. */
   const seen = async (uid, kind, key, note) => {
@@ -203,6 +209,17 @@ async function runCron({ dry = false, only = null, get = getJson } = {}) {
     W.set(k, nw); return nw;
   };
   const gone = async (uid, kind, key) => { const k = `${uid}|${kind}|${key}`; if (!W.has(k)) return; W.delete(k); if (!dry) await io.rest(`email_watch?user_id=eq.${uid}&kind=eq.${kind}&key=eq.${uq(key)}`, { method: 'DELETE', prefer: 'return=minimal' }); };
+  /* shared facts for the update emails, read once for everyone */
+  const lgMemo = new Map(), dataMemo = new Map();
+  const memo = (k, fn) => { if (!dataMemo.has(k)) dataMemo.set(k, fn().catch(() => null)); return dataMemo.get(k); };
+  const wk = await recapWeek(get, now).catch(() => null);
+  const clips = wk ? await weekClips(get, wk).catch(() => []) : [];
+  const weekOf = lg => { const k = `${lg.type}:${lg.id}:${lg.rid}`; if (!lgMemo.has(k)) lgMemo.set(k, leagueWeek(lg, wk, get, memo, clips)); return lgMemo.get(k); };
+  const players = await playerNames();
+  const inj = await injuryInputs(now);
+  const wkInfo = await weekInfo(now).catch(() => null);
+  const moves = inMovesWindow(now) ? await trackMoves(get, { get: kvGet, put: kvPut }, now, dry).catch(() => null) : null;
+  stats.weekly = wk ? `Week ${wk.week}` : 'not due'; stats.injuryFeeds = !!inj; stats.moves = moves ? moves.length : 'not in season or unavailable';
   const note = (uid, r) => { stats.results.push({ user: uid.slice(0, 8), type: r.type, key: r.key, status: r.status }); if (r.status === 'sent') stats.sent++; if (r.status === 'failed') stats.sendFailed = true; };
 
   for (const a of accs) {
@@ -236,6 +253,27 @@ async function runCron({ dry = false, only = null, get = getJson } = {}) {
       say({ result: v.champion ? 'champion' : v.clinched ? 'clinched' : 'no clinch, no title', team: v.team, facts: v.facts,
         email: big.filter(b => b.key === eventKey).map(b => b.type).join(', ') || (v.champion || v.clinched ? 'waiting for a second check a day later' : 'none') });
     }
+    const lgs = leagues.filter(l => !(l.type === 'espn' && l.priv) && l.rid);
+    // the weekly recap: one email after the week's last game, sections by switch
+    if (wk && lgs.length) {
+      const weeks = await Promise.all(lgs.map(weekOf));
+      weeks.forEach((w, i) => { if (!w.ok) stats.conclusions.push({ user: a.id.slice(0, 8), league: lgs[i].name, result: 'weekly recap: league skipped', why: w.why }); else if (w.topWhy) stats.conclusions.push({ user: a.id.slice(0, 8), league: lgs[i].name, result: 'weekly recap: no #1 claim', why: w.topWhy }); });
+      note(a.id, await sendEmail(user, 'weekly', `weekly:${wk.season}:${wk.week}`, weeklyData(weeks, wk), { dry }));
+    }
+    // injuries: players ruled out or put on IR since yesterday (confirmed)
+    if (inj && players && st) {
+      const list = injuryData(st, players, inj.log, inj.cur, now);
+      if (list.length) note(a.id, await sendEmail(user, 'injury', `inj:${new Date(now).toISOString().slice(0, 10)}`, { list }, { dry }));
+    }
+    // trade deadlines within a few days
+    if (st) for (const dl of deadlinesOf(st, wkInfo, now)) note(a.id, await sendEmail(user, 'deadline', `${dl.key}:${new Date(dl.at).toISOString().slice(0, 10)}`, dl, { dry }));
+    // offseason player moves since the last moves email
+    if (moves && moves.length && players && st) {
+      const last = await io.rest(`email_sent?user_id=eq.${a.id}&type=eq.moves&live=eq.${isLive()}&status=eq.sent&order=at.desc&limit=1&select=at`);
+      const since = Array.isArray(last) && last[0] ? Date.parse(last[0].at) : now - 7 * D;
+      const list = movesFor(st, players, moves, since);
+      if (list.length) note(a.id, await sendEmail(user, 'moves', `moves:${new Date(now).toISOString().slice(0, 10)}`, { list }, { dry }));
+    }
     // the August draft reminder: once a year, only to accounts that haven't been used in a month
     const d = new Date(now);
     if (d.getUTCMonth() === 7 && d.getUTCDate() >= RULES.draftFromDay) {
@@ -247,6 +285,29 @@ async function runCron({ dry = false, only = null, get = getJson } = {}) {
   return stats;
 }
 
+/* the site's own player list (names and teams by the site's player ids), for rosters */
+let PLAYERS = null;
+async function playerNames() {
+  if (PLAYERS) return PLAYERS;
+  let d = null;
+  try { d = JSON.parse(await readFile(new URL('../data/nfl.json', import.meta.url), 'utf8')); } catch {}
+  if (!d) { try { const r = await fetch(`${siteBase()}/data/nfl.json`); if (r.ok) d = await r.json(); } catch {} }
+  if (!d || !Array.isArray(d.players)) return null;
+  const m = {};
+  for (const p of d.players) m[p[0]] = { n: p[1], t: p[3] };
+  for (const k of d.k || []) m[k[0]] = { n: k[1], t: k[2] };
+  return PLAYERS = m;
+}
+/* injury inputs: the last day of status changes, and what both injury reports say right now */
+async function injuryInputs(now) {
+  const [inj, note, rows] = await Promise.all([injuries().catch(() => null), notes().catch(() => null),
+    io.rest(`status_log?at=gte.${encodeURIComponent(new Date(now - 25 * H).toISOString())}&select=src,name,team,was,st,body,at&order=at.asc&limit=3000`, { ms: 8000 })]);
+  if (!Array.isArray(rows)) return null;
+  const espnList = note ? note.map(x => [x.n, x.t, ESPN_ST(x.st)]) : null;
+  const mapOf = (list, min) => { if (!list || list.length < min) return null; const m = {}; for (const [n, , st] of list) if (n && st) m[norm(n)] = st; return m; };
+  return { log: rows.map(r => ({ ...r, at: Date.parse(r.at) })), cur: { sleeper: mapOf(inj, 300), espn: mapOf(espnList, 40) } };
+}
+
 /* ================= trying things by hand =================
    /api/email/test?what=...   Everything here sends to the owner's own account, through the same sendEmail().
      status                         what's set up
@@ -256,6 +317,8 @@ async function runCron({ dry = false, only = null, get = getJson } = {}) {
      cron&dry=1                     the whole daily check, without sending or writing anything
      unsub&type=clinch              the owner's unsubscribe link for that kind
      click&type=clinch              makes the same signed-out request that clicking that link makes
+     weekly&week=12                 the owner's weekly recap for that week, read from the real leagues: what it would
+                                    say and why. Sends nothing
      reset                          forget the owner's test-mode send records, so tests can be run again */
 async function test(q) {
   const what = q.get('what') || 'status';
@@ -284,6 +347,19 @@ async function test(q) {
   }
   if (what === 'reset') { await io.rest(`email_sent?user_id=eq.${OWNER_ID}&live=eq.false`, { method: 'DELETE', prefer: 'return=minimal' }); return json(200, { ok: true }); }
   if (what === 'cron') return json(200, await runCron({ dry: true, only: q.get('all') === '1' ? null : [OWNER_ID] }));
+  if (what === 'weekly') {
+    const st = await io.rest(`user_state?user_id=eq.${OWNER_ID}&select=${STATE_COLS}`, { ms: 8000 });
+    const mine = Array.isArray(st) && st[0] ? leaguesOf(st[0]).filter(l => l.id && l.rid && !(l.type === 'espn' && l.priv)) : [];
+    const state = await getJson('https://api.sleeper.app/v1/state/nfl').catch(() => ({}));
+    const season = +q.get('season') || +state.season, week = +q.get('week') || Math.max(1, +state.week - 1);
+    const board = await getJson(`https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?seasontype=2&week=${week}&dates=${season}`).catch(() => null);
+    const wk = { season, week, games: ((board && board.events) || []).map(e => ({ id: e.id })) };
+    const clips = await weekClips(getJson, wk).catch(() => []);
+    const memoM = new Map(), memo = (k, fn) => { if (!memoM.has(k)) memoM.set(k, fn().catch(() => null)); return memoM.get(k); };
+    const weeks = await Promise.all(mine.map(lg => leagueWeek(lg, wk, getJson, memo, clips)));
+    const data = weeklyData(weeks, wk), m = render('weekly', data, { base: siteBase(), unsubUrl: unsubUrl(OWNER_ID, 'weekly') });
+    return json(200, { sends: 'nothing (check only)', week, season, clipsThisWeek: clips.length, leagues: weeks.map((w, i) => ({ league: mine[i].name, ok: w.ok, why: w.why, team: w.team, result: w.result, players: w.players && w.players.length, standouts: w.perf, tops: w.tops, topWhy: w.topWhy, clips: w.clips && w.clips.length })), subject: m.subject, text: m.text });
+  }
   if (what === 'check') {
     const st = await io.rest(`user_state?user_id=eq.${OWNER_ID}&select=${STATE_COLS}`, { ms: 8000 });
     const want = q.get('league') || '', mine = Array.isArray(st) && st[0] ? leaguesOf(st[0]) : [];

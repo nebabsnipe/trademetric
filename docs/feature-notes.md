@@ -81,4 +81,4 @@ All in `js/deadline.js` (loaded after app.js) plus small hooks in news.js (banne
 - **The real NFL deadline (quiet):** two bell rows only, about a week before and on the day. The date is set per season in `TDL_NFL` at the top of `js/deadline.js` (2026: Tue Nov 10, 4:00 pm ET, already passed). Add next season's date there.
 
 ## Emails (added 2026-11-25, on the `emails` branch, NOT live)
-The few emails TradeMetric sends: welcome, league stopped updating, clinched a playoff spot, won the championship, season recap (built, off), the August draft reminder. Everything goes through `api/_email.js`; `EMAIL_LIVE` is off so emails only reach the owner. Full notes, rules and setup steps: `docs/emails.md`.
+Account emails (welcome, league stopped updating) plus update emails with their own switches: weekly recap (matchup, standout games, #1 at his position, highlights), injuries (off by default), trade deadline, clinch, championship, and offseason season recap (built, off), player moves and the August draft reminder. Everything goes through `api/_email.js`; `EMAIL_LIVE` is off so emails only reach the owner. Full notes, rules and setup steps: `docs/emails.md`.

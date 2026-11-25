@@ -102,7 +102,7 @@ export function userRosters(st, players) {
      4. it's confirmed: either the other feed also lists him as hurt, or it has stayed that way for 10+ minutes,
         which means two separate reads of the feed agree. Never a single unconfirmed data point.
      5. it's less than 12 hours old */
-export function injuryEvents({ roster, src, log, cur, now = Date.now() }) {
+export function injuryEvents({ roster, src, log, cur, now = Date.now(), maxAgeH = RULES.maxAgeH }) {
   const mine = cur[src];
   if (!mine) return [];                                 // the user's feed didn't load this time: say nothing
   const other = cur[src === 'espn' ? 'sleeper' : 'espn'];
@@ -114,7 +114,7 @@ export function injuryEvents({ roster, src, log, cur, now = Date.now() }) {
     const who = roster[k];
     if (who.team && r.team && who.team !== r.team && who.team !== 'FA') continue;   // same name, different player
     const age = now - r.at;
-    if (age < 0 || age > RULES.maxAgeH * 3600e3) continue;
+    if (age < 0 || age > maxAgeH * 3600e3) continue;
     if (mine[k] !== r.st) continue;
     const both = !!(other && other[k]);
     if (!both && age < RULES.confirmMin * 60e3) continue;

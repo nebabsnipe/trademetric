@@ -3,24 +3,43 @@
 Status (2026-11-25): **built on the `emails` branch, not live.** `EMAIL_LIVE` is off, so every email goes only to
 the owner's own inbox with the intended person shown in the subject.
 
-TradeMetric sends very few emails: account stuff and a handful of really big moments. Everything else is an
-in-site alert or a phone push. **If in doubt, don't email.**
+**2026-11-25 change (owner):** the first plan emailed almost nothing. The owner widened it the same day to a set of
+update emails, each with its own switch. Still: one email per kind at a time, never repeated, and every fact
+checked against the league's own data.
 
 ## The full list (nothing else gets emailed)
 
-| Email | When | Can be switched off |
-| --- | --- | --- |
-| Welcome | Once, right after a new account's first sign-in | No |
-| Confirm email, reset password | Sent by Supabase Auth through Resend (`supabase/email/`) | No |
-| League stopped updating | A saved league can't be read for 48 hours in a row. Once per league per breakage | No |
-| Clinched a playoff spot | Mathematically locked, confirmed on two checks a day apart | Yes |
-| Won the championship | Title game final and the league says they won, confirmed on two checks a day apart | Yes |
-| Season recap is ready | **Built, switched off** (`on: false` in `TYPES`, `api/_email.js`) until the recap is live | Yes |
-| Draft season reminder | Once in August (from the 10th), only to accounts unused for 30+ days | Yes |
+**Account emails** (always sent, no switch), from `support@`:
 
-**Never emailed:** lineup alerts, injuries, big plays, trades, weekly wins or losses, news.
+| Email | When |
+| --- | --- |
+| Welcome | Once, right after a new account's first sign-in (accounts under 14 days old) |
+| Confirm email, reset password | Sent by Supabase Auth through Resend (`supabase/email/`) |
+| League stopped updating | A saved league can't be read for 48 hours in a row. Once per league per breakage |
+
+**Update emails** (each has a switch in Account → Leagues → Email, and a one-click unsubscribe), from `updates@`:
+
+| Group | Switch | Default | When | Limit |
+| --- | --- | --- | --- | --- |
+| Every week | Matchup results · Standout games · #1 at his position · Highlights | On | **One** weekly recap email, 6+ hours after the week's last game (Tuesday). Each switch is a section of it; nothing in the switched-on sections = no email | One per week |
+| As it happens | Injuries | **Off** | A morning email when a player on your team was ruled out or put on IR since yesterday (confirmed, same rules as push) | One a day |
+| | Trade deadline | On | When a league's deadline is within 3 days. Once per league | One a day |
+| | Clinched a playoff spot | On | Mathematically locked, confirmed on two checks a day apart | One big moment a day |
+| | Won the championship | On | Title game final and the league says they won, confirmed twice | One big moment a day |
+| Offseason | Season recap is ready | On | **Built, switched off** until the recap feature is live | One big moment a day |
+| | Player moves | On | Feb–Aug: a player from your team is listed on a new NFL team on two daily checks | About one a week |
+| | Draft season reminder | On | Once in August, only to accounts unused for 30+ days | One big moment a day |
+
+**Never emailed:** lineup alerts, live big plays, news or rumors, unverified trades.
 **Billing** (trial ending, receipt, payment failed, renewal, cancelled): the templates exist
 (`api/_email_templates.js`, samples in `supabase/email/billing/`) but nothing sends them. They belong to the payments work.
+
+### What goes in the weekly recap (`api/_weekly.js`)
+- **Matchup:** the league's own final score and your record. A two-week playoff round is reported after its second week.
+- **Standout games:** 28+ points, or 2.2x his projection and at least 12 (the site's big-game rule). Up to 3, bench included (marked).
+- **#1 at his position:** only when the whole position's scores for the week could be read **and** agree with the
+  league's own number for your player. Otherwise the section is left out. Ties say "co-#1".
+- **Highlights:** the league's official game clips that are tagged with your players. Up to 3. Links only, no images.
 
 ## The pieces
 
@@ -29,6 +48,7 @@ in-site alert or a phone push. **If in doubt, don't email.**
 | `api/_email.js` | **The one helper every email goes through** (`sendEmail`): switches, no repeats, one a day, the safety switch, the block list |
 | `api/_email_templates.js` | Every email's wording and the one shared design (light and dark, phone, plain-text version, no images) |
 | `api/_league_check.js` | Decides "clinched" and "champion" from the league's own results, standings and bracket, with reasons |
+| `api/_weekly.js` | The weekly recap's facts, injuries, trade deadlines and offseason player moves |
 | `api/email.js` | One server function: `/api/email/welcome`, `/unsub`, `/hook`, `/cron`, `/test` (function 12 of the plan's 12) |
 | `js/email.js` | The Email card in Account -> Leagues, and asking for the welcome email after a first sign-in |
 | `supabase/emails.sql` | `email_sent`, `email_prefs`, `email_block`, `email_watch` |
@@ -40,10 +60,10 @@ in-site alert or a phone push. **If in doubt, don't email.**
 
 - **Never twice.** `(user, type, key)` is written to `email_sent` before sending and the database refuses a second
   copy, even if two checks overlap. The key names the event, e.g. league + season.
-- **One big moment a day per person.** If two are due, the bigger one goes (championship > clinch > recap > draft
-  reminder) and the other is dropped for good.
-- **Switches.** Account -> Leagues -> Email: one small switch per big moment, all on by default, saved on the
-  account (`email_prefs`). A switched-off kind is never sent.
+- **Limits per group.** Big moments: one a day (championship > clinch > recap > draft reminder; the other is dropped
+  for good). Weekly recap: one a week. Injuries: one a day. Trade deadline: one a day. Player moves: about one a week.
+- **Switches.** Account -> Leagues -> Email: eleven small switches in three groups, all on by default except
+  injuries, saved on the account (`email_prefs`). A switched-off kind is never sent.
 - **Unsubscribe.** Every big-moment email has a signed link (works signed out) and the `List-Unsubscribe` headers.
   The link turns off that kind and offers "turn off all" and "turn back on". Opening the page alone changes
   nothing until the page itself confirms (mail scanners open links).
@@ -98,4 +118,5 @@ Read from the league's own platform on the server. Never a projection or a win c
 `/api/email/test?what=...` with the `CRON_SECRET` (or, on a preview only, `EMAIL_TEST_KEY`). Everything goes to
 the owner's account through the same `sendEmail()`:
 `status` · `send&type=clinch&key=abc` · `biggest&types=clinch,champ` · `check&league=espn:123` ·
-`cron&dry=1` · `unsub&type=clinch` · `reset`. The daily check itself: `/api/email/cron?dry=1`.
+`weekly&week=12` (the owner's real weekly recap for that week, sends nothing) · `cron&dry=1` · `unsub&type=clinch` ·
+`click&type=clinch` · `reset`. The daily check itself: `/api/email/cron?dry=1`.

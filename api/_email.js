@@ -5,8 +5,9 @@
 // Every send passes all of these, in this order, or it isn't sent:
 //   1. the kind of email is one we send, and it's switched on (the recap email is built but off)
 //   2. the address hasn't hard-bounced or marked us as spam (email_block)
-//   3. big moments only: the person hasn't switched that kind off (email_prefs)
-//   4. big moments only: at most one a day per person. A second one that day is dropped, for good
+//   3. the person hasn't switched that kind off (email_prefs; account emails have no switch)
+//   4. its limit: one per group per person in a set time (big moments one a day, the weekly recap one a week,
+//      injuries one a day ...). A second one in that time is dropped, for good
 //   5. it has never been sent before: (user, type, key) is written to email_sent BEFORE sending, and the
 //      database refuses a second copy, so two checks running at once can't both send it
 //   6. the safety switch: unless EMAIL_LIVE is 1 (and this is the real site, never a preview), the email goes
@@ -28,17 +29,31 @@ const OWNER_ID = '1cf5c595-1619-4ffc-bb69-b042382443f3';        // the site owne
 const FROM = { account: 'support@trademetric.app', updates: 'updates@trademetric.app' };
 const REPLY = 'support@trademetric.app';
 
-/* The kinds of email. big = a "big moment" (has a switch, an unsubscribe link and the one-a-day limit).
-   rank decides which one wins when two are due on the same day. on:false = built, but not sent yet. */
+/* Every kind of email.
+   group: emails that share a limit. At most one email per group per person within capH hours. If two in the
+          same group are due together, the higher rank goes and the other is dropped (championship beats clinch).
+   sw:    the switches in Account -> Email that control it. No switches = an account email, always sent.
+          The weekly recap has four (matchup, standout games, #1 at his position, highlights): each one is a
+          section of that one email, and the email only goes when at least one switched-on section has something.
+   on:false = built, but not sent yet. */
 export const TYPES = {
-  welcome:    { big: false },
-  sync_broke: { big: false },
-  champ:      { big: true, rank: 4 },
-  clinch:     { big: true, rank: 3 },
-  recap:      { big: true, rank: 2, on: false },   // switch on when the season recap feature is live
-  draft:      { big: true, rank: 1 },
+  welcome:    {},
+  sync_broke: {},
+  champ:      { group: 'big', capH: 24, rank: 4, sw: ['champ'] },
+  clinch:     { group: 'big', capH: 24, rank: 3, sw: ['clinch'] },
+  recap:      { group: 'big', capH: 24, rank: 2, sw: ['recap'], on: false },   // switch on when the season recap feature is live
+  draft:      { group: 'big', capH: 24, rank: 1, sw: ['draft'] },
+  weekly:     { group: 'weekly', capH: 96, sw: ['matchup', 'perf', 'top', 'clips'] },
+  injury:     { group: 'injury', capH: 20, sw: ['inj'] },
+  deadline:   { group: 'deadline', capH: 20, sw: ['deadline'] },
+  moves:      { group: 'moves', capH: 6 * 24, sw: ['moves'] },
 };
-export const BIG = Object.keys(TYPES).filter(t => TYPES[t].big);
+/* Every switch, and whether it starts on. Injuries start off (they can come often); everything else starts on. */
+export const SWITCHES = ['matchup', 'perf', 'top', 'clips', 'inj', 'deadline', 'clinch', 'champ', 'recap', 'moves', 'draft'];
+export const SWITCH_DEFAULT = { inj: false };
+export const switchOn = (prefs, k) => (prefs && typeof prefs[k] === 'boolean' ? prefs[k] : SWITCH_DEFAULT[k] !== false);
+export const hasSwitch = type => !!(TYPES[type] && TYPES[type].sw);
+const groupTypes = g => Object.keys(TYPES).filter(t => TYPES[t].group === g);
 
 /* Outside services, in one object so the tests can swap them for stand-ins. */
 export const io = {
@@ -85,20 +100,19 @@ export function readUnsubToken(tok) {
   const want = Buffer.from(sign(body)), got = Buffer.from(sig);
   if (want.length !== got.length || !timingSafeEqual(want, got)) return null;
   const [userId, type] = Buffer.from(body, 'base64url').toString().split(':');
-  return /^[0-9a-f-]{36}$/i.test(userId || '') && TYPES[type] && TYPES[type].big ? { userId, type } : null;
+  return /^[0-9a-f-]{36}$/i.test(userId || '') && hasSwitch(type) ? { userId, type } : null;
 }
 export const unsubUrl = (userId, type) => `${siteBase()}/api/email/unsub?t=${unsubToken(userId, type)}`;
 
 /* ---- small database helpers ---- */
 const uq = v => encodeURIComponent(String(v));
-const dayAgo = () => new Date(io.now() - 24 * 3600e3).toISOString();
 export async function prefsOf(userId) {
-  const r = await io.rest(`email_prefs?user_id=eq.${uq(userId)}&select=clinch,champ,recap,draft`);
+  const r = await io.rest(`email_prefs?user_id=eq.${uq(userId)}&select=${SWITCHES.join(',')}`);
   return Array.isArray(r) ? (r[0] || {}) : null;                // null = couldn't read: send nothing
 }
 export async function setPrefs(userId, flags) {
   const row = { user_id: userId };
-  for (const k of BIG) if (k in flags) row[k] = !!flags[k];
+  for (const k of SWITCHES) if (k in flags) row[k] = !!flags[k];
   return !!(await io.rest('email_prefs?on_conflict=user_id', { method: 'POST', body: row, prefer: 'resolution=merge-duplicates,return=minimal' }));
 }
 export async function isBlocked(email) {
@@ -126,7 +140,8 @@ async function testAddress() {
      would_send    dry run: every check passed
      duplicate     already sent (or being sent) once: never again
      pref_off      the person switched this kind off
-     capped        they already got a big-moment email in the last day: dropped
+     capped        they already got one from this group recently: dropped
+     empty         the weekly recap had nothing in its switched-on sections
      blocked       the address bounced or complained
      type_off      this kind of email isn't switched on yet
      not_ready     a key, the database or the link secret is missing: nothing sent
@@ -138,18 +153,24 @@ export async function sendEmail(user, type, key, data = {}, opts = {}) {
   if (T.on === false && !opts.evenIfOff) return out('type_off');
   if (!user.email) return out('no_address');
   if (!io.storeOn()) return out('not_ready');                               // can't check for repeats: send nothing
-  if (T.big && linkSecret().length < 16) return out('not_ready');           // no unsubscribe link: send nothing
+  if (T.sw && linkSecret().length < 16) return out('not_ready');            // no unsubscribe link: send nothing
 
   const blocked = await isBlocked(user.email);
   if (blocked === null) return out('not_ready');
   if (blocked) return out('blocked');
 
-  if (T.big) {
+  if (T.sw) {
     const prefs = await prefsOf(user.id);
     if (!prefs) return out('not_ready');
-    if (prefs[type] === false) return out('pref_off');
-    // one big-moment email a day: anything sent (or on its way) in the last 24 hours uses up the day
-    const recent = await io.rest(`email_sent?user_id=eq.${uq(user.id)}&live=eq.${live}&type=in.(${BIG.join(',')})&status=in.(sending,sent)&at=gte.${uq(dayAgo())}&select=type,key&limit=5`);
+    const on = T.sw.filter(k => switchOn(prefs, k));
+    if (!on.length) return out('pref_off');
+    if (T.sw.length > 1) {                                                 // the weekly recap: only the switched-on sections
+      data = { ...data, on: Object.fromEntries(T.sw.map(k => [k, on.includes(k)])) };
+      if (!T.sw.some(k => data.on[k] && Array.isArray(data[k]) && data[k].length)) return out('empty');
+    }
+    // the group's limit: anything from this group sent (or on its way) in the last capH hours uses it up
+    const since = new Date(io.now() - T.capH * 3600e3).toISOString();
+    const recent = await io.rest(`email_sent?user_id=eq.${uq(user.id)}&live=eq.${live}&type=in.(${groupTypes(T.group).join(',')})&status=in.(sending,sent)&at=gte.${uq(since)}&select=type,key&limit=5`);
     if (!Array.isArray(recent)) return out('not_ready');
     if (recent.some(r => r.type === type && r.key === key)) return out('duplicate');
     if (recent.length) {
@@ -176,9 +197,9 @@ export async function sendEmail(user, type, key, data = {}, opts = {}) {
     if (!to) { await undo(); return out('not_ready'); }
     subjectTag = `[TEST, for ${user.email}] `;
   }
-  const un = T.big ? unsubUrl(user.id, type) : '';
+  const un = T.sw ? unsubUrl(user.id, type) : '';
   const m = render(type, data, { base: siteBase(), unsubUrl: un, postal: process.env.EMAIL_POSTAL || '' });
-  const from = (T.big ? process.env.EMAIL_FROM_UPDATES : process.env.EMAIL_FROM_ACCOUNT) || (T.big ? FROM.updates : FROM.account);
+  const from = (T.sw ? process.env.EMAIL_FROM_UPDATES : process.env.EMAIL_FROM_ACCOUNT) || (T.sw ? FROM.updates : FROM.account);
   const msg = {
     from: /</.test(from) ? from : `TradeMetric <${from}>`,
     to: [to], subject: subjectTag + m.subject, html: m.html, text: m.text,
@@ -199,11 +220,11 @@ export async function sendEmail(user, type, key, data = {}, opts = {}) {
   return { ...out('sent'), id: r.id, to: live ? 'recipient' : 'owner (test mode)' };
 }
 
-/* Several big moments due for one person at once: the biggest goes out (championship beats clinch beats recap
+/* Several emails from the same group due for one person at once: the biggest goes out (championship beats clinch beats recap
    beats the draft reminder) and the rest are dropped by the one-a-day limit.
    list: [{ type, key, data }]. Returns each one's result, biggest first. */
 export async function sendBiggest(user, list, opts = {}) {
-  const sorted = [...list].sort((a, b) => (TYPES[b.type].rank || 0) - (TYPES[a.type].rank || 0));
+  const sorted = [...list].sort((a, b) => (TYPES[b.type].rank || 0) - (TYPES[a.type].rank || 0));   // only for one group at a time (the big moments)
   const results = [];
   let used = false;
   for (const c of sorted) {

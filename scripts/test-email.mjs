@@ -11,6 +11,7 @@ delete process.env.EMAIL_LIVE; delete process.env.VERCEL_ENV;
 const { io, sendEmail, sendBiggest, unsubToken, readUnsubToken, isLive, TYPES } = await import('../api/_email.js');
 const { render, TEMPLATES, SAMPLE } = await import('../api/_email_templates.js');
 const { clinchMath, espnVerdict, sleeperVerdict } = await import('../api/_league_check.js');
+const W8 = await import('../api/_weekly.js');
 const { GET, POST } = await import('../api/email.js');
 
 let pass = 0, fail = 0;
@@ -267,6 +268,88 @@ eq(outbox.map(m => m.subject), ['[TEST, for owner@example.com] Draft season is h
 clock += 24 * 3600e3; await cron(); eq(outbox.length, 1, '...once');
 clock = Date.UTC(2027, 8, 12, 15); await cron(); eq(outbox.length, 1, 'not in September');
 globalThis.fetch = realFetch;
+
+/* ---- 13. the update emails: switches, sections and limits ---- */
+reset();
+const WK = SAMPLE.weekly;
+eq(await st(owner, 'weekly', 'weekly:2026:12', WK), 'sent', 'weekly recap sends');
+ok(outbox[0].from === 'TradeMetric <updates@trademetric.app>' && outbox[0].headers['List-Unsubscribe'], 'weekly recap: from updates@, with unsubscribe');
+eq(await st(owner, 'weekly', 'weekly:2026:12', WK), 'duplicate', 'the same week is never sent twice');
+eq(await st(owner, 'weekly', 'weekly:2026:13', WK), 'capped', 'a second weekly recap within four days is dropped');
+eq(await st(owner, 'clinch', 'k', SAMPLE.clinch), 'sent', 'a weekly recap does not use up the big-moment limit');
+eq(await st(owner, 'injury', 'inj:2026-11-25', SAMPLE.injury), 'pref_off', 'injuries are off until switched on');
+db.email_prefs.push({ user_id: OWNER, inj: true });
+eq(await st(owner, 'injury', 'inj:2026-11-25', SAMPLE.injury), 'sent', '...and send once switched on');
+eq(await st(owner, 'injury', 'inj:2026-11-25b', SAMPLE.injury), 'capped', 'one injury email a day');
+reset();
+db.email_prefs.push({ user_id: OWNER, matchup: false, perf: true, top: false, clips: false });
+const only = { ...WK, perf: [] };
+eq(await st(owner, 'weekly', 'w1', only), 'empty', 'weekly recap with nothing in its switched-on sections is not sent');
+eq(await st(owner, 'weekly', 'w2', WK), 'sent', 'weekly recap with a switched-on section sends');
+ok(/STANDOUT GAMES/.test(outbox[0].text) && !/YOUR MATCHUP|#1 AT HIS|HIGHLIGHTS/.test(outbox[0].text), '...with only the switched-on section in it');
+ok(/Your Week 12 recap/.test(outbox[0].subject), '...and a subject that does not give away a switched-off result');
+Object.assign(db.email_prefs[0], { perf: false });
+eq(await st(owner, 'weekly', 'w3', WK), 'pref_off', 'all four sections off: no weekly recap');
+reset();
+let tk = unsubToken(U2, 'weekly');
+await POST(R('/api/email?do=unsub&t=' + tk, { method: 'POST' }));
+eq(['matchup', 'perf', 'top', 'clips', 'clinch'].map(k => db.email_prefs[0][k]), [false, false, false, false, true], 'unsubscribing from the weekly recap turns off its four sections only');
+await POST(R('/api/email?do=unsub&all=1&t=' + tk, { method: 'POST' }));
+ok(['matchup', 'perf', 'top', 'clips', 'inj', 'deadline', 'clinch', 'champ', 'recap', 'moves', 'draft'].every(k => db.email_prefs[0][k] === false), '"turn off all" turns off all eleven');
+
+/* ---- 14. reading a week: ESPN ---- */
+const espnWk = (scores, kona) => async (url, headers) => {
+  if (/kona_player_info/.test(url)) return kona(JSON.parse(headers['x-fantasy-filter']));
+  const pl = (id, name, pos, slot, pts, proj) => ({ lineupSlotId: slot, playerPoolEntry: { player: { id, fullName: name, defaultPositionId: pos, proTeamId: 4, stats: [{ scoringPeriodId: 12, statSourceId: 0, statSplitTypeId: 1, appliedTotal: pts }, { scoringPeriodId: 12, statSourceId: 1, statSplitTypeId: 1, appliedTotal: proj }] } } });
+  return { settings: { name: 'Test League', scheduleSettings: { matchupPeriods: { 12: [12] } } }, schedule: [{ matchupPeriodId: 12, winner: scores.winner, playoffTierType: 'NONE', home: { teamId: 1, totalPoints: 131.42 }, away: { teamId: 2, totalPoints: 118.2 } }],
+    teams: [{ id: 1, name: 'Mine', record: { overall: { wins: 8, losses: 4 } }, roster: { entries: [pl(10, 'Star Receiver', 3, 4, 38.4, 17.2), pl(11, 'Okay Runner', 2, 2, 9.1, 12.0), pl(12, 'Bench Guy', 3, 20, 30.2, 8.0)] } }, { id: 2, name: 'Theirs' }] };
+};
+const sortedKona = f => ({ players: [{ player: { id: 10, stats: [{ scoringPeriodId: 12, statSourceId: 0, appliedTotal: 38.4 }] } }, { player: { id: 12, stats: [{ scoringPeriodId: 12, statSourceId: 0, appliedTotal: 30.2 }] } }, ...[29, 27, 25, 20].map((p, i) => ({ player: { id: 90 + i, stats: [{ scoringPeriodId: 12, statSourceId: 0, appliedTotal: p }] } }))] });
+const wk12 = { season: 2026, week: 12, games: [] }, memoF = () => { const m = new Map(); return (k, fn) => { if (!m.has(k)) m.set(k, fn()); return m.get(k); }; };
+let w = await W8.leagueWeek({ type: 'espn', id: '5', rid: 1, name: 'Test League' }, wk12, espnWk({ winner: 'HOME' }, sortedKona), memoF(), [{ title: 'Star Receiver 64-yard TD', url: 'https://x/v', who: ['star receiver'] }]);
+eq([w.result.won, w.result.me, w.result.record], [true, 131.4, '8-4'], 'ESPN week: the result and record');
+eq(w.perf.map(p => p.name), ['Star Receiver', 'Bench Guy'], 'ESPN week: standout games (38.4, and a bench player at 30.2)');
+eq(w.tops.map(p => p.name), ['Star Receiver'], 'ESPN week: #1 WR when he tops the whole position');
+eq(w.clips.map(c => c.player), ['Star Receiver'], 'ESPN week: his highlight clip');
+w = await W8.leagueWeek({ type: 'espn', id: '5', rid: 1 }, wk12, espnWk({ winner: 'HOME' }, () => ({ players: [20, 45, 30, 38.4, 10].map((p, i) => ({ player: { id: 80 + i, stats: [{ scoringPeriodId: 12, statSourceId: 0, appliedTotal: p }] } })) })), memoF(), []);
+eq(w.tops.length, 0, 'ESPN week: scores that do not come back in order: no #1 claim');
+w = await W8.leagueWeek({ type: 'espn', id: '5', rid: 1 }, wk12, espnWk({ winner: 'HOME' }, () => ({ players: [{ player: { id: 77, stats: [{ scoringPeriodId: 12, statSourceId: 0, appliedTotal: 41 }] } }, ...[38.4, 30.2, 29, 27].map((p, i) => ({ player: { id: 10 + i, stats: [{ scoringPeriodId: 12, statSourceId: 0, appliedTotal: p }] } }))] })), memoF(), []);
+eq(w.tops.length, 0, 'ESPN week: someone else scored more: no #1 claim');
+w = await W8.leagueWeek({ type: 'espn', id: '5', rid: 1 }, wk12, espnWk({ winner: 'UNDECIDED' }, sortedKona), memoF(), []);
+eq(w.result, null, 'ESPN week: an unfinished matchup has no result');
+
+/* ---- 15. reading a week: Sleeper ---- */
+const slpGet = ({ ours = 30.5 } = {}) => async url => {
+  if (/\/matchups\/12$/.test(url)) return [{ roster_id: 1, matchup_id: 3, points: 120.5, starters: ['p1'], players_points: { p1: 30.5, p2: 4 } }, { roster_id: 2, matchup_id: 3, points: 121, starters: [], players_points: {} }];
+  if (/\/rosters$/.test(url)) return [{ roster_id: 1, owner_id: 'a', settings: { wins: 6, losses: 6 } }, { roster_id: 2, owner_id: 'b', settings: {} }];
+  if (/\/users$/.test(url)) return [{ user_id: 'a', display_name: 'me' }, { user_id: 'b', metadata: { team_name: 'Rivals' } }];
+  if (/players\/nfl$/.test(url)) return Object.fromEntries([['p1', { position: 'RB', full_name: 'Run Back', team: 'ATL' }], ['p2', { position: 'WR', full_name: 'Wide Out', team: 'KC' }], ...Array.from({ length: 150 }, (_, i) => ['x' + i, { position: 'RB', full_name: 'Other ' + i }])]);
+  if (/\/stats\//.test(url)) return [{ player_id: 'p1', stats: { rush_yd: ours * 10 } }, ...Array.from({ length: 150 }, (_, i) => ({ player_id: 'x' + i, stats: { rush_yd: i } }))];
+  if (/\/projections\//.test(url)) return [{ player_id: 'p1', stats: { rush_yd: 100 } }];
+  if (/\/league\/9$/.test(url)) return { name: 'Lap', scoring_settings: { rush_yd: 0.1 }, settings: { playoff_week_start: 15 } };
+  return null;
+};
+w = await W8.leagueWeek({ type: 'sleeper', id: '9', rid: 1 }, wk12, slpGet(), memoF(), []);
+eq([w.result.won, w.result.oppName, w.result.record], [false, 'Rivals', '6-6'], 'Sleeper week: the result');
+eq([w.perf.map(p => p.name), w.tops.map(p => p.name)], [['Run Back'], ['Run Back']], 'Sleeper week: 30.5 is a standout game and the #1 RB');
+w = await W8.leagueWeek({ type: 'sleeper', id: '9', rid: 1 }, wk12, slpGet({ ours: 25 }), memoF(), []);
+eq(w.tops.length, 0, 'Sleeper week: our scoring does not match the league\'s number: no #1 claim');
+
+/* ---- 16. trade deadlines and player moves ---- */
+const nowT = Date.UTC(2026, 10, 25, 15);
+const stDl = { leagueKey: 'espn:1', league: { name: 'L1', tdl: { at: nowT + 2 * 864e5 } }, leagues: [{ key: 'espn:1', name: 'L1' }, { key: 'espn:2', name: 'L2', snap: { league: { tdl: { at: nowT + 6 * 864e5 } } } }] };
+eq(W8.deadlinesOf(stDl, null, nowT).map(d => d.league), ['L1'], 'trade deadline: only the one within three days');
+let kvS = {};
+const kv = { get: async k => ({ value: kvS[k] || null }), put: async (k, v) => { kvS[k] = v; return true; } };
+let slpP = { a: { position: 'RB', full_name: 'Tony Moves', team: 'TEN' }, ...Object.fromEntries(Array.from({ length: 1000 }, (_, i) => ['f' + i, { position: 'WR', full_name: 'Filler ' + i, team: 'NE' }])) };
+const pget = async () => slpP;
+eq(await W8.trackMoves(pget, kv, nowT, false), [], 'moves: the first check only records teams');
+slpP.a.team = 'KC';
+eq((await W8.trackMoves(pget, kv, nowT + 864e5, false)).length, 0, 'moves: a new team is not believed on one check');
+eq((await W8.trackMoves(pget, kv, nowT + 2 * 864e5, false)).map(x => [x.name, x.from, x.to]), [['Tony Moves', 'TEN', 'KC']], 'moves: still there a day later: confirmed');
+kvS = {}; slpP.a.team = 'TEN'; await W8.trackMoves(pget, kv, nowT, false); slpP.a.team = 'KC'; await W8.trackMoves(pget, kv, nowT + 864e5, false); slpP.a.team = 'TEN';
+eq((await W8.trackMoves(pget, kv, nowT + 2 * 864e5, false)).length, 0, 'moves: a change that flips back is never sent');
+ok(!W8.inMovesWindow(Date.UTC(2026, 10, 25)) && W8.inMovesWindow(Date.UTC(2027, 3, 10)), 'moves only in the offseason');
 
 console.log(`${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

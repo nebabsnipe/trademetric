@@ -132,7 +132,8 @@
       "includeFiles": "data/nfl.json"
     },
     "api/email.js": {
-      "maxDuration": 60
+      "maxDuration": 60,
+      "includeFiles": "data/nfl.json"
     }
   }
 }

@@ -15,7 +15,7 @@ TradeMetric (trademetric.app) is a paid fantasy football trade analyzer. Hosted 
 - The owner isn't a programmer: explain changes in plain words, not code terms.
 
 ## Feature plans and history
-Longer plans and build notes are in `docs/`: offseason mode, season recap, trade visuals, advanced stats, accounts, account sync, push notifications, and a running feature-notes list. Read the relevant one before working on that area, and update it when something ships or a decision changes.
+Longer plans and build notes are in `docs/`: offseason mode, season recap, trade visuals, advanced stats, accounts, account sync, push notifications, emails, and a running feature-notes list. Read the relevant one before working on that area, and update it when something ships or a decision changes.
 
 ## Hard rules — never break these
 - **Never name other fantasy sites or data sources** anywhere on the site.
@@ -68,7 +68,9 @@ Longer plans and build notes are in `docs/`: offseason mode, season recap, trade
 - Alerts: opening the Alerts tab marks them seen. Seen alerts clear after 3 days, unseen after 7. Trade and #1-finish notifications pop up for users who missed them, only within 7 days.
 
 ## Emails
-- Very few emails: account ones (welcome, sign-in codes, a league that stops updating) and big moments (clinch, championship, recap, draft reminder). Never lineup alerts, injuries, big plays, trades, weekly results or news. If in doubt, don't email.
+- Owner's list (changed 2026-11-25; the first plan sent almost nothing). Account emails, always sent: welcome, sign-in codes, a league that stops updating. Update emails, each with its own switch in Account → Email: the weekly recap (matchup result, standout games, #1 at his position, highlights, one email after Monday night), injuries (ruled out or IR only, one morning email at most, **off by default**), trade deadline, clinched, championship, and offseason: season recap, player moves, draft reminder.
+- Never emailed: lineup alerts, live big plays, news or rumors, unverified trades.
+- Every fact in an email comes from the league's own data and is left out rather than risk being wrong (e.g. "#1 at his position" only when the whole position could be checked).
 - Every send goes through `sendEmail()` in `api/_email.js`. Never call the email service from anywhere else.
 - `EMAIL_LIVE` stays off (emails go only to the owner) until the owner says to go live. See `docs/emails.md`.
 
