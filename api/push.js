@@ -182,7 +182,7 @@ async function cron(req, res) {
       const events = anyInj && !offKinds.includes('inj') ? injuryEvents({ roster, src, log, cur, now }).filter(e => !had.has(e.key)) : [];   // the Injuries switch
       if (isQuiet(devices[0].tz, now)) { stats.quiet += events.length; continue; }               // everything waits until 8am
       // deadline notices and lineup fixes go out as their own notifications (one per league at most)
-      const extraJobs = W ? (await alertsFor(st, W, devices[0].tz, offKinds)).filter(a => a.keys.some(k => !had.has(k))) : [];
+      const extraJobs = W ? (await alertsFor(st, W, devices[0].tz, offKinds, had)).filter(a => a.keys.some(k => !had.has(k))) : [];
       if (!events.length && !extraJobs.length) continue;
       stats.events += events.length;
       const lastHour = mineSent.filter(r => r.kind !== 'test' && now - Date.parse(r.sent_at) < 3600e3).length;

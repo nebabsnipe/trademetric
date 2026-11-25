@@ -79,7 +79,7 @@ t('quiet hours: 11pm to 8am in the user\'s time zone', () => {
   assert.equal(isQuiet('Not/AZone', at('2026-11-23T04:30:00Z')), true);           // unknown: treated as Eastern
 });
 /* ---- trade deadlines and lineup fixes (api/_alerts.js) ---- */
-const { deadlineNotice, lineupIssues } = await import('../api/_alerts.js');
+const { deadlineNotice, lineupIssues, lineupTiming, gameSchedule } = await import('../api/_alerts.js');
 const H = 36e5, D = 864e5, L0 = { key: 'sleeper:1', name: 'Home League' };
 t('deadline: a week out, 3 days out, final day, and nothing after it passes', () => {
   assert.match(deadlineNotice(L0, now + 6.2 * D, now, 'America/New_York').title, /Trade deadline in 6 days/);
@@ -97,13 +97,52 @@ t('lineup: empty slot, starter out, starter on bye', () => {
   const out = lineupIssues(L, G, now, 12).map(x => x.k);
   assert.deepEqual(out, ['12:0:out:A', '12:1:bye:T', '12:2:empty']);
 });
-t('lineup: bench swap only when 5+ more AND about double, close to kickoff, and never once a game started', () => {
+t('lineup: bench swap only when 5+ more AND about double, and never once a game started', () => {
   const mk = (sp, bp, team = 'BUF') => ({ app: 'ESPN', slots: [slot('WR', ['WR'], P('S', 'WR', team, sp))], bench: [P('B', 'WR', 'KC', bp)] });
   assert.equal(lineupIssues(mk(4, 12), G, now, 12).length, 1);          // 8 more and 3x: yes
   assert.equal(lineupIssues(mk(10, 16), G, now, 12).length, 0);         // 6 more but not double: no
   assert.equal(lineupIssues(mk(4, 8), G, now, 12).length, 0);           // double but only 4 more: no
   assert.equal(lineupIssues(mk(4, 12, 'DAL'), G, now, 12).length, 0);   // his game already started: no
-  assert.equal(lineupIssues(mk(4, 12, 'MIA'), G, now, 12).length, 0);   // kickoff more than 3 hours away: not yet
+});
+
+/* when lineup alerts go out (owner, 2026-11-25): Thursday games -> 6 pm the day before + 4 hours before;
+   Sat/Sun/Mon games -> Friday 6 pm + 1 hour before; new problems in between go out right away */
+const ET = 'America/New_York', Z = s => Date.parse(s);
+const THU = Z('2026-11-27T01:15:00Z'), SUN = Z('2026-11-29T18:00:00Z'), MON = Z('2026-12-01T01:15:00Z');   // Thu 8:15pm, Sun 1pm, Mon 8:15pm ET
+const GW = { DAL: { start: THU, state: 'pre' }, BUF: { start: SUN, state: 'pre' }, KC: { start: MON, state: 'pre' } };
+const keyOf = (iss, at) => lineupTiming(iss, GW, Z(at), ET).map(x => x.when + ' ' + x.k);
+t('timing: the heads-up times and reminder leads', () => {
+  assert.equal(new Date(gameSchedule(THU, ET).eve).toISOString(), '2026-11-25T23:00:00.000Z');          // Wed 6pm ET
+  assert.equal(gameSchedule(THU, ET).lead, 4 * H);
+  assert.equal(new Date(gameSchedule(SUN, ET).eve).toISOString(), '2026-11-27T23:00:00.000Z');          // Fri 6pm ET
+  assert.equal(new Date(gameSchedule(MON, ET).eve).toISOString(), '2026-11-27T23:00:00.000Z');          // Monday night: same Friday
+  assert.equal(gameSchedule(SUN, ET).lead, H);
+  assert.equal(new Date(gameSchedule(SUN, 'America/Los_Angeles').eve).toISOString(), '2026-11-28T02:00:00.000Z');   // Fri 6pm Pacific
+});
+t('timing: Thursday player out -> nothing before Wed 6pm, heads-up after, reminder 4 hours before', () => {
+  const iss = [{ k: 'o', kind: 'out', kick: THU }];
+  assert.deepEqual(keyOf(iss, '2026-11-25T22:30:00Z'), []);                                             // Wed 5:30pm
+  assert.deepEqual(keyOf(iss, '2026-11-25T23:05:00Z'), ['eve o:wd2026-11-26']);                          // Wed 6:05pm
+  assert.deepEqual(keyOf(iss, '2026-11-26T21:30:00Z'), ['pre o:p' + THU]);                               // Thu 4:30pm
+});
+t('timing: Sunday player ruled out on Saturday -> sent right away as a change; then the 1-hour reminder', () => {
+  const iss = [{ k: 'o', kind: 'out', kick: SUN }];
+  assert.deepEqual(keyOf(iss, '2026-11-27T20:00:00Z'), []);                                             // Fri 3pm: too early
+  assert.deepEqual(keyOf(iss, '2026-11-28T17:00:00Z'), ['change o:wwknd']);                              // Sat noon
+  assert.deepEqual(keyOf(iss, '2026-11-29T17:10:00Z'), ['pre o:p' + SUN]);                               // Sun 12:10pm
+});
+t('timing: bench swaps only at the heads-up and the reminder, not as changes', () => {
+  const iss = [{ k: 'b', kind: 'bench', kick: SUN }];
+  assert.deepEqual(keyOf(iss, '2026-11-27T23:10:00Z'), ['eve b:wwknd']);                                 // Fri 6:10pm
+  assert.deepEqual(keyOf(iss, '2026-11-28T17:00:00Z'), []);                                              // Sat noon: projections moved, quiet
+  assert.deepEqual(keyOf(iss, '2026-11-29T17:15:00Z'), ['pre b:p' + SUN]);                               // Sun 12:15pm
+});
+t('timing: an empty slot follows the next game: Thursday heads-up, then the weekend ones', () => {
+  const iss = [{ k: 'e', kind: 'empty', kick: null }];
+  assert.deepEqual(keyOf(iss, '2026-11-25T23:05:00Z'), ['eve e:wd2026-11-26']);
+  const after = { ...GW, DAL: { start: THU, state: 'in' } };
+  assert.deepEqual(lineupTiming(iss, after, Z('2026-11-27T23:05:00Z'), ET).map(x => x.k), ['e:wwknd']);
+  assert.deepEqual(lineupTiming(iss, after, Z('2026-11-29T17:05:00Z'), ET).map(x => x.k), ['e:pwknd']);
 });
 
 console.log(`\n${n} checks passed`);

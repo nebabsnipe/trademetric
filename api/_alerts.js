@@ -1,13 +1,16 @@
 // Trade deadline and lineup alerts for push notifications. Helper for api/push.js (the scheduled check), not an
 // endpoint. Reads each saved league straight from Sleeper or ESPN:
 //   - trade deadline: about a week out, about 3 days out, and a final one in the last 24 hours
-//   - lineup fixes, within 3 hours of a kickoff: an empty starting slot, a starter who is out / on IR / suspended /
-//     on bye, or a bench player projected at least 5 points more (and about double) than the starter he'd replace.
+//   - lineup fixes: an empty starting slot, a starter who is out / on IR / suspended / on bye, or a bench player
+//     projected at least 5 points more (and about double) than the starter he'd replace. When (owner, 2026-11-25):
+//       Thursday games (and any other midweek game): 6 pm the day before, and 4 hours before kickoff
+//       Saturday / Sunday / Monday games: Friday at 6 pm, and 1 hour before kickoff
+//       and in between, any NEW problem (a starter ruled out, a slot left empty) is sent right away
 //     The same rules as the lineup alerts on the site (lineupAlerts in js/app.js); projections are the league
 //     platform's own, scored with that league's settings.
 // Private ESPN leagues get deadline notices only (their login codes never leave the person's browser).
 
-const H = 36e5, D = 864e5, LU_GAP = 5, LU_X = 1.8, SOON = 3 * H;
+const H = 36e5, D = 864e5, LU_GAP = 5, LU_X = 1.8;
 const TEAM = { WSH: 'WAS', LA: 'LAR', JAC: 'JAX' }, fix = t => TEAM[t] || t;
 const ESPN_TEAM = { 1: 'ATL', 2: 'BUF', 3: 'CHI', 4: 'CIN', 5: 'CLE', 6: 'DAL', 7: 'DEN', 8: 'DET', 9: 'GB', 10: 'TEN', 11: 'IND', 12: 'KC', 13: 'LV', 14: 'LAR', 15: 'MIA', 16: 'MIN', 17: 'NE', 18: 'NO', 19: 'NYG', 20: 'NYJ', 21: 'PHI', 22: 'ARI', 23: 'PIT', 24: 'LAC', 25: 'SF', 26: 'SEA', 27: 'TB', 28: 'WAS', 29: 'CAR', 30: 'JAX', 33: 'BAL', 34: 'HOU' };
 const ESPN_POS = { 1: 'QB', 2: 'RB', 3: 'WR', 4: 'TE', 5: 'K', 16: 'DEF' };
@@ -62,21 +65,19 @@ export function lineupIssues(lineup, games, now, week) {
   const out = [], used = new Set(), app = lineup.app;
   const started = p => { const g = games[p.team]; return !!(g && (g.state !== 'pre' || g.start <= now)); };
   const bye = p => !!p.team && !games[p.team];
-  const soon = p => { const g = games[p.team]; return !!(g && g.state === 'pre' && g.start > now && g.start - now <= SOON); };
   const ok = p => !!p.team && !bye(p) && !p.bad && !started(p);
   const best = (x, skip) => lineup.bench.filter(b => x.el.includes(b.pos) && ok(b) && !used.has(b.id) && b.id !== skip).sort((a, b) => b.pj - a.pj)[0];
   const pick = x => { const pos = x.el.map(p => p === 'DEF' ? 'defense' : p === 'K' ? 'kicker' : p); return (pos[0] === 'RB' ? 'an ' : 'a ') + (pos.length > 1 ? pos.slice(0, -1).join(', ') + ' or ' + pos.slice(-1) : pos[0]); };
   lineup.slots.forEach((x, i) => {
     if (!x.p) { const b = best(x); if (b) used.add(b.id);
-      out.push({ k: `${week}:${i}:empty`, msg: b ? `Your ${x.label} is empty. Start ${b.n} in ${app}.` : `Your ${x.label} is empty. Pick up ${pick(x)} in ${app}.` }); return; }
+      out.push({ k: `${week}:${i}:empty`, kind: 'empty', kick: null, msg: b ? `Your ${x.label} is empty. Start ${b.n} in ${app}.` : `Your ${x.label} is empty. Pick up ${pick(x)} in ${app}.` }); return; }
     const p = x.p; if (started(p)) return;
     const why = bye(p) ? 'is on bye' : p.bad || (!p.team ? 'is not on an NFL team' : null);
     if (why) { const b = best(x, p.id); if (b) used.add(b.id);
-      out.push({ k: `${week}:${i}:${bye(p) ? 'bye' : 'out'}:${p.id}`, msg: `${p.n} ${why}. ${b ? `Start ${b.n} in ${app}.` : `Pick up ${pick(x)} in ${app}.`}` }); return; }
-    if (!soon(p)) return;   // projections move all week: only call a bench swap close to his kickoff
+      out.push({ k: `${week}:${i}:${bye(p) ? 'bye' : 'out'}:${p.id}`, kind: bye(p) ? 'bye' : 'out', kick: games[p.team] ? games[p.team].start : null, msg: `${p.n} ${why}. ${b ? `Start ${b.n} in ${app}.` : `Pick up ${pick(x)} in ${app}.`}` }); return; }
     const b = best(x, p.id); if (!b) return;
     if (b.pj >= p.pj + LU_GAP && b.pj >= p.pj * LU_X) { used.add(b.id);
-      out.push({ k: `${week}:${i}:bench:${p.id}:${b.id}`, msg: `Start ${b.n} over ${p.n} at ${x.label} in ${app} (${f1(b.pj)} vs ${f1(p.pj)} projected).` }); }
+      out.push({ k: `${week}:${i}:bench:${p.id}:${b.id}`, kind: 'bench', kick: games[p.team].start, msg: `Start ${b.n} over ${p.n} at ${x.label} in ${app} (${f1(b.pj)} vs ${f1(p.pj)} projected).` }); }
   });
   return out;
 }
@@ -140,6 +141,46 @@ function leaguesOf(S) {
 }
 
 
+/* ---------- when lineup alerts go out ---------- */
+const WEEKEND = ['Saturday', 'Sunday', 'Monday'];
+function tzOff(ms, tz) {
+  const p = new Intl.DateTimeFormat('en-US', { timeZone: tz, hourCycle: 'h23', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' }).formatToParts(ms);
+  const g = t => +p.find(x => x.type === t).value;
+  return Date.UTC(g('year'), g('month') - 1, g('day'), g('hour'), g('minute'), g('second')) - ms;
+}
+/* y-m-d h:00 on the clock in that time zone, as a moment in time */
+function atLocal(y, m, d, h, tz) { let t = Date.UTC(y, m - 1, d, h); t -= tzOff(t, tz); return Date.UTC(y, m - 1, d, h) - tzOff(t, tz); }
+/* the schedule for a game kicking off at `kick`, for someone in time zone tz:
+   eve  = when the heads-up goes out (Friday 6 pm for Sat/Sun/Mon games, otherwise 6 pm the day before)
+   lead = how long before kickoff the reminder goes out (1 hour for Sat/Sun/Mon games, otherwise 4 hours) */
+export function gameSchedule(kick, tz) {
+  const wd = dayIn(kick, 'America/New_York'), weekend = WEEKEND.includes(wd);
+  const p = new Intl.DateTimeFormat('en-US', { timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit', weekday: 'long' }).formatToParts(kick);
+  const g = t => p.find(x => x.type === t).value, local = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'].indexOf(g('weekday'));
+  const back = weekend ? (local - 5 + 7) % 7 || 7 : 1;
+  const ymd = new Date(kick).toLocaleDateString('en-CA', { timeZone: 'America/New_York' });
+  return { id: weekend ? 'wknd' : 'd' + ymd, eve: atLocal(+g('year'), +g('month'), +g('day') - back, 18, tz), lead: weekend ? H : 4 * H };
+}
+/* Which lineup problems to send now, and under which record key (so each goes once per moment):
+   - ':w<group>'  the heads-up (night before / Friday 6 pm). A problem first seen later in that window, like a starter
+                  ruled out on Saturday, gets the same key, so it goes out the moment it appears.
+   - ':p<kickoff>' the reminder before kickoff (4 hours / 1 hour), for anything still not fixed.
+   Bench swaps follow projections, which move all week: only at the heads-up and the reminder, never as a "change". */
+export function lineupTiming(issues, games, now, tz) {
+  const upcoming = Object.values(games).filter(g => g.state === 'pre' && g.start > now).map(g => g.start).sort((a, b) => a - b);
+  const out = [];
+  for (const x of issues) {
+    const kick = x.kick || upcoming[0];
+    if (!kick || kick <= now) continue;
+    const S = gameSchedule(kick, tz);
+    if (now < S.eve) continue;                                              // too early: the heads-up hasn't gone out yet
+    const pre = now >= kick - S.lead;
+    if (pre) out.push({ ...x, k: `${x.k}:p${x.kind === 'empty' ? S.id : kick}`, when: 'pre', mins: Math.round((kick - now) / 6e4) });
+    else if (x.kind !== 'bench' || now < S.eve + 3 * H) out.push({ ...x, k: `${x.k}:w${S.id}`, when: now < S.eve + 3 * H ? 'eve' : 'change' });
+  }
+  return out;
+}
+
 /* ---------- one run's shared facts: the NFL week, kickoff times, when the last game of the week ends ---------- */
 export async function weekInfo(now = Date.now()) {
   const nfl = await j('https://api.sleeper.app/v1/state/nfl').catch(() => null);
@@ -149,12 +190,13 @@ export async function weekInfo(now = Date.now()) {
   const games = gamesOf(board), starts = Object.values(games).map(g => g.start).filter(Boolean);
   return { season, week, games, now, rd: makeReader(season, week),
     weekEnd: starts.length ? Math.max(...starts) + 3.5 * H : null,                                   // the last game of the week ends
-    lineupTime: Object.values(games).some(g => g.state === 'pre' && g.start > now && g.start - now <= SOON) };
+    // lineups are only read when some game kicks off within the next 3 days (Friday 6 pm covers Monday night)
+    lineupTime: Object.values(games).some(g => g.state === 'pre' && g.start > now && g.start - now <= 3 * D) };
 }
 
 /* Everything new for one account: [{ keys: [push_sent keys], kind: 'dl' | 'lineup', payload }].
    off: the account's switched-off kinds (S.acct.push.off). Leagues set to "News tab only" are skipped. */
-export async function alertsFor(st, W, tz, off = []) {
+export async function alertsFor(st, W, tz, off = [], had = new Set()) {
   const out = [], skip = new Set((st.notif && st.notif.off) || []), now = W.now;
   if (!tzOk(tz)) tz = 'America/New_York';
   for (const lg of leaguesOf(st)) {
@@ -176,9 +218,14 @@ export async function alertsFor(st, W, tz, off = []) {
         if (t) lineup = espnLineup(d, t, W.week);
       }
       if (!lineup) continue;
-      const iss = lineupIssues(lineup, W.games, now, W.week).map(x => ({ ...x, k: `lu:${lg.key}:${x.k}` }));
-      if (iss.length) out.push({ keys: iss.map(x => x.k), kind: 'lineup', each: iss.map(x => x.k),
-        payload: { title: `Lineup fix: ${lg.name}`, body: iss[0].msg + (iss.length > 1 ? ` Plus ${iss.length - 1} more.` : ''), tag: ('lu-' + lg.key).replace(/[^A-Za-z0-9_-]/g, '-'), url: '/#team' } });
+      const ORD = { out: 0, empty: 1, bye: 2, bench: 3 };
+      const iss = lineupTiming(lineupIssues(lineup, W.games, now, W.week), W.games, now, tz).map(x => ({ ...x, k: `lu:${lg.key}:${x.k}` }))
+        .filter(x => !had.has(x.k)).sort((a, b) => ORD[a.kind] - ORD[b.kind]);
+      if (!iss.length) continue;
+      const pre = iss.find(x => x.when === 'pre'), change = iss.every(x => x.when === 'change');
+      const title = pre ? `Kickoff in ${pre.mins >= 90 ? Math.round(pre.mins / 60) + ' hours' : pre.mins + ' min'}: fix your lineup in ${lg.name}` : change ? `Lineup change: ${lg.name}` : `Lineup check: ${lg.name}`;
+      out.push({ keys: iss.map(x => x.k), kind: 'lineup',
+        payload: { title, body: iss[0].msg + (iss.length > 1 ? ` Plus ${iss.length - 1} more.` : ''), tag: ('lu-' + lg.key).replace(/[^A-Za-z0-9_-]/g, '-'), url: '/#team' } });
     } catch (e) { /* one league failing never stops the others */ }
   }
   return out;

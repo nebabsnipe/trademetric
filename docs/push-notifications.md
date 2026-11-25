@@ -79,10 +79,14 @@ Part of the same scheduled check (`/api/push/cron`), rules in `api/_alerts.js`, 
 - **Deadlines:** about a week out, about 3 days out, and a last call in the final 24 hours, per saved league. The
   deadline is the one the site already reads at import/sync (`league.tdl`): ESPN's exact time, or for Sleeper the
   end of that week's last game. Tapping opens the Trades tab.
-- **Lineup fixes:** only when some game kicks off within 3 hours. Read straight from Sleeper/ESPN: an empty
-  starting slot, a starter who is out / on IR / suspended / on bye, or a bench player projected 5+ points more
-  and about double the starter (the site's rule), only for players whose game hasn't started; bench swaps only
-  within 3 hours of that starter's kickoff. One notification per league ("Plus 2 more"). Tapping opens My Team.
+- **Lineup fixes:** read straight from Sleeper/ESPN: an empty starting slot, a starter who is out / on IR /
+  suspended / on bye, or a bench player projected 5+ points more and about double the starter (the site's rule),
+  only for players whose game hasn't started. One notification per league ("Plus 2 more"). Tapping opens My Team.
+  **When (owner, 2026-11-25):** Thursday games (and any other midweek game): 6 pm the day before and 4 hours
+  before kickoff. Saturday/Sunday/Monday games: Friday 6 pm and 1 hour before kickoff. In between, a NEW problem
+  (starter ruled out, slot left empty) goes out right away. Bench swaps only at the 6 pm heads-up and the
+  pre-kickoff reminder (projections move all week). 6 pm is in the user's own time zone; quiet hours still apply.
+  Logic: `gameSchedule` and `lineupTiming` in `api/_alerts.js`.
 - Private ESPN leagues: deadline notices only (their login codes stay in the browser).
 - Checked with `node scripts/test-push.mjs` and a full run of the scheduled check with every outside service faked.
 

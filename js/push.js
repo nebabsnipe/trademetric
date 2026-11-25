@@ -10,7 +10,7 @@ const PUSH_TYPES=[
   ['inj','Injuries and status changes','When one of your players is questionable, doubtful, out or on injured reserve',true],
   ['trade','Trades involving your players','When a player on your team is traded in the NFL'],
   ['dl','Trade deadlines','A week out, 3 days out, and a last call on deadline day',true],
-  ['lineup','Lineup fixes','Before kickoff: an empty starting spot, a starter who is out or on bye, or a bench player projected 5+ points more',true],
+  ['lineup','Lineup fixes','An empty spot, a starter who is out or on bye, or a bench player projected 5+ more. 6 pm the night before (Friday for weekend games), again before kickoff, and right away if something changes',true],
   ['top','#1 finishes','When your player outscores everyone at his position']];
 const PUSH_ID_LS='tm-push-device',PUSH_SEEN_LS='tm-push-seen',PUSH_HINT_LS='tm-push-ios-hint';
 const pushLs=(k,v)=>{try{if(v===undefined)return localStorage.getItem(k);if(v===null)localStorage.removeItem(k);else localStorage.setItem(k,v)}catch(e){}return null};
