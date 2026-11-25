@@ -383,10 +383,12 @@ export async function buildRecap({ league, year, teamId, creds }) {
   for (const a of addVal) { const k = a.team + ':' + a.pid; if (!bestAdd.has(k) || bestAdd.get(k).pointsAfter < a.pointsAfter) bestAdd.set(k, a); }
   const allAdds = [...bestAdd.values()].filter(a => a.pointsAfter > 0).sort((a, b) => b.pointsAfter - a.pointsAfter);
   const usingFaab = !!(st.acquisitionSettings && st.acquisitionSettings.isUsingAcquisitionBudget);
-  const myAdd = allAdds.find(a => a.team === teamId);
+  const myAdds = allAdds.filter(a => a.team === teamId), myAdd = myAdds[0];
   const waivers = {
     myBest: myAdd ? { player: pInfo(myAdd.pid, myAdd.sp), week: myAdd.sp, faab: usingFaab ? myAdd.faab : null, pointsAfter: r1(myAdd.pointsAfter), leagueRank: allAdds.indexOf(myAdd) + 1 } : null,
-    top5: allAdds.slice(0, 5).map(a => ({ player: (P[a.pid] || {}).name, pos: (P[a.pid] || {}).pos, teamName: tName[a.team], week: a.sp, pointsAfter: r1(a.pointsAfter), isMine: a.team === teamId })),
+    // my other pickups, best first (shown smaller under the best one)
+    myNext: myAdds.slice(1, 4).map(a => ({ player: pInfo(a.pid, a.sp), week: a.sp, faab: usingFaab ? a.faab : null, pointsAfter: r1(a.pointsAfter), leagueRank: allAdds.indexOf(a) + 1 })),
+    top5: allAdds.slice(0, 5).map(a => ({ player: (P[a.pid] || {}).name, pos: (P[a.pid] || {}).pos, team: proAbbr[(P[a.pid] || {}).proTeam] || 'FA', teamName: tName[a.team], week: a.sp, pointsAfter: r1(a.pointsAfter), isMine: a.team === teamId })),
   };
 
   // ---- trades output ----

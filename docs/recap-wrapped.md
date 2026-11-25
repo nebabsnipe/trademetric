@@ -184,4 +184,6 @@ The card list is now the 12-card build prompt (league trades, your trades + podi
 - **Cover screen:** the recap now opens on a cover ("Your season, graded.", team and league, three facts, Start) before card 1.
 - **Card list:** on wide screens a list of the cards sits beside the card (click to jump, current card highlighted); the card grows to most of the window's height.
 - **Recap tab preview:** the tab shows a phone-shaped live preview that loops the sample recap (`?demo=1`: no cover, no controls). Clicking it opens the sample.
+- **Team badges (owner's request, 2026-11-25):** every player on the trade, fleece and waiver cards has a small badge in his NFL team's colors with the team's letters, so you can tell who is who at a glance. Colors are the same list the main site uses (`TC` in `js/recap.js`).
+- **Waiver card:** under "Your best waiver add" there is now a smaller "Your next best adds" list (up to three, from `waivers.myNext` in the API). The league top 5 rows also carry the team badge.
 - **Not done yet:** a public link/preview image for sharing (only the image is shareable for now).

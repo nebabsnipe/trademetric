@@ -24,7 +24,7 @@
     { key: 'worst', flag: 's4', dur: 7500, glow: ['#ef4444', '#ef4444'], bg: 'bgGrid' },
     { key: 'defining', flag: 's5', dur: 7000, glow: ['#f59e0b', '#f59e0b'], bg: 'bgGrid' },
     { key: 'fleece', flag: 's6', dur: 7500, glow: ['#ef4444', '#f59e0b'], bg: 'bgGrid' },
-    { key: 'waivers', flag: 's7', dur: 8500, glow: ['#22c55e', '#0ea5e9'], bg: 'bgGrid' },
+    { key: 'waivers', flag: 's7', dur: 10000, glow: ['#22c55e', '#0ea5e9'], bg: 'bgGrid' },
     { key: 'timelapse', flag: 's8', dur: 10000, glow: ['#8b5cf6', '#8b5cf6'], bg: null },
     { key: 'bestWeeks', flag: 's9', dur: 7500, glow: ['rgba(245,158,11,.35)', '#f59e0b'], bg: 'bgStadium' },
     { key: 'beatdown', flag: 'sBeat', dur: 6500, glow: ['rgba(239,68,68,.4)', '#ef4444'], bg: 'bgStadium' },
@@ -75,8 +75,23 @@
     } else el.style.boxShadow = '0 0 ' + (key === 'mgr' ? 22 : 26) + 'px rgba(' + t[1] + ',.3)';
   }
 
+  // ---------- team colors (primary, trim, text), for the team badge beside each player ----------
+  var TC = { ARI: ['#97233F', '#FFB612', '#fff'], ATL: ['#A71930', '#000000', '#fff'], BAL: ['#241773', '#9E7C0C', '#fff'], BUF: ['#00338D', '#C60C30', '#fff'], CAR: ['#0085CA', '#101820', '#fff'], CHI: ['#0B162A', '#C83803', '#fff'],
+    CIN: ['#FB4F14', '#000000', '#fff'], CLE: ['#311D00', '#FF3C00', '#fff'], DAL: ['#003594', '#869397', '#fff'], DEN: ['#FB4F14', '#002244', '#fff'], DET: ['#0076B6', '#B0B7BC', '#fff'], GB: ['#203731', '#FFB612', '#fff'],
+    HOU: ['#03202F', '#A71930', '#fff'], IND: ['#002C5F', '#A2AAAD', '#fff'], JAX: ['#006778', '#D7A22A', '#fff'], KC: ['#E31837', '#FFB81C', '#fff'], LV: ['#000000', '#A5ACAF', '#fff'], LAC: ['#0080C6', '#FFC20E', '#fff'],
+    LAR: ['#003594', '#FFA300', '#fff'], MIA: ['#008E97', '#FC4C02', '#fff'], MIN: ['#4F2683', '#FFC62F', '#fff'], NE: ['#002244', '#C60C30', '#fff'], NO: ['#D3BC8D', '#101820', '#101820'], NYG: ['#0B2265', '#A71930', '#fff'],
+    NYJ: ['#125740', '#000000', '#fff'], PHI: ['#004C54', '#A5ACAF', '#fff'], PIT: ['#FFB612', '#101820', '#101820'], SF: ['#AA0000', '#B3995D', '#fff'], SEA: ['#002244', '#69BE28', '#fff'], TB: ['#D50A0A', '#34302B', '#fff'],
+    TEN: ['#0C2340', '#4B92DB', '#fff'], WAS: ['#5A1414', '#FFB612', '#fff'] };
+  var TC_ALT = { WSH: 'WAS', JAC: 'JAX', OAK: 'LV', LA: 'LAR', SD: 'LAC', STL: 'LAR' };
+  // adds the badge values (team, c1, c2, ct) to a list item; players with no team get a plain grey "FA"
+  function tb(o, team) {
+    var t = String(team || '').toUpperCase(); t = TC_ALT[t] || t;
+    var c = TC[t] || ['#3a3f47', '#8a919c', '#fff'];
+    o.team = TC[t] ? t : 'FA'; o.c1 = c[0]; o.c2 = c[1]; o.ct = c[2]; return o;
+  }
+
   // ---------- fill the cards from the API ----------
-  function chips(list, start) { return list.map(function (p, i) { return { pos: p.pos, name: p.name, ppw: f1(p.ptsPerWeekAfter), d: dCls(start + i) }; }); }
+  function chips(list, start) { return list.map(function (p, i) { return tb({ pos: p.pos, name: p.name, ppw: f1(p.ptsPerWeekAfter), d: dCls(start + i) }, p.team); }); }
   function tradeChips(t, key) {
     renderList(key + 'Gave', chips(t.gave, 2));
     var gl = one('[data-dl="' + key + 'GotLbl"]');
@@ -137,7 +152,7 @@
     }
     // 5: defining trade
     if (T.defining) {
-      var df = T.defining, meta = function (p) { return { name: p.name, meta: p.pos + ' · ' + p.team }; };
+      var df = T.defining, meta = function (p) { var o = tb({ name: p.name }, p.team); o.meta = p.pos + ' · ' + o.team; return o; };
       setV('defWeek', df.week);
       renderList('defGave', df.gave.map(meta));
       renderList('defGot', df.got.map(meta));
@@ -148,7 +163,7 @@
     }
     // 6: biggest fleece
     if (T.fleece) {
-      var fl = T.fleece, pp = function (p) { return { name: p.name, ppw: f1(p.ptsPerWeekAfter) }; };
+      var fl = T.fleece, pp = function (p) { return tb({ name: p.name, ppw: f1(p.ptsPerWeekAfter) }, p.team); };
       setV('flWeek', fl.week);
       setV('flWinName', fl.winner.isMine ? 'You' : fl.winner.teamName);
       setV('flLoseName', fl.loser.isMine ? 'You' : fl.loser.teamName);
@@ -164,15 +179,21 @@
     var WV = R.waivers || {};
     if (WV.myBest) {
       var mb = WV.myBest;
-      setV('wPos', mb.player.pos); setV('wName', mb.player.name);
-      setV('wMeta', 'Added Week ' + mb.week + (mb.faab != null ? ' · $' + mb.faab + ' FAAB' : ''));
+      setV('wName', mb.player.name);
+      var wb = tb({}, mb.player.team), wEl = one('[data-tb="wBest"]');
+      wEl.textContent = wb.team; wEl.style.setProperty('--c1', wb.c1); wEl.style.setProperty('--c2', wb.c2); wEl.style.setProperty('--ct', wb.ct);
+      setV('wMeta', mb.player.pos + ' · Added Week ' + mb.week + (mb.faab != null ? ' · $' + mb.faab + ' FAAB' : ''));
+      // my other pickups, smaller, under the best one
+      var nx = (WV.myNext || []).slice(0, 3);
+      setIf('wNext', nx.length > 0);
+      renderList('wNext', nx.map(function (x, i) { return tb({ name: x.player.name, meta: x.player.pos + ' · Wk ' + x.week + (x.faab != null ? ' · $' + x.faab : ''), pts: '+' + f1(x.pointsAfter), cls: 'rc-fu rc-d' + Math.min(8, 7 + i) }, x.player.team); }));
       COUNTS.n7 = [mb.pointsAfter, 900, 1600, 1];
       setV('wRank', '#' + mb.leagueRank + ' waiver add in your league.');
     }
     var top = WV.top5 || [];
     setV('wTopTitle', "Your league's top " + (top.length === 1 ? 'waiver add' : top.length + ' waiver adds'));
     renderList('wTop', top.map(function (x, i) {
-      return { rank: i + 1, player: x.player, mgr: x.isMine ? 'You' : x.teamName, wk: x.week, pts: f1(x.pointsAfter), cls: 'rc-fu rc-d' + (i + 1), bg: x.isMine ? 'rgba(34,197,94,.1)' : '#141417', bd: x.isMine ? '#22c55e' : '#2a2a30', rc: i === 0 ? '#4ade80' : '#71717a' };
+      return tb({ rank: i + 1, player: x.player, mgr: x.isMine ? 'You' : x.teamName, wk: x.week, pts: f1(x.pointsAfter), cls: 'rc-fu rc-d' + (i + 1), bg: x.isMine ? 'rgba(34,197,94,.1)' : '#141417', bd: x.isMine ? '#22c55e' : '#2a2a30', rc: i === 0 ? '#4ade80' : '#71717a' }, x.team);
     }));
 
     // 8: standings timelapse
@@ -315,7 +336,7 @@
     Object.keys(COUNTS).forEach(function (n) { var v = COUNTS[n]; setV(n, (v[0] * ease(e - v[1], v[2])).toFixed(v[3])); });
     if (k === 'waivers') {
       var hasMine = !!D.waivers.myBest, hasTop = D.waivers.top5.length > 0;
-      var mineNow = hasMine && (!hasTop || e < 4200);
+      var mineNow = hasMine && (!hasTop || e < ((D.waivers.myNext || []).length ? 5600 : 4200));
       setIf('waiverMine', mineNow); setIf('waiverTop', !mineNow);
     }
     if (k === 'timelapse') drawRace(e);

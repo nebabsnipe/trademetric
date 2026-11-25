@@ -10,7 +10,7 @@
 <link rel="apple-touch-icon" href="/apple-touch-icon.png?v=2">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Kanit:ital,wght@0,700;0,800;1,700;1,800;1,900&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/css/recap.css?v=2">
+<link rel="stylesheet" href="/css/recap.css?v=3">
 <script>(function(){var q=location.search,c="";if(/[?&]embed=/.test(q))c="rc-embed";if(/[?&]demo=/.test(q))c="rc-embed rc-demo";if(c)document.documentElement.className=c})()</script>
 </head>
 <body>
@@ -135,15 +135,15 @@
       <div class="rc-lbl rc-fu rc-d1" style="margin-top: 8px">You gave</div>
       <template data-for="bestGave">
         <div class="rc-chip rc-sl {{c.d}}" style="display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: 12px; background: #141417; border: 1px solid #2a2a30">
-          <span style="font-size: 11px; font-weight: 800; padding: 4px 7px; border-radius: 6px; background: #27272a; color: #d4d4d8">{{c.pos}}</span>
-          <div style="flex: 1"><div style="font-weight: 600; font-size: 15px">{{c.name}}</div><div style="font-size: 12px; color: #a1a1aa">{{c.ppw}} pts/wk after the deal</div></div>
+          <span class="rc-tb" style="--c1: {{c.c1}}; --c2: {{c.c2}}; --ct: {{c.ct}}">{{c.team}}</span>
+          <div style="flex: 1"><div style="font-weight: 600; font-size: 15px">{{c.name}}</div><div style="font-size: 12px; color: #a1a1aa">{{c.pos}} · {{c.ppw}} pts/wk after the deal</div></div>
         </div>
       </template><div class="rc-if"></div>
       <div class="rc-lbl rc-fu" data-dl="bestGotLbl" style="margin-top: 6px">You got</div>
       <template data-for="bestGot">
         <div class="rc-chip rc-sr {{c.d}} rc-beamG" style="display: flex; align-items: center; gap: 12px; padding: 14px; border-radius: 12px">
-          <span style="font-size: 11px; font-weight: 800; padding: 4px 7px; border-radius: 6px; background: #14532d; color: #bbf7d0">{{c.pos}}</span>
-          <div style="flex: 1"><div style="font-weight: 700; font-size: 17px">{{c.name}}</div><div style="font-size: 12px; color: #86efac">{{c.ppw}} pts/wk after the deal</div></div>
+          <span class="rc-tb" style="--c1: {{c.c1}}; --c2: {{c.c2}}; --ct: {{c.ct}}">{{c.team}}</span>
+          <div style="flex: 1"><div style="font-weight: 700; font-size: 17px">{{c.name}}</div><div style="font-size: 12px; color: #86efac">{{c.pos}} · {{c.ppw}} pts/wk after the deal</div></div>
         </div>
       </template><div class="rc-if"></div>
       <div style="display: flex; align-items: center; gap: 18px; margin-top: 18px">
@@ -164,15 +164,15 @@
       <div class="rc-lbl rc-fu rc-d1" style="margin-top: 8px">You gave</div>
       <template data-for="worstGave">
         <div class="rc-chip rc-sl {{c.d}}" style="display: flex; align-items: center; gap: 12px; padding: 14px; border-radius: 12px; background: #141417; border: 1px solid #7f1d1d">
-          <span style="font-size: 11px; font-weight: 800; padding: 4px 7px; border-radius: 6px; background: #450a0a; color: #fecaca">{{c.pos}}</span>
-          <div style="flex: 1"><div style="font-weight: 700; font-size: 17px">{{c.name}}</div><div style="font-size: 12px; color: #fca5a5">{{c.ppw}} pts/wk after the deal</div></div>
+          <span class="rc-tb" style="--c1: {{c.c1}}; --c2: {{c.c2}}; --ct: {{c.ct}}">{{c.team}}</span>
+          <div style="flex: 1"><div style="font-weight: 700; font-size: 17px">{{c.name}}</div><div style="font-size: 12px; color: #fca5a5">{{c.pos}} · {{c.ppw}} pts/wk after the deal</div></div>
         </div>
       </template><div class="rc-if"></div>
       <div class="rc-lbl rc-fu" data-dl="worstGotLbl" style="margin-top: 6px">You got</div>
       <template data-for="worstGot">
         <div class="rc-chip rc-sr {{c.d}}" style="display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: 12px; background: #141417; border: 1px solid #2a2a30">
-          <span style="font-size: 11px; font-weight: 800; padding: 4px 7px; border-radius: 6px; background: #27272a; color: #d4d4d8">{{c.pos}}</span>
-          <div style="flex: 1"><div style="font-weight: 600; font-size: 15px">{{c.name}}</div><div style="font-size: 12px; color: #a1a1aa">{{c.ppw}} pts/wk after the deal</div></div>
+          <span class="rc-tb" style="--c1: {{c.c1}}; --c2: {{c.c2}}; --ct: {{c.ct}}">{{c.team}}</span>
+          <div style="flex: 1"><div style="font-weight: 600; font-size: 15px">{{c.name}}</div><div style="font-size: 12px; color: #a1a1aa">{{c.pos}} · {{c.ppw}} pts/wk after the deal</div></div>
         </div>
       </template><div class="rc-if"></div>
       <div style="display: flex; align-items: center; gap: 18px; margin-top: 18px">
@@ -194,15 +194,13 @@
         <div class="rc-sl rc-d2" style="padding: 12px; border-radius: 12px; background: #141417; border: 1px solid #2a2a30; display: flex; flex-direction: column; gap: 4px">
           <div class="rc-lbl" style="font-size: 10px">Gave</div>
           <template data-for="defGave">
-            <div style="font-weight: 600; font-size: 15px">{{c.name}}</div>
-            <div style="font-size: 12px; color: #a1a1aa">{{c.meta}}</div>
+            <div style="display: flex; align-items: center; gap: 9px"><span class="rc-tb rc-tb-sm" style="--c1: {{c.c1}}; --c2: {{c.c2}}; --ct: {{c.ct}}">{{c.team}}</span><div style="min-width: 0"><div style="font-weight: 600; font-size: 15px; line-height: 1.2">{{c.name}}</div><div style="font-size: 12px; color: #a1a1aa">{{c.meta}}</div></div></div>
           </template><div class="rc-if"></div>
         </div>
         <div class="rc-sr rc-d3 rc-beamY" style="padding: 12px; border-radius: 12px; display: flex; flex-direction: column; gap: 4px">
           <div class="rc-lbl" style="font-size: 10px; color: #fbbf24">Got</div>
           <template data-for="defGot">
-            <div style="font-weight: 700; font-size: 15px">{{c.name}}</div>
-            <div style="font-size: 12px; color: #fcd34d">{{c.meta}}</div>
+            <div style="display: flex; align-items: center; gap: 9px"><span class="rc-tb rc-tb-sm" style="--c1: {{c.c1}}; --c2: {{c.c2}}; --ct: {{c.ct}}">{{c.team}}</span><div style="min-width: 0"><div style="font-weight: 700; font-size: 15px; line-height: 1.2">{{c.name}}</div><div style="font-size: 12px; color: #fcd34d">{{c.meta}}</div></div></div>
           </template><div class="rc-if"></div>
         </div>
       </div>
@@ -231,16 +229,14 @@
         <div class="rc-sl rc-d2" style="padding: 16px 14px; background: #141417; display: flex; flex-direction: column; gap: 10px; border-right: 1px dashed #3f3f46">
           <div style="font-size: 12px; font-weight: 700; color: #a1a1aa"><span data-v="flWinName"></span> got</div>
           <template data-for="flWin">
-            <div style="font-weight: 700; font-size: 16px">{{c.name}}</div>
-            <div style="font-size: 12px; color: #86efac">{{c.ppw}} pts/wk after</div>
+            <div style="display: flex; align-items: center; gap: 9px"><span class="rc-tb rc-tb-sm" style="--c1: {{c.c1}}; --c2: {{c.c2}}; --ct: {{c.ct}}">{{c.team}}</span><div style="min-width: 0"><div style="font-weight: 700; font-size: 15px; line-height: 1.2">{{c.name}}</div><div style="font-size: 12px; color: #86efac">{{c.ppw}} pts/wk after</div></div></div>
           </template><div class="rc-if"></div>
           <div class="rc-stamp" data-stamp="flWin" style="align-self: flex-start; border: 3px solid #4ade80; border-radius: 10px; padding: 4px 12px; box-shadow: 0 0 26px rgba(74,222,128,.3)"><span class="rc-k" style="font-size: 40px; font-weight: 900; color: #4ade80"></span></div>
         </div>
         <div class="rc-sr rc-d3" style="padding: 16px 14px; background: #141417; display: flex; flex-direction: column; gap: 10px">
           <div style="font-size: 12px; font-weight: 700; color: #a1a1aa"><span data-v="flLoseName"></span> got</div>
           <template data-for="flLose">
-            <div style="font-weight: 700; font-size: 16px">{{c.name}}</div>
-            <div style="font-size: 12px; color: #fca5a5">{{c.ppw}} pts/wk after</div>
+            <div style="display: flex; align-items: center; gap: 9px"><span class="rc-tb rc-tb-sm" style="--c1: {{c.c1}}; --c2: {{c.c2}}; --ct: {{c.ct}}">{{c.team}}</span><div style="min-width: 0"><div style="font-weight: 700; font-size: 15px; line-height: 1.2">{{c.name}}</div><div style="font-size: 12px; color: #fca5a5">{{c.ppw}} pts/wk after</div></div></div>
           </template><div class="rc-if"></div>
           <div class="rc-wince" data-stamp="flLose" style="align-self: flex-start; border: 3px solid #f87171; border-radius: 10px; padding: 4px 16px; box-shadow: 0 0 26px rgba(248,113,113,.3)"><span class="rc-k" style="font-size: 40px; font-weight: 900; color: #f87171"></span></div>
         </div>
@@ -261,7 +257,7 @@
         <div class="rc-k rc-fu rc-d1" style="font-size: 46px">Your best waiver add</div>
         <div class="rc-sr rc-d2 rc-beamG" style="margin-top: 14px; padding: 20px; border-radius: 16px; display: flex; flex-direction: column; gap: 14px">
           <div style="display: flex; align-items: center; gap: 12px">
-            <span style="font-size: 11px; font-weight: 800; padding: 4px 7px; border-radius: 6px; background: #14532d; color: #bbf7d0"><span data-v="wPos"></span></span>
+            <span class="rc-tb rc-tb-lg" data-tb="wBest"></span>
             <div style="flex: 1"><div style="font-weight: 700; font-size: 20px"><span data-v="wName"></span></div><div style="font-size: 13px; color: #a1a1aa"><span data-v="wMeta"></span></div></div>
           </div>
           <div style="display: flex; align-items: baseline; gap: 10px">
@@ -270,6 +266,18 @@
           </div>
         </div>
         <div class="rc-fu rc-d6" style="font-size: 14px; color: #a1a1aa"><span data-v="wRank"></span></div>
+        <div class="rc-if" data-if="wNext" hidden>
+          <div class="rc-lbl rc-fu rc-d7" style="margin-top: 10px">Your next best adds</div>
+          <div style="display: flex; flex-direction: column; gap: 6px">
+            <template data-for="wNext">
+              <div class="{{c.cls}}" style="display: flex; align-items: center; gap: 10px; padding: 8px 12px; border-radius: 10px; background: #141417; border: 1px solid #2a2a30">
+                <span class="rc-tb rc-tb-sm" style="--c1: {{c.c1}}; --c2: {{c.c2}}; --ct: {{c.ct}}">{{c.team}}</span>
+                <div style="flex: 1; min-width: 0"><div style="font-weight: 600; font-size: 14px">{{c.name}}</div><div style="font-size: 11.5px; color: #a1a1aa">{{c.meta}}</div></div>
+                <div style="font-weight: 800; font-size: 14px; color: #86efac; font-variant-numeric: tabular-nums">{{c.pts}}</div>
+              </div>
+            </template><div class="rc-if"></div>
+          </div>
+        </div>
       </div>
       <div class="rc-if" data-if="waiverTop" hidden>
         <div class="rc-lbl rc-fu" style="color: #4ade80">Waiver wire</div>
@@ -278,6 +286,7 @@
           <template data-for="wTop">
             <div class="{{w.cls}}" style="display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: 12px; background: {{w.bg}}; border: 1px solid {{w.bd}}">
               <div class="rc-k" style="font-size: 26px; width: 22px; color: {{w.rc}}">{{w.rank}}</div>
+              <span class="rc-tb rc-tb-sm" style="--c1: {{w.c1}}; --c2: {{w.c2}}; --ct: {{w.ct}}">{{w.team}}</span>
               <div style="flex: 1; min-width: 0"><div style="font-weight: 700; font-size: 15px">{{w.player}}</div><div style="font-size: 12px; color: #a1a1aa">{{w.mgr}} · Wk {{w.wk}}</div></div>
               <div style="font-weight: 800; font-size: 15px; font-variant-numeric: tabular-nums">{{w.pts}}</div>
             </div>
@@ -449,6 +458,6 @@
 </div>
 <aside id="rc-side" hidden aria-label="Recap cards"></aside>
 </div>
-<script src="/js/recap.js?v=3"></script>
+<script src="/js/recap.js?v=4"></script>
 </body>
 </html>
