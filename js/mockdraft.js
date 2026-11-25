@@ -12,11 +12,13 @@ var MD={page:'home',home:null,room:null,picks:[],shown:0,fresh:-1,pool:[],by:{},
   ui:{pos:'ALL',q:'',sort:'adp',hide:true,tab:'queue',ptab:'players',board:false,mine:false,team:null,limit:80,confirm:null,sheet:null,set:null,setMode:'solo',dlg:null,res:null},
   delays:[],revT:null,paused:false,loopT:null,ch:null,chId:null,rt:false,present:null,lastSync:0,syncing:false,tickAt:0,title:null,titleT:null,wasTurn:false,join:null,err:null};
 var MD_POS=['QB','RB','WR','TE','K','DST'],MD_SLOTS=['QB','RB','WR','TE','FLEX','SF','K','DST','BN'];
-var MD_DEF={teams:12,scoring:'half',roster:{QB:1,RB:2,WR:2,TE:1,FLEX:1,SF:0,K:1,DST:1,BN:6},clock:60,speed:'fast',slot:0};
+var MD_DEF={teams:12,scoring:'ppr',roster:{QB:1,RB:2,WR:2,TE:1,FLEX:1,SF:0,K:1,DST:1,BN:6},clock:60,speed:'fast',slot:0};
 var MD_SLOT_MAX={QB:2,RB:4,WR:4,TE:2,FLEX:3,SF:1,K:1,DST:1,BN:10};
 var MD_SC={ppr:'PPR',half:'Half PPR',std:'Standard'},MD_EMOJI=['🔥','😂','😬','👏','💀','🧊'];
 var MD_IC={
   star:'<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M12 3.5l2.6 5.4 5.9.8-4.3 4.1 1 5.8L12 16.9 6.8 19.6l1-5.8L3.5 9.7l5.9-.8z"/></svg>',
+  plus:'<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M12 5.500v13M5.500 12h13"/></svg>',
+  check:'<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.500l4.500 4.500L19 7.500"/></svg>',
   grip:'<svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor" aria-hidden="true"><circle cx="9" cy="6" r="1.6"/><circle cx="15" cy="6" r="1.6"/><circle cx="9" cy="12" r="1.6"/><circle cx="15" cy="12" r="1.6"/><circle cx="9" cy="18" r="1.6"/><circle cx="15" cy="18" r="1.6"/></svg>',
   x:'<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>',
   search:'<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/></svg>',
@@ -42,6 +44,14 @@ function mdAv(s,cls){if(!s||s.k==='o')return `<span class="md-av md-av-open ${cl
 function mdSeatName(i){const s=MD.room.seats[i];return s&&s.name?s.name:'Open seat'}
 function mdShort(n){const p=String(n).split(' ');if(p.length<2)return n;const suf=/^(Jr\.?|Sr\.?|II|III|IV|V)$/.test(p[p.length-1])?p.pop():'';return p[0][0]+'. '+p.slice(1).join(' ')+(suf?' '+suf:'')}
 function mdPosChip(pos){return `<i class="md-pos md-p-${pos}">${pos==='DST'?'DEF':pos}</i>`}
+/* his jersey in team colors (the same drawing the rest of the site uses) and a team tag in the team's color */
+function mdJy(o,cls){try{if(typeof jersey==='function')return `<span class="md-jy ${cls||''}">${jersey({id:o.id,n:o.n,pos:o.pos,t:o.t},false)}</span>`}catch(e){}return mdPosChip(o.pos)}
+function mdTm(t){let c=null;try{c=TC[t]}catch(e){}return t?`<i class="md-tmc" style="--tc:${c?c[0]:'#3a3f47'};--tt:${c?c[2]:'#fff'}">${esc(t)}</i>`:'<i class="md-tmc md-fa">FA</i>'}
+/* favorites: the players you follow on the site (saved on the account). They get a star in the room and their own filter. */
+function mdFavs(){try{return new Set(typeof USER!=='undefined'&&USER&&typeof S!=='undefined'&&S&&S.following||[])}catch(e){return new Set()}}
+function mdFavToggle(id,name){try{if(typeof S==='undefined'||!S||typeof USER==='undefined'||!USER){location.hash='signin';return}S.following=S.following||[];const i=S.following.indexOf(id);if(i>=0)S.following.splice(i,1);else S.following.unshift(id);if(typeof save==='function')save();mdToast(i>=0?`Removed ${name} from your favorites`:`${name} is a favorite. His news comes first, and he’s starred in your drafts.`,i>=0?'':'good')}catch(e){}}
+var MD_FAV='<svg class="md-favm" viewBox="0 0 24 24" width="12" height="12" aria-label="Favorite"><path fill="currentColor" d="M12 2.800l2.800 5.900 6.400.800-4.700 4.400 1.200 6.300L12 17.200l-5.700 3 1.200-6.300L2.800 9.500l6.400-.800z"/></svg>';
+var MD_CLOCKS=[15,30,45,60,75,90,105,120];
 function mdCounts(ids){const c={QB:0,RB:0,WR:0,TE:0,K:0,DST:0};ids.forEach(id=>{const o=MD.by[id];if(o)c[o.pos]++});return c}
 /* how a set of position counts sits in the roster (the same sum the server does) */
 function mdFit(c,R){const over={},open={};MD_POS.forEach(p=>{const d=c[p]-(R[p]||0);over[p]=Math.max(0,d);open[p]=Math.max(0,-d)});
@@ -200,21 +210,24 @@ async function mdHomeLoad(){MD.homeLoading=true;const j=await mdApi('home');MD.h
   MD.homeAt=Date.now();if(mdOn()&&MD.page==='home')mdRender()}
 
 /* ---------- settings sheet ---------- */
-function mdSetInit(mode){const saved=mdAcct('mdSet',null),s=JSON.parse(JSON.stringify(saved&&saved.roster?saved:MD_DEF));s.roster=Object.assign({},MD_DEF.roster,s.roster);if(mode!=='solo'&&!s.clock)s.clock=60;MD.ui.set=s;MD.ui.setMode=mode}
+function mdSetInit(mode){const saved=mdAcct('mdSet2',null),s=JSON.parse(JSON.stringify(saved&&saved.roster?saved:MD_DEF));s.roster=Object.assign({},MD_DEF.roster,s.roster);if(mode!=='solo'&&!s.clock)s.clock=60;MD.ui.set=s;MD.ui.setMode=mode}
 function mdLeagueSet(){try{if(typeof S==='undefined'||!S||S.noLeague||S.example||!S.league)return null;const L=S.league,sl=L.slots||{},sc=L.sc||{},rec=sc.recWR!=null?sc.recWR:sc.rec;
   const n=[8,10,12,14].reduce((a,b)=>Math.abs(b-(L.teams||12))<Math.abs(a-(L.teams||12))?b:a,12),cl=(k,v)=>Math.min(MD_SLOT_MAX[k],Math.max(0,Math.round(v||0)));
   return {name:L.name||'your league',teams:n,scoring:rec>=.9?'ppr':rec>=.4?'half':'std',roster:{QB:cl('QB',sl.QB),RB:cl('RB',sl.RB),WR:cl('WR',sl.WR),TE:cl('TE',sl.TE),FLEX:cl('FLEX',(sl.FLEX||0)+(sl.WRT||0)+(sl.RWT||0)),SF:cl('SF',(sl.SF||0)+(sl.SFLEX||0)+(sl.OP||0)),K:cl('K',sl.K),DST:cl('DST',(sl.DST||0)+(sl.DEF||0)),BN:cl('BN',sl.BN!=null?sl.BN:sl.BENCH!=null?sl.BENCH:6)}}}catch(e){return null}}
 function mdSeg(key,cur,opts){return `<div class="seg md-seg" role="group">${opts.map(([v,l])=>`<button type="button" data-md="set" data-k="${key}" data-v="${v}" aria-pressed="${String(v)===String(cur)}">${l}</button>`).join('')}</div>`}
 function mdSetHtml(){
-  const s=MD.ui.set,mode=MD.ui.setMode,lg=mdLeagueSet(),rounds=MD_SLOTS.reduce((a,k)=>a+(s.roster[k]||0),0),host=mode==='lobby';
+  const s=MD.ui.set,mode=MD.ui.setMode,other=!!MD.ui.tOther||![8,10,12,14].includes(s.teams),CL=MD_CLOCKS.concat(mode==='solo'?[0]:[]),ci=Math.max(0,CL.indexOf(s.clock)>=0?CL.indexOf(s.clock):CL.findIndex(v=>v>=s.clock)),lg=mdLeagueSet(),rounds=MD_SLOTS.reduce((a,k)=>a+(s.roster[k]||0),0),host=mode==='lobby';
   const step=(k,l)=>`<div class="md-step"><span>${l}</span><div><button type="button" data-md="step" data-k="${k}" data-d="-1" aria-label="Fewer ${l}"${s.roster[k]<=0?' disabled':''}>−</button><b>${s.roster[k]}</b><button type="button" data-md="step" data-k="${k}" data-d="1" aria-label="More ${l}"${s.roster[k]>=MD_SLOT_MAX[k]?' disabled':''}>+</button></div></div>`;
   return `<div class="md-sheet-h"><h2>${mode==='solo'?'Draft settings':host?'Room settings':'Create a room'}</h2><button class="md-x" type="button" data-md="close" aria-label="Close">${MD_IC.x}</button></div>
   <div class="md-sheet-b">
     ${lg?`<button class="btn md-uselg" type="button" data-md="uselg">Use ${esc(lg.name)}’s settings</button>`:''}
-    <div class="md-f"><label>Teams</label>${mdSeg('teams',s.teams,[[8,'8'],[10,'10'],[12,'12'],[14,'14']])}</div>
+    <div class="md-f"><label>Teams</label><div class="md-teams"><div class="seg md-seg" role="group">${[8,10,12,14].map(v=>`<button type="button" data-md="set" data-k="teams" data-v="${v}" aria-pressed="${!other&&s.teams===v}">${v}</button>`).join('')}<button type="button" data-md="teams-other" aria-pressed="${other}">Other</button></div>
+      ${other?`<div class="md-stepper"><button type="button" data-md="tstep" data-d="-1" aria-label="Fewer teams"${s.teams<=4?' disabled':''}>−</button><span class="md-stepper-n"><b class="${MD.ui.tAnim?'md-roll md-roll-'+MD.ui.tAnim:''}">${s.teams}</b><small>teams</small></span><button type="button" data-md="tstep" data-d="1" aria-label="More teams"${s.teams>=20?' disabled':''}>+</button></div>`:''}</div></div>
     <div class="md-f"><label>Scoring</label>${mdSeg('scoring',s.scoring,[['ppr','PPR'],['half','Half PPR'],['std','Standard']])}</div>
     <div class="md-f"><label>Roster <small>${rounds} rounds</small></label><div class="md-steps">${step('QB','QB')}${step('RB','RB')}${step('WR','WR')}${step('TE','TE')}${step('FLEX','Flex')}${step('SF','Superflex')}${step('K','K')}${step('DST','D/ST')}${step('BN','Bench')}</div></div>
-    <div class="md-f"><label>Pick clock</label>${mdSeg('clock',s.clock,[[30,'30s'],[60,'60s'],[90,'90s']].concat(mode==='solo'?[[0,'No limit']]:[]))}</div>
+    <div class="md-f"><label for="md-clock-r">Pick clock <b class="md-range-v" id="md-clock-v">${s.clock?s.clock+' seconds':'No limit'}</b></label>
+      <input type="range" class="md-range" id="md-clock-r" min="0" max="${CL.length-1}" step="1" value="${ci}" style="--p:${100*ci/(CL.length-1)}%" data-md-vals="${CL.join(',')}" aria-valuetext="${s.clock?s.clock+' seconds':'No limit'}">
+      <div class="md-range-t"><span>15s</span><span>${mode==='solo'?'No limit':'120s'}</span></div></div>
     <div class="md-f"><label>CPU pick speed</label>${mdSeg('speed',s.speed,[['instant','Instant'],['fast','Fast'],['real','Realistic']])}</div>
     ${mode==='solo'?`<div class="md-f"><label for="md-slot">Your draft slot</label><select id="md-slot" data-md-change="slot"><option value="0">Random</option>${Array.from({length:s.teams},(_,i)=>`<option value="${i+1}"${s.slot===i+1?' selected':''}>Pick ${i+1}</option>`).join('')}</select></div>`:''}
   </div>
@@ -227,9 +240,9 @@ function mdConfirm(title,text,yes,act){mdDlg('confirm',`<div class="md-sheet-h">
 
 /* ---------- starting, joining, leaving ---------- */
 async function mdBusy(fn){if(MD.busy)return;MD.busy=true;document.body.classList.add('md-busy');try{await fn()}finally{MD.busy=false;document.body.classList.remove('md-busy')}}
-function mdStartSolo(){return mdBusy(async()=>{if(!MD.ui.set)mdSetInit('solo');const set=MD.ui.set;mdAcctSet('mdSet',set);mdDlgClose();MD.carry=null;
+function mdStartSolo(){return mdBusy(async()=>{if(!MD.ui.set)mdSetInit('solo');const set=MD.ui.set;mdAcctSet('mdSet2',set);mdDlgClose();MD.carry=null;
   const j=await mdApi('create',{mode:'solo',settings:set});if(!j.ok)return mdFail(j);MD.home=null;mdApply(j)})}
-function mdCreateFriends(){return mdBusy(async()=>{const set=MD.ui.set;mdAcctSet('mdSet',set);mdDlgClose();const j=await mdApi('create',{mode:'friends',settings:set});if(!j.ok)return mdFail(j);MD.home=null;mdApply(j);try{history.replaceState(null,'','#draft/'+j.room.code)}catch(e){}})}
+function mdCreateFriends(){return mdBusy(async()=>{const set=MD.ui.set;mdAcctSet('mdSet2',set);mdDlgClose();const j=await mdApi('create',{mode:'friends',settings:set});if(!j.ok)return mdFail(j);MD.home=null;mdApply(j);try{history.replaceState(null,'','#draft/'+j.room.code)}catch(e){}})}
 function mdJoinCode(code){return mdBusy(async()=>{code=String(code||'').replace(/[^A-Za-z0-9]/g,'').toUpperCase();if(code.length<4)return mdToast('That code looks too short.','bad');
   const j=await mdApi('join',{code});if(!j.ok){try{history.replaceState(null,'','#drafttools')}catch(e){}return mdFail(j)}MD.home=null;mdApply(j)})}
 function mdJoinRoom(id,quick){return mdBusy(async()=>{const j=await mdApi(quick?'quick':'join',quick?{}:{room:id});if(!j.ok)return mdFail(j);MD.home=null;mdApply(j)})}
@@ -302,6 +315,7 @@ function mdRoomRender(el){
     <header class="md-top" id="md-top">
       <div class="md-clock" id="md-clock"><svg viewBox="0 0 44 44" aria-hidden="true"><circle class="md-ring-bg" cx="22" cy="22" r="19"/><circle class="md-ring" id="md-ring" cx="22" cy="22" r="19" pathLength="100"/></svg><b id="md-secs"></b></div>
       <div class="md-otc" id="md-otc"></div>
+      <div class="md-hl" id="md-hl" aria-live="polite"></div>
       <div class="md-top-r">
         <span class="md-next" id="md-next"></span>
         ${solo?`<button class="btn small" type="button" data-md="sim" id="md-sim">Sim to my pick</button><button class="btn small" type="button" data-md="pause" id="md-pause">Pause</button><button class="btn small" type="button" data-md="undo" id="md-undo">Undo</button>`:''}
@@ -318,7 +332,7 @@ function mdRoomRender(el){
         <div class="md-assist" id="md-assist" hidden></div>
         <div class="md-tools">
           <label class="md-search">${MD_IC.search}<input type="search" id="md-q" placeholder="Search players" autocomplete="off" value="${esc(MD.ui.q)}" aria-label="Search players"><kbd>/</kbd></label>
-          <div class="seg md-seg md-posseg" role="group" aria-label="Position">${['ALL','QB','RB','WR','TE','FLEX'].concat(r.settings.roster.K?['K']:[],r.settings.roster.DST?['DST']:[]).map(p=>`<button type="button" data-md="pos" data-v="${p}" aria-pressed="${MD.ui.pos===p}">${p==='ALL'?'All':p==='DST'?'DEF':p}</button>`).join('')}</div>
+          <div class="seg md-seg md-posseg" role="group" aria-label="Position">${['ALL','QB','RB','WR','TE','FLEX'].concat(r.settings.roster.K?['K']:[],r.settings.roster.DST?['DST']:[]).map(p=>`<button type="button" data-md="pos" data-v="${p}" aria-pressed="${MD.ui.pos===p}">${p==='ALL'?'All':p==='DST'?'DEF':p}</button>`).join('')}<button type="button" data-md="pos" data-v="FAV" aria-pressed="${MD.ui.pos==='FAV'}" title="Your favorites" aria-label="Your favorites">★</button></div>
           <div class="md-tools-r"><div class="seg md-seg" role="group" aria-label="Sort"><button type="button" data-md="sort" data-v="adp" aria-pressed="${MD.ui.sort==='adp'}">ADP</button><button type="button" data-md="sort" data-v="tm" aria-pressed="${MD.ui.sort==='tm'}">TM rank</button></div>
           <label class="md-check"><input type="checkbox" id="md-hide"${MD.ui.hide?' checked':''}> Hide drafted</label></div>
         </div>
@@ -347,9 +361,9 @@ function mdPaint(){if(MD.page!=='room'||!MD.room||!document.getElementById('md-t
 function mdPaintTop(){
   const r=MD.room,n=r.settings.teams,k=Math.min(MD.shown,mdTotal()-1),seat=mdSeatAt(k,n),s=r.seats[seat],turn=mdMyTurn(),nx=mdNextIn(),paused=r.status==='paused'||MD.paused;
   const top=document.getElementById('md-top');top.classList.toggle('md-turn',turn);top.classList.toggle('md-paused',paused);
-  document.getElementById('md-otc').innerHTML=`${mdAv(s,'md-av-lg')}<div><small>Round ${Math.floor(k/n)+1} · Pick ${k%n+1} · ${k+1} overall</small><b>${paused?'Draft paused':turn?'You’re on the clock':esc(s.name)+' is on the clock'}${s.k==='c'&&!turn&&!paused?'<span class="md-cpu">CPU</span>':''}${s.auto&&s.k==='h'?'<span class="md-cpu">Auto</span>':''}</b></div>`;
+  document.getElementById('md-otc').innerHTML=`${mdAv(s,'md-av-lg')}<div><small>Round ${Math.floor(k/n)+1} · Pick ${k%n+1} · ${k+1} overall${!turn&&nx>0?` · <span class="md-nx">you pick in ${nx}</span>`:!turn&&nx===0?' · <span class="md-nx">you’re up next</span>':''}</small><b>${paused?'Draft paused':turn?'You’re on the clock':esc(s.name)+' is on the clock'}${s.k==='c'&&!turn&&!paused?'<span class="md-cpu">CPU</span>':''}${s.auto&&s.k==='h'?'<span class="md-cpu">Auto</span>':''}</b></div>`;
   const me=r.seats[MD.you];
-  document.getElementById('md-next').innerHTML=me&&me.auto?`<button class="btn small accent" type="button" data-md="back">I’m back</button>`:turn?'':nx>0?`Your next pick in <b>${nx}</b>`:nx===0?'You’re up next':'';
+  document.getElementById('md-next').innerHTML=me&&me.auto?`<button class="btn small accent" type="button" data-md="back">I’m back</button>`:'';mdPaintHeadline();
   const pb=document.getElementById('md-pause');if(pb)pb.textContent=paused?'Resume':'Pause';
   const sim=document.getElementById('md-sim');if(sim)sim.disabled=MD.shown>=MD.picks.length;
   const un=document.getElementById('md-undo');if(un)un.disabled=!MD.picks.some((p,i)=>p[1]==='user'&&mdSeatAt(i,n)===MD.you);
@@ -357,6 +371,14 @@ function mdPaintTop(){
   const tb=document.getElementById('md-turnbar');tb.hidden=!turn;
   if(turn&&!MD.wasTurn){if(!mdPhone())mdToast('You’re on the clock','turn');mdBeep();try{navigator.vibrate&&navigator.vibrate([120,60,120])}catch(e){}}
   MD.wasTurn=turn;mdTitle(turn&&mdOn());
+}
+/* the headline in the middle of the top bar: the pick that was just made, with his jersey */
+function mdPaintHeadline(){
+  const el=document.getElementById('md-hl');if(!el)return;const r=MD.room,k=MD.shown-1;
+  if(k<0){if(el.dataset.k!=='-1'){el.dataset.k='-1';el.innerHTML='<div class="md-hl-in md-hl-0"><small>Latest pick</small><b>The first pick is coming up</b></div>'}return}
+  if(el.dataset.k===String(k))return;const p=MD.picks[k],o=MD.by[p[0]],si=mdSeatAt(k,r.settings.teams);if(!o)return;
+  const anim=el.dataset.k!==undefined&&!mdCalm();el.dataset.k=String(k);
+  el.innerHTML=`<div class="md-hl-in${anim?' md-hl-new':''}${si===MD.you?' md-me':''}" data-md="sheet" data-id="${esc(o.id)}">${mdJy(o,'md-jy-lg')}<div class="md-hl-t"><small>Pick ${mdPickLabel(k)} · ${si===MD.you?'You':esc(mdSeatName(si))}</small><b>${esc(o.n)}</b></div><span class="md-hl-r">${mdPosChip(o.pos)}${mdTm(o.t)}</span></div>`;
 }
 function mdClock(){
   const r=MD.room,ring=document.getElementById('md-ring'),secs=document.getElementById('md-secs'),box=document.getElementById('md-clock');if(!r||!ring)return;
@@ -379,22 +401,23 @@ function mdIsReach(o,k){return o.pos!=='K'&&o.pos!=='DST'&&o.adp-(k+1)>=Math.max
 function mdTmCell(o){return o.tm?`<span class="md-tmr">${o.tm}</span>${typeof tmoDiff==='function'&&o.diff?tmoDiff(o.diff):''}`:'<span class="md-tmr md-dim">—</span>'}
 function mdFiltered(){
   const u=MD.ui,taken=mdTaken(),q=u.q.trim().toLowerCase();
-  let L=MD.pool.filter(o=>(u.pos==='ALL'||(u.pos==='FLEX'?/RB|WR|TE/.test(o.pos):o.pos===u.pos))&&(!u.hide||!taken.has(o.id))&&(!q||o.n.toLowerCase().includes(q)||(o.t||'').toLowerCase()===q));
+  const favs=u.pos==='FAV'?mdFavs():null;
+  let L=MD.pool.filter(o=>(u.pos==='ALL'||(u.pos==='FAV'?favs.has(o.id):u.pos==='FLEX'?/RB|WR|TE/.test(o.pos):o.pos===u.pos))&&(!u.hide||!taken.has(o.id))&&(!q||o.n.toLowerCase().includes(q)||(o.t||'').toLowerCase()===q));
   if(u.sort==='tm')L=L.slice().sort((a,b)=>(a.tm||900+a.adp)-(b.tm||900+b.adp));
   return {L,taken};
 }
 function mdPaintPool(){
-  const el=document.getElementById('md-list');if(!el)return;const u=MD.ui,{L,taken}=mdFiltered(),turn=mdMyTurn(),k=MD.shown,qs=new Set(MD.queue),mine=mdSeatIds(MD.you);
+  const el=document.getElementById('md-list');if(!el)return;const u=MD.ui,{L,taken}=mdFiltered(),turn=mdMyTurn(),k=MD.shown,qs=new Set(MD.queue),mine=mdSeatIds(MD.you),favs=mdFavs();
   const tiers=u.sort==='tm'&&u.pos==='ALL'&&!u.q;
   el.innerHTML=L.slice(0,u.limit).map(o=>{const gone=taken.has(o.id),ok=turn&&!gone&&mdLegal(mine,o.pos),conf=u.confirm===o.id;
     return (tiers&&o.tierStart&&o.tier>1?`<div class="md-tier"><span>Tier ${o.tier}</span></div>`:'')+`<div class="md-row${gone?' md-gone':''}${qs.has(o.id)?' md-q':''}" data-md="sheet" data-id="${esc(o.id)}" tabindex="0">
       <span class="md-adp">${o.adp}</span>
-      <span class="md-pl">${mdPosChip(o.pos)}<span class="md-pl-n"><b>${esc(o.n)}</b><small>${esc(o.t||'FA')}${!gone&&mdValueTag(o,k)?'<em class="md-val">Value</em>':''}</small></span></span>
+      <span class="md-pl">${mdJy(o)}<span class="md-pl-n"><b>${esc(o.n)}${favs.has(o.id)?MD_FAV:''}</b><small>${mdPosChip(o.pos)}${mdTm(o.t)}${conf?`<em class="md-rch">Reach · usually pick ${o.adp}</em>`:!gone&&mdValueTag(o,k)?'<em class="md-val">Value</em>':''}</small></span></span>
       <span class="md-c-bye">${o.bye||'—'}</span>
       <span class="md-c-tm">${mdTmCell(o)}</span>
       <span class="md-c-ppg">${o.ppg?o.ppg.toFixed(1):'—'}</span>
-      <span class="md-acts">${gone?'<span class="md-took">Drafted</span>':`<button class="md-star${qs.has(o.id)?' md-on':''}" type="button" data-md="q" data-id="${esc(o.id)}" aria-label="${qs.has(o.id)?'Remove from queue':'Add to queue'}" aria-pressed="${qs.has(o.id)}">${MD_IC.star}</button><button class="md-draft${conf?' md-reach':''}" type="button" data-md="draft" data-id="${esc(o.id)}"${ok?'':' disabled'}>${conf?'Reach · confirm':'Draft'}</button>`}</span></div>`}).join('')
-    +(L.length>u.limit?`<button class="btn md-more" type="button" data-md="more">Show more</button>`:'')||'<p class="note md-empty">No players match.</p>';
+      <span class="md-acts">${gone?'<span class="md-took">Drafted</span>':`<button class="md-star${qs.has(o.id)?' md-on':''}" type="button" data-md="q" data-id="${esc(o.id)}" title="${qs.has(o.id)?'In your queue':'Add to queue'}" aria-label="${qs.has(o.id)?'Remove from queue':'Add to queue'}" aria-pressed="${qs.has(o.id)}">${qs.has(o.id)?MD_IC.check:MD_IC.plus}</button><button class="md-draft${conf?' md-arm':''}" type="button" data-md="draft" data-id="${esc(o.id)}"${ok?'':' disabled'}>${conf?MD_IC.check+'<span>Confirm</span>':'Draft'}</button>`}</span></div>`}).join('')
+    +(L.length>u.limit?`<button class="btn md-more" type="button" data-md="more">Show more</button>`:'')||`<p class="note md-empty">${u.pos==='FAV'?'No favorites here yet. Open a player and tap Favorite, or star players on the Rankings page.':'No players match.'}</p>`;
   mdPaintAssist();
 }
 /* Pro assist: up to three suggestions on your turn, from TM rank and what your roster still needs */
@@ -407,22 +430,23 @@ function mdSuggest(){
   return out.sort((a,b)=>b.w-a.w).slice(0,3);
 }
 function mdPaintAssist(){const el=document.getElementById('md-assist');if(!el)return;const on=mdMyTurn()&&typeof tmoIsPro==='function'&&tmoIsPro();el.hidden=!on;if(!on)return;
-  el.innerHTML=`<span class="md-assist-l">Best available for your team</span>${mdSuggest().map(x=>`<button type="button" class="md-sug" data-md="sheet" data-id="${esc(x.o.id)}">${mdPosChip(x.o.pos)}<b>${esc(mdShort(x.o.n))}</b><small>${x.why}</small></button>`).join('')}`}
+  el.innerHTML=`<span class="md-assist-l">Best available for your team</span>${mdSuggest().map(x=>`<button type="button" class="md-sug" data-md="sheet" data-id="${esc(x.o.id)}">${mdJy(x.o,'md-jy-sm')}<b>${esc(mdShort(x.o.n))}</b><small>${x.o.pos} · ${x.why}</small></button>`).join('')}`}
 function mdRosterHtml(seat,n){
   const r=MD.room,ids=mdSeatIds(seat,n),L=mdLayout(ids),c=mdCounts(ids);
-  return `<ul class="md-roster">${L.map(s=>{const o=s.id&&MD.by[s.id];return `<li class="${o?'':'md-emp'}"><span class="md-slot">${s.slot==='DST'?'DEF':s.slot==='SF'?'SFLX':s.slot}</span>${o?`${mdPosChip(o.pos)}<b>${esc(o.n)}</b><small>${esc(o.t||'')}${o.bye?' · Bye '+o.bye:''}</small>`:'<b class="md-dim">Empty</b>'}</li>`}).join('')}</ul>
+  return `<ul class="md-roster">${L.map(s=>{const o=s.id&&MD.by[s.id];return `<li class="${o?'':'md-emp'}"><span class="md-slot">${s.slot==='DST'?'DEF':s.slot==='SF'?'SFLX':s.slot}</span>${o?`${mdJy(o,'md-jy-sm')}<b>${esc(o.n)}</b>${mdTm(o.t)}<small>${o.bye?'Bye '+o.bye:''}</small>`:'<b class="md-dim">Empty</b>'}</li>`}).join('')}</ul>
     <p class="md-count-line">${['QB','RB','WR','TE'].concat(r.settings.roster.K?['K']:[],r.settings.roster.DST?['DST']:[]).map(p=>`${p==='DST'?'DEF':p} <b>${c[p]}</b>`).join(' · ')}</p>`;
 }
 function mdPickRow(k,fresh){const r=MD.room,p=MD.picks[k],o=MD.by[p[0]],si=mdSeatAt(k,r.settings.teams),s=r.seats[si],re=r.reacts&&r.reacts[k];if(!o)return '';
-  return `<li class="md-pk${fresh?' md-in':''}${si===MD.you?' md-me':''}"><span class="md-pk-n">${mdPickLabel(k)}</span>${mdAv(s,'md-av-sm')}<span class="md-pk-m"><b>${esc(o.n)}</b><small>${mdPosChip(o.pos)} ${esc(o.t||'')} · ${si===MD.you?'You':esc(s.name)}${p[1]==='auto'||p[1]==='queue'?' · auto':''}</small></span>
+  return `<li class="md-pk${fresh?' md-in':''}${si===MD.you?' md-me':''}"><span class="md-pk-n">${mdPickLabel(k)}</span>${mdJy(o,'md-jy-sm')}<span class="md-pk-m"><b>${esc(o.n)}</b><small>${mdPosChip(o.pos)}${mdTm(o.t)} ${si===MD.you?'You':esc(s.name)}${p[1]==='auto'||p[1]==='queue'?' · auto':''}</small></span>
     ${r.mode!=='solo'?`<span class="md-re">${re?Object.keys(re).map(e=>`<i>${e}<small>${re[e]}</small></i>`).join(''):''}<button type="button" class="md-re-b" data-md="react-open" data-k="${k}" aria-label="React">+</button></span>`:''}</li>`}
 function mdPaintSide(){
   const el=document.getElementById('md-side');if(!el)return;const r=MD.room,tab=mdPhone()?(MD.ui.ptab==='players'||MD.ui.ptab==='board'?null:MD.ui.ptab):MD.ui.tab;
   const qn=document.getElementById('md-qn');if(qn){const taken=mdTaken(),n=MD.queue.filter(id=>!taken.has(id)).length;qn.textContent=n||'';qn.hidden=!n}
   if(!tab){el.innerHTML='';return}
   if(tab==='queue'){const taken=mdTaken(),Q=MD.queue.filter(id=>MD.by[id]&&!taken.has(id));
-    el.innerHTML=Q.length?`<p class="md-side-note">The top of your queue is taken if your clock runs out.</p><ol class="md-queue md-sortable">${Q.map((id,i)=>{const o=MD.by[id];return `<li data-id="${esc(id)}"><span class="md-grip" data-md-grip aria-hidden="true">${MD_IC.grip}</span><span class="md-pk-m" data-md="sheet" data-id="${esc(id)}"><b>${esc(o.n)}</b><small>${mdPosChip(o.pos)} ${esc(o.t||'')} · ADP ${o.adp}</small></span>${i===0?'<em class="md-nextup">Next</em>':''}<button type="button" class="md-x" data-md="q" data-id="${esc(id)}" aria-label="Remove ${esc(o.n)}">${MD_IC.x}</button></li>`}).join('')}</ol>`
-      :`<div class="md-side-empty">${MD_IC.star}<b>Your queue is empty</b><p>Tap the star next to a player to line him up. If your clock runs out, the top of your queue is picked for you.</p></div>`;
+    const favQ=[...mdFavs()].filter(id=>MD.by[id]&&!taken.has(id)&&!MD.queue.includes(id)),favB=favQ.length?`<button class="btn small md-qfav" type="button" data-md="q-favs">★ Add my ${favQ.length} favorite${favQ.length===1?'':'s'}</button>`:'';
+    el.innerHTML=Q.length?`<p class="md-side-note">The top of your queue is taken if your clock runs out.</p>${favB}<ol class="md-queue md-sortable">${Q.map((id,i)=>{const o=MD.by[id];return `<li data-id="${esc(id)}"><span class="md-grip" data-md-grip aria-hidden="true">${MD_IC.grip}</span><span class="md-pk-m" data-md="sheet" data-id="${esc(id)}"><b>${esc(o.n)}</b><small>${mdPosChip(o.pos)}${mdTm(o.t)} ADP ${o.adp}</small></span>${i===0?'<em class="md-nextup">Next</em>':''}<button type="button" class="md-x" data-md="q" data-id="${esc(id)}" aria-label="Remove ${esc(o.n)}">${MD_IC.x}</button></li>`}).join('')}</ol>`
+      :`<div class="md-side-empty">${MD_IC.plus}<b>Your queue is empty</b><p>Tap + next to a player to line him up. If your clock runs out, the top of your queue is picked for you.</p>${favB}</div>`;
     mdSortable(el.querySelector('.md-queue'),order=>{const taken2=mdTaken();MD.queue=order.concat(MD.queue.filter(id=>taken2.has(id)));mdQueueSave();mdPaintSide()});return}
   if(tab==='team'){const seat=MD.ui.team==null?MD.you:MD.ui.team;
     el.innerHTML=`<select class="md-teamsel" data-md-change="team" aria-label="Team">${r.seats.map((s,i)=>`<option value="${i}"${i===seat?' selected':''}>${i===MD.you?'My team':esc(s.name)}</option>`).join('')}</select>${mdRosterHtml(seat)}`;return}
@@ -454,9 +478,9 @@ function mdPaintBoard(){
 }
 /* the player card: a centered card on desktop, a sheet from the bottom on a phone */
 function mdSheet(id){
-  const o=MD.by[id];if(!o)return;MD.ui.sheet=id;const gone=mdTaken().has(id),turn=mdMyTurn()&&!gone&&MD.page==='room'&&mdLegal(mdSeatIds(MD.you),o.pos),q=MD.queue.includes(id),take=typeof TMO!=='undefined'&&TMO.takes&&TMO.takes[id]&&TMO.takes[id].st==='ok'?TMO.takes[id]:null,k=MD.shown;
+  const o=MD.by[id];if(!o)return;MD.ui.sheet=id;const fav=mdFavs().has(id),gone=mdTaken().has(id),turn=mdMyTurn()&&!gone&&MD.page==='room'&&mdLegal(mdSeatIds(MD.you),o.pos),q=MD.queue.includes(id),take=typeof TMO!=='undefined'&&TMO.takes&&TMO.takes[id]&&TMO.takes[id].st==='ok'?TMO.takes[id]:null,k=MD.shown;
   const f=(l,v)=>`<div><dt>${l}</dt><dd>${v}</dd></div>`;
-  mdDlg('player',`<div class="md-sheet-h"><div class="md-ps-h">${mdPosChip(o.pos)}<div><h2>${esc(o.n)}</h2><small>${esc(TMO_TEAM(o.t))}${o.age?' · Age '+o.age:''}${o.bye?' · Bye '+o.bye:''}</small></div></div><button class="md-x" type="button" data-md="close" aria-label="Close">${MD_IC.x}</button></div>
+  mdDlg('player',`<div class="md-sheet-h"><div class="md-ps-h">${mdJy(o,'md-jy-xl')}<div><h2>${esc(o.n)}</h2><small>${mdPosChip(o.pos)}${mdTm(o.t)} ${esc(TMO_TEAM(o.t))}${o.age?' · Age '+o.age:''}${o.bye?' · Bye '+o.bye:''}</small></div></div><button class="md-favb${fav?' md-on':''}" type="button" data-md="fav" data-id="${esc(id)}" aria-pressed="${fav}">${fav?'★ Favorite':'☆ Favorite'}</button><button class="md-x" type="button" data-md="close" aria-label="Close">${MD_IC.x}</button></div>
   <div class="md-sheet-b"><dl class="md-ps-g">${f('ADP',o.adp)}${f('TM rank',o.tm?mdTmCell(o):'—')}${f('Pts/G',o.ppg?o.ppg.toFixed(1):'—')}${o.score!=null?f('TM Score',o.score.toFixed(1)):''}</dl>
     ${!gone&&MD.page==='room'&&mdValueTag(o,k)?`<p class="md-ps-tag md-val-t">Value: he usually goes around pick ${o.adp}.</p>`:''}${!gone&&MD.page==='room'&&mdIsReach(o,k)?`<p class="md-ps-tag md-reach-t">Reach: he usually goes around pick ${o.adp}.</p>`:''}
     ${take?`<div class="md-ps-take"><h4>TradeMetric take</h4><p>${esc(take.take)}</p></div>`:''}</div>
@@ -470,7 +494,7 @@ function mdQueueSave(){clearTimeout(MD_Q_T);const id=MD.room.id;MD_Q_T=setTimeou
 function mdQueueToggle(id){const i=MD.queue.indexOf(id);if(i>=0)MD.queue.splice(i,1);else MD.queue.push(id);mdQueueSave();mdPaintPool();mdPaintSide();if(MD.ui.sheet===id)mdSheet(id)}
 function mdDraft(id,sure){
   const o=MD.by[id];if(!o||!mdMyTurn())return;
-  if(!sure&&mdIsReach(o,MD.shown)&&MD.ui.confirm!==id){MD.ui.confirm=id;mdPaintPool();return}
+  if(!sure&&mdIsReach(o,MD.shown)&&MD.ui.confirm!==id){MD.ui.confirm=id;mdPaintPool();clearTimeout(MD.confT);MD.confT=setTimeout(()=>{if(MD.ui.confirm===id){MD.ui.confirm=null;mdPaintPool()}},4000);return}
   MD.ui.confirm=null;mdDlgClose();
   return mdBusy(async()=>{const j=await mdApi('pick',{room:MD.room.id,player:id});
     if(j.ok){const i=MD.queue.indexOf(id);if(i>=0)MD.queue.splice(i,1);mdApply(j,{quiet:j.room.status!=='done'||(j.made||[]).length>0});mdPing()}
@@ -556,7 +580,11 @@ document.addEventListener('click',e=>{
     case 'set-lobby':u.set=JSON.parse(JSON.stringify(MD.room.settings));u.setMode='lobby';mdDlg('settings',mdSetHtml());break;
     case 'save-set':{const set=u.set;mdDlgClose();mdLobbyAct('settings',{settings:set});break}
     case 'create-friends':mdCreateFriends();break;
-    case 'set':{const k=b.dataset.k,v=b.dataset.v;u.set[k]=k==='scoring'||k==='speed'?v:+v;if(k==='teams'&&u.set.slot>u.set.teams)u.set.slot=0;mdDlgPaint(mdSetHtml());break}
+    case 'set':{const k=b.dataset.k,v=b.dataset.v;u.set[k]=k==='scoring'||k==='speed'?v:+v;if(k==='teams'){u.tOther=false;if(u.set.slot>u.set.teams)u.set.slot=0}mdDlgPaint(mdSetHtml());break}
+    case 'teams-other':u.tOther=true;if([8,10,12,14].includes(u.set.teams))u.set.teams=16;u.tAnim='up';mdDlgPaint(mdSetHtml());u.tAnim=null;break;
+    case 'tstep':{const d=+b.dataset.d;u.set.teams=Math.min(20,Math.max(4,u.set.teams+d));if(u.set.slot>u.set.teams)u.set.slot=0;u.tOther=true;u.tAnim=d>0?'up':'dn';mdDlgPaint(mdSetHtml());u.tAnim=null;break}
+    case 'fav':{const o=MD.by[id];if(o){mdFavToggle(id,o.n);mdSheet(id);mdPaintPool();mdPaintSide()}break}
+    case 'q-favs':{const tk=mdTaken();[...mdFavs()].forEach(x=>{if(MD.by[x]&&!tk.has(x)&&!MD.queue.includes(x))MD.queue.push(x)});mdQueueSave();mdPaintPool();mdPaintSide();break}
     case 'step':{const k=b.dataset.k;u.set.roster[k]=Math.min(MD_SLOT_MAX[k],Math.max(0,u.set.roster[k]+(+b.dataset.d)));mdDlgPaint(mdSetHtml());break}
     case 'uselg':{const lg=mdLeagueSet();if(lg){u.set.teams=lg.teams;u.set.scoring=lg.scoring;u.set.roster=lg.roster;if(u.set.slot>lg.teams)u.set.slot=0;mdDlgPaint(mdSetHtml());mdToast('Filled in from '+lg.name,'good')}break}
     case 'close':mdDlgClose();break;
@@ -601,7 +629,10 @@ document.addEventListener('submit',e=>{const f=e.target.closest('[data-md-form]'
   if(k==='code')mdJoinCode(f.code.value);
   if(k==='rename'){const name=f.name.value;mdDlgClose();mdLobbyAct('rename',{name})}
   if(k==='chat'){const inp=f.querySelector('input'),text=inp.value.trim();if(!text)return;inp.value='';mdApi('chat',{room:MD.room.id,text}).then(j=>{if(j.ok){MD.room.chat=j.chat;mdPaintSide();mdPing()}else mdFail(j)})}});
-document.addEventListener('input',e=>{if(e.target.id==='md-q'){MD.ui.q=e.target.value;MD.ui.limit=80;mdPaintPool()}});
+document.addEventListener('input',e=>{const t=e.target;if(t.id==='md-q'){MD.ui.q=t.value;MD.ui.limit=80;mdPaintPool()}
+  if(t.id==='md-clock-r'){const V=t.dataset.mdVals.split(',').map(Number),v=V[+t.value];MD.ui.set.clock=v;t.style.setProperty('--p',(100*t.value/(V.length-1))+'%');const l=v?v+' seconds':'No limit';t.setAttribute('aria-valuetext',l);const o=document.getElementById('md-clock-v');if(o)o.textContent=l}});
+/* the favorite star on the Rankings page */
+document.addEventListener('click',e=>{const b=e.target.closest('[data-md-fav]');if(!b)return;e.preventDefault();e.stopPropagation();mdFavToggle(b.dataset.mdFav,b.dataset.n||'He');if(typeof renderTmRank==='function'&&document.body.dataset.tab==='tmrank')renderTmRank()},true);
 document.addEventListener('change',e=>{const t=e.target;if(t.id==='md-hide'){MD.ui.hide=t.checked;mdPaintPool();return}
   const k=t.dataset&&t.dataset.mdChange;if(!k)return;
   if(k==='slot')MD.ui.set.slot=+t.value;if(k==='team'){MD.ui.team=+t.value;mdPaintSide()}if(k==='res'){MD.ui.res=+t.value;mdRender()}});

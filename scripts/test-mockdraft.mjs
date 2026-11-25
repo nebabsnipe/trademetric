@@ -40,7 +40,7 @@ if (process.argv[2] === 'dump') {
 
 /* ---- 200 CPU drafts ---- */
 console.log('200 simulated CPU drafts');
-const SETS = [{ teams: 12, scoring: 'half' }, { teams: 10, scoring: 'ppr' }, { teams: 12, scoring: 'half', roster: { ...E.DEF_ROSTER, SF: 1 } }, { teams: 8, scoring: 'std' }, { teams: 14, scoring: 'ppr' },
+const SETS = [{ teams: 12, scoring: 'half' }, { teams: 10, scoring: 'ppr' }, { teams: 12, scoring: 'half', roster: { ...E.DEF_ROSTER, SF: 1 } }, { teams: 8, scoring: 'std' }, { teams: 14, scoring: 'ppr' }, { teams: 20 }, { teams: 5, scoring: 'ppr', clock: 45 },
   { teams: 12, scoring: 'half', roster: { QB: 1, RB: 2, WR: 3, TE: 1, FLEX: 2, SF: 0, K: 0, DST: 0, BN: 5 } }];
 const at = new Map(); let nDrafts = 0;
 for (let d = 0; d < 200; d++) {
@@ -130,7 +130,7 @@ x = await call('on-01', { action: 'quick' }); const pub = x.room.id; ok(x.ok && 
 x = await call('on-02', { action: 'quick' }); ok(x.room.id === pub, 'quick join picks the lobby starting soonest');
 x = await call('on-02', { action: 'rename', room: pub, name: 'Custom' }); ok(!x.ok, 'no custom names in public rooms');
 x = await call('on-01', { action: 'chat', room: pub, text: 'hi' }); ok(!x.ok, 'no chat in public rooms');
-clock += 181e3; x = await call('on-01', { action: 'tick', room: pub }); ok(x.room.status === 'live' && x.room.seats.filter(s => s.k === 'c').length === 10, 'countdown ends: draft starts with CPU teams in the empty seats');
+clock += 181e3; x = await call('on-01', { action: 'tick', room: pub }); ok(x.room.status === 'live' && x.room.seats.filter(s => s.k === 'c').length === x.room.settings.teams - 2, 'countdown ends: draft starts with CPU teams in the empty seats');
 r = await call('on-03', { action: 'lobbies' }); ok(r.lobbies.length === 3 && r.lobbies.every(l => l.room !== pub), 'a new lobby opens for that preset');
 x = await call('on-02', { action: 'leave', room: pub }); x = await call('on-01', { action: 'state', room: pub }); ok(x.room.seats.some(s => s.left && s.auto), 'leaving early puts the seat on autopick');
 

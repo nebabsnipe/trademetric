@@ -37,15 +37,15 @@ const GRADE_W = (() => {
 export const _t = { mem: null, auth: null, now: null, data: null };
 const NOW = () => (_t.now ? _t.now() : Date.now());
 
-const TEAMS = [8, 10, 12, 14], SCORING = ['ppr', 'half', 'std'], CLOCKS = [0, 30, 60, 90], SPEEDS = ['instant', 'fast', 'real'];
+const TEAM_MIN = 4, TEAM_MAX = 20, SCORING = ['ppr', 'half', 'std'], CLOCK_MIN = 10, CLOCK_MAX = 180, SPEEDS = ['instant', 'fast', 'real'];
 const POS = ['QB', 'RB', 'WR', 'TE', 'K', 'DST'], SLOTS = ['QB', 'RB', 'WR', 'TE', 'FLEX', 'SF', 'K', 'DST', 'BN'];
 const SLOT_MAX = { QB: 2, RB: 4, WR: 4, TE: 2, FLEX: 3, SF: 1, K: 1, DST: 1, BN: 10 };
 const DEF_ROSTER = { QB: 1, RB: 2, WR: 2, TE: 1, FLEX: 1, SF: 0, K: 1, DST: 1, BN: 6 };
 const CAP = { QB: 36, RB: 72, WR: 96, TE: 36 };
 const PRESETS = [
-  { key: 'half12', name: '12-team Half PPR', settings: { teams: 12, scoring: 'half', roster: { ...DEF_ROSTER } } },
+  { key: 'ppr12', name: '12-team PPR', settings: { teams: 12, scoring: 'ppr', roster: { ...DEF_ROSTER } } },
   { key: 'ppr10', name: '10-team PPR', settings: { teams: 10, scoring: 'ppr', roster: { ...DEF_ROSTER } } },
-  { key: 'sf12', name: '12-team Superflex', settings: { teams: 12, scoring: 'half', roster: { ...DEF_ROSTER, SF: 1, BN: 6 } } },
+  { key: 'sfppr12', name: '12-team Superflex', settings: { teams: 12, scoring: 'ppr', roster: { ...DEF_ROSTER, SF: 1, BN: 6 } } },
 ];
 const LOBBY_MS = 3 * 60e3, PAUSE_MAX_MS = 5 * 60e3, EMPTY_LOBBY_MS = 15 * 60e3, KEEP_DONE_MS = 30 * 864e5;
 const STRATS = ['bal', 'bal', 'rb', 'wr', 'te', 'qb', 'lateqb'];
@@ -164,11 +164,12 @@ function cleanSettings(s, mode) {
   s = s || {}; const r = s.roster || {}, roster = {};
   SLOTS.forEach(k => { const v = Math.round(+r[k]); roster[k] = Number.isFinite(v) ? Math.min(SLOT_MAX[k], Math.max(0, v)) : DEF_ROSTER[k]; });
   if (roster.QB + roster.RB + roster.WR + roster.TE + roster.FLEX + roster.SF < 1) Object.assign(roster, DEF_ROSTER);
-  const teams = TEAMS.includes(+s.teams) ? +s.teams : 12;
+  const tn = Math.round(+s.teams), teams = tn >= TEAM_MIN && tn <= TEAM_MAX ? tn : 12;
   /* the pool has to cover every pick */
-  let guard = 0; while (teams * SLOTS.reduce((a, k) => a + roster[k], 0) > 300 && roster.BN > 0 && guard++ < 20) roster.BN--;
-  let clock = CLOCKS.includes(+s.clock) ? +s.clock : 60; if (mode !== 'solo' && !clock) clock = 60; if (mode === 'public') clock = 60;
-  return { teams, scoring: SCORING.includes(s.scoring) ? s.scoring : 'half', roster, clock, speed: SPEEDS.includes(s.speed) ? s.speed : 'fast', slot: Math.min(teams, Math.max(0, Math.round(+s.slot) || 0)) };
+  /* 240 skill players are ranked; very large leagues get a shorter bench so nobody is left without a real pick */
+  let guard = 0; while (teams * (SLOTS.reduce((a, k) => a + roster[k], 0) - roster.K - roster.DST) > 220 && roster.BN > 0 && guard++ < 20) roster.BN--;
+  const cn = Math.round(+s.clock); let clock = cn === 0 ? 0 : cn >= CLOCK_MIN && cn <= CLOCK_MAX ? cn : 60; if (mode !== 'solo' && !clock) clock = 60; if (mode === 'public') clock = 60;
+  return { teams, scoring: SCORING.includes(s.scoring) ? s.scoring : 'ppr', roster, clock, speed: SPEEDS.includes(s.speed) ? s.speed : 'fast', slot: Math.min(teams, Math.max(0, Math.round(+s.slot) || 0)) };
 }
 
 /* ---------- rules engine ---------- */
@@ -202,10 +203,15 @@ function cpuPick(room, picks, P, seat, strat, tight) {
   const sf = R.SF > 0, maxN = { QB: Math.max(2, R.QB + R.SF + (sf ? 1 : 0)), TE: Math.max(2, R.TE), K: R.K, DST: R.DST, RB: 99, WR: 99 };
   const coreOpen = now.open.QB + now.open.RB + now.open.WR + now.open.TE + now.open.FLEX + now.open.SF;
   const must = left <= now.openN;                                                              // every pick left has to fill a starting slot
+  /* in big leagues a position can run short: never take a spare QB or TE that another team still needs to start */
+  const left0 = { QB: 0, TE: 0 }, short = { QB: 0, TE: 0 };
+  for (const o of P.list) if (!taken.has(o.id) && left0[o.pos] != null) left0[o.pos]++;
+  for (let i = 0; i < n; i++) { if (i === seat) continue; const ci = countsOf(seatIds(picks, i), P); short.QB += Math.max(0, R.QB - ci.QB); short.TE += Math.max(0, R.TE - ci.TE); }
   const cand = [];
   for (const o of P.list) {
     if (taken.has(o.id)) continue;
     if (!legalFor(c, o.pos, R)) continue;
+    if (left0[o.pos] != null && c[o.pos] >= R[o.pos] && left0[o.pos] <= short[o.pos]) continue;
     const d = { ...c }; d[o.pos]++; const after = fit(d, R), fills = after.openN < now.openN;
     if (must && !fills) continue;
     if (left - 1 < after.openN) continue;

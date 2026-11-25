@@ -57,9 +57,19 @@ The Draft Tools tab (`#drafttools`) is now the mock draft entry page for anyone 
 - **Grade:** blends value against ADP, TM rank of the roster, lineup strength and roster balance, each compared with the other teams in the room. The blend can be set with the `DRAFT_GRADE_W` environment variable ("a,b,c,d"). **Provisional until the owner approves it.** Never shown on the site.
 - **Saved on the account:** last settings used, the sound switch, and (until the tables exist) the solo draft in progress and the history list.
 
+### Round 2 (2026-11-25, owner's notes)
+- **PPR is the default** for every draft, and the three online lobbies are PPR (12-team, 10-team, 12-team Superflex). Saved settings moved to a new account key so everyone starts on PPR.
+- **Teams:** 8 / 10 / 12 / 14 as chips, and "Other" opens a small stepper for any size from 4 to 20. Leagues of 18 or more get a shorter bench automatically, because only 240 skill players are ranked.
+- **Pick clock is a slider**, 15 to 120 seconds in 15-second steps, with "No limit" at the end for solo drafts.
+- **Favorites** are the players you follow (`S.following`, saved on the account; the same list the News tab already puts first). New: a star on each Rankings row for signed-in accounts, a gold star beside favorites in the draft room, a ★ filter, "Add my favorites" in the queue, and a Favorite button on the draft player card.
+- **Top bar:** the middle now shows the pick that was just made as a headline, with the player's jersey (the site's own jersey drawing), who took him, his position and team. "You pick in N" moved under the round line.
+- **Team is clearer everywhere:** jersey in team colors plus a team tag in the team's color on pool rows, the queue, rosters, the picks feed and the player card.
+- **Queue button** is now a + (a check once queued), so the star only means favorite.
+- **Draft button** is smaller. A reach turns it into a small outlined "Confirm" with a one-line note under the name, and it goes back by itself after 4 seconds.
+
 ### Setup needed (not done yet)
 1. Run `supabase/mockdraft.sql` in the Supabase SQL editor.
-2. `SUPABASE_SECRET_KEY` set in Vercel for **Preview** as well as Production (the preview does not have it today).
+2. `SUPABASE_SECRET_KEY` set in Vercel for **Preview** as well as Production. **Done 2026-11-25.**
 3. Supabase Realtime left on (it is by default). Nothing to add to a publication.
 
 Until 1 and 2 are done, **solo drafts work anyway**: the page sends the draft back to the server with each request, the server checks and advances it, and the draft in progress is kept on the account. Friends rooms and online lobbies say they are not switched on yet.

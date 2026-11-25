@@ -194,6 +194,7 @@ function renderOffHome(){
 /* ---------- Rankings ---------- */
 function renderTmRank(){
   const el=document.getElementById('tm-rank');if(!el)return;const R=tmoRows(),pro=tmoIsPro();
+  const signed=tmoSignedIn()&&typeof S!=='undefined'&&!!S,favs=new Set(signed?S.following||[]:[]);
   let L=TMO.pos==='ALL'?R.slice():R.filter(o=>o.pos===TMO.pos);
   tmoTiers(L);
   if(TMO.view!=='all')L=L.filter(o=>o.tag===TMO.view);
@@ -205,7 +206,7 @@ function renderTmRank(){
     const open=TMO.open===o.id;
     return tierRow+`<tr class="tmo-row${open?' open':''}" data-tmo-row="${o.id}" tabindex="0" aria-expanded="${open}">
       <td class="r tmo-rkc">${o.rank}</td>
-      <td>${tmoName(o)}${o.tag?`<span class="tmo-tag ${o.tag}">${o.tag==='sleeper'?'Sleeper':'Bust'}</span>`:''}</td>
+      <td>${tmoName(o)}${o.tag?`<span class="tmo-tag ${o.tag}">${o.tag==='sleeper'?'Sleeper':'Bust'}</span>`:''}${signed?`<button type="button" class="md-rkfav${favs.has(o.id)?' on':''}" data-md-fav="${o.id}" data-n="${esc(o.n)}" aria-pressed="${favs.has(o.id)}" title="${favs.has(o.id)?'Favorite. Click to remove':'Add to favorites: his news comes first and he is starred in your mock drafts'}" aria-label="${favs.has(o.id)?'Remove from favorites':'Add to favorites'}">${favs.has(o.id)?'★':'☆'}</button>`:''}</td>
       <td class="tmo-sc"><span class="tmo-bar"><i style="width:${Math.max(4,o.score).toFixed(1)}%"></i></span><b>${o.score.toFixed(1)}</b></td>
       <td class="r">${tmoDiff(o.diff)}</td>
       <td class="r num">${o.cRank}</td>
