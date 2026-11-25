@@ -67,6 +67,11 @@ Longer plans and build notes are in `docs/`: offseason mode, season recap, trade
 - No Draft tab in the in-season site.
 - Alerts: opening the Alerts tab marks them seen. Seen alerts clear after 3 days, unseen after 7. Trade and #1-finish notifications pop up for users who missed them, only within 7 days.
 
+## Emails
+- Very few emails: account ones (welcome, sign-in codes, a league that stops updating) and big moments (clinch, championship, recap, draft reminder). Never lineup alerts, injuries, big plays, trades, weekly results or news. If in doubt, don't email.
+- Every send goes through `sendEmail()` in `api/_email.js`. Never call the email service from anywhere else.
+- `EMAIL_LIVE` stays off (emails go only to the owner) until the owner says to go live. See `docs/emails.md`.
+
 ## Phone layout
 - A separate phone layout switches automatically from desktop. It should feel app-like (like a native iPhone app), be easy to scroll, and have fewer click-into screens.
 

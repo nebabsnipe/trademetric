@@ -120,12 +120,19 @@
     {
       "source": "/api/push/:do",
       "destination": "/api/push?do=:do"
+    },
+    {
+      "source": "/api/email/:do",
+      "destination": "/api/email?do=:do"
     }
   ],
   "functions": {
     "api/push.js": {
       "maxDuration": 60,
       "includeFiles": "data/nfl.json"
+    },
+    "api/email.js": {
+      "maxDuration": 60
     }
   }
 }

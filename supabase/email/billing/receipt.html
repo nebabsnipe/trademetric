@@ -1,0 +1,60 @@
+<!-- TradeMetric billing email "receipt" with sample details. NOT sent by anything yet: the wording and the fields it needs are in api/_email_templates.js. Subject: Your TradeMetric receipt ($50) -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<meta name="supported-color-schemes" content="light dark">
+<title>Your TradeMetric receipt ($50)</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&amp;family=Kanit:ital,wght@1,700;1,800&amp;display=swap" rel="stylesheet">
+<style>
+:root{color-scheme:light dark;supported-color-schemes:light dark}
+body{margin:0;padding:0}
+a{text-decoration:none}
+@media (prefers-color-scheme:dark){
+.tm-bg{background:#050607!important}
+.tm-card{background:#0F1113!important;border-color:#22262A!important}
+.tm-ink{color:#F2F3F5!important}
+.tm-mut{color:#B4B9C1!important}
+.tm-foot,.tm-foot-a{color:#949AA3!important}
+.tm-foot{border-color:#22262A!important}
+.tm-code{background:#2B1409!important;color:#F2F3F5!important}
+.tm-btn{background:#FF6A33!important;color:#170700!important}
+.tm-btn-td{background:#FF6A33!important}
+}
+@media (max-width:520px){
+.tm-out{padding:16px 10px!important}
+.tm-pad{padding-left:22px!important;padding-right:22px!important}
+.tm-h1{font-size:23px!important}
+.tm-btn{display:block!important;text-align:center!important}
+.tm-btn-t{width:100%!important}
+}
+</style>
+</head>
+<body class="tm-bg" style="margin:0;padding:0;background:#F4F5F7">
+<div style="display:none;max-height:0;max-width:0;overflow:hidden;opacity:0;color:transparent;font-size:1px;line-height:1px">Thanks. $50 paid for TradeMetric Pro.</div>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" class="tm-bg" style="background:#F4F5F7">
+<tr><td align="center" class="tm-out" style="padding:32px 16px">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" class="tm-card" style="max-width:520px;background:#FFFFFF;border:1px solid #E2E4E8;border-radius:14px;overflow:hidden">
+<tr><td class="tm-pad" style="background:#0B0C0E;padding:20px 32px;border-radius:13px 13px 0 0">
+<a href="https://www.trademetric.app" style="font-family:Kanit,'Arial Black','Helvetica Neue',Arial,sans-serif;font-style:italic;font-weight:800;font-size:23px;line-height:1;letter-spacing:.04em;text-transform:uppercase;color:#FFFFFF;text-decoration:none">TRADE<span style="color:#FF4F12">METRIC</span></a>
+</td></tr>
+<tr><td class="tm-pad" style="padding:32px 32px 12px;font-family:Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif">
+<h1 class="tm-ink tm-h1" style="margin:0 0 14px;font-family:Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;font-size:25px;line-height:1.2;font-weight:700;letter-spacing:-.01em;color:#0B0C0E">Thanks for your payment</h1>
+<p class="tm-mut" style="margin:0 0 16px;font-size:16px;line-height:1.55;color:#3D424A">We charged <b>$50</b> to your card ending in 4242 on Dec 4, 2026 for TradeMetric Pro (yearly).</p>
+<p class="tm-mut" style="margin:0 0 16px;font-size:16px;line-height:1.55;color:#3D424A">Your plan renews on Dec 4, 2027.</p>
+
+
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" class="tm-btn-t" style="margin:8px 0 20px"><tr><td class="tm-btn-td" bgcolor="#FF4F12" style="background:#FF4F12;border-radius:10px">
+<a class="tm-btn" href="https://www.trademetric.app/#account-plan" style="display:inline-block;padding:14px 26px;font-family:Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;font-size:16px;line-height:1.2;font-weight:700;color:#FFFFFF;text-decoration:none;border-radius:10px;background:#FF4F12">View billing</a>
+</td></tr></table>
+</td></tr>
+<tr><td class="tm-pad tm-foot" style="padding:18px 32px 26px;border-top:1px solid #E2E4E8;font-family:Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;font-size:12.5px;line-height:1.55;color:#636872">
+This is a billing email for your TradeMetric account.
+</td></tr>
+</table>
+</td></tr>
+</table>
+</body>
+</html>

@@ -2367,7 +2367,7 @@ function leaveApp(){window.TMT&&TMT.reset();stopConfirmWatch();document.body.cla
 function authFail(t){AUTH_BUSY=false;AUTH_MSG={bad:true,html:esc(friendly(t))};renderSignin()}
 function authNote(h){AUTH_BUSY=false;AUTH_MSG={bad:false,html:h};renderSignin()}
 /* Everything that happens once someone is signed in, however they got there (form, code, link, Google, another tab). */
-async function signedIn(user,fresh){SIGNING=true;USER=user;window.TMT&&TMT.auth(user,fresh);startSessionClock(fresh);acctUI();cloudReset();cloudPull('signin');try{await loadProfile()}finally{SIGNING=false}if(!USER||USER.id!==user.id)return;
+async function signedIn(user,fresh){SIGNING=true;USER=user;window.TMT&&TMT.auth(user,fresh);if(typeof emailWelcome==='function')setTimeout(()=>emailWelcome(user),4000);startSessionClock(fresh);acctUI();cloudReset();cloudPull('signin');try{await loadProfile()}finally{SIGNING=false}if(!USER||USER.id!==user.id)return;
   if(AUTH_MODE==='recover')return;
   if(!PROFILE&&PROFILE_OK&&!lsGet(SKIP_UN+user.id)){AUTH_MODE='username';AUTH_MSG=null;AUTH_BUSY=false;AUTH_VALS={};UN_STATE=null;showSignin();return}
   if(AUTH_MODE==='confirmed'||AUTH_MODE==='reset'){AUTH_BUSY=false;showSignin();return}
@@ -2820,6 +2820,7 @@ function accLeagues(){const L=S.leagues||[],me=typeof myTeam==='function'&&S.tea
     ${list}<div class="acc-sec-f"><a class="btn primary" href="#hub">Manage leagues</a><a class="btn" href="#league">League settings</a></div></section>
     ${typeof tmnNotifHtml==='function'?tmnNotifHtml():''}
     ${typeof pushHtml==='function'?pushHtml():''}
+    ${typeof emailHtml==='function'?emailHtml():''}
     <section class="card acc-sec"><header class="acc-sec-h"><h2>Sync</h2></header>${accRow('Cloud save',sync)}</section>`}
 /* Pricing grid (Annual Savings Pricing Grid layout): Free vs Pro with a Monthly/Annual toggle.
    Prices are placeholders from the plan in CLAUDE.md; checkout isn't connected, so Pro shows "Free during beta". */

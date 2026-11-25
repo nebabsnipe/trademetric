@@ -32,6 +32,7 @@ const FEEDS = [
   [/(^|\.)fantasycalc\.com$/, 'market-values'],
   [/^api\.anthropic\.com$/, 'ai'],
   [/\.supabase\.co$/, 'database'],
+  [/^api\.resend\.com$/, 'email-service'],
 ];
 const feedOf = host => { for (const [re, name] of FEEDS) if (re.test(host)) return name; return host; };
 
@@ -153,4 +154,17 @@ export function withSentry(handler, route) {
       throw e;
     }
   };
+}
+
+/* A one-off report from inside a route that isn't wrapped (api/email.js answers in the web-standard style):
+   a failed email send, or a crash. Same rules: only on the real site and previews, never personal data. */
+export async function reportIssue(message, { level = 'error', route = '', tags = {}, extra, error } = {}) {
+  if (!ON) return;
+  if (!error && !due('issue|' + message)) return;
+  const S = await sdk();
+  if (!S) return;
+  const base = { route: '/api/' + route, build: SHA || 'unknown', ...tags };
+  if (error) S.withScope(sc => { sc.setTags({ ...base, kind: 'crash' }); S.captureException(error); });
+  else S.captureEvent({ message, level, fingerprint: [message], tags: base, contexts: extra ? { details: extra } : undefined });
+  await S.flush(2000).catch(() => {});
 }
