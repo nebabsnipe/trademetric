@@ -2819,6 +2819,7 @@ function accLeagues(){const L=S.leagues||[],me=typeof myTeam==='function'&&S.tea
   return `<section class="card acc-sec"><header class="acc-sec-h"><h2>Leagues</h2><p>Synced to any device.</p></header>
     ${list}<div class="acc-sec-f"><a class="btn primary" href="#hub">Manage leagues</a><a class="btn" href="#league">League settings</a></div></section>
     ${typeof tmnNotifHtml==='function'?tmnNotifHtml():''}
+    ${typeof pushHtml==='function'?pushHtml():''}
     <section class="card acc-sec"><header class="acc-sec-h"><h2>Sync</h2></header>${accRow('Cloud save',sync)}</section>`}
 /* Pricing grid (Annual Savings Pricing Grid layout): Free vs Pro with a Monthly/Annual toggle.
    Prices are placeholders from the plan in CLAUDE.md; checkout isn't connected, so Pro shows "Free during beta". */
