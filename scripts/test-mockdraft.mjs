@@ -82,6 +82,10 @@ let guard = 0; while (r.room.status === 'live' && guard++ < 40) { const tk = tak
 ok(r.room.status === 'done' && r.room.results && r.room.results.length === 12 && r.room.results[3].grade, 'draft finishes with a grade for every team');
 ok(r.room.seats.every((s, i) => i === 3 || s.strat), 'CPU strategies are shown only once the draft is over');
 x = await call('user-a1', { action: 'home' }); ok(x.results.length === 1 && x.results[0].grade, 'result saved to history');
+{ const id = x.results[0].room;
+  let y = await call('user-zz', { action: 'forget', room: id }); y = await call('user-a1', { action: 'home' }); ok(y.results.length === 1, 'deleting only touches your own history');
+  y = await call('user-a1', { action: 'forget', room: id }); ok(y.ok && y.results.length === 0, 'a past draft can be deleted');
+  y = await call('user-a1', { action: 'forget', room: 'nope' }); ok(!y.ok, 'a bad draft id is refused'); }
 
 /* ---- solo with no tables: the draft travels with the request ---- */
 { // changing draft spot before the first pick

@@ -14,7 +14,7 @@ if(location.hostname==='trademetric-rho.vercel.app')location.replace('https://ww
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600;700;800&family=Kanit:ital,wght@0,700;0,800;1,600;1,700;1,800&display=swap">
 <meta name="description" content="Fantasy football trades, rankings and lineup advice built on your league's exact settings.">
 <link rel="stylesheet" href="css/styles.css?v=51">
-<link rel="stylesheet" href="css/mockdraft.css?v=5">
+<link rel="stylesheet" href="css/mockdraft.css?v=6">
 <link rel="stylesheet" href="css/recap-tab.css?v=2">
 </head>
 <body class="signed-out">
@@ -353,7 +353,7 @@ if(location.hostname==='trademetric-rho.vercel.app')location.replace('https://ww
 <script>
 /* Load the stats snapshot, then start the app */
 fetch('data/nfl.json',{cache:'no-cache'}).then(r=>r.json()).then(d=>{
-  window.NFL_DATA=d;const n=document.createElement('script');n.src='js/news.js?v=29';n.onload=n.onerror=()=>{const o=document.createElement('script');o.src='js/offseason.js?v=17';o.onload=o.onerror=()=>{const f=document.createElement('script');f.src='js/offnews.js?v=5';f.onload=f.onerror=()=>{const k=document.createElement('script');k.src='js/mockdraft.js?v=6';k.onload=k.onerror=()=>{const s=document.createElement('script');s.src='js/app.js?v=40';s.onload=()=>{const m=document.createElement('script');m.src='js/mobile.js?v=6';document.body.appendChild(m);const q=document.createElement('script');q.src='js/polish.js?v=5';document.body.appendChild(q)};document.body.appendChild(s)};document.body.appendChild(k)};document.body.appendChild(f)};document.body.appendChild(o)};document.body.appendChild(n);
+  window.NFL_DATA=d;const n=document.createElement('script');n.src='js/news.js?v=29';n.onload=n.onerror=()=>{const o=document.createElement('script');o.src='js/offseason.js?v=17';o.onload=o.onerror=()=>{const f=document.createElement('script');f.src='js/offnews.js?v=5';f.onload=f.onerror=()=>{const k=document.createElement('script');k.src='js/mockdraft.js?v=7';k.onload=k.onerror=()=>{const s=document.createElement('script');s.src='js/app.js?v=40';s.onload=()=>{const m=document.createElement('script');m.src='js/mobile.js?v=6';document.body.appendChild(m);const q=document.createElement('script');q.src='js/polish.js?v=5';document.body.appendChild(q)};document.body.appendChild(s)};document.body.appendChild(k)};document.body.appendChild(f)};document.body.appendChild(o)};document.body.appendChild(n);
 }).catch(()=>{document.body.insertAdjacentHTML('afterbegin','<p style="padding:20px;font-family:sans-serif">Could not load player data. Refresh to try again.</p>')});
 </script>
 </body>

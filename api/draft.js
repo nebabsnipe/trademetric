@@ -4,7 +4,7 @@
 //   solo:    create (mode solo) -> tick / pick / undo / pause / resume / abandon
 //   friends: create (mode friends) / join {code} / settings / order / kick / rename / start / pause / resume / chat / react
 //   public:  lobbies / quick / join {id}
-//   all:     state / queue / pick / tick / leave / back / results / result
+//   all:     state / queue / pick / tick / leave / back / results / result / forget
 //
 // The server owns the truth. Serverless functions can't hold a timer, so each room stores a pick deadline and
 // clients call "tick" when they see it pass (or when a CPU seat is up). tick checks the deadline itself and is safe
@@ -340,6 +340,7 @@ function memStore(seed) {
     async queueGet(id, uid) { return cp(M.queues.get(id + '|' + uid) || []); },
     async queueSet(id, uid, ids) { M.queues.set(id + '|' + uid, cp(ids)); },
     async resultPut(uid, room, summary) { M.results = M.results.filter(r => !(r.user_id === uid && r.room_id === room.id)); M.results.push({ user_id: uid, room_id: room.id, summary: cp(summary), created_at: iso(NOW()) }); },
+    async resultDel(uid, id) { M.results = M.results.filter(r => !(r.user_id === uid && r.room_id === id)); },
     async resultsList(uid) { return cp(M.results.filter(r => r.user_id === uid).sort((a, b) => b.created_at.localeCompare(a.created_at)).slice(0, 20)); },
     async lobbies() { return cp([...M.rooms.values()].filter(r => r.mode === 'public' && r.status === 'lobby')); },
     async soloOpen(uid) { return cp([...M.rooms.values()].filter(r => r.mode === 'solo' && r.host === uid && (r.status === 'live' || r.status === 'paused')).sort((a, b) => b.created_at.localeCompare(a.created_at))[0] || null); },
@@ -378,6 +379,7 @@ function sbStore() {
     async queueGet(id, uid) { const r = await sb(`draft_queues?room_id=eq.${e(id)}&user_id=eq.${e(uid)}&select=ids`); return (r.ok && r.data[0] && r.data[0].ids) || []; },
     async queueSet(id, uid, ids) { need(await sb('draft_queues?on_conflict=room_id,user_id', { method: 'POST', body: { room_id: id, user_id: uid, ids, updated_at: iso(NOW()) }, prefer: 'resolution=merge-duplicates,return=minimal' })); },
     async resultPut(uid, room, summary) { await sb('draft_results?on_conflict=user_id,room_id', { method: 'POST', body: { user_id: uid, room_id: room.id, summary, created_at: iso(NOW()) }, prefer: 'resolution=merge-duplicates,return=minimal' }); },
+    async resultDel(uid, id) { need(await sb(`draft_results?user_id=eq.${e(uid)}&room_id=eq.${e(id)}`, { method: 'DELETE' })); },
     async resultsList(uid) { const r = await sb(`draft_results?user_id=eq.${e(uid)}&select=room_id,summary,created_at&order=created_at.desc&limit=20`); return r.ok ? r.data : []; },
     async lobbies() { return need(await sb(`draft_rooms?mode=eq.public&status=eq.lobby&select=*`)); },
     async soloOpen(uid) { const r = await sb(`draft_rooms?mode=eq.solo&host=eq.${e(uid)}&status=in.(live,paused)&select=*&order=created_at.desc&limit=1`); return (r.ok && r.data[0]) || null; },
@@ -520,6 +522,11 @@ async function run(action, body, user) {
       return out;
     }
     case 'lobbies': needStore(); return { ok: true, now, lobbies: await lobbyList(S, now) };
+    case 'forget': {                                               // delete a finished draft from your own history (the room itself is untouched)
+      const id = String(body.room || ''); if (!/^[0-9a-f-]{36}$/i.test(id)) throw new Fail('bad', 'That draft couldn’t be found.', 400);
+      if (on) await S.resultDel(user.id, id);
+      return { ok: true, now, results: on ? (await S.resultsList(user.id)).map(r => ({ room: r.room_id, ...r.summary })) : null };
+    }
     case 'results': return { ok: true, now, results: on ? (await S.resultsList(user.id)).map(r => ({ room: r.room_id, ...r.summary })) : null };
 
     /* ----- create ----- */

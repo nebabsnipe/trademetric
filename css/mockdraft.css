@@ -47,9 +47,11 @@ button.md-lob:hover{border-color:var(--ink)}
 .md-lob-note{color:var(--muted);font-size:13px;padding:8px 2px}
 .md-lob.md-sk{padding:0;border:0}.md-lob.md-sk i{width:100%;height:48px;border-radius:10px;display:block}
 .md-under{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(0,1fr);gap:14px;align-items:start}
-.md-hist-l{list-style:none;margin:0;padding:0}
-.md-hist-i{display:flex;align-items:center;gap:12px;width:100%;padding:10px 6px;border:0;border-top:1px solid var(--line);background:none;text-align:left;cursor:pointer;border-radius:6px}
-.md-hist-l li:first-child .md-hist-i{border-top:0}.md-hist-i:hover:not(:disabled){background:var(--surface-2)}.md-hist-i:disabled{cursor:default}
+.md-hist-l{list-style:none;margin:0;padding:0}.md-hist-l li{display:flex;align-items:center;gap:4px;border-top:1px solid var(--line)}.md-hist-l li:first-child{border-top:0}
+.md-hist-del{flex:none;display:grid;place-items:center;width:34px;height:34px;border:0;border-radius:8px;background:none;color:var(--muted);cursor:pointer;opacity:.55;transition:opacity .15s,color .15s,background .15s}
+.md-hist-del:hover,.md-hist-del:focus-visible{opacity:1;color:var(--bad,#d93025);background:var(--surface-2)}
+.md-hist-i{display:flex;align-items:center;gap:12px;width:100%;padding:10px 6px;border:0;background:none;text-align:left;cursor:pointer;border-radius:6px;min-width:0}
+.md-hist-i:hover:not(:disabled){background:var(--surface-2)}.md-hist-i:disabled{cursor:default}
 .md-hist-m{display:flex;flex-direction:column;min-width:0;flex:1}.md-hist-m small{color:var(--muted);font-size:12px}
 .md-hist-r{font:600 12.5px/1 var(--f-mono);color:var(--muted);white-space:nowrap}
 .md-how{align-self:flex-start}

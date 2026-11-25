@@ -20,6 +20,7 @@ var MD_IC={
   plus:'<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M12 5.500v13M5.500 12h13"/></svg>',
   check:'<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.500l4.500 4.500L19 7.500"/></svg>',
   grip:'<svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor" aria-hidden="true"><circle cx="9" cy="6" r="1.6"/><circle cx="15" cy="6" r="1.6"/><circle cx="9" cy="12" r="1.6"/><circle cx="15" cy="12" r="1.6"/><circle cx="9" cy="18" r="1.6"/><circle cx="15" cy="18" r="1.6"/></svg>',
+  trash:'<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12M9 7V4h6v3"/></svg>',
   x:'<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>',
   search:'<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/></svg>',
   board:'<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="4.5" width="17" height="15" rx="2"/><path d="M3.5 10h17M3.5 14.7h17M9.2 4.5v15M14.8 4.5v15"/></svg>',
@@ -196,7 +197,7 @@ function mdHomeRender(el){
     </div>
     <div class="md-under">
       <section class="card md-hist"><div class="card-h"><h2>My mock drafts</h2>${hist.length?`<span class="note">Last ${hist.length}</span>`:''}</div>
-        ${!H&&!hist.length?'<div class="md-sk"><i class="skel"></i><i class="skel"></i></div>':hist.length?`<ul class="md-hist-l">${hist.map(h=>`<li><button type="button" class="md-hist-i" ${h.room&&rooms?`data-md="past" data-id="${esc(h.room)}"`:'disabled'}><span class="md-g md-g-${esc((h.grade||'C')[0])}">${esc(h.grade||'')}</span><span class="md-hist-m"><b>${esc(h.team||'My team')}</b><small>${mdAgo(h.at)} · ${h.teams} teams · ${MD_SC[h.scoring]||''} · ${h.mode==='solo'?'vs CPU':h.mode==='friends'?'With friends':'Online'}</small></span><span class="md-hist-r">${mdOrd(h.rank)} of ${h.teams}</span></button></li>`).join('')}</ul>`:'<p class="note md-empty">Your finished drafts show up here with their grades.</p>'}
+        ${!H&&!hist.length?'<div class="md-sk"><i class="skel"></i><i class="skel"></i></div>':hist.length?`<ul class="md-hist-l">${hist.map(h=>`<li><button type="button" class="md-hist-i" ${h.room&&rooms?`data-md="past" data-id="${esc(h.room)}"`:'disabled'}><span class="md-g md-g-${esc((h.grade||'C')[0])}">${esc(h.grade||'')}</span><span class="md-hist-m"><b>${esc(h.team||'My team')}</b><small>${mdAgo(h.at)} · ${h.teams} teams · ${MD_SC[h.scoring]||''} · ${h.mode==='solo'?'vs CPU':h.mode==='friends'?'With friends':'Online'}</small></span><span class="md-hist-r">${mdOrd(h.rank)} of ${h.teams}</span></button>${h.room||h.id?`<button type="button" class="md-hist-del" data-md="del-past" data-id="${esc(h.room||h.id)}" title="Delete this draft" aria-label="Delete this draft">${MD_IC.trash}</button>`:''}</li>`).join('')}</ul>`:'<p class="note md-empty">Your finished drafts show up here with their grades.</p>'}
       </section>
       <section class="card md-soon"><div class="card-h"><h2>Draft pick values</h2><span class="tmo-soon-chip">Coming soon</span></div><p class="note">Is 1.04 worth more than 1.07 plus a 3rd? Pick values for every slot in your draft, and a grade for any pick trade.</p></section>
     </div>
@@ -258,6 +259,11 @@ function mdJoinRoom(id,quick){return mdBusy(async()=>{const j=await mdApi(quick?
 function mdResume(){return mdBusy(async()=>{const H=MD.home,c=mdAcct('mdSolo',null);
   if(H&&H.solo){const j=await mdApi('join',{room:H.solo.room});if(j.ok)return mdApply(j,{instant:true});return mdFail(j)}
   if(c&&c.room){MD.carry=c;MD.room={id:c.room.id,mode:'solo'};const j=await mdApi('state',{room:c.room.id,pool:1});MD.room=null;if(j.ok)return mdApply(j,{instant:true});MD.carry=null;mdAcctSet('mdSolo',null);mdFail(j);mdRender()}})}
+/* removes a finished draft from My mock drafts (the server copy and this account's saved list) */
+function mdDelPast(id){return mdBusy(async()=>{mdDlgClose();MD.ui.del=null;if(!id)return;
+  if(MD.home&&MD.home.rooms){const j=await mdApi('forget',{room:id});if(!j.ok)return mdFail(j);MD.home.results=j.results||[]}
+  const L=mdAcct('mdHist',[])||[];if(L.some(h=>h.id===id))mdAcctSet('mdHist',L.filter(h=>h.id!==id));
+  mdToast('Draft deleted','good');if(MD.page==='home'&&mdOn())mdRender()})}
 function mdDiscard(){return mdBusy(async()=>{mdDlgClose();const H=MD.home,id=MD.room?MD.room.id:H&&H.solo?H.solo.room:null;if(id&&!(MD.carry&&!H))await mdApi('abandon',{room:id});MD.carry=null;mdAcctSet('mdSolo',null);MD.home=null;mdLeaveLocal()})}
 function mdLeave(){return mdBusy(async()=>{mdDlgClose();const r=MD.room;if(!r)return;if(r.mode!=='solo'&&r.status!=='done'){await mdApi('leave',{room:r.id});mdPing()}try{if(location.hash.startsWith('#draft/'))history.replaceState(null,'','#drafttools')}catch(e){}MD.home=null;mdLeaveLocal()})}
 function mdAskLeave(){const r=MD.room;if(!r)return;if(r.status==='done'||r.status==='lobby'&&r.mode==='solo')return mdLeave();
@@ -607,6 +613,8 @@ document.addEventListener('click',e=>{
     case 'resume':mdResume();break;
     case 'discard':mdConfirm('Discard this draft?','The draft in progress is thrown away. This can’t be undone.','Discard','discard-yes');break;
     case 'discard-yes':mdDiscard();break;
+    case 'del-past':u.del=id;mdConfirm('Delete this draft?','It’s removed from My mock drafts. This can’t be undone.','Delete','del-past-yes');break;
+    case 'del-past-yes':mdDelPast(u.del);break;
     case 'past':mdBusy(async()=>{const j=await mdApi('result',{room:id});if(j.ok)mdApply(j,{instant:true});else mdFail(j)});break;
     case 'ask-leave':mdAskLeave();break;
     case 'leave-yes':mdLeave();break;
