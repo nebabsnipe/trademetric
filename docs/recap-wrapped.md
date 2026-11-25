@@ -195,3 +195,11 @@ The card list is now the 12-card build prompt (league trades, your trades + podi
 - **Biggest comebacks.** The API now returns `clutch.comebacks` (up to three, one per game, biggest hole first; `clutch.comeback` is still the biggest). The card shows the biggest as before and the next two as short rows under it. With comebacks but no clutch records the headline changes ("You were never out of it").
 - **Side panel is a slim rail** (owner picked option A of four mock-ups). A thin pill beside the card: the card number in the card's color, a small round up button (previous card) and down button (next card), one dot per card (the current one is tall and glows; tap a dot to jump), and the card's name with what's next in a small label beside its dot. Shown only when the window has room for it.
 - Checked with the sample recap (`/recap?sample`) in three cases: clutch, not clutch (card skipped, 11 cards), and comebacks only.
+
+## Save video (2026-11-25)
+
+- **Where:** a "Save video" button on the last card, above Save image / Share. Code in `js/recap-video.js`, styles at the end of `css/recap.css`.
+- **What it makes:** a vertical 1080x1920 highlight reel, about 15 seconds, no sound. Scenes: team name and season, final standing with record, best week with the top player, up to two highlights (biggest comeback, best trade, biggest beatdown, in that order, only when the data exists), then the manager grade stamped in with the TradeMetric wordmark. Each scene has its own color, and story-style progress bars run along the top.
+- **How:** drawn on a canvas and recorded in the person's own browser. Nothing is uploaded and no server function was added. A sheet shows the video being made (about 15 seconds, the tab has to stay open), then plays it back with Save video, Share (where the device supports sharing a file) and Done.
+- **File type:** MP4 where the browser can record it (Chrome, Safari), otherwise WebM. A browser that cannot record video gets a short message and the image option.
+- **Checked:** recorded from the sample recap in headless Chrome: a 16.4 second, 1080x1920 MP4 of about 5 MB. Not yet tried on a real phone.

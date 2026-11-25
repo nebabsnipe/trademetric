@@ -385,6 +385,7 @@
     prev: function () { show(st.card - 1); },
     replay: function () { show(0); },
     togglePause: function () { setPaused(!st.paused); },
+    saveVideo: function () { if (!window.rcVideo || !window.rcVideo.supported()) { toast('This browser can’t record video. Save the image instead.'); return; } setPaused(true); window.rcVideo.make(D); },
     saveImage: function () { exportCard().then(function (blob) { download(blob); toast('Image saved.'); }).catch(function () { toast("Couldn't make the image. Try again."); }); },
     shareImage: function () {
       exportCard().then(function (blob) {
