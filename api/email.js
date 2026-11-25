@@ -334,13 +334,13 @@ async function test(q) {
     return json(200, await sendEmail(owner, t, q.get('key') || 'test', { ...SAMPLE[t], ...(t === 'welcome' ? { name: owner.name } : {}) }, sendOpts));
   }
   if (what === 'biggest') {
-    const types = (q.get('types') || 'clinch,champ').split(',').filter(t => TYPES[t] && TYPES[t].big);
+    const types = (q.get('types') || 'clinch,champ').split(',').filter(t => TYPES[t] && TYPES[t].group === 'big');
     return json(200, { results: await sendBiggest(owner, types.map(t => ({ type: t, key: q.get('key') || 'test', data: SAMPLE[t] })), sendOpts) });
   }
   if (what === 'prefs') return json(200, { prefs: await prefsOf(OWNER_ID) });
-  if (what === 'unsub') { const t = q.get('type') || 'clinch'; return TYPES[t] && TYPES[t].big ? json(200, { url: unsubUrl(OWNER_ID, t) }) : json(400, { error: 'type' }); }
+  if (what === 'unsub') { const t = q.get('type') || 'clinch'; return TYPES[t] && TYPES[t].sw ? json(200, { url: unsubUrl(OWNER_ID, t) }) : json(400, { error: 'type' }); }
   if (what === 'click') {                                                    // exactly what clicking the link does: the same signed-out request the unsubscribe page makes
-    const t = q.get('type') || 'clinch'; if (!TYPES[t] || !TYPES[t].big) return json(400, { error: 'type' });
+    const t = q.get('type') || 'clinch'; if (!TYPES[t] || !TYPES[t].sw) return json(400, { error: 'type' });
     const u = new URL(unsubUrl(OWNER_ID, t)); if (q.get('all') === '1') u.searchParams.set('all', '1'); if (q.get('on') === '1') u.searchParams.set('on', '1');
     const r = await unsub(new Request(u, { method: 'POST' }), u.searchParams);
     return json(200, { clicked: u.pathname, answer: await r.json(), prefsNow: await prefsOf(OWNER_ID) });
