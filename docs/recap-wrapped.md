@@ -213,3 +213,4 @@ The card list is now the 12-card build prompt (league trades, your trades + podi
 - **Two states.** Before watching: badge "Sample league", side cards faded with a lock, chips dimmed. After watching: badge "Your league", "Slide to watch again", side cards and chips open the slideshow at that card.
 - **Not done yet (phase 2):** remembering that the recap was watched (on the account, per league and year), playing the user's own league in the frame, and the one-time unlock animation. Until then `?unlocked=1` in the address shows the "after" look for review, still with the sample league. **Phase 3:** the Save video button in the frame stays hidden.
 
+- **Planned (owner, 2026-11-25):** the landing screen's layout is approved. Its theme and colours will be changed later to feel more like football. Not started; wait for the owner's direction before restyling.
