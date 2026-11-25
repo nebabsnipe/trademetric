@@ -36,7 +36,10 @@ const FEEDS = [
 const feedOf = host => { for (const [re, name] of FEEDS) if (re.test(host)) return name; return host; };
 
 /* expected answers that are not failures */
-const EXPECTED = (route, feed, status) =>
+const SELF = /(^|\.)trademetric\.app$|\.vercel\.app$/;
+const EXPECTED = (route, feed, status, host) =>
+  (SELF.test(host) && (status === 401 || status === 403)) ||          // our own site behind preview password protection
+
   (route === 'espn' && feed === 'espn-fantasy' && (status === 401 || status === 403 || status === 404)) ||
   (feed === 'database' && status === 409);                              // "already saved": the shared store uses this on purpose
 
@@ -81,7 +84,7 @@ if (realFetch && !realFetch.__tm) {
 function note(ctx, url, status, err) {
   try {
     const u = new URL(url), feed = feedOf(u.hostname);
-    if (EXPECTED(ctx.route, feed, status)) return;
+    if (EXPECTED(ctx.route, feed, status, u.hostname)) return;
     // the path with numbers and long ids taken out, so league ids and the like never leave the server
     const path = u.pathname.replace(/\/\d+(?=\/|$)/g, '/:n').replace(/\/[A-Za-z0-9_-]{20,}(?=\/|$)/g, '/:id').slice(0, 120);
     ctx.feeds.push({ feed, status: String(status), path, err: err ? String(err.message || err).slice(0, 200) : undefined });
@@ -100,12 +103,11 @@ async function report(ctx, res, thrown) {
   if (!S) return;
   const base = { route: '/api/' + ctx.route, build: SHA || 'unknown' };
   for (const f of feeds) {
-    S.withScope(sc => {
-      sc.setLevel('warning');
-      sc.setFingerprint(['upstream-feed', f.feed, f.status]);
-      sc.setTags({ ...base, kind: 'upstream', upstream: f.feed, upstream_status: f.status });
-      sc.setContext('feed', { path: f.path, error: f.err, route_status: res && res.statusCode });
-      S.captureMessage(`Feed failed: ${f.feed} ${f.status}`);
+    S.captureEvent({
+      message: `Feed failed: ${f.feed} ${f.status}`, level: 'warning',
+      fingerprint: ['upstream-feed', f.feed, f.status],
+      tags: { ...base, kind: 'upstream', upstream: f.feed, upstream_status: f.status },
+      contexts: { feed: { path: f.path, error: f.err, route_status: res && res.statusCode } },
     });
   }
   if (thrown) {
@@ -117,11 +119,11 @@ async function report(ctx, res, thrown) {
   } else if (failed && !ctx.feeds.length && due('route|' + ctx.route + '|' + res.statusCode)) {
     // the route caught its own error and answered 5xx with no outside feed failing: most likely our bug
     const b = ctx.body && typeof ctx.body === 'object' ? ctx.body : {};
-    S.withScope(sc => {
-      sc.setFingerprint(['route-failed', ctx.route, String(res.statusCode)]);
-      sc.setTags({ ...base, kind: 'route_error', status: String(res.statusCode) });
-      sc.setContext('response', { error: b.error, code: b.code, detail: b.detail });
-      S.captureMessage(`/api/${ctx.route} answered ${res.statusCode}: ${String(b.detail || b.error || 'no details').slice(0, 160)}`, 'error');
+    S.captureEvent({
+      message: `/api/${ctx.route} answered ${res.statusCode}: ${String(b.detail || b.error || 'no details').slice(0, 160)}`, level: 'error',
+      fingerprint: ['route-failed', ctx.route, String(res.statusCode)],
+      tags: { ...base, kind: 'route_error', status: String(res.statusCode) },
+      contexts: { response: { error: b.error, code: b.code, detail: b.detail } },
     });
   }
   await S.flush(2000).catch(() => {});

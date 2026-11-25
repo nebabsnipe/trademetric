@@ -103,9 +103,9 @@
         if (ev.user) ev.user = ev.user.id ? { id: ev.user.id } : undefined;   // the Supabase user id only
         return sentryTags(ev);
       },
-      beforeSendTransaction: sentryTags,
     });
     sentryReady = true;
+    Sentry.setTags({ layout: layout(), build: BUILD });                  // also on timing data; tab and platform update as they change
     removeEventListener('error', onEarly);
     removeEventListener('unhandledrejection', onEarly);
     early.splice(0).forEach(function (e) { if (e) Sentry.captureException(e); });
@@ -142,11 +142,10 @@
     if (feedSeen[key]) return; feedSeen[key] = 1;
     var Sentry = S_(); if (!Sentry) return;
     var path = scrub(u.pathname).replace(/\/\d+(?=\/|$)/g, '/:n');
-    Sentry.withScope(function (sc) {
-      sc.setLevel('warning');
-      sc.setFingerprint(['upstream-feed', 'browser', src, what]);
-      sc.setTags({ kind: 'upstream', upstream: src, upstream_status: what, route: 'browser:' + path });
-      Sentry.captureMessage('Feed failed: ' + src + ' ' + what + ' (from the browser, ' + path + ')');
+    Sentry.captureEvent({
+      message: 'Feed failed: ' + src + ' ' + what + ' (from the browser)', level: 'warning',
+      fingerprint: ['upstream-feed', 'browser', src, what],
+      tags: { kind: 'upstream', upstream: src, upstream_status: what, route: 'browser:' + path },
     });
   });
   if (window.fetch) {
@@ -176,6 +175,7 @@
       autocapture: { css_selector_ignorelist: ['.ph-no-autocapture', '[data-ph-no-autocapture]', '#v-signin', '#v-account', '.acc-shell', '.espn-priv'] },
       mask_all_text: true,                                      // button text can hold league or team names
       disable_session_recording: DNT,
+      disable_surveys: true,
       session_recording: { sampleRate: 0.25, maskAllInputs: true, blockSelector: PRIVATE },
       before_send: function (ev) {
         if (!ev || !ev.properties) return ev;
@@ -202,7 +202,7 @@
 
   var lastPage = null, lockedTab = null, signinShown = false;
   API.page = safe(function (t) {
-    var Sentry = S_(); if (Sentry) Sentry.setTag('tab', t);
+    var Sentry = S_(); if (Sentry) Sentry.setTags({ tab: t, platform: platform(), layout: layout() });
     if (t === lastPage) return;
     var from = lastPage; lastPage = t;
     var ph = PH();
@@ -214,7 +214,8 @@
     if (t === 'rankings') ev('rankings_viewed', { view: g('plView') || 'rank', signed_in: signedIn });
     if (t === 'signin' && !signedIn) {
       signinShown = true;
-      ev('signin_prompt_shown', { reason: lockedTab ? 'locked_tab' : 'visit', wanted_tab: lockedTab });
+      var want = lockedTab || (g('INTENDED') || '').replace(/-.*/, '') || null;
+      ev('signin_prompt_shown', { reason: lockedTab ? 'locked_tab' : want && want !== 'signin' ? 'link_to_tab' : 'visit', wanted_tab: want && want !== 'signin' ? want : null });
       lockedTab = null;
     } else if (from === 'signin' && signinShown && !signedIn) { signinShown = false; ev('signin_prompt_dismissed', { how: 'navigated' }); }
   });
@@ -310,6 +311,11 @@
     if ((c = t.closest('a.hthumb[href], a[href*="youtube.com/watch"], a[href*="espn.com/video"]'))) ev('clip_watched', { source: /youtube/.test(c.href) ? 'youtube' : 'espn', from: curTab() });
     if (t.closest('#alert-btn')) { var pop = document.getElementById('alert-pop'); if (pop && pop.hidden) { var an = document.getElementById('alert-n'); ev('alert_opened', { unread: an && !an.hidden ? an.textContent : '0' }); } }
     if (t.closest('#dr-start')) { var DR = g('DR'); ev('mock_draft_started', { mode: (DR && DR.mode) || 'mock', teams: DR && DR.n, fast: !!(DR && DR.fast) }); }
+  }), true);
+  /* signed out, the tabs are hidden; a link or typed address to a tab still counts as wanting that tab */
+  addEventListener('hashchange', safe(function () {
+    var t = location.hash.slice(1).replace(/-.*/, '');
+    if (t && t !== 'signin' && document.body.classList.contains('signed-out') && !g('USER')) { lockedTab = t; ev('locked_tab_clicked', { wanted_tab: t, how: 'link' }); }
   }), true);
   addEventListener('submit', safe(function (e) {
     if (e.target && e.target.id === 'tw-form') {
