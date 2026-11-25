@@ -180,4 +180,8 @@ The card list is now the 12-card build prompt (league trades, your trades + podi
 - **Local testing:** on localhost only, `&dev=<espnTeamId>` builds the recap straight from the league's public data without signing in.
 - **Recap tab:** the site's Recap tab (offseason mode) now has an "Open your recap" button for signed-in users and a "See a sample recap" button for everyone.
 - **Sample recap:** `/recap?sample=1` plays the slideshow from `data/recap-sample.json`, a made-up 10-team league in the same shape the API returns. No sign-in or league needed, so the preview can always show it.
+- **Opens on top of the site (owner's request, 2026-11-25):** the Recap tab's buttons open the recap in a layer over the site, with the page behind dimmed and blurred (`tmoRecapOpen` in `js/offseason.js`, `.rcx` in `css/styles.css`). It is the same `recap.html`, loaded in a frame with `?embed=1`. Close with the X, Escape, or a click outside. `/recap` still works as its own page.
+- **Cover screen:** the recap now opens on a cover ("Your season, graded.", team and league, three facts, Start) before card 1.
+- **Card list:** on wide screens a list of the cards sits beside the card (click to jump, current card highlighted); the card grows to most of the window's height.
+- **Recap tab preview:** the tab shows a phone-shaped live preview that loops the sample recap (`?demo=1`: no cover, no controls). Clicking it opens the sample.
 - **Not done yet:** a public link/preview image for sharing (only the image is shareable for now).

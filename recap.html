@@ -10,9 +10,11 @@
 <link rel="apple-touch-icon" href="/apple-touch-icon.png?v=2">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Kanit:ital,wght@0,700;0,800;1,700;1,800;1,900&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/css/recap.css?v=1">
+<link rel="stylesheet" href="/css/recap.css?v=2">
+<script>(function(){var q=location.search,c="";if(/[?&]embed=/.test(q))c="rc-embed";if(/[?&]demo=/.test(q))c="rc-embed rc-demo";if(c)document.documentElement.className=c})()</script>
 </head>
 <body>
+<div id="rc-wrap">
 <div id="rc-stage">
 <div id="rc-root" style="--rc-ga: #7c3aed; --rc-gb: #2563eb; width: 390px; height: 844px; position: relative; overflow: hidden; background: #0d0d0d; color: #f4f4f5; font-family: Inter, system-ui, sans-serif; border-radius: 28px">
 
@@ -25,6 +27,21 @@
       <div class="rc-if" data-if="gateLoading"><p class="rc-pulse">Running every trade through the grade…</p></div>
       <div class="rc-if" data-if="gateMsg" hidden><p><span data-v="gateMsg"></span></p></div>
       <div class="rc-if" data-if="gateBtn" hidden><a class="rc-btn" data-gate-link href="/">TradeMetric</a></div>
+    </div>
+  </div>
+
+  <!-- Cover: the opening screen, before the first card -->
+  <div class="rc-if" data-if="cover" hidden>
+    <div class="rc-cover">
+      <div aria-hidden="true" class="rc-cover-stamp"><span>?</span></div>
+      <div class="rc-k rc-fu" style="font-size: 18px; color: #fafafa">TM</div>
+      <div style="flex: 1"></div>
+      <div class="rc-lbl rc-fu rc-d1"><span data-v="coverLbl"></span></div>
+      <div class="rc-k rc-fu rc-d2" style="font-size: 64px; color: #fafafa">Your season, graded.</div>
+      <div class="rc-fu rc-d3" style="font-size: 16px; line-height: 1.5; color: #d4d4d8"><b style="color: #fafafa"><span data-v="coverTeam"></span></b><br><span data-v="coverLeague"></span></div>
+      <div class="rc-fu rc-d4 rc-cover-facts"><template data-for="coverFacts"><div><b>{{f.n}}</b><span>{{f.l}}</span></div></template><div class="rc-if"></div></div>
+      <button type="button" data-start class="rc-fu rc-d5 rc-start">Start<svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path class="rc-ic" d="M5 12h14M13 6l6 6-6 6"></path></svg></button>
+      <div class="rc-fu rc-d6" style="font-size: 13px; color: #a1a1aa"><span data-v="coverMeta"></span></div>
     </div>
   </div>
 
@@ -430,6 +447,8 @@
 
 </div>
 </div>
-<script src="/js/recap.js?v=2"></script>
+<aside id="rc-side" hidden aria-label="Recap cards"></aside>
+</div>
+<script src="/js/recap.js?v=3"></script>
 </body>
 </html>

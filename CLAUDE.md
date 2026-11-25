@@ -26,6 +26,7 @@ Longer plans and build notes are in `docs/`: offseason mode, season recap, trade
 - **Redraft only** for now. No dynasty features yet.
 - **Rankings stay free/public.** Everything else is premium. During the beta, everyone gets Pro unlocked.
 - **Keep the site simple and uncluttered.** Aim for a clean, professional look (in the spirit of the big fantasy analysis sites) and avoid anything that looks like generic "AI slop" UI.
+- For new UI pieces, the owner likes the component style of 21st.dev: use it for ideas when convenient and rebuild them in this site's plain HTML/CSS/JS (no React, no build step).
 
 ## Branches & deploys
 - `main` = live site.

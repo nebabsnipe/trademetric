@@ -8,6 +8,13 @@
   var stage = document.getElementById('rc-stage');
   var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   var AUTOPLAY = !reduce;
+  var QS = new URLSearchParams(location.search);
+  var DEMO = QS.has('demo');            // the looping preview on the site's Recap tab: no cover, no controls
+  var EMBED = QS.has('embed') || DEMO;  // shown on top of the site, in a frame
+  var side = document.getElementById('rc-side');
+  var TITLES = { leagueTrades: 'League trades', myTrades: 'Your trades', best: 'Best trade', worst: 'Worst trade', defining: 'Defining trade', fleece: 'Biggest fleece',
+    waivers: 'Waiver wire', timelapse: 'Season timelapse', bestWeeks: 'Best weeks', beatdown: 'Biggest beatdown', clutch: 'Clutch', share: 'Your recap card' };
+  if (DEMO) AUTOPLAY = true;
 
   // Every possible card, in order. `on` decides whether this recap has real data for it.
   var ALL = [
@@ -27,7 +34,7 @@
   var CARDS = [], LAST = 0, D = null;
   var st = { card: 0, elapsed: 0, paused: false };
   var toastTimer = null, lastCallKey = null, last = 0, running = false;
-  var COUNTS = {}, RACE = null, barRows = [], segEls = [];
+  var COUNTS = {}, RACE = null, barRows = [], segEls = [], sideEls = [], seen = -1;
 
   // ---------- tiny DOM helpers (from the reference; list values are now escaped) ----------
   function all(sel) { return Array.prototype.slice.call(root.querySelectorAll(sel)); }
@@ -227,6 +234,20 @@
     if (S.beatdown) { setV('smBdLabel', S.beatdown.label); setV('smBdMargin', f1(S.beatdown.margin)); }
     buildNetwork(R);
 
+    // cover + the card list beside the card
+    setV('coverLbl', 'Season Recap · ' + yr);
+    setV('coverTeam', R.me.teamName);
+    setV('coverLeague', R.league.name);
+    setV('coverMeta', CARDS.length + ' cards · about a minute');
+    var facts = [{ n: R.league.weeksPlayed, l: R.league.weeksPlayed === 1 ? 'week played' : 'weeks played' }];
+    if (T.leagueTotal > 0) facts.push({ n: T.leagueTotal, l: T.leagueTotal === 1 ? 'league trade' : 'league trades' });
+    facts.push({ n: 1, l: 'final grade' });
+    renderList('coverFacts', facts);
+    side.innerHTML = '<div class="rc-side-h"><div class="rc-lbl">Season Recap · ' + esc(yr) + '</div><div class="rc-k rc-side-t">' + esc(R.me.teamName) + '</div><div class="rc-side-s">' + esc(R.league.name) + '</div></div>' +
+      '<ol class="rc-ch">' + CARDS.map(function (c, i) { return '<li><button type="button" data-go="' + i + '" disabled><i>' + (i < 9 ? '0' : '') + (i + 1) + '</i>' + TITLES[c.key] + '</button></li>'; }).join('') + '</ol>' +
+      '<div class="rc-side-f"><kbd>←</kbd><kbd>→</kbd> move between cards<br><kbd>Space</kbd> pause</div>';
+    sideEls = Array.prototype.slice.call(side.querySelectorAll('[data-go]'));
+
     segEls = renderList('segs', CARDS.map(function () { return { w: '0%' }; })).map(function (s) { return s.firstElementChild; });
   }
 
@@ -310,6 +331,9 @@
     root.style.setProperty('--rc-ga', card.glow[0]);
     root.style.setProperty('--rc-gb', card.glow[1]);
     setV('counter', (c + 1) + ' / ' + CARDS.length);
+    seen = Math.max(seen, c);
+    var tone = /^#/.test(card.glow[1]) ? card.glow[1] : '#a78bfa';
+    sideEls.forEach(function (b, i) { b.disabled = false; b.className = i === c ? 'rc-now' : i <= seen ? 'rc-seen' : ''; if (i === c) { b.style.setProperty('--rc-now', tone); b.setAttribute('aria-current', 'true'); } else b.removeAttribute('aria-current'); });
     setIf('toast', false);
     draw();
   }
@@ -337,12 +361,20 @@
     }
   };
 
+  // leaving: tell the site to close the recap (when it is open on top of the site)
+  function closeEmbed() { if (EMBED && !DEMO && window.parent !== window) { try { window.parent.postMessage({ rc: 'close' }, location.origin); } catch (e) {} } }
+  document.addEventListener('click', function (ev) { if (!ev.target.closest('#rc-root,#rc-side')) closeEmbed(); });
+  side.addEventListener('click', function (ev) { var b = ev.target.closest('[data-go]'); if (b && running) show(+b.getAttribute('data-go')); });
   root.addEventListener('click', function (ev) {
+    if (ev.target.closest('[data-start]')) { begin(); return; }
+    if (EMBED && ev.target.closest('a[href="/"]')) { ev.preventDefault(); closeEmbed(); return; } // the TM mark closes the recap instead of reloading the site
     var el = ev.target.closest('[data-act]');
     if (el && running && ACTIONS[el.getAttribute('data-act')]) ACTIONS[el.getAttribute('data-act')]();
   });
   document.addEventListener('keydown', function (ev) {
-    if (!running) return;
+    if (DEMO) return;
+    if (ev.key === 'Escape') { closeEmbed(); return; }
+    if (!running) { if (onCover && (ev.key === 'Enter' || ev.key === ' ' || ev.key === 'ArrowRight')) { ev.preventDefault(); begin(); } return; }
     if (ev.key === 'ArrowRight') ACTIONS.next();
     else if (ev.key === 'ArrowLeft') ACTIONS.prev();
     else if (ev.key === ' ' && ev.target === document.body) { ev.preventDefault(); ACTIONS.togglePause(); }
@@ -352,20 +384,29 @@
     var dt = Math.min(100, now - last); last = now;
     if (!st.paused) {
       var e = st.elapsed + dt;
-      if (AUTOPLAY && st.card < LAST && e >= CARDS[st.card].dur) show(st.card + 1);
+      if (DEMO && st.card === LAST && e >= 6000) show(0);
+      else if (AUTOPLAY && st.card < LAST && e >= CARDS[st.card].dur) show(st.card + 1);
       else if (e < 20000) { st.elapsed = e; draw(); }
     }
     requestAnimationFrame(tick);
   }
 
   // ---------- fit the 390x844 card to the window ----------
+  // On a wide screen the card grows to most of the window's height and the card list sits beside it.
   function fit() {
     var vw = window.innerWidth, vh = window.innerHeight;
     var s = Math.min(vw / 390, vh / 844);
-    if (vw > 500) s = Math.min(1, (vh - 32) / 844, (vw - 32) / 390);
+    if (DEMO) s = Math.min(vw / 390, vh / 844);
+    else if (vw > 500) s = Math.min(1.35, (vh - (EMBED ? 56 : 32)) / 844, (vw - 32) / 390);
+    else if (EMBED) s = Math.min((vw - 12) / 390, (vh - 60) / 844); // leaves room for the site's close button above the card
     stage.style.transform = 'scale(' + s.toFixed(4) + ')';
     stage.style.margin = ((844 * s - 844) / 2) + 'px ' + ((390 * s - 390) / 2) + 'px';
+    var sw = Math.min(340, Math.max(260, Math.round(300 * s)));
+    var wide = !DEMO && sideReady && vw >= 760 && vw >= 390 * s + sw + 16 + 32;
+    side.hidden = !wide;
+    if (wide) { side.style.width = sw + 'px'; side.style.height = Math.round(844 * s) + 'px'; }
   }
+  var sideReady = false, onCover = false;
   window.addEventListener('resize', fit); fit();
 
   // ---------- share card -> PNG (drawn by hand on a canvas, no libraries) ----------
@@ -470,7 +511,7 @@
     setV('gateLbl', lbl || 'Season Recap'); setV('gateTitle', title);
     setIf('gateMsg', !!msg); setV('gateMsg', msg || '');
     setIf('gateBtn', !!link);
-    if (link) { var a = one('[data-gate-link]'); a.href = link; a.textContent = linkText; }
+    if (link) { var a = one('[data-gate-link]'); a.href = link; a.textContent = linkText; a.target = EMBED && link !== location.href ? '_top' : ''; }
   }
   function params() {
     var q = new URLSearchParams(location.search), m = location.pathname.match(/\/recap\/(\d+)(?:\/(\d{4}))?/);
@@ -516,12 +557,22 @@
     return j;
   }
 
+  // The recap opens on a cover; Start (or Enter) plays the cards.
   function start(R) {
     D = R;
     fill(R);
-    setIf('gate', false); setIf('ready', true);
-    running = true;
+    sideReady = true; fit();
+    setIf('gate', false);
     var s = parseInt((location.hash.match(/card=(\d+)/) || [])[1], 10); // #card=6 jumps to card 6
+    if (DEMO || s) return begin(s);
+    onCover = true;
+    root.style.setProperty('--rc-ga', '#7c3aed'); root.style.setProperty('--rc-gb', '#f59e0b');
+    setIf('bgAurora', true); setIf('cover', true);
+  }
+  function begin(s) {
+    if (running) return;
+    onCover = false; setIf('cover', false); setIf('ready', true);
+    running = true;
     setPaused(false);
     show(s ? s - 1 : 0);
     last = performance.now();
