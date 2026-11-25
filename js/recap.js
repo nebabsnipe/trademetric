@@ -269,10 +269,12 @@
     if (T.leagueTotal > 0) facts.push({ n: T.leagueTotal, l: T.leagueTotal === 1 ? 'league trade' : 'league trades' });
     facts.push({ n: 1, l: 'final grade' });
     renderList('coverFacts', facts);
-    side.innerHTML = '<div class="rc-side-h"><div class="rc-lbl">Season Recap · ' + esc(yr) + '</div><div class="rc-k rc-side-t">' + esc(R.me.teamName) + '</div><div class="rc-side-s">' + esc(R.league.name) + '</div></div>' +
-      '<div class="rc-np"><div class="rc-np-n"><b data-sv="num">01</b><span>/ ' + (CARDS.length < 10 ? '0' : '') + CARDS.length + '</span></div><div class="rc-np-t" data-sv="title">' + esc(TITLES[CARDS[0].key]) + '</div><div class="rc-np-x" data-sv="next"></div></div>' +
+    /* a slim rail beside the card: the card number, up / down buttons, one dot per card, and the card's name next to its dot */
+    side.innerHTML = '<b class="rc-rail-n" data-sv="num">01</b>' +
+      '<button type="button" class="rc-rail-b" data-rail="prev" aria-label="Previous card" title="Previous card"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 14.500l6-6 6 6"/></svg></button>' +
       '<div class="rc-dots" role="list">' + CARDS.map(function (c, i) { return '<button type="button" role="listitem" data-go="' + i + '" disabled title="' + esc(TITLES[c.key]) + '" aria-label="' + (i + 1) + '. ' + esc(TITLES[c.key]) + '"></button>'; }).join('') + '</div>' +
-      '<div class="rc-side-f"><kbd>←</kbd><kbd>→</kbd> move between cards<br><kbd>Space</kbd> pause · tap a bar to jump</div>';
+      '<button type="button" class="rc-rail-b" data-rail="next" aria-label="Next card" title="Next card"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9.500l6 6 6-6"/></svg></button>' +
+      '<div class="rc-rail-tip" data-rail-tip><b data-sv="title">' + esc(TITLES[CARDS[0].key]) + '</b><small data-sv="next"></small></div>';
     sideEls = Array.prototype.slice.call(side.querySelectorAll('[data-go]'));
 
     segEls = renderList('segs', CARDS.map(function () { return { w: '0%' }; })).map(function (s) { return s.firstElementChild; });
@@ -363,6 +365,8 @@
     sideEls.forEach(function (b, i) { b.disabled = false; b.className = i === c ? 'rc-now' : i <= seen ? 'rc-seen' : ''; if (i === c) { b.style.setProperty('--rc-now', tone); b.setAttribute('aria-current', 'true'); } else b.removeAttribute('aria-current'); });
     var sv = function (k, v) { var e = side.querySelector('[data-sv="' + k + '"]'); if (e && e.textContent !== v) { e.textContent = v; e.classList.remove('rc-sv-in'); void e.offsetWidth; e.classList.add('rc-sv-in'); } };
     side.style.setProperty('--rc-now', tone);
+    var tip = side.querySelector('[data-rail-tip]'), dot = sideEls[c]; if (tip && dot) tip.style.top = (dot.offsetTop + dot.offsetHeight / 2) + 'px';
+    var rb = side.querySelectorAll('[data-rail]'); if (rb[0]) rb[0].disabled = c === 0; if (rb[1]) rb[1].disabled = c === CARDS.length - 1;
     sv('num', (c < 9 ? '0' : '') + (c + 1)); sv('title', TITLES[card.key]); sv('next', CARDS[c + 1] ? 'Next: ' + TITLES[CARDS[c + 1].key] : 'Last card');
     setIf('toast', false);
     draw();
@@ -394,7 +398,7 @@
   // leaving: tell the site to close the recap (when it is open on top of the site)
   function closeEmbed() { if (EMBED && !DEMO && window.parent !== window) { try { window.parent.postMessage({ rc: 'close' }, location.origin); } catch (e) {} } }
   document.addEventListener('click', function (ev) { if (!ev.target.closest('#rc-root,#rc-side')) closeEmbed(); });
-  side.addEventListener('click', function (ev) { var b = ev.target.closest('[data-go]'); if (b && running) show(+b.getAttribute('data-go')); });
+  side.addEventListener('click', function (ev) { var r = ev.target.closest('[data-rail]'); if (r && running && !r.disabled) { ACTIONS[r.getAttribute('data-rail')](); return; } var b = ev.target.closest('[data-go]'); if (b && running) show(+b.getAttribute('data-go')); });
   root.addEventListener('click', function (ev) {
     if (ev.target.closest('[data-start]')) { begin(); return; }
     if (EMBED && ev.target.closest('a[href="/"]')) { ev.preventDefault(); closeEmbed(); return; } // the TM mark closes the recap instead of reloading the site
@@ -431,8 +435,8 @@
     else if (EMBED) s = Math.min((vw - 12) / 390, (vh - 60) / 844); // leaves room for the site's close button above the card
     stage.style.transform = 'scale(' + s.toFixed(4) + ')';
     stage.style.margin = ((844 * s - 844) / 2) + 'px ' + ((390 * s - 390) / 2) + 'px';
-    var sw = Math.min(250, Math.max(210, Math.round(220 * s)));
-    var wide = !DEMO && sideReady && vw >= 760 && vw >= 390 * s + sw + 16 + 32;
+    var sw = 48;
+    var wide = !DEMO && sideReady && vw >= 760 && vw >= 390 * s + sw + 16 + 32 + 340;   // room for the card's name beside the rail
     side.hidden = !wide;
     if (wide) { side.style.width = sw + 'px'; side.style.height = ''; }
   }
