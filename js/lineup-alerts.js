@@ -86,8 +86,9 @@ var LU_CFG = {
         a.detail = f1(a.benchProj) + ' vs ' + f1(a.starterProj) + ' projected.';
       }
       /* one line for the bar at the top of My Team */
-      a.banner = a.title + (o.kind === 'gap' ? ' (' + f1(a.benchProj) + ' vs ' + f1(a.starterProj) + ' projected)'
-        : o.kind === 'empty' ? (bn ? '. Start ' + bn.name + '.' : '. Pick up a player for it.')
+      a.banner = o.kind === 'gap'
+        ? (o.level === 'start' ? 'Start ' : 'Consider starting ') + bn.name + ' over ' + st.name + ' (' + f1(a.benchProj) + ' vs ' + f1(a.starterProj) + ' projected)'
+        : a.title + (o.kind === 'empty' ? (bn ? '. Start ' + bn.name + '.' : '. Pick up a player for it.')
         : '. ' + st.name + ' ' + (o.kind === 'bye' ? 'is on bye' : CANT[st.status]) + '.');
       /* swapKey names the change itself, so the same swap is never pushed twice; key adds the level so a
          Consider that grows into a Start shows up as a new alert */

@@ -1644,7 +1644,8 @@ function schedule(){REG_WEEKS=(S.real&&S.real.regWeeks)||14;const ids=S.teams.ma
   if(S.real&&S.real.sched)for(const w in S.real.sched){const pr=S.real.sched[w].filter(x=>ids.includes(x[0])&&(!x[1]||ids.includes(x[1])));if(pr.length)weeks[w]=pr}
   SCHED={key,weeks};return weeks}
 function oppOf(tid,w){const pr=(schedule()[w]||[]).find(p=>p.includes(tid));return pr?(pr[0]===tid?pr[1]:pr[0]):null}
-function pickVal(w){return id=>{const p=byId[id];if(!availIn(id,w))return 0;if(w===WEEK&&G[id]&&G[id].live)return G[id].projNext;const o=OPP[p.t]&&OPP[p.t][w];return V.pts[id]*(o?matchF(o.opp,p.pos):1)*(w===WEEK?weekMult(id)*(p.pos==='DST'?1:vegasF(p.t)):1)}}
+/* this week: the same projection My Team's lineup card and the lineup alerts use (platform blend + injury news) */
+function pickVal(w){return id=>{const p=byId[id];if(!availIn(id,w))return 0;if(w===WEEK&&G[id]&&(G[id].live||G[id].next))return G[id].projNext;const o=OPP[p.t]&&OPP[p.t][w];return V.pts[id]*(o?matchF(o.opp,p.pos):1)*(w===WEEK?weekMult(id)*(p.pos==='DST'?1:vegasF(p.t)):1)}}
 function weekLine(players,w,tid){const f=pickVal(w),lu=(w===WEEK&&tid&&realLineup(tid))||weekLineup(players,w,f);let m=0,v=0;lu.slots.forEach(s=>{if(!s.p)return;const x=f(s.p.id),l=w===WEEK&&liveOf(s.p.id),rf=l?(l.state==='post'?0:l.rem):1;m+=x;v+=(CV[s.p.pos]*x*rf)**2});return {m,sd:Math.sqrt(v)||1,lu}}
 function recordsThru(n){const d={};S.teams.forEach(T=>d[T.id]={w:0,l:0,t:0,pf:0});const sched=schedule();
   if(S.real&&S.real.scores){for(let w=1;w<=n;w++){const sc=S.real.scores[w]||{};(sched[w]||[]).forEach(([a,b])=>{if(!a||!b||sc[a]==null||sc[b]==null)return;d[a].pf+=sc[a];d[b].pf+=sc[b];if(sc[a]>sc[b]){d[a].w++;d[b].l++}else if(sc[b]>sc[a]){d[b].w++;d[a].l++}else{d[a].t++;d[b].t++}})}return d}
