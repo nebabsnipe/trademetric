@@ -71,24 +71,41 @@ html.rc-embed #rc-root{box-shadow:0 30px 90px rgba(0,0,0,.6),0 0 0 1px rgba(255,
 .rc-start:hover{transform:translateY(-1px);box-shadow:0 10px 34px rgba(250,250,250,.2)}
 .rc-start:active{transform:scale(.98)}
 /* card list beside the card on wide screens */
-#rc-side{box-sizing:border-box;flex:none;display:flex;flex-direction:column;padding:26px 14px 18px;border-radius:28px;background:rgba(13,13,13,.94);border:1px solid rgba(255,255,255,.07);color:#f4f4f5;font-family:Inter,system-ui,sans-serif;overflow:hidden;box-shadow:0 30px 90px rgba(0,0,0,.5)}
+#rc-side{box-sizing:border-box;flex:none;align-self:center;position:relative;display:flex;flex-direction:column;align-items:center;gap:8px;padding:14px 0 10px;border-radius:99px;background:rgba(13,13,13,.94);border:1px solid rgba(255,255,255,.08);color:#f4f4f5;font-family:Inter,system-ui,sans-serif;box-shadow:0 30px 90px rgba(0,0,0,.5)}
 #rc-side[hidden]{display:none}
-.rc-side-h{padding:0 12px 18px;display:flex;flex-direction:column;gap:8px;border-bottom:1px solid #1f1f23}
-.rc-side-t{font-size:26px;color:#fafafa;overflow-wrap:anywhere}
-.rc-side-s{font-size:13px;color:#a1a1aa}
-.rc-ch{list-style:none;margin:10px 0 0;padding:0;flex:1;min-height:0;overflow:auto;display:flex;flex-direction:column;gap:2px}
-.rc-ch button{width:100%;display:flex;align-items:center;gap:12px;padding:9px 12px;border:0;border-radius:10px;background:transparent;color:#a1a1aa;font:500 14px Inter,sans-serif;text-align:left;cursor:pointer;transition:background .15s ease,color .15s ease}
-.rc-ch button:hover{background:#18181b;color:#fafafa}
-.rc-ch button:disabled{opacity:.45;cursor:default;background:transparent;color:#a1a1aa}
-.rc-ch i{flex:none;width:22px;font:italic 800 13px Kanit,sans-serif;color:#52525b;font-variant-numeric:tabular-nums}
-.rc-ch .rc-seen{color:#d4d4d8}
-.rc-ch .rc-now{background:#18181b;color:#fafafa;font-weight:700}
-.rc-ch .rc-now i{color:var(--rc-now,#a78bfa)}
-.rc-ch .rc-now::after{content:"";margin-left:auto;width:7px;height:7px;border-radius:50%;background:var(--rc-now,#a78bfa);box-shadow:0 0 12px var(--rc-now,#a78bfa)}
-.rc-side-f{padding:14px 12px 0;border-top:1px solid #1f1f23;font-size:12px;color:#71717a;line-height:1.5}
-.rc-side-f kbd{font:600 11px Inter,sans-serif;padding:2px 6px;border-radius:5px;border:1px solid #3f3f46;color:#d4d4d8;margin-right:2px}
+.rc-rail-n{font:italic 800 18px/1 Kanit,sans-serif;color:var(--rc-now,#a78bfa);font-variant-numeric:tabular-nums;transition:color .3s ease}
+.rc-sv-in{animation:rc-sv .35s cubic-bezier(.2,.8,.2,1)}
+@keyframes rc-sv{from{opacity:0;transform:translateY(6px)}}
+/* small round buttons: up is the card before, down is the next one */
+.rc-rail-b{appearance:none;width:30px;height:30px;padding:0;border-radius:50%;border:1px solid #2a2a30;background:#141417;color:#d4d4d8;display:grid;place-items:center;cursor:pointer;outline:0;transition:transform .18s cubic-bezier(.3,1.4,.5,1),background .15s ease,border-color .15s ease,color .15s ease}
+.rc-rail-b:hover:not(:disabled){background:#fafafa;border-color:#fafafa;color:#0d0d0d;transform:scale(1.1)}
+.rc-rail-b:active:not(:disabled){transform:scale(.9)}
+.rc-rail-b:focus-visible{box-shadow:0 0 0 2px #fafafa}
+.rc-rail-b:disabled{opacity:.3;cursor:default}
+.rc-dots{display:flex;flex-direction:column;align-items:center;gap:7px;padding:4px 0}
+.rc-dots button{flex:none;width:6px;height:6px;padding:0;border:0;border-radius:99px;background:#27272a;cursor:pointer;outline:0;position:relative;transition:height .35s cubic-bezier(.3,1.25,.5,1),background .2s ease,box-shadow .2s ease,transform .15s ease}
+.rc-dots button::before{content:"";position:absolute;inset:-4px -14px}
+.rc-dots button:hover:not(:disabled){background:#d4d4d8;transform:scale(1.4)}
+.rc-dots button:disabled{cursor:default;opacity:.6}
+.rc-dots button:focus-visible{box-shadow:0 0 0 2px #fafafa}
+.rc-dots .rc-seen{background:#71717a}
+.rc-dots .rc-now{height:22px;background:var(--rc-now,#a78bfa);box-shadow:0 0 12px var(--rc-now,#a78bfa);transform:none!important}
+/* the current card's name, beside its dot */
+.rc-rail-tip{position:absolute;left:calc(100% + 10px);top:50%;transform:translateY(-50%);white-space:nowrap;padding:7px 11px;border-radius:10px;background:#18181b;border:1px solid #2a2a30;box-shadow:0 10px 30px rgba(0,0,0,.4);display:flex;flex-direction:column;gap:2px;transition:top .35s cubic-bezier(.3,1.25,.5,1);pointer-events:none}
+.rc-rail-tip::before{content:"";position:absolute;left:-5px;top:50%;width:8px;height:8px;margin-top:-4px;background:#18181b;border-left:1px solid #2a2a30;border-bottom:1px solid #2a2a30;transform:rotate(45deg)}
+.rc-rail-tip b{font:700 13px/1.2 Inter,sans-serif;color:#fafafa}
+.rc-rail-tip small{font-size:11px;color:#71717a}
+.rc-rail-tip small:empty{display:none}
 
 /* team badge: the player's NFL team in its colors, so you can tell who is who at a glance */
 .rc-tb{flex:none;width:42px;height:42px;border-radius:11px;display:flex;align-items:center;justify-content:center;font:italic 800 13px/1 Kanit,sans-serif;letter-spacing:.02em;color:var(--ct,#fff);background:linear-gradient(160deg,var(--c1,#3a3f47),color-mix(in srgb,var(--c1,#3a3f47) 62%,#000));box-shadow:inset 0 -4px 0 var(--c2,#8a919c),inset 0 0 0 1px rgba(255,255,255,.18);padding-bottom:3px;box-sizing:border-box}
 .rc-tb-sm{width:30px;height:30px;border-radius:8px;font-size:10px;box-shadow:inset 0 -3px 0 var(--c2,#8a919c),inset 0 0 0 1px rgba(255,255,255,.18);padding-bottom:2px}
 .rc-tb-lg{width:52px;height:52px;border-radius:13px;font-size:16px}
+
+/* clutch card: the other comebacks, under the biggest one */
+.rc-cbs{display:flex;flex-direction:column;gap:8px}
+.rc-cbs-l{display:flex;flex-direction:column;gap:6px}
+.rc-cb{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:12px;background:#141417;border:1px solid #2a2a30;font-size:13px;color:#a1a1aa}
+.rc-cb i{flex:none;font:italic 800 13px Kanit,sans-serif;color:#4ade80;min-width:30px}
+.rc-cb span{flex:1;min-width:0}.rc-cb b{color:#fafafa}
+.rc-cb em{flex:none;font-style:normal;font-weight:600;color:#d4d4d8;white-space:nowrap}

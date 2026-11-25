@@ -303,17 +303,16 @@ function renderProTab(){
     document.body.classList.remove('md-in-room');
   }
   const live=key==='recap';/* the Season Recap slideshow is built (recap.html); the other pages are still on the way */
-  const sample=live?'<a class="btn tmo-big" href="/recap?sample=1" data-recap-open="sample">Watch a sample</a>':'';
   /* the Recap page keeps its preview video running: only rebuild it when what it shows would change */
   const stamp=key+'|'+signed+'|'+pro;if(live&&el.dataset.k===stamp&&el.firstElementChild)return;el.dataset.k=live?stamp:'';
   const chip=pro?(live?'':'<span class="tmo-soon-chip">Coming soon</span>'):`<span class="tmo-lock">${TMO_LOCK}Pro</span>`;
   const cta=pro&&live?`<p class="tmo-pp-note"><b>Your recap is ready.</b> It plays like a slideshow, about a minute start to finish. Tap to move through the cards.</p>
-      <div class="tmo-cta"><a class="btn accent tmo-big" href="/recap" data-recap-open="mine">Open your recap</a>${sample}</div>`
+      <div class="tmo-cta"><a class="btn accent tmo-big" href="/recap" data-recap-open="mine">Open your recap</a></div>`
     :pro?`<p class="tmo-pp-note"><b>You’re in.</b> ${TMO_BETA_PRO?'Pro is free for your account during the beta, and ':'It’s part of your Pro plan, and '}${esc(P.h)} will show up here as soon as it’s ready.</p>
       <div class="tmo-cta"><a class="btn tmo-big" href="#tmrank">See the rankings</a></div>`
-    :signed?`<p class="tmo-pp-note">${esc(P.h)} is part of TradeMetric Pro.</p><div class="tmo-cta"><a class="btn accent tmo-big" href="#account-plan">See Pro plans</a>${sample}</div>`
+    :signed?`<p class="tmo-pp-note">${esc(P.h)} is part of TradeMetric Pro.</p><div class="tmo-cta"><a class="btn accent tmo-big" href="#account-plan">See Pro plans</a></div>`
     :`<p class="tmo-pp-note">${TMO_BETA_PRO?'<b>Pro is free during the beta.</b> Sign in and it’s yours, no card needed.':'Sign in to get TradeMetric Pro.'}</p>
-      <div class="tmo-cta"><a class="btn accent tmo-big" href="#signin">${TMO_BETA_PRO?'Sign in free':'Sign in'}</a>${sample||'<a class="btn tmo-big" href="#tmrank">See the free rankings</a>'}</div>`;
+      <div class="tmo-cta"><a class="btn accent tmo-big" href="#signin">${TMO_BETA_PRO?'Sign in free':'Sign in'}</a><a class="btn tmo-big" href="#tmrank">See the free rankings</a></div>`;
   el.innerHTML=`<div class="tmo-pp">
     <div class="tmo-pp-main">
       <div class="tmo-pp-k"><span class="kicker">TradeMetric Pro</span>${chip}</div>
@@ -322,34 +321,32 @@ function renderProTab(){
       <ul class="tmo-pp-list">${P.pts.map(x=>`<li>${TMO_CHECK}<span>${x}</span></li>`).join('')}</ul>
       ${cta}
     </div>
-    ${live?`<div class="tmo-rcp" data-recap-open="sample" role="button" tabindex="0" aria-label="Watch a sample recap">
+    ${live?`<div class="tmo-rcp" aria-hidden="true">
       <div class="tmo-rcp-glow" aria-hidden="true"></div>
       <div class="tmo-rcp-phone"><video src="/media/recap-sample.mp4?v=3" poster="/media/recap-sample.jpg?v=2" ${matchMedia('(prefers-reduced-motion: reduce)').matches?'':'autoplay'} muted loop playsinline preload="metadata" tabindex="-1" aria-hidden="true" disablepictureinpicture disableremoteplayback></video></div>
-      <span class="tmo-rcp-play"><svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path fill="currentColor" d="M7 4.5v15l13-7.500z"/></svg>Watch a sample recap</span>
     </div>`:`<div class="tmo-pp-cards">${P.cards.map(([h,p],i)=>`<div class="tmo-pp-card"><span class="tmo-pp-n">${i+1}</span><div><h3>${h}</h3><p>${p}</p></div></div>`).join('')}</div>`}
   </div>`;
   if(key==='drafttools'&&typeof mdPreview==='function')mdPreview(el);
 }
 
 /* ---------- Season Recap, opened on top of the site (the page behind stays, dimmed) ---------- */
-function tmoRecapOpen(sample){
+function tmoRecapOpen(){
   if(document.getElementById('rcx'))return;
   const w=document.createElement('div');w.id='rcx';w.className='rcx';w.setAttribute('role','dialog');w.setAttribute('aria-modal','true');w.setAttribute('aria-label','Season Recap');
-  w.innerHTML=`<iframe class="rcx-f" title="Season Recap" src="/recap?embed=1${sample?'&sample=1':''}" style="color-scheme:light" allow="web-share"></iframe>
+  w.innerHTML=`<iframe class="rcx-f" title="Season Recap" src="/recap?embed=1" style="color-scheme:light" allow="web-share"></iframe>
     <button class="rcx-x" type="button" data-recap-close aria-label="Close recap"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>`;
   TMO.recapBack=document.activeElement;document.body.appendChild(w);document.documentElement.classList.add('rcx-open');
   const f=w.querySelector('iframe');f.addEventListener('load',()=>{try{f.contentWindow.focus()}catch(e){}});
 }
 function tmoRecapClose(){const w=document.getElementById('rcx');if(!w)return;w.remove();document.documentElement.classList.remove('rcx-open');try{TMO.recapBack&&TMO.recapBack.focus()}catch(e){}TMO.recapBack=null}
 addEventListener('message',e=>{if(e.origin===location.origin&&e.data&&e.data.rc==='close')tmoRecapClose()});
-document.addEventListener('keydown',e=>{if(e.key==='Escape'&&document.getElementById('rcx'))tmoRecapClose();
-  const o=e.target.closest&&e.target.closest('div[data-recap-open]');if(o&&(e.key==='Enter'||e.key===' ')){e.preventDefault();tmoRecapOpen(o.dataset.recapOpen==='sample')}});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&document.getElementById('rcx'))tmoRecapClose();});
 
 /* ---------- events ---------- */
 document.addEventListener('click',e=>{
   const t=e.target;
   if(t.closest('[data-recap-close]')||t.id==='rcx'){tmoRecapClose();return}
-  const ro=t.closest('[data-recap-open]');if(ro){e.preventDefault();tmoRecapOpen(ro.dataset.recapOpen==='sample');return}
+  const ro=t.closest('[data-recap-open]');if(ro){e.preventDefault();tmoRecapOpen();return}
   if(t.closest('#mode-pill')){tmoSetMode(tmoMode()==='off'?'in':'off');return}
   const v=t.closest('[data-tmo-view]');if(v){TMO.view=v.dataset.tmoView;TMO.open=null;if(document.body.dataset.tab==='tmrank'){e.preventDefault();renderTmRank()}return}
   const p=t.closest('[data-tmo-pos]');if(p){TMO.pos=p.dataset.tmoPos;TMO.open=null;TMO.limit=100;renderTmRank();return}
