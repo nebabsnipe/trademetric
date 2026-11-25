@@ -1,5 +1,6 @@
 // Compact Sleeper player list (id -> [name, position, team]) so the page can sync
 // Sleeper rosters without downloading Sleeper's full 5 MB player file.
+// Answers /api/players through api/market.js (files starting with "_" are not endpoints of their own).
 export default async function handler(req, res) {
   try {
     const r = await fetch('https://api.sleeper.app/v1/players/nfl', { headers: { 'User-Agent': 'TradeMetric/1.0' } });

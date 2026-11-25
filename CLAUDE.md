@@ -11,6 +11,7 @@ TradeMetric (trademetric.app) is a paid fantasy football trade analyzer. Hosted 
 - Test changes in a browser at desktop (1280) and phone (390) widths, light and dark mode, and check the console for errors before pushing.
 - Don't only test as the owner: other users differ in address, platform (Sleeper vs ESPN), account age and empty browser caches.
 - The Vercel preview environment is missing `SUPABASE_SECRET_KEY` and `ANTHROPIC_API_KEY`, so previews show raw headlines and no shared store.
+- **Vercel allows 12 server functions on this plan.** Every file in `api/` that does not start with `_` counts, and a 13th makes the whole deploy fail. Before adding one, fold a small one into another (as `/api/players` is served by `api/market.js` through a rewrite in `vercel.json`).
 - Pushing to `main` deploys to www.trademetric.app in about a minute. Only push to main when the owner says to.
 - The owner isn't a programmer: explain changes in plain words, not code terms.
 

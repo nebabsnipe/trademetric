@@ -105,5 +105,11 @@
       "includeFiles": "data/{nfl,market,tmhist}.json"
     }
   },
-  "cleanUrls": true
+  "cleanUrls": true,
+  "rewrites": [
+    {
+      "source": "/api/players",
+      "destination": "/api/market?fn=players"
+    }
+  ]
 }

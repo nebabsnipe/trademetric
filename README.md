@@ -25,7 +25,7 @@ Fantasy football trades, rankings and lineup advice built on your league's exact
 | `js/mockdraft.js`, `css/mockdraft.css` | Mock drafts on the offseason Draft Tools tab: entry page, lobby, draft room, board, results |
 | `api/draft.js` | Server for mock drafts: rooms, rules, CPU drafting, the pick clock and grades. `node scripts/test-mockdraft.mjs` checks it; add `dump 3` to print three simulated drafts |
 | `supabase/mockdraft.sql` | Tables for mock draft rooms. Run once after accounts_v2.sql |
-| `api/players.js` | Compact Sleeper player list used to sync rosters in the background |
+| `api/_players.js` (answers `/api/players`, through `api/market.js`) | Compact Sleeper player list used to sync rosters in the background |
 | `api/_shared.js` | The shared news store: injury status history, story recaps and the league news archive, saved in Supabase so they are built once and sent to everyone (see "Shared news store" below) |
 | `api/espn.js` | Reads private ESPN leagues with the user's espn_s2 and SWID codes (never stored) |
 | `supabase/schema.sql` | Table that stores each user's saved league. Run once in Supabase's SQL Editor |
