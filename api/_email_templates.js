@@ -83,7 +83,7 @@ const COPY = {
       '**Trade deadline reminders**, **playoff and championship news**, and in the offseason, **player moves** and a **draft season reminder**.',
       'Injury emails are off unless you turn them on. We never email lineup alerts, live plays or news.',
       'You don\'t need to do anything to keep getting them. If you\'d rather not, you can turn them all off in one click, or pick the ones you want.'],
-    btn: ['Choose your emails', '/#account-leagues'],
+    btn: ['Choose your emails', '/#account-notifications'],
     link: ['No thanks, turn off all update emails', ctx.unsubUrl || ''],
     who: 'you have a TradeMetric account. This is the only email like this we\'ll send.',
   }),
@@ -238,7 +238,7 @@ export function render(type, data = {}, ctx = {}) {
   const P = s => `<p class="tm-mut" style="margin:0 0 16px;font-size:16px;line-height:1.55;color:#3D424A">${c.raw ? s : rich(s)}</p>`;
 
   const footHtml = big
-    ? `You're getting this because ${c.who ? esc(c.who) : esc(LABEL[type]) + ' emails are on for your TradeMetric account.'} <a class="tm-foot-a" href="${esc(ctx.unsubUrl)}" style="color:#636872;text-decoration:underline">Unsubscribe from these</a> or <a class="tm-foot-a" href="${esc(base + '/#account-leagues')}" style="color:#636872;text-decoration:underline">change your email settings</a>.`
+    ? `You're getting this because ${c.who ? esc(c.who) : esc(LABEL[type]) + ' emails are on for your TradeMetric account.'} <a class="tm-foot-a" href="${esc(ctx.unsubUrl)}" style="color:#636872;text-decoration:underline">Unsubscribe from these</a> or <a class="tm-foot-a" href="${esc(base + '/#account-notifications')}" style="color:#636872;text-decoration:underline">change your email settings</a>.`
     : (c.raw ? c.foot : esc(c.foot || 'This is an account email for your TradeMetric account.'));
 
   const html = `<!doctype html>
@@ -316,7 +316,7 @@ ${footHtml}${ctx.postal ? `<br><br>${esc(ctx.postal)}` : ''}
     `${c.btn[0]}: ${url(c.btn[1])}`, '',
     ...(c.link && c.link[1] ? [`${c.link[0]}: ${c.link[1]}`, ''] : []),
     '--',
-    big ? `You're getting this because ${c.who || LABEL[type] + ' emails are on for your TradeMetric account.'}\nUnsubscribe from these: ${ctx.unsubUrl}\nEmail settings: ${base}/#account-leagues`
+    big ? `You're getting this because ${c.who || LABEL[type] + ' emails are on for your TradeMetric account.'}\nUnsubscribe from these: ${ctx.unsubUrl}\nEmail settings: ${base}/#account-notifications`
       : (c.foot || 'This is an account email for your TradeMetric account.'),
     ...(ctx.postal ? ['', ctx.postal] : []),
   ].join('\n');

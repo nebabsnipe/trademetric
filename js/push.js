@@ -1,5 +1,5 @@
 /* ===== Push notifications: real alerts on the lock screen or desktop, even when TradeMetric is closed =====
-   Loaded after app.js. Draws the "Push notifications" card inside Account -> Leagues (pushHtml()).
+   Loaded after app.js. Draws the "Push notifications" card inside Account -> Notifications (pushHtml()).
    - The browser is only asked for permission when the user taps "Turn on notifications on this device".
    - Which kinds of alert are on is saved on the account (S.acct.push), so it applies to every device.
    - Each device that's switched on is saved on the server (/api/push/subscribe), tied to the account.

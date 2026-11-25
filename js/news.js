@@ -597,7 +597,7 @@ function tmnRender(){const el=$('news-body');if(!el)return;if(!TMN_F.some(([k])=
       <div class="tmn-nav" role="group" aria-label="Show" id="tmn-seg"></div>
       ${Ls.length>1?`<select id="tmn-lg" class="tmn-lgsel" aria-label="League"><option value="all">All leagues</option>${Ls.map(c=>`<option value="${esc(c.key)}" ${TMN.lg===c.key?'selected':''}>${esc(c.name)}</option>`).join('')}</select>`:''}
       <div class="tmn-tog" role="group" aria-label="Filter the Feed" id="tmn-tog"><button type="button" class="y" data-nshow="mine" aria-pressed="${sh.mine}"><i aria-hidden="true"></i>Yours</button><button type="button" data-nshow="lg" aria-pressed="${sh.lg}"><i aria-hidden="true"></i>League</button></div>
-      ${lite?'':`<a class="tmn-gear" href="#account-leagues" data-notif-go="1" title="Notification settings" aria-label="Notification settings">${TMN_GEAR}</a>`}`;
+      ${lite?'':`<a class="tmn-gear" href="#account-notifications" data-notif-go="1" title="Notification settings" aria-label="Notification settings">${TMN_GEAR}</a>`}`;
   /* the rail and the feed are only rebuilt when they change: a button replaced mid-tap never gets its click on a phone */
   if(TMN.sideH!==side||!$('tmn-feed')){el.innerHTML=`<div class="tmn-lay"><aside class="tmn-side" aria-label="News sections">${side}</aside>
     <div class="tmn-feed" id="tmn-feed"></div></div>`;TMN.sideH=side;TMN.segH=TMN.bodyH=null}
@@ -987,7 +987,7 @@ function tmnTopMini(e){const p=byId[e.pid];if(!p)return '';
     <span class="tmn-topm-t"><small>#1 ${esc(tmnPosN(e.pos))} · Week ${e.week}</small><b>${esc(p.n)}</b></span><span class="tmn-topm-p num">${f1(e.pts)}<small>pts</small></span></article>`}
 function tmnBuildClips(Ls){if(typeof FEED==='undefined'||!FEED||typeof buildClips!=='function')return;const ids=new Set();Ls.forEach(c=>{if(TMN.lg!=='all'&&c.key!==TMN.lg)return;c.roster.forEach(id=>ids.add(id))});buildClips([...ids].filter(id=>byId[id]).map(id=>({id})))}
 
-/* ---------- Account → Leagues: which leagues can pop up ---------- */
+/* ---------- Account → Notifications: which leagues can pop up ---------- */
 function tmnNotifHtml(){const L=S.leagues&&S.leagues.length?S.leagues:[{key:S.leagueKey,name:S.league&&S.league.name}],n=tmnNotif();
   return `<section class="card acc-sec" id="acc-notif"><header class="acc-sec-h"><h2>Banners</h2><p>Which leagues can pop up big-play banners while the site is open.</p></header>
     <ul class="tmn-nl">${L.map(x=>`<li><span class="acc-lg-t"><b>${esc(x.name||'League')}</b><span class="note">${tmnOn(x.key)?'Banners on':'News tab only'}</span></span><label class="tmn-sw"><input type="checkbox" data-notif="${esc(x.key)}" ${tmnOn(x.key)?'checked':''}><i aria-hidden="true"></i><span class="sr">Banners for ${esc(x.name||'League')}</span></label></li>`).join('')}

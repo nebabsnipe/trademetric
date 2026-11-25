@@ -1,4 +1,4 @@
-/* ===== Email: the "Email" card in Account -> Leagues, and asking for the welcome email after a first sign-in =====
+/* ===== Email: the "Email" card in Account -> Notifications, and asking for the welcome email after a first sign-in =====
    Loaded after app.js. One small switch per kind of update email, in three groups (every week, as it happens,
    offseason). All on by default except injuries. The switches are saved on the account (the email_prefs table, which
    each person can only read and change for themselves), not in the browser, so the unsubscribe link in an email

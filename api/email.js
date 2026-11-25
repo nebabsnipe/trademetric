@@ -141,7 +141,7 @@ send('',off)})();
 </script>` : `
 <h1>This link didn't work</h1>
 <p>The unsubscribe link is incomplete or out of date. You can change which emails you get in your account.</p>
-<div class="acts"><a class="btn" href="${siteBase()}/#account-leagues">Open email settings</a></div>`}
+<div class="acts"><a class="btn" href="${siteBase()}/#account-notifications">Open email settings</a></div>`}
 </div></main></body></html>`;
 }
 

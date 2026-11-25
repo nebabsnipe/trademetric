@@ -115,7 +115,7 @@ async function handler(req, res) {
       if (!r.ok) return res.status(502).json({ error: 'db' });
       const subs = r.data || [];
       if (!subs.length) return res.status(200).json({ ok: true, sent: 0, devices: 0 });
-      const out = await sendToDevices(subs, { title: 'TradeMetric notifications are on', body: 'This is a test. Alerts about your players will show up like this.', tag: 'test', url: '/#account-leagues' }, { ttl: 600 });
+      const out = await sendToDevices(subs, { title: 'TradeMetric notifications are on', body: 'This is a test. Alerts about your players will show up like this.', tag: 'test', url: '/#account-notifications' }, { ttl: 600 });
       if (out.gone.length) await asUser(token, `push_subscriptions?id=in.(${out.gone.join(',')})`, { method: 'DELETE', prefer: 'return=minimal' });
       return res.status(200).json({ ok: true, sent: out.sent, devices: subs.length, removed: out.gone.length });
     }

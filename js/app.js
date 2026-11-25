@@ -2777,14 +2777,15 @@ addEventListener('resize',queueBalance);
 try{const ro=new ResizeObserver(queueBalance);document.querySelectorAll('.grid2>*').forEach(c=>ro.observe(c));
   document.querySelectorAll('.grid2>.stack>*').forEach(c=>ro.observe(c))}catch(e){}
 
-/* ===== Account area: Profile, Leagues, Subscription, Security. Headed by the username, never the email. ===== */
+/* ===== Account area: Profile, Leagues, Notifications, Subscription, Security. Headed by the username, never the email. ===== */
 var ACC_TAB='profile',ACC_EDIT=null,ACC_MSG=null,ACC_BUSY=false;
 const ACC_IC={
   profile:'<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/>',
   leagues:'<path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0z"/><path d="M17 5h3v2a3 3 0 0 1-3 3M7 5H4v2a3 3 0 0 0 3 3"/>',
+  notifications:'<path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/>',
   plan:'<rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20M6 15h4"/>',
   security:'<rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>'};
-const ACC_TABS=[['profile','Profile'],['leagues','Leagues'],['plan','Subscription'],['security','Security']];
+const ACC_TABS=[['profile','Profile'],['leagues','Leagues'],['notifications','Notifications'],['plan','Subscription'],['security','Security']];
 const accIc=k=>`<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ACC_IC[k]}</svg>`;
 function fmtDate(d,time){if(!d)return '—';const x=new Date(d);if(isNaN(x))return '—';return x.toLocaleDateString([], {month:'short',day:'numeric',year:'numeric'})+(time?' · '+x.toLocaleTimeString([], {hour:'numeric',minute:'2-digit'}):'')}
 function fmtMonth(d){const x=new Date(d);return isNaN(x)?'':x.toLocaleDateString([], {month:'long',year:'numeric'})}
@@ -2804,9 +2805,9 @@ function renderAccount(){const el=$('account-body');if(!el)return;if(!USER){el.i
         <div class="acc-badges"><span class="acc-badge plan">${esc(plan.name)} plan</span>${USER.created_at?`<span class="acc-badge">Member since ${esc(fmtMonth(USER.created_at))}</span>`:''}</div></div>
       <button class="btn acc-out" type="button" id="auth-out">Sign out</button></div></div>`;
   const nav=`<nav class="acc-nav" aria-label="Account sections">${ACC_TABS.map(([k,l])=>`<a href="#account-${k}" ${k===ACC_TAB?'aria-current="page"':''}>${accIc(k)}<span>${l}</span></a>`).join('')}</nav>`;
-  el.innerHTML=head+`<div class="acc-shell">${nav}<div class="acc-main">${({profile:accProfile,leagues:accLeagues,plan:accPlan,security:accSecurity})[ACC_TAB]()}</div></div>`;
+  el.innerHTML=head+`<div class="acc-shell">${nav}<div class="acc-main">${({profile:accProfile,leagues:accLeagues,notifications:accNotifications,plan:accPlan,security:accSecurity})[ACC_TAB]()}</div></div>`;
   const f=el.querySelector('.acc-form input');if(f&&innerWidth>820)setTimeout(()=>f.focus(),0);
-  if(typeof TMN!=='undefined'&&TMN.goNotif&&ACC_TAB==='leagues'){TMN.goNotif=false;const n=$('acc-notif');if(n)setTimeout(()=>n.scrollIntoView({behavior:'smooth',block:'start'}),60)}}
+  if(typeof TMN!=='undefined'&&TMN.goNotif)TMN.goNotif=false}
 function accProfile(){const un=PROFILE&&PROFILE.username,email=USER.email||'';
   const unForm=`<form class="acc-form" id="acc-form" data-kind="username" novalidate><label>New username<input type="text" id="acc-un" value="${esc(un||suggestUsername())}" autocapitalize="none" autocorrect="off" spellcheck="false" maxlength="20" required><span class="hint" id="un-hint" aria-live="polite"></span></label>${accMsg()}<div class="acc-form-act">${accBtn('Save username')}<button class="btn" type="button" data-acc-cancel>Cancel</button></div></form>`;
   return `<section class="card acc-sec"><header class="acc-sec-h"><h2>Profile</h2><p>How you show up on TradeMetric.</p></header>
@@ -2819,10 +2820,12 @@ function accLeagues(){const L=S.leagues||[],me=typeof myTeam==='function'&&S.tea
     :S.noLeague?`<div class="acc-empty"><b>No league yet</b><p class="note">Bring in yours from Sleeper or ESPN.</p></div>`:`<div class="acc-empty"><b>${esc(S.league&&S.league.name||'My League')}</b><p class="note">This is the league on this account.</p></div>`;
   return `<section class="card acc-sec"><header class="acc-sec-h"><h2>Leagues</h2><p>Synced to any device.</p></header>
     ${list}<div class="acc-sec-f"><a class="btn primary" href="#hub">Manage leagues</a><a class="btn" href="#league">League settings</a></div></section>
-    ${typeof tmnNotifHtml==='function'?tmnNotifHtml():''}
-    ${typeof pushHtml==='function'?pushHtml():''}
-    ${typeof emailHtml==='function'?emailHtml():''}
     <section class="card acc-sec"><header class="acc-sec-h"><h2>Sync</h2></header>${accRow('Cloud save',sync)}</section>`}
+/* Notifications tab: banners while the site is open (news.js), push alerts (push.js) and email (email.js). Each of those
+   files draws its own card and repaints it in place by id (acc-notif, acc-push, acc-email). */
+function accNotifications(){return `${typeof tmnNotifHtml==='function'?tmnNotifHtml():''}
+    ${typeof pushHtml==='function'?pushHtml():''}
+    ${typeof emailHtml==='function'?emailHtml():''}`}
 /* Pricing grid: Free vs Pro with a Monthly/Annual toggle. Prices come from TM_PRICES in js/plan.js (and the PostHog
    "price-test" flag, off for now). Checkout isn't connected, so Pro says "Coming soon". */
 var PR_ANNUAL=false;
