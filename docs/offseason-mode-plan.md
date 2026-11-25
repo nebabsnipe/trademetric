@@ -35,6 +35,12 @@ Built on branch **`offseason-mode`** (Vercel preview). Not merged to main. A **P
 
 ---
 
+## Brought up to date with the live site (2026-11-25, not pushed yet)
+
+The live site's changes through 2026-11-25 (account sync, shared news store, News fixes, motion polish, matchup colors, no-league accounts) are merged into this branch. Where both sides had changed the same spot, the live site's version was kept and the offseason hooks were added back on top. An account with no league now counts as offseason, the same as a signed-out visitor. The phone More sheet no longer lists Draft in-season (the live site removed that tab). Checked signed out at 1280 light and 390 dark: Home, Rankings, News, Recap, Draft Tools and League Fit all open with no errors. Signed-in pages still need a check on the preview.
+
+---
+
 ## Offseason News (built 2026-11-23, not deployed yet)
 
 The News tab in offseason mode. Code in `js/offnews.js`; the in-season News (`js/news.js`) is untouched.

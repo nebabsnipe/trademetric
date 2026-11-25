@@ -409,19 +409,49 @@ except Exception as e:print('dynasty values skipped',e,file=sys.stderr)
 if dyn:d['dyn']=dyn
 elif PREV.get('dyn'):d['dyn']=PREV['dyn']
 print(len(dyn),'dynasty values',file=sys.stderr)
-# team changes (trades): any player whose NFL team differs from the last run, with the day it was first seen.
-# The News tab's Feed shows these for fantasy-relevant players, with a story about the trade when one exists.
-# [player key, from team, to team, ISO date]; kept 30 days.
-moves=[m for m in (PREV.get('moves') or []) if m[3]>=(datetime.date.today()-datetime.timedelta(days=30)).isoformat()]
+# team changes (trades). A move is only logged once it's been seen in two runs in a row on different days, so a
+# one-night blip in the roster file never becomes a trade alert (that's how a false "Brock Bowers traded to the
+# Raiders" got out). Team codes are normalized first (LV/OAK, LAR/LA, JAX/JAC, WAS/WSH...); blank, FA or unknown
+# teams on either side are ignored, and a move to the team he was already on is never logged.
+# moves:        [player key, from team, to team, ISO date first seen]; kept 30 days. The News tab reads these.
+# movesPending: {player key: [from team, to team, ISO date first seen]}: seen once, waiting for the next run.
+TEAM_ALIAS={'OAK':'LV','LVR':'LV','RAI':'LV','LA':'LAR','STL':'LAR','RAM':'LAR','SD':'LAC','SDG':'LAC','JAC':'JAX','WSH':'WAS','WFT':'WAS',
+            'GNB':'GB','KAN':'KC','KCC':'KC','NWE':'NE','NOR':'NO','SFO':'SF','TAM':'TB','ARZ':'ARI','BLT':'BAL','CLV':'CLE','HST':'HOU'}
+_NFL=set(d['sched'].keys())
+def team_code(t):
+    t=str(t or '').upper().strip();t=TEAM_ALIAS.get(t,t)
+    return t if t in _NFL else None
+def move_ok(m,now_team):
+    """a logged move stays only if both teams are real and different, and he is on the new team right now"""
+    if not isinstance(m,list) or len(m)<4:return False
+    a,b=team_code(m[1]),team_code(m[2])
+    return bool(a and b and a!=b and now_team.get(m[0])==b)
+TODAY=datetime.date.today().isoformat()
+_now={p[0]:team_code(p[3]) for p in d['players']}
+_was={p[0]:team_code(p[3]) for p in (PREV.get('players') or [])}
+moves,pending,purged,seen=[],{},[],set()
 try:
-    _was={p[0]:p[3] for p in (PREV.get('players') or [])}
-    _NFL=set(d['sched'].keys())
+    cutoff=(datetime.date.today()-datetime.timedelta(days=30)).isoformat()
+    for m in (PREV.get('moves') or []):
+        if not isinstance(m,list) or len(m)<4 or m[3]<cutoff:continue
+        if move_ok(m,_now):moves.append([m[0],team_code(m[1]),team_code(m[2]),m[3]])
+        else:purged.append(m)
+    for pid,(a,b,first) in (PREV.get('movesPending') or {}).items():
+        if _now.get(pid)==b and first<TODAY and a!=b and not any(m[0]==pid and m[2]==b for m in moves):
+            moves.append([pid,a,b,first])          # second run in a row on the new team: confirmed
+        elif _now.get(pid)==b:
+            pending[pid]=[a,b,first]               # same day as the first sighting: wait for the next night
+        elif _now.get(pid) and _now.get(pid)!=a:
+            pending[pid]=[a,_now[pid],TODAY]       # showed up somewhere else again: start over from his real team
+        seen.add(pid)                              # back on his old team (a blip) or gone: nothing to log
     for p in d['players']:
-        a,b=_was.get(p[0]),p[3]
-        if a and b and a!=b and a in _NFL and b in _NFL and not any(m[0]==p[0] and m[2]==b for m in moves):
-            moves.append([p[0],a,b,datetime.date.today().isoformat()])
-except Exception as e:print('moves skipped',e,file=sys.stderr)
-d['moves']=moves;print(len(moves),'team changes in the last 30 days',file=sys.stderr)
+        pid,a,b=p[0],_was.get(p[0]),_now.get(p[0])
+        if not a or not b or a==b or pid in pending or pid in seen:continue
+        if any(m[0]==pid and m[2]==b for m in moves):continue
+        pending[pid]=[a,b,TODAY]                   # first sighting: not a move yet
+except Exception as e:print('moves skipped',e,file=sys.stderr);moves=[m for m in moves if move_ok(m,_now)]
+d['moves']=moves;d['movesPending']=pending
+print(len(moves),'confirmed team changes in the last 30 days,',len(pending),'waiting for a second run,',len(purged),'dropped',file=sys.stderr)
 # Signings and releases (offseason News, js/offnews.js): a player who joined a team from no team, or left a team for
 # no team. Same shape as moves, with '' for "no team". Kept apart from moves so the in-season trade cards are unchanged.
 txn=[m for m in (PREV.get('txn') or []) if m[3]>=(datetime.date.today()-datetime.timedelta(days=30)).isoformat()]
@@ -433,14 +463,14 @@ try:
     _prev=PREV.get('players') or []
     _NFL=set(d['sched'].keys())
     if len(_prev)>200:                      # skip on a first run or a broken previous file
-        _was={p[0]:(p[3] if p[3] in _NFL else '') for p in _prev};_now={p[0]:(p[3] if p[3] in _NFL else '') for p in d['players']}
+        _twas={p[0]:(p[3] if p[3] in _NFL else '') for p in _prev};_tnow={p[0]:(p[3] if p[3] in _NFL else '') for p in d['players']}
         _info={p[0]:(p[1],p[2]) for p in _prev+list(d['players'])}
         def _add(pid,a,b):
             if a!=b and (a=='' or b=='') and not any(m[0]==pid and m[1]==a and m[2]==b for m in txn):
                 n,pos=_info.get(pid,('',''));txn.append([pid,a,b,datetime.date.today().isoformat(),n,pos])
-        for pid,b in _now.items():_add(pid,_was.get(pid,''),b)
-        for pid,a in _was.items():
-            if pid not in _now:_add(pid,a,'')
+        for pid,b in _tnow.items():_add(pid,_twas.get(pid,''),b)
+        for pid,a in _twas.items():
+            if pid not in _tnow:_add(pid,a,'')
 except Exception as e:print('signings skipped',e,file=sys.stderr)
 d['txn']=txn;print(len(txn),'signings and releases in the last 30 days',file=sys.stderr)
 

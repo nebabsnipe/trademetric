@@ -2,21 +2,23 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
+<script>/* the old vercel.app address: its server requests are redirected to trademetric.app and fail, so move the whole page there */
+if(location.hostname==='trademetric-rho.vercel.app')location.replace('https://www.trademetric.app'+location.pathname+location.search+location.hash)</script>
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>TradeMetric</title>
-<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png?v=2">
-<link rel="icon" type="image/png" sizes="512x512" href="/icon-512.png?v=2">
-<link rel="apple-touch-icon" href="/apple-touch-icon.png?v=2">
+<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png?v=3">
+<link rel="icon" type="image/png" sizes="512x512" href="/icon-512.png?v=3">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png?v=3">
 <meta name="theme-color" content="#141414">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600;700;800&family=Kanit:ital,wght@0,700;0,800;1,600;1,700;1,800&display=swap">
 <meta name="description" content="Fantasy football trades, rankings and lineup advice built on your league's exact settings.">
-<link rel="stylesheet" href="css/styles.css?v=24">
+<link rel="stylesheet" href="css/styles.css?v=47">
 </head>
 <body class="signed-out">
 <div class="topbar">
   <div class="wrap topbar-in">
-    <a class="logo" href="#team" aria-label="TradeMetric home"><img class="logo-img" src="/logo-tm.png?v=2" width="398" height="160" alt=""><b>Trade<span>Metric</span></b></a>
+    <a class="logo" href="#team" aria-label="TradeMetric home"><img class="logo-img" src="/logo-tm.png?v=3" width="398" height="160" alt=""><b>Trade<span>Metric</span></b></a>
     <span class="preview-pill" id="preview-pill" hidden>Preview</span>
     <script>if(!/(^|\.)trademetric\.app$/.test(location.hostname))document.getElementById('preview-pill').hidden=false</script>
     <nav class="nav" aria-label="Sections">
@@ -31,11 +33,9 @@
       <button data-tab="trade">Trades</button>
       <button data-tab="season"><span class="lbl-l">Season Sim</span><span class="lbl-s">Sim</span></button>
       <button data-tab="hub">League</button>
-      <button data-tab="draft" class="nav-draft">Draft</button>
     </nav>
     <div class="topbar-right">
       <button class="mode-pill" id="mode-pill" type="button"><span class="mp-dot" aria-hidden="true"></span><span class="mp-l">Offseason</span></button>
-      <span class="demo-pill" id="week-pill"></span>
       <select id="league-switch" class="league-switch" aria-label="Switch league" hidden></select>
       <div class="alerts-wrap"><button class="alert-btn" id="alert-btn" type="button" aria-label="Alerts" aria-expanded="false"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg><span class="alert-n" id="alert-n" hidden></span></button>
         <div class="alert-pop" id="alert-pop" hidden></div></div>
@@ -58,22 +58,19 @@
   <!-- MY TEAM -->
   <section class="view" id="v-team" hidden>
     <div class="hero">
-      <div><div class="kicker" id="team-kicker"></div><h1 id="team-title">Your Team</h1><p>Your best <span class="wk-now">this week's</span> lineup for your league's scoring. Select any player for his full profile.</p></div>
-      <span class="example" id="team-example">Sample league. Import yours in League Hub.</span>
+      <div><div class="kicker" id="team-kicker"></div><h1 id="team-title">Your Team</h1></div>
     </div>
+    <div class="lu-alert" id="lu-alert" hidden></div>
     <div class="tiles" id="team-tiles"></div>
     <div class="card" id="matchup"></div>
     <div class="grid2 even">
       <div class="stack">
-        <div class="card"><div class="card-h"><h2>Starting lineup</h2><span class="note"><span class="wk-now">This week's</span> projection</span></div>
+        <div class="card"><div class="card-h"><h2>Starting lineup</h2></div>
           <div id="lineup"></div>
           <div class="total"><span id="lineup-total-lab">Projected total</span><span class="total-r"><b id="lineup-total">0.0</b><small id="lineup-total-sub"></small></span></div></div>
         <div class="card"><div class="card-h"><h2>Bench</h2></div><div id="bench"></div></div>
         <div class="card" id="ir-card" hidden></div>
-        <div class="card" data-float><div class="card-h"><h2>Roster strength</h2><span class="note">Pts/week vs league average</span></div><div class="strength" id="strength"></div></div>
-        <div class="card" data-float><div class="card-h"><h3>Add a player</h3></div>
-          <div class="addrow"><input type="text" id="add-player" list="dl-players" placeholder="Type a name, like Puka Nacua" autocomplete="off"><button class="btn primary" id="add-btn">Add</button></div>
-          <p class="note" id="roster-count" style="margin:8px 0 0"></p></div>
+        <div class="card" data-float><div class="card-h"><h2>Roster strength</h2></div><div class="strength" id="strength"></div></div>
         <div class="card" id="opp-card" data-float></div>
       </div>
       <div class="stack">
@@ -103,7 +100,7 @@
         <div class="as-chips" id="as-chips"></div>
       </div>
     <div class="tablebox"><table id="rank-table" style="min-width:1110px">
-      <thead><tr><th class="r" data-sort data-first="asc">#</th><th data-sort data-first="asc">Player</th><th data-sort data-first="asc">Pos</th><th class="r" data-sort>Wk <span class="wk-num">9</span></th><th class="r" data-sort title="Projected points per game for the rest of the season">Pts/G</th><th class="r" data-sort data-first="asc" title="FantasyPros expert consensus rank at his position for the rest of the season">Experts</th><th class="r" data-sort title="Last 3 games compared with his season average">Trend</th><th class="r" data-sort title="Share of his team's targets">Tgt share</th><th class="r" data-sort title="Share of his team's offensive snaps">Snap %</th><th class="r" data-sort title="Carries plus targets per game">Opp/G</th><th data-sort data-first="asc">League team</th></tr></thead>
+      <thead><tr><th class="r" data-sort data-first="asc">#</th><th data-sort data-first="asc">Player</th><th data-sort data-first="asc">Pos</th><th class="r" data-sort>Wk <span class="wk-num">9</span></th><th class="r" data-sort title="Projected points per game for the rest of the season">Pts/G</th><th class="r" data-sort data-first="asc" title="Expert consensus rank at his position, rest of season">Experts</th><th class="r" data-sort title="Last 3 games compared with his season average">Trend</th><th class="r" data-sort title="Share of his team's targets">Tgt share</th><th class="r" data-sort title="Share of his team's offensive snaps">Snap %</th><th class="r" data-sort title="Carries plus targets per game">Opp/G</th><th data-sort data-first="asc">League team</th></tr></thead>
       <tbody id="rank-body"></tbody></table></div>
       <div id="rank-more" class="rank-more"></div>
     </div>
@@ -113,8 +110,8 @@
 
   <!-- TRADES -->
   <section class="view" id="v-trade" hidden>
-    <div class="hero"><div><div class="kicker" id="trade-kicker"></div><h1>Trades</h1><p id="tr-intro"></p></div>
-      <div class="seg pl-seg" id="tr-seg" aria-label="Trade views"><button data-trv="build" aria-pressed="true">Trade builder</button><button data-trv="ideas" aria-pressed="false">Trade ideas<span class="tr-n" id="tr-n"></span></button></div></div>
+    <div class="hero"><div><div class="kicker" id="trade-kicker"></div><h1>Trades</h1><p id="tr-intro"></p></div></div>
+    <div class="tr-tabs" id="tr-seg" role="group" aria-label="Trade views"><button type="button" data-trv="build" aria-pressed="true">Trade builder</button><button type="button" data-trv="ideas" aria-pressed="false">Trade ideas<span class="tr-n" id="tr-n"></span></button></div>
     <div class="tr-sec" id="tr-build">
       <div class="grid2 grid-trade">
         <div class="stack">
@@ -140,6 +137,11 @@
       </div>
     </div>
     <div class="tr-sec" id="tr-ideas" hidden>
+      <div class="tw" id="tw">
+        <form class="tw-form" id="tw-form" autocomplete="off"><input type="text" id="tw-in" maxlength="200" enterkeyhint="go" placeholder="Need an RB for the playoffs, can spare a WR" aria-label="Tell us what you want from a trade"><button type="submit" class="tw-go" id="tw-go" aria-label="Find trades that fit"><svg viewBox="0 0 20 20" width="16" height="16" aria-hidden="true"><path d="M4 10h11M11 5.5 15.5 10 11 14.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button></form>
+        <div class="tw-row" id="tw-row"></div>
+        <p class="tw-msg tw-err" id="tw-err" role="status" hidden></p>
+      </div>
       <div class="toolbar tr-bar"><span class="note" id="sug-note"></span><button class="btn" id="refresh-trades">New ideas</button></div>
       <div class="grid3" id="suggestions"></div>
     </div>
@@ -148,7 +150,7 @@
   <!-- HUB -->
   <section class="view" id="v-hub" hidden>
     <div class="hero"><div><div class="kicker" id="hub-kicker"></div><h1>League Hub</h1></div>
-      <div class="toolbar"><a class="btn primary" href="#league" id="lg-settings-btn">League settings</a><button class="btn" id="load-sample">Load sample league</button><button class="btn ghost" id="clear-league">Clear other rosters</button></div></div>
+      <div class="toolbar"><a class="btn primary" href="#league" id="lg-settings-btn">League settings</a><button class="btn ghost" id="clear-league">Clear other rosters</button></div></div>
     <div class="card" id="import-card"></div>
     <div class="card lg-card" id="league-list"></div>
     <div class="grid2 even">
@@ -157,7 +159,7 @@
         <div class="card" data-float><div class="card-h"><h2>Trade log</h2></div><div id="trade-log"></div></div>
       </div>
       <div class="stack">
-        <div class="card"><div class="card-h"><h2>Power rankings</h2><span class="note">Roster strength and points scored</span></div><div id="power"></div></div>
+        <div class="card"><div class="card-h"><h2>Power rankings</h2></div><div id="power"></div></div>
         <div class="card" data-float><div class="card-h"><h2>What your scoring rewards</h2></div><ul class="dna" id="dna-list"></ul></div>
       </div>
     </div>
@@ -165,12 +167,12 @@
 
   <!-- SEASON -->
   <section class="view" id="v-season" hidden>
-    <div class="hero"><div><div class="kicker" id="season-kicker">Season simulator</div><h1>Season Sim</h1><p>Playoff and title odds from 2,000 simulated seasons. <a class="how" href="#help-sim">How this works</a></p></div></div>
+    <div class="hero"><div><div class="kicker" id="season-kicker">Season simulator</div><h1>Season Sim</h1><p><a class="how" href="#help-sim">How it works</a></p></div></div>
     <div id="sim-hero"></div>
     <div class="card" id="sim-race"></div>
     <div class="grid2 grid-season">
       <div class="card" id="sim-need"></div>
-      <div class="stack"><div class="card road-card"><div class="card-h"><h2>Your road</h2><span class="note">Win odds each week</span></div><div id="road"></div></div><div class="card" id="tiebreak"></div></div>
+      <div class="stack"><div class="card road-card"><div class="card-h"><h2>Your road</h2></div><div id="road"></div></div><div class="card" id="tiebreak"></div></div>
     </div>
   </section>
 
@@ -186,11 +188,11 @@
     <div class="auth-wrap">
       <aside class="auth-brand" aria-label="What you get with TradeMetric">
         <div class="auth-brand-top">
-          <div class="auth-brand-logo"><img src="/logo-tm.png?v=2" width="398" height="160" alt=""><b>Trade<span>Metric</span></b></div>
+          <div class="auth-brand-logo"><img src="/logo-tm.png?v=3" width="398" height="160" alt=""><b>Trade<span>Metric</span></b></div>
           <span class="auth-beta">Free during the beta</span>
         </div>
         <h2>Win the trade.<br>Win the league.</h2>
-        <p class="auth-brand-lede">Every trade, ranking and lineup call, scored on your league's exact rules.</p>
+        
         <div class="auth-demo" aria-hidden="true">
           <div class="auth-demo-h"><span>Trade Score</span><span class="auth-demo-tag">Example</span></div>
           <div class="auth-demo-b">
@@ -218,19 +220,18 @@
 
   <section class="view" id="v-welcome" hidden>
     <div class="wl">
-      <div class="wl-hero"><div class="kicker">Welcome to TradeMetric</div><h1>Bring in your league</h1><p>TradeMetric scores every player, lineup and trade with your league's exact rules. Connect your league to start; it takes about a minute.</p></div>
+      <div class="wl-hero"><div class="kicker">Welcome to TradeMetric</div><h1>Bring in your league</h1><p>Takes about a minute.</p></div>
       <div class="card" id="wl-import"></div>
       <div class="wl-alt">
-        <div class="card wl-opt"><h3>Upload a screenshot</h3><p class="note">Works with any app. The AI reads your roster and you check every player before saving.</p><label class="btn primary" for="wl-shot">Choose a screenshot</label><input type="file" id="wl-shot" accept="image/*" hidden></div>
-        <div class="card wl-opt"><h3>Build it by hand</h3><p class="note">Start with empty teams and add players by name.</p><div class="addrow"><select id="wl-teams" aria-label="Number of teams"><option value="8">8 teams</option><option value="10">10 teams</option><option value="12" selected>12 teams</option><option value="14">14 teams</option></select><button class="btn" id="wl-hand">Start</button></div></div>
+        <div class="card wl-opt"><h3>Upload a screenshot</h3><p class="note">Works with any app.</p><label class="btn primary" for="wl-shot">Choose a screenshot</label><input type="file" id="wl-shot" accept="image/*" hidden></div>
+        <div class="card wl-opt"><h3>Build it by hand</h3><div class="addrow"><select id="wl-teams" aria-label="Number of teams"><option value="8">8 teams</option><option value="10">10 teams</option><option value="12" selected>12 teams</option><option value="14">14 teams</option></select><button class="btn" id="wl-hand">Start</button></div></div>
       </div>
-      <button class="btn ghost wl-skip" id="wl-skip">Skip for now and explore a sample league</button>
     </div>
   </section>
 
   <!-- DRAFT -->
   <section class="view" id="v-draft" hidden>
-    <div class="hero"><div><div class="kicker" id="draft-kicker">Draft tools</div><h1>Draft</h1><p id="draft-intro">Cheat sheets, mock drafts and a live draft assistant, all valued for your league's scoring and roster.</p></div>
+    <div class="hero"><div><div class="kicker" id="draft-kicker">Draft tools</div><h1>Draft</h1><p id="draft-intro" hidden></p></div>
       <div class="seg" id="dr-seg" aria-label="Draft tools"><button data-dr="sheet" aria-pressed="true">Cheat sheet</button><button data-dr="mock" aria-pressed="false">Mock draft</button><button data-dr="live" aria-pressed="false">Live draft</button></div></div>
     <div id="draft-body"></div>
   </section>
@@ -242,8 +243,10 @@
       <details class="faq-i" id="faq-team"><summary>My Team and your lineup</summary><div class="faq-b"><p>Your lineup is the highest-projected group of players that fits your league's roster slots. If you imported from Sleeper or ESPN, it shows the lineup you actually set there.</p>
 <p><b>Injured reserve:</b> if your league has IR slots, an <b>Injured reserve</b> card appears under Bench whenever someone is on IR or qualifies for it. It shows who's on IR as synced from Sleeper or ESPN; you make the actual moves there. Players who qualify get an <b>IR eligible</b> tag (Out or IR on ESPN; whatever your Sleeper league allows). A player still on IR after his designation clears is flagged <b>Healthy again</b>, because most apps block adds and trades until you activate him. IR players don't count against your roster limit, here or in trade grades.</p>
 <p>Each projection starts from his points per game this season, blended with preseason expectations early in the year. It is then adjusted for this week's opponent, his team's expected points from the betting line, his injury status and the factors listed under Player values.</p>
-<p>Roster strength compares your starters at each position with the league average. Weakest spot is the position furthest below it.</p></div></details>
-      <details class="faq-i" id="faq-startsit"><summary>Start or sit</summary><div class="faq-b"><p>Your lineup sits under the board, starters and bench. Drag any two or three players onto the board (or tap them) and it tells you who to start and who to sit, with each one's projection, matchup, range and risk. Drag a player back to your lineup, or hit the ×, to take him off. On a phone, press and hold a player for a moment, then drag. It opens on the closest call in your lineup: the starter whose projection is nearest to a bench player who could replace him. You can also type in anyone on your team, or switch to free agents.</p>
+<p>Roster strength compares your starters at each position with the league average. Weakest spot is the position furthest below it, counting only QB, RB, WR and TE (never kicker or defense).</p>
+<p><b>Matchup:</b> the matchup card shows your first three lineup slots against your opponent's. Tap <b>See all</b> to open every position.</p>
+<p><b>Lineup alerts</b> flag only obvious problems in the lineup you set in Sleeper or ESPN: an empty starting slot, a starter who is on bye, out, suspended, or on IR or the PUP list, or a bench player who fits the slot and is projected at least 5 points more and about double the starter (5 against 12, say). Close calls are never flagged. You'll see a slim bar at the top of My Team, a red mark on that lineup row and a row in the bell. Make the change in Sleeper or ESPN; the alert goes away once that starter's game kicks off.</p></div></details>
+      <details class="faq-i" id="faq-startsit"><summary>Start or sit</summary><div class="faq-b"><p>Your lineup sits under the board, starters and bench. Tap any two or three players to put them on the board and it tells you who to start and who to sit, with each one's projection, matchup, range and risk. Tap a player again, or hit the ×, to take him off. If the board is already full, tap a new player and the board players he could replace light up; tap the one to swap out, or tap him again to cancel. Players on IR are listed but can't be added until you activate them. The board starts empty each time you open the site, so nothing is on it until you pick. You can also type in anyone on your team, or switch to free agents.</p>
 <p><b>Floor and ceiling</b> come from how much his scoring has swung week to week. <b>Clear call</b> means a gap of 3 or more points, <b>Lean</b> 1 to 3, and <b>Coin flip</b> under 1.</p></div></details>
       <details class="faq-i" id="faq-values"><summary>Player values, experts and risk</summary><div class="faq-b"><p>A player's value is the points he is projected to score from here on, compared with the best player you could get off waivers at his position. Current production counts most.</p><p><b>This week's projection</b> is 90% ESPN's and Sleeper's own projections, averaged and scored with your league's settings, and 10% TradeMetric's model. The platforms update theirs through the week as injury news and depth charts change, so the site checks them every 5 minutes. If both platforms leave a player out, they're projecting him for zero, usually because he's out. Each player's card shows all three numbers.</p>
 <p>The <b>Experts</b> rank is the FantasyPros consensus for the rest of the season. It makes up 40% of rest-of-season values, so a proven player off to a slow start is not written off after one bad month.</p>
@@ -258,7 +261,8 @@
 <p>The suggested bid is a share of your season budget. It rises with his value to you and to the league, rises when other teams need his position and when he is moving into a bigger role, and falls as fewer weeks are left. In leagues that use waiver order, it suggests whether he is worth a high claim instead.</p></div></details>
       <details class="faq-i" id="faq-tradevalues"><summary>Trade values</summary><div class="faq-b"><p>Each player gets a 0 to 100 score: half from trade market values (FantasyCalc, KeepTradeCut and FantasyPros) and half from TradeMetric's rest-of-season projection for your scoring. Stars count for more than the sum of lesser players, so two 30s rarely get you a 60.</p>
 <p>Tiers group players with similar scores at each position. In keeper and dynasty leagues, long-term value is blended in.</p></div></details>
-      <details class="faq-i" id="faq-trades"><summary>Trade suggestions and grades</summary><div class="faq-b"><p>TradeMetric looks at every deal from one-for-one up to three-for-two with each team, then keeps the ones that help you and that the other manager has a reason to accept: fair market value, a better lineup for them, or filling a need.</p><p>Find them under <b>Trade ideas</b> at the top of the Trades tab. <b>Open in builder</b> moves a deal to the <b>Trade builder</b> to grade or change.</p>
+      <details class="faq-i" id="faq-trades"><summary>Trade suggestions and grades</summary><div class="faq-b"><p>TradeMetric looks at every deal from one-for-one up to three-for-two with each team, then keeps the ones that help you and that the other manager has a reason to accept: fair market value, a better lineup for them, or filling a need.</p><p><b>Injured players.</b> Players who are out, on injured reserve, on the PUP list or suspended only count from the week they're expected back. A player with no return date, or a season-ending injury, never makes your lineup in the grade, the week-by-week lineup chart or the Season Sim. A player you get while he's on IR goes in an open IR slot (or on your bench if IR is full) until he's back.</p><p>Find them on the <b>Trade ideas</b> tab at the top of Trades; the number on the tab is how many there are. They only live there, not on My Team. <b>Open in builder</b> moves a deal to the <b>Trade builder</b> to grade or change.</p>
+<p><b>Tell us what you want.</b> The box at the top of Trade ideas takes a plain-English request, like "Need an RB for the playoffs, can spare a WR" or "Get younger", or tap one of the examples. The AI reads it into a few preferences (positions you want, positions you can give, players to keep or move, and whether you lean toward winning now or the future) and never writes the trades itself. The ideas still come from the same trade model. Deals that break your request are dropped, the rest are sorted by how well they fit with the normal grade as the tiebreak, and each card says why it fits. It works in redraft, keeper and dynasty leagues: the more you lean toward the future, the more long-term value and age count against points this season. Tap the ✕ on the "Looking for" pill to go back to the normal ideas. Your last request is remembered for each league on this device.</p>
 <p>The shape fits each team's situation. A team with depth to spare gets offered a consolidation, two players for one better starter. A team with injured starters or holes in its lineup gets offered extra bodies. Trades that would force a team to cut a starter are left out.</p>
 <p>Your grade weighs points added each week, your playoff weeks (15 to 17 count extra), and the change in your playoff and title odds, minus injury and stacking risk. What counts most depends on where you stand: contenders care about the playoffs, teams on the bubble about winning now. Once any player in a deal has played this week, the grade counts from next week on, since this week's points can't change hands.</p><p><b>Realistic trades.</b> Every deal is also checked the way a real manager would see it:</p><ul>
 <li><b>Starting lineup, before and after:</b> each team's best starting lineup in points per week over the rest of the season, now and after the trade. Suggestions only show deals where both lineups get better or stay about even.</li>
@@ -273,13 +277,11 @@
 <p><b>Team total</b> is the points his team is expected to score, from the betting line.</p></div></details>
       <details class="faq-i" id="faq-news"><summary>News and practice</summary><div class="faq-b"><p>Stories come from ESPN, CBS, Yahoo, ProFootballTalk, RotoBaller, Pro Football Network, The Athletic and Google News. The same story from different outlets is combined, and the four most useful recent ones are shown. Titles and summaries are written by AI from each story.</p>
 <p>Practice reports show his final practice of each week from the official NFL injury report.</p></div></details>
-      <details class="faq-i" id="faq-bigplays"><summary>News tab and big-play banners</summary><div class="faq-b"><p>The News tab covers every league you've saved at once. Each item is tagged with the leagues it touches, and every card goes somewhere when you tap it: plays and injuries open the player card, stories and videos open on the site that published them, results open the matchup. Cards show what a player has actually scored. When a player is going off, the card says how far over his projection he's scored.</p><p><b>Feed</b> is everything in one timeline: everything about your players (big plays, status changes, final results, #1 and #2 finishes at a position, the latest stories), plus the league news that moves fantasy value (trades, signings, releases, season-ending injuries and new starters for fantasy-relevant players, each tagged with who has him in your league: you, another team, or nobody, so you can grab him off waivers). Any trade of a top-500 fantasy player gets its own Trade card showing where he went, with a story about that trade when there's a good one; if there isn't, the card still shows, without the story. Story titles always lead with the player the card is about. When several outlets run basically the same story, you see it once. Stories from subscriber-only sites (The Athletic, ESPN+ and newspapers with paywalls) don't link out, since you couldn't read them anyway: the card's title and bullet points spell out the news instead, and tapping it opens the player card. Only the important ones make it in (trades, signings and releases, real injury news like being ruled out or going on IR, and new starters). When a free outlet runs the same story, you get the free one. Every card about your team starts with an orange dot; league news starts with a grey ring. The <b>Yours</b> and <b>League</b> buttons turn each half on or off. The time is in the top right corner of each card.</p><p>The tabs, the filter and the notification gear sit in a column on the left (above the feed on a phone). On Feed, the <b>Yours</b> and <b>League</b> buttons there switch each kind of news off and on, so you can read only league news or only your own. One of them always stays on, and your choice is remembered on this device.</p><p>Stories about your players come from ESPN, CBS Sports, Yahoo, ProFootballTalk, The Athletic, Pro Football Network, NFL Trade Rumors and a news search across dozens of other sites, plus team and NFL videos. About 70% is injury news and about 30% is role news: snaps, targets, depth chart and workload.</p><p><b>Injuries</b> follows every hurt player on your rosters, starters and bench, in every league: his status, ESPN's latest note and the newest stories about him. Status changes (hurt, upgraded, downgraded, cleared) land at the top, and a new injury or downgrade to a starter pops a banner too. Injury opportunities shows who picks up the carries and targets while a starter is out, how much it's worth per game, and whether he's yours, a free agent or on another team.</p><p>A banner pops up, wherever you are on the site, when one of your starters does something worth texting a friend about: a run of 30+ yards, a catch of 40+, a second (or third) touchdown, a first touchdown of 20+ yards or worth 12+ points, or a game of 28+ points or 2.2 times his projection. It also pops up when a late score flips your matchup from losing to winning, when your week is clinched (you're 99%+ to win and nothing left on their side can catch you), and when an opponent's starter is ruled out mid-game. The banner shows big for a few seconds, then shrinks to a chip in the corner for 5 minutes. Tap either to jump to it in News.</p><p>Once every game of the week is final, Monday night included, any player of yours who outscored everyone at his position (in your league's scoring) gets a special orange banner. From the moment the week ends on Monday night until the very start of Thursday (your time), it stays pinned to the top of News and as a chip in the corner of every page; close the chip and it stays pinned in News only. On Thursday it moves into the timeline. If he was the top scorer in the whole NFL, it says so. A #2 finish at QB, RB, WR or TE gets a silver card in the timeline: no banner, but it stands out.</p><p>Clips open on ESPN or YouTube in a new tab. When a clip shows one of your players' big plays, it's attached to that play. The Clips filter shows every clip of your players, with the matched ones linked back to their play.</p><p>Turn banners on or off for each league in Account, under Leagues. The News tab always shows every league. Banners show while the site is open in a tab.</p></div></details>
-      <details class="faq-i" id="faq-draft"><summary>Draft tools</summary><div class="faq-b"><p>Draft values use value over a replacement-level starter for your league's scoring and roster. During the season they are rest-of-season values; next summer they switch to full-season projections.</p>
-<p><b>Mock draft:</b> computer drafters pick by value and roster need, with some randomness. <b>Live draft:</b> keep it open during your real draft and tap each pick as it happens. Best picks favor open starting spots and warn when a player probably won't last until your next pick.</p></div></details>
+      <details class="faq-i" id="faq-bigplays"><summary>News tab and big-play banners</summary><div class="faq-b"><p>The News tab covers every league you've saved at once. Each item is tagged with the leagues it touches, and every card goes somewhere when you tap it: plays and injuries open the player card, stories and videos open on the site that published them, results open the matchup. Cards show what a player has actually scored. When a player is going off, the card says how far over his projection he's scored.</p><p><b>Feed</b> is everything in one timeline: everything about your players (big plays, status changes, final results, #1 and #2 finishes at a position, the latest stories), plus the league news that moves fantasy value (trades, signings, releases, season-ending injuries and new starters for fantasy-relevant players, each tagged with who has him in your league: you, another team, or nobody, so you can grab him off waivers). Any trade of a top-500 fantasy player gets its own Trade card showing where he went. Every team change is checked first: he has to show up on the new team in two nightly data updates in a row, both teams have to be real NFL teams (old codes like OAK or JAC count as the same team), and he has to be on the new team right now. A card only says <b>traded</b> when a story names him, says he was traded, dealt or acquired, isn't a rumour (could, interest in, potential, talks) and is dated on or after the move; otherwise it says he <b>changed teams</b>. Anything that fails a check doesn't show anywhere: no card, banner, chip or bell row. Story titles always lead with the player the card is about. When several outlets run basically the same story, you see it once. Stories from subscriber-only sites (The Athletic, ESPN+ and newspapers with paywalls) don't link out, since you couldn't read them anyway: the card's title and bullet points spell out the news instead, and tapping it opens the player card. Only the important ones make it in (trades, signings and releases, real injury news like being ruled out or going on IR, and new starters). When a free outlet runs the same story, you get the free one. Every card about your team starts with an orange dot; league news starts with a grey ring. The <b>Yours</b> and <b>League</b> buttons turn each half on or off. The time is in the top right corner of each card.</p><p>The tabs, the filter and the notification gear sit in a column on the left (above the feed on a phone). On Feed, the <b>Yours</b> and <b>League</b> buttons there switch each kind of news off and on, so you can read only league news or only your own. One of them always stays on, and your choice is remembered on this device.</p><p>Stories about your players come from ESPN, CBS Sports, Yahoo, ProFootballTalk, The Athletic, Pro Football Network, NFL Trade Rumors and a news search across dozens of other sites, plus team and NFL videos. About 70% is injury news and about 30% is role news: snaps, targets, depth chart and workload.</p><p><b>Injuries</b> follows every hurt player on your rosters, starters and bench, in every league: his status, ESPN's latest note and the newest stories about him. Status changes (hurt, upgraded, downgraded, cleared) land at the top, and a new injury or downgrade to a starter pops a banner too. Injury opportunities shows who picks up the carries and targets while a starter is out, how much it's worth per game, and whether he's yours, a free agent or on another team. Only backups projected for 7 or more points a game with the extra work are listed; an injured player with none at that level is left out. A backup on another team in your league has a <b>Trade target</b> tag: tap it to open the trade builder with him in You get. Tap his name for his player card.</p><p>A banner pops up, wherever you are on the site, when one of your starters does something worth texting a friend about: a run of 30+ yards, a catch of 40+, a second (or third) touchdown, a first touchdown of 20+ yards or worth 12+ points, or a game of 28+ points or 2.2 times his projection. It also pops up when a late score flips your matchup from losing to winning, when your week is clinched (you're 99%+ to win and nothing left on their side can catch you), and when an opponent's starter is ruled out mid-game. The banner shows big for a few seconds, then shrinks to a chip in the corner for 5 minutes. Tap either to jump to it in News.</p><p>Once every game of the week is final, Monday night included, any player of yours who outscored everyone at his position (in your league's scoring) gets a special orange banner. From the moment the week ends on Monday night until the very start of Thursday (your time), it stays pinned to the top of News and as a chip in the corner of every page; close the chip and it stays pinned in News only. On Thursday it moves into the timeline. If he was the top scorer in the whole NFL, it says so. A #2 finish at QB, RB, WR or TE gets a silver card in the timeline: no banner, but it stands out.</p><p>Clips open on ESPN or YouTube in a new tab. When a clip shows one of your players' big plays, it's attached to that play. The Clips filter shows every clip of your players, with the matched ones linked back to their play.</p><p>Turn banners on or off for each league in Account, under Leagues. The News tab always shows every league. Banners show while the site is open in a tab.</p></div></details>
       <details class="faq-i" id="faq-league"><summary>League type, waivers and QB value</summary><div class="faq-b"><p><b>Keeper and dynasty</b> leagues blend in long-term value (age, draft year and DynastyProcess market values) for trades, trade values and the draft. Redraft leagues count this season only.</p>
 <p><b>Waiver budget</b> sets the dollar amounts for suggested bids.</p>
 <p><b>Quarterback value</b> depends on league size. In one-QB leagues quarterbacks are easy to replace, more so in small leagues, so their trade value is scaled down: about a third in 8-team leagues, half in 12-team leagues and nearly full value in very large ones. A standout still keeps a big edge because he beats the best waiver QB by a lot. Superflex and 2QB leagues use full value.</p></div></details>
-      <details class="faq-i" id="faq-alerts"><summary>Alerts</summary><div class="faq-b"><p>The bell flags starters who are out, doubtful, questionable or on bye, sell-high windows on your players, and big pickups when a starter gets hurt. Alerts show inside the site.</p></div></details>
+      <details class="faq-i" id="faq-alerts"><summary>Alerts</summary><div class="faq-b"><p>The bell flags lineup problems (an empty slot, a starter who can't play, or an obvious bench upgrade; see My Team), starters who are questionable or doubtful, sell-high windows on your players, and big pickups when a starter gets hurt. Alerts show inside the site.</p><p>Opening the bell marks everything in it as seen. A seen alert clears 3 days later; one you never opened clears 7 days after it showed up. This is saved to your account, so opening the bell on one device counts on all of them.</p></div></details>
       <details class="faq-i" id="faq-data"><summary>Where the data comes from</summary><div class="faq-b"><p>Stats, schedules, betting lines, injury reports, depth charts and snap counts come from nflverse. Expert rankings (weekly and rest of season), roster rates and dynasty values come from FantasyPros via DynastyProcess. Market values come from FantasyCalc and KeepTradeCut. Every 5 minutes the site also pulls live: ESPN and Sleeper weekly projections, injury designations and ESPN injury notes (including practice participation), betting lines (DraftKings, via ESPN) until kickoff, FantasyCalc trade values and player news. During games, scores and stats update about every 2 minutes. Season stats, snap counts, expert rankings and KeepTradeCut values refresh each morning and again after each game day.</p></div></details>
     </div>
   </section>
@@ -318,7 +320,7 @@
     <div class="card"><div class="card-h"><h2>Scoring</h2></div><div id="scoring-form"></div></div>
   </section>
 </main>
-<footer><div class="wrap" id="site-foot"><a href="#help" class="foot-help">How TradeMetric works</a> · <a href="/privacy" class="foot-help">Privacy</a> · Stats, schedules, betting lines and injury reports from nflverse. Expert consensus (weekly and rest-of-season) and dynasty values from FantasyPros via DynastyProcess. Projections blend preseason expectations with 2026 production. Updated every morning.</div></footer>
+<footer><div class="wrap" id="site-foot"><a href="#help" class="foot-help">How TradeMetric works</a> · <a href="/privacy" class="foot-help">Privacy</a></div></footer>
 <datalist id="dl-players"></datalist>
 <div class="scrim" id="scrim" hidden><div class="modal" id="modal" role="dialog" aria-modal="true" aria-label="Player card"></div></div>
 <div class="toast" id="toast" hidden></div>
@@ -347,7 +349,7 @@
 <script>
 /* Load the stats snapshot, then start the app */
 fetch('data/nfl.json',{cache:'no-cache'}).then(r=>r.json()).then(d=>{
-  window.NFL_DATA=d;const n=document.createElement('script');n.src='js/news.js?v=14';n.onload=n.onerror=()=>{const o=document.createElement('script');o.src='js/offseason.js?v=6';o.onload=o.onerror=()=>{const f=document.createElement('script');f.src='js/offnews.js?v=4';f.onload=f.onerror=()=>{const s=document.createElement('script');s.src='js/app.js?v=14';s.onload=()=>{const m=document.createElement('script');m.src='js/mobile.js?v=3';document.body.appendChild(m)};document.body.appendChild(s)};document.body.appendChild(f)};document.body.appendChild(o)};document.body.appendChild(n);
+  window.NFL_DATA=d;const n=document.createElement('script');n.src='js/news.js?v=29';n.onload=n.onerror=()=>{const o=document.createElement('script');o.src='js/offseason.js?v=7';o.onload=o.onerror=()=>{const f=document.createElement('script');f.src='js/offnews.js?v=5';f.onload=f.onerror=()=>{const s=document.createElement('script');s.src='js/app.js?v=39';s.onload=()=>{const m=document.createElement('script');m.src='js/mobile.js?v=5';document.body.appendChild(m);const q=document.createElement('script');q.src='js/polish.js?v=5';document.body.appendChild(q)};document.body.appendChild(s)};document.body.appendChild(f)};document.body.appendChild(o)};document.body.appendChild(n);
 }).catch(()=>{document.body.insertAdjacentHTML('afterbegin','<p style="padding:20px;font-family:sans-serif">Could not load player data. Refresh to try again.</p>')});
 </script>
 </body>

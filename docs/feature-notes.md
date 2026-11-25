@@ -63,3 +63,13 @@ Configure Google Search for www.trademetric.app so the site shows up properly in
 
 ### News tab moods
 - **Gameday (live):** big plays first. **Day-after:** results first. **Midweek:** injuries, waiver and trade signals first.
+
+## Motion polish ported from 21st.dev (added 2026-11-16)
+All of it lives in `js/polish.js` (loaded last, never changes app.js logic) with styles at the end of `css/styles.css`. Everything respects the "reduce motion" setting.
+- **Round 1:** sliding highlight under segmented controls and the Trade builder / Trade ideas tabs; table rows glide to their new spot on re-sort; key numbers roll to their new value; shimmer loaders; weekly points chart in the player card; alerts grouped by day. Animated theme switch (circle reveal from the sun/moon button, phone menu too) is in app.js.
+- **Round 2:** alerts popup items and News cards arrive one after another (Magic UI "Animated List", only when the popup opens or the tab is first shown, not on every refresh); the Live dot ripples (iconiq "Status Dot"); confetti bursts out of a "clinched" banner (Magic UI "Confetti", own small canvas, no library); the toast gets a green check or amber "!" icon and slides up (cnippet "Toast").
+- Not used: the Colorful-Pricing section (owner decided to keep the current pricing grid). A win-chance ring on the matchup (Magic UI "Animated Circular Progress Bar") shipped briefly and was removed the same day at the owner's request.
+
+## Scoreboard touches (added 2026-11-16, live on main)
+Owner tried two bigger restyles (a red palette, then a fully "turned up" orange version) and kept only three pieces, then put Season Sim and the My Team matchup back to normal the same day; only the trade chart change remains. Everything else stays exactly as on main, including the My Team tiles and colors.
+- **Trade week chart:** playoffs shown as an orange band with an orange top edge and label; bold slanted bar values and week labels.

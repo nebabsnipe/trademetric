@@ -5,6 +5,8 @@
 // GET /api/news?name=Wan'Dale%20Robinson&team=TEN&pos=WR
 // GET /api/news?probe=1&name=...   -> which sources answered and how many stories matched (no AI)
 
+import { sharedOn, recapsGet, recapsPut, archiveMerge } from './_shared.js';
+
 const API_KEY = process.env.ANTHROPIC_API_KEY || process.env.APIKEY1;
 const MODEL = process.env.NEWS_MODEL || 'claude-haiku-5-5';
 const UA = 'Mozilla/5.0 (compatible; TradeMetric/1.0; +https://www.trademetric.app)';
@@ -190,6 +192,9 @@ const MOVE = [
   ['role', /\b(names? [\w'. -]{2,40} (the |as )?(starting \w+|starter)|named (the )?starter|new starter|will start|to start (at|for|week)|benched|takes over (as|at)|starting (qb|quarterback|job)|demoted|promoted to|depth chart change)\b/i],
 ];
 const RUMOR = /\b(could|might|would|interest(ed)? in|rumou?rs?|potential|candidates?|should|predict|trade targets?|ideas|deadline (buyers|sellers)|what if|mock)\b/i;
+/* trade cards: the story has to say it happened, in so many words */
+const TR_WORD = /\b(traded|dealt|acquired?|acquires|acquiring)\b/i;
+const TR_RUMOR = /\b(could|might|would|may|interest(ed)?\s+in|potential(ly)?|talks?|rumou?rs?|considering|exploring|shopping|candidates?|trade targets?|speculat\w*|eyeing|linked)\b/i;
 function moveOf(t) { for (const [k, re] of MOVE) if (re.test(t || '')) return k; return null; }
 /* Offseason News: the moves that change fantasy value between seasons. Order matters: a coach who retires is a
    coach change, a re-signing is a contract, and a trade story that mentions an injury is still a trade. */
@@ -210,6 +215,71 @@ function offKindOf(t) { for (const [k, re] of OFF_MOVE) if (re.test(t || '')) re
 const TEAM_NICK = { ARI: 'Cardinals', ATL: 'Falcons', BAL: 'Ravens', BUF: 'Bills', CAR: 'Panthers', CHI: 'Bears', CIN: 'Bengals', CLE: 'Browns', DAL: 'Cowboys', DEN: 'Broncos', DET: 'Lions', GB: 'Packers', HOU: 'Texans', IND: 'Colts', JAX: 'Jaguars', KC: 'Chiefs', LV: 'Raiders', LAC: 'Chargers', LAR: 'Rams', MIA: 'Dolphins', MIN: 'Vikings', NE: 'Patriots', NO: 'Saints', NYG: 'Giants', NYJ: 'Jets', PHI: 'Eagles', PIT: 'Steelers', SF: '49ers', SEA: 'Seahawks', TB: 'Buccaneers', TEN: 'Titans', WAS: 'Commanders' };
 /* NFL teams a headline names, in the order it names them */
 function teamsIn(t) { const s = String(t || ''); return Object.entries(TEAM_NICK).map(([k, n]) => [k, s.search(new RegExp('\\b' + n + '\\b', 'i'))]).filter(x => x[1] >= 0).sort((a, b) => a[1] - b[1]).map(x => x[0]); }
+/* A story that is only about a celebration (a backflip, a dance) tells a fantasy manager nothing, so it stays out.
+   Only for stories labeled game, team or news: an injury, ejection or fine that happened on a celebration is real news. */
+const CELEB = /\b(backflip\w*|celebrat(es?|ed|ions?|ing|ory)|(touchdown|td|end zone|sack) dance|dance moves|griddy|somersault\w*|cartwheel\w*)\b/i;
+const celebOnly = (kind, title) => (kind === 'game' || kind === 'team' || kind === 'news') && CELEB.test(title || '');
+/* LGKIND-START  The label for a league story that isn't a trade, an injury or a depth-chart change.
+   This block is kept word for word the same in api/news.js and js/news.js (scripts/test-news-kind.mjs checks it).
+   "move" (Roster move) only when the move happens to the named player, with the move word next to his name in the
+   headline or the first sentence: signed, released, waived, claimed, cut, placed on IR, activated, reinstated, retired,
+   or suspended for a set number of games. A move by someone else in the story, an old suspension, a possible one, or a
+   figure of speech ("retire the celebration", "released a statement") doesn't count. Otherwise: "disc" (ejected, fined,
+   suspension under review), "game" (what he did in a game), "team" (quotes, coach and team-outlook stories), or "news". */
+function lgKind(title, desc, names, at) {
+  const low = s => String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+  const nz = s => (' ' + low(s) + ' ').replace(/['’`]/g, '').replace(/\b([a-z])\.(?=[\sa-z]|$)/g, '$1').replace(/\b(jr|sr|st|vs|no)\./g, '$1')
+    .replace(/[.!?;:]+(?=\s|$)|\s[-–—]+\s|[–—]/g, ' | ').replace(/,/g, ' , ').replace(/[^a-z0-9|,]+/g, ' ').replace(/\s+/g, ' ').trim();
+  const d = String(desc || ''), fm = /^[\s\S]{20,}?[a-z0-9)"’'%]{2}[.!?]["’']?(?=\s+[A-Z"“]|\s*$)/.exec(d), first = (fm ? fm[0] : d).slice(0, 320);
+  const S = nz(title) + ' | ' + nz(first);
+  const yr = new Date(at && !isNaN(Date.parse(at)) ? at : Date.now()).getFullYear();
+  const nm = [];
+  (names || []).forEach(n => { const w = nz(n).replace(/[^a-z0-9 ]/g, '').replace(/ (jr|sr|ii|iii|iv)$/, '').trim().split(' ').filter(Boolean);
+    if (w.length) { nm.push(w.join(' ')); if (w.length > 1 && w[w.length - 1].length > 2) nm.push(w[w.length - 1]); } });
+  const NM = nm.length ? '(?:' + nm.join('|') + ')' : '[a-z]+', SUF = '(?: (?:jr|sr|ii|iii|iv))?';
+  const AUX = '(?:(?:has|had|have|was|were|is|are|will|be|been|being|gets|got|to|officially|reportedly|now|also|just|expected|set) ){0,4}';
+  const FILL = '(?:(?:the|veteran|former|pro|bowl|all|star|rookie|backup|starting|starter|wr|rb|qb|te|k|fb|wide|receiver|wideout|running|back|quarterback|tight|end|kicker|free|agent|their|his|standout|injured|struggling|embattled|longtime|second|third|fourth|year|[a-z0-9]+ time|ex [a-z0-9]+|cardinals|falcons|ravens|bills|panthers|bears|bengals|browns|cowboys|broncos|lions|packers|texans|colts|jaguars|chiefs|raiders|chargers|rams|dolphins|vikings|patriots|saints|giants|jets|eagles|steelers|49ers|niners|seahawks|buccaneers|bucs|titans|commanders) ){0,5}';
+  const NUM = '(?:\\d+|one|two|three|four|five|six|seven|eight|nine|ten|multiple|several)';
+  const LEN = '(?:' + NUM + ' (?:[a-z]+ )?(?:games?|weeks?)|indefinitely|(?:rest|remainder) of|for the (?:season|year))';
+  const NOBJ = '(?! (?:(?:a|an|his|the|new|this|that|its|their) )?(?:[a-z]+ )?(?:statement|video|apology|footage|photos?|report|details|song|album|book|trailer|schedule|list|chart|rankings?|autographs?|jerseys?|footballs?)\\b)';
+  const SIGNQ = '(?= (?:[a-z0-9]+ ){0,5}?(?:with|by|deal|contract|extension|year|squad|roster|tender|offer)\\b)';
+  const WAS = '(?:was|were|been|being|be|gets|got|is|are) (?:officially |reportedly |being |now )?';
+  const plain = [
+    '\\b' + NM + SUF + ' ' + AUX + '(?:(?:re )?sign(?:s|ed|ing)?' + SIGNQ + '|released' + NOBJ + '|waived|claimed(?= (?:off|by)\\b)|cut(?= by\\b)|activated|reinstated|placed on (?:ir|injured reserve|reserve|the [a-z ]{0,24}list)|retir(?:e|es|ed|ing)(?= (?:\\||from|after|at|following|as)\\b|$)|announc(?:es|ed) (?:his )?retirement)',
+    '\\b' + NM + SUF + ' ' + AUX + WAS + '(?:cut|claimed|signed|released' + NOBJ + '|waived)\\b',
+    '\\b(?:(?:re )?sign(?:s|ed|ing)?|releas(?:e|es|ed|ing)|waiv(?:e|es|ed|ing)|cut(?:s|ting)?|claim(?:s|ed|ing)?|activat(?:e|es|ed|ing)|reinstat(?:e|es|ed|ing)|add(?:s|ed|ing)?|part(?:s|ed|ing)? ways with|mov(?:e|es|ed|ing) on from) ' + FILL + NM + '\\b',
+    '\\bplac(?:e|es|ed|ing) ' + FILL + NM + SUF + ' (?:[a-z]+ ){0,2}?on (?:ir|injured reserve|reserve|the )',
+  ];
+  const susp = [
+    '\\b' + NM + SUF + ' ' + AUX + 'suspended (?:[a-z0-9]+ ){0,5}?' + LEN,
+    '\\bsuspend(?:s|ed|ing)? ' + FILL + NM + SUF + ' (?:[a-z0-9]+ ){0,5}?' + LEN,
+    '\\b' + NM + SUF + ' (?:[a-z]+ ){0,5}?' + NUM + ' game (?:suspension|ban)\\b',
+    '\\b' + NUM + ' game (?:suspension|ban) (?:for|to) ' + FILL + NM + '\\b',
+  ];
+  const old = t => /\b(last (season|year|spring|summer|offseason|month)|years? ago|previously|back in)\b/.test(t) || (t.match(/\b20\d\d\b/g) || []).some(y => +y < yr);
+  const unsure = t => /\b(could|may|might|possible|possibly|potential|faces?|facing|risks?|whether|if)\b/.test(t);
+  const hit = (list, bad) => list.some(src => { const re = new RegExp(src, 'g'); let m;
+    while ((m = re.exec(S))) { const a = S.lastIndexOf('|', m.index) + 1, b = S.indexOf('|', m.index + m[0].length), seg = S.slice(a, b < 0 ? S.length : b);
+      if (!bad(seg)) return true; if (!m[0].length) re.lastIndex++; }
+    return false; });
+  if (hit(plain, old) || hit(susp, t => old(t) || unsure(t))) return 'move';
+  const D1 = /\b(ejected|ejection|disqualified|fined|fine of|unsportsmanlike|arrested|charged with|disciplin\w+|league review|under review)\b|\$[\d,.]+k? fine/;
+  const D2 = /\bsuspen(d|ds|ded|sion|sions)\b/;
+  const QUOTE = /\b(says?|said|told|tells|explains?|admits?|address(es|ed)?|reacts?|responds?|insists?|believes?|voices?|confidence|confident|comments?|complain\w*|blasts?|criticiz\w+)\b/;
+  const GAME = /\b(touchdowns?|tds?|yards?|yds|catch(es)?|caught|receptions?|carries|rush(ed|es|ing)|threw|throws?|scor(ed|es|ing)|interceptions?|sacks?|fumbles?|stat line|backflip\w*|celebrat\w+|hurdl\w+|highlights?|wins?|won|loss|lost|loses|beats?|victory|defeat(ed|s)?|overtime|comeback|game-winn\w+|walk-off|blowout|\d{1,2}-\d{1,2})\b/;
+  const TEAM = /\b(says?|said|told|tells|explains?|believes?|thinks?|confident|expects?|admits?|address(es|ed)?|press conference|presser|reporters|coach(es|ing)?|coordinator|gm|general manager|front office|owner|locker room|outlook|plans?|future|comments?|reacts?|responds?|insists?|praises?|defends?|interview|offense)\b/;
+  const tl = low(title), fl = tl + ' ' + low(first);
+  const disc = t => D1.test(t) || (D2.test(t) && !old(nz(t)));
+  if (disc(tl)) return 'disc';
+  if (QUOTE.test(tl)) return 'team';
+  if (GAME.test(tl)) return 'game';
+  if (TEAM.test(tl)) return 'team';
+  if (disc(fl)) return 'disc';
+  if (GAME.test(fl)) return 'game';
+  if (TEAM.test(fl)) return 'team';
+  return 'news';
+}
+/* LGKIND-END */
 function kindOf(x) {
   const t = x.title || '', d = x.desc || '';
   if (FLUFF.test(t)) return null;
@@ -224,15 +294,23 @@ function kindOf(x) {
    reading without clicking through. One Claude call per batch of up to 12 stories, cached per story URL. */
 const RECAPS = new Map();
 async function recapBatch(list) {
-  const body = list.map((x, i) => `[${i}] Player: ${x.n} (${x.pos || '?'}, ${x.t || '?'}) · ${x.outlet || 'unknown outlet'}${x.f === 'trade' ? ' · TRADE' + (x.from && x.to ? ` (${x.from} to ${x.to})` : '') : ''}${x.pay ? ' · SUBSCRIBER-ONLY' : ''}\nHeadline: ${x.title}\nText: ${x.desc || '(headline only)'}`).join('\n\n');
+  const body = list.map((x, i) => `[${i}] Player: ${x.n} (${x.pos || '?'}, ${x.t || '?'}) · ${x.outlet || 'unknown outlet'}${x.f === 'trade' ? ' · TRADE' + (x.from && x.to ? ` (${x.from} to ${x.to})` : '') : ''}${x.pay ? ' · SUBSCRIBER-ONLY' : ''}${x.ctx ? `\nWhat we know about him (recent games newest first, then his situation): ${x.ctx}` : ''}\nHeadline: ${x.title}\nText: ${x.desc || '(headline only)'}`).join('\n\n');
   const prompt = `You write the news feed of a fantasy football app. For each story below, write a recap so a fantasy manager gets the news at face value without opening the article.
 
 - "title": the single biggest takeaway for the named player as a plain statement, under 85 characters. It must start with the player's name (full name, or last name if the full title would run long) and say what is happening to him, even when the original headline is about someone else, a team or a coach (for example "Achane ruled out Sunday with a high ankle sprain; Week 12 return possible" or "Jeanty out-snapped Mitchell 41-22 and got 9 of 11 red-zone touches" or "Pittman traded from the Colts to the Steelers for a 2027 3rd"). When a story is marked as a trade, the title says who he was traded from and to, and the points cover what was sent back and how his role changes. No clickbait, no questions, no outlet names.
-- "points": 1 to 3 short bullet points, each under 95 characters, with the other key facts: numbers, injury details, practice status, timelines, who is affected. The last point may be the fantasy takeaway, but only when it follows directly from the facts given. If the story is only a headline with no text, return just one point or an empty array; never add anything the headline and text do not say.
+- "kind": what the story is for the named player, one of:
+  "move": the news is that THIS player was signed, released, waived, claimed, cut, placed on or activated from a reserve list, reinstated, retired, or suspended for a set number of games. Not when the move happens to a different player in the story, not for a past suspension or release that is only background, not for a possible or pending suspension, and not for a figure of speech (such as retiring a celebration).
+  "discipline": he was ejected, fined, or faces a suspension that is under review or not decided.
+  "game": what he did in a game: a big play, a celebration, a stat line, a win or loss.
+  "team": a coach, quarterback or team-outlook story, quotes, a press conference.
+  "trade", "injury" or "role" (depth chart, snaps, usage) when that is what the story is.
+  "news": none of the above.
+- "fluff": true only when the story is just color with nothing a fantasy manager needs to know: a celebration (a backflip, a dance), a gesture, an outfit, a fan or social-media reaction, and nothing new about his health, role, playing time, discipline, contract or team. An injury, ejection or fine that happened during a celebration is real news, not fluff. Otherwise false.
+- "points": 1 to 3 short bullet points, each under 95 characters, with the other key facts: numbers, injury details, practice status, timelines, who is affected. The last point may be the fantasy takeaway, but only when it follows directly from the facts given. If the story is only a headline, or has very little text, still write 2 or 3 points that describe what is going on, like a beat writer explaining it to a reader: what the headline is saying and WHY it is happening (his role and spot on the depth chart, snap share changes, teammates who are hurt or out, a trade or move, practice status), and what it means for him next (his next opponent and how tough that defense is). Write these as plain explanation, not a stat list. When the headline makes a claim about how he is playing (he is becoming a starter, breaking out, heating up, slumping, losing work), say in words how he has been trending and back it up with numbers that show the progression from earlier games to his latest ones (for example "Ward has found a rhythm: after topping 200 passing yards once in his first five starts, he threw for 304 and 231 with 4 TDs in his last two"). Otherwise use only the one or two numbers that best support a point. Never write that there are no details, that it is headline only, or that information is unavailable. Word each one for that player and story; don't reuse a stock phrase. Never add facts that the headline, the text or what we know about him do not give.
 
 A story marked SUBSCRIBER-ONLY can't be opened by the reader (it's behind a paywall), so its title and points are all they get: put every key fact from the headline and text into them, and give 2 or 3 points whenever the text has that much.
 
-Use only facts in the headline and text. Reply with only a JSON array like [{"i":0,"title":"...","points":["...","..."]}].
+Use only facts in the headline and text. Reply with only a JSON array like [{"i":0,"title":"...","kind":"...","fluff":false,"points":["...","..."]}].
 
 ${body}`;
   const ctl = new AbortController(); const t = setTimeout(() => ctl.abort(), 25000);
@@ -248,17 +326,31 @@ ${body}`;
   } catch (e) { LAST_ERR = String(e && e.message || e).slice(0, 150); return null; } finally { clearTimeout(t); }
 }
 const cleanLine = (s, n) => String(s || '').replace(/\s+/g, ' ').trim().slice(0, n);
+/* v4: recaps also carry the story's kind (the card label), so everything written before is redone once */
+const rk = x => (x.pay ? 'v5p|' : 'v5|') + x.u;   /* v5: plus a fluff flag */
+/* old recaps that said "headline only / no details" instead of describing the story: written again */
+const RC_EMPTY = /\b(headline only|no (supporting |further |additional |other )?(details?|information|text|context)|details? (are |were )?(not |un)available)\b/i;
+const rcBad = v => !v || !v.t || (v.pts || []).some(p => RC_EMPTY.test(p));
+const RC_KIND = { move: 'move', discipline: 'disc', disc: 'disc', game: 'game', team: 'team', news: 'news', trade: 'trade', injury: 'inj', inj: 'inj', role: 'role' };
 async function recapAll(items) {
   const out = {}, todo = [];
-  items.forEach(x => { const c = RECAPS.get((x.pay ? 'v3p|' : 'v2|') + x.u); if (c && Date.now() - c.at < 7 * 864e5) out[x.u] = c.v; else todo.push(x); });
+  items.forEach(x => { const c = RECAPS.get(rk(x)); if (c && Date.now() - c.at < 7 * 864e5 && !rcBad(c.v)) out[x.u] = c.v; else todo.push(x); });
+  /* a story someone else already had recapped: read it from the shared store instead of paying to write it again */
+  if (todo.length && sharedOn()) {
+    const got = await recapsGet(todo.map(rk));
+    for (let i = todo.length - 1; i >= 0; i--) { const v = got[rk(todo[i])]; if (!rcBad(v)) { RECAPS.set(rk(todo[i]), { at: Date.now(), v }); out[todo[i].u] = v; todo.splice(i, 1); } }
+  }
   if (todo.length && API_KEY) {
+    const made = {};
     const chunks = []; for (let i = 0; i < todo.length; i += 12) chunks.push(todo.slice(i, i + 12));
     await Promise.all(chunks.map(async ch => {
       const arr = await recapBatch(ch); if (!arr) return;
       arr.forEach(a => { const x = a && ch[a.i]; if (!x || !a.title) return;
-        const v = { t: cleanLine(a.title, 110), pts: (Array.isArray(a.points) ? a.points : []).map(p => cleanLine(p, 140)).filter(Boolean).slice(0, 3) };
-        RECAPS.set((x.pay ? 'v3p|' : 'v2|') + x.u, { at: Date.now(), v }); out[x.u] = v; });
+        const v = { t: cleanLine(a.title, 110), pts: (Array.isArray(a.points) ? a.points : []).map(p => cleanLine(p, 140)).filter(p => p && !RC_EMPTY.test(p)).slice(0, 3) };
+        const k = RC_KIND[String(a.kind || '').toLowerCase().trim()]; if (k) v.k = k; if (a.fluff === true) v.fluff = 1;
+        RECAPS.set(rk(x), { at: Date.now(), v }); out[x.u] = v; made[rk(x)] = v; });
     }));
+    if (sharedOn()) await recapsPut(made);
     if (RECAPS.size > 3000) [...RECAPS.keys()].slice(0, 1000).forEach(k => RECAPS.delete(k));
   }
   return out;
@@ -284,16 +376,18 @@ export { API_KEY, ESPN_TEAM, collect, getText, parseRSS, parseESPN, norm, simila
 const clip = (s, n) => { s = String(s || ''); if (s.length <= n) return s; const c = s.slice(0, n); const k = Math.max(c.lastIndexOf('. '), c.lastIndexOf(' ')); return c.slice(0, k > n * .6 ? k + 1 : n).trim() + '…'; };
 const cache = new Map();
 
+export { lgKind, recapAll, celebOnly };
+
 export default async function handler(req, res) {
   const q = req.query || {};
   /* recap mode for the News tab: POST {items:[{u,n,pos,t,title,desc,outlet}]} -> {items:{[url]:{t,pts}}} */
   if (req.method === 'POST' && q.recap) {
-    if (!API_KEY) return res.status(200).json({ ai: false, items: {} });
+    if (!API_KEY && !sharedOn()) return res.status(200).json({ ai: false, items: {} });
     const raw = (req.body && Array.isArray(req.body.items)) ? req.body.items : [];
     const items = raw.slice(0, 30).filter(x => x && typeof x.u === 'string' && /^https?:/.test(x.u) && x.title).map(x => ({
       u: x.u.slice(0, 600), n: cleanLine(x.n, 60), pos: cleanLine(x.pos, 4), t: cleanLine(x.t, 4),
       title: cleanLine(x.title, 220), desc: cleanLine(x.desc, 900), outlet: cleanLine(x.outlet, 60),
-      pay: !!x.pay, f: x.f === 'trade' ? 'trade' : '', from: cleanLine(x.from, 4), to: cleanLine(x.to, 4) }));
+      pay: !!x.pay, f: x.f === 'trade' ? 'trade' : '', from: cleanLine(x.from, 4), to: cleanLine(x.to, 4), ctx: cleanLine(x.ctx, 1000) }));
     const v = await recapAll(items);
     return res.status(200).json({ ai: true, items: v, err: Object.keys(v).length < items.length ? LAST_ERR : undefined });
   }
@@ -336,20 +430,27 @@ export default async function handler(req, res) {
     return res.status(200).json(v);
   }
   /* trade mode for the News tab's Feed: the best story about each fantasy-relevant player who just changed teams,
-     so the trade card can carry an article about that trade. No AI. GET /api/news?trades=Name|FROM|TO;...
+     so the trade card can carry an article about that trade. No AI. GET /api/news?trades=Name|FROM|TO|DAY;...
+     A story only counts if it names the player, says traded / dealt / acquired, has no rumour words ("could",
+     "interest in", "potential", "talks"...), and is dated on or after the move (DAY, the day the nightly update first
+     saw him on the new team; the day before also counts, since that run happens the morning after).
      -> {items:{[name]:{title,desc,url,outlet,at,img}}}; a player with no good story is simply left out. */
   if (q.trades) {
     const list = String(q.trades).split(';').map(x => x.split('|')).filter(x => x[0]).slice(0, 12)
-      .map(([n, f, t]) => ({ n: String(n).slice(0, 60), from: String(f || '').toUpperCase().slice(0, 4), to: String(t || '').toUpperCase().slice(0, 4) }));
-    const key = 'trades:' + list.map(x => norm(x.n) + x.to).sort().join(',');
+      .map(([n, f, t, d]) => ({ n: String(n).slice(0, 60), from: String(f || '').toUpperCase().slice(0, 4), to: String(t || '').toUpperCase().slice(0, 4), day: /^\d{4}-\d\d-\d\d$/.test(d || '') ? d : '' }));
+    const key = 'trades:' + list.map(x => norm(x.n) + x.to + x.day).sort().join(',');
     const c = cache.get(key);
     if (c && Date.now() - c.at < 20 * 60e3) { res.setHeader('Cache-Control', 'public, max-age=0, s-maxage=1200'); return res.status(200).json(c.v); }
     const out = {};
     await Promise.all(list.map(async x => {
       try {
         const { items } = await collect(x.n, x.to || x.from, false, false, 'trade', 21);
-        const last = norm(x.n).split(' ').pop();
-        const good = items.filter(i => !RUMOR.test(i.title) && !FLUFF.test(i.title) && (moveOf(i.title) === 'trade' || moveOf((i.desc || '').slice(0, 300)) === 'trade'))
+        const last = norm(x.n).split(' ').pop(), full = norm(x.n), since = x.day ? Date.parse(x.day + 'T00:00:00Z') - 864e5 : 0;
+        const good = items.filter(i => {
+          const t = i.title || '', d = (i.desc || '').slice(0, 400), at = Date.parse(i.at || 0);
+          return !RUMOR.test(t) && !TR_RUMOR.test(t) && !TR_RUMOR.test(d.slice(0, 220)) && !FLUFF.test(t) && TR_WORD.test(t + ' ' + d)
+            && (' ' + norm(t + ' ' + d) + ' ').includes(' ' + full + ' ') && (!since || (at && at >= since));
+        })
           .map(i => ({ i, s: (i.pay ? -3 : 0) + (norm(i.title).includes(last) ? 2 : 0) + (moveOf(i.title) === 'trade' ? 2 : 0) + (i.desc ? 1 : 0) + Date.parse(i.at || 0) / 864e5 / 100 }))
           .sort((a, b) => b.s - a.s);
         const b = good[0] && good[0].i;
@@ -373,12 +474,22 @@ export default async function handler(req, res) {
     const cutoff = Date.now() - 7 * 864e5, out = [];
     for (const i of got.flat().sort((a, b) => (!!a.pay - !!b.pay) || (!!b.desc - !!a.desc) || ((RANK[a.src] ?? 5) - (RANK[b.src] ?? 5)))) {
       if (!i.title || !i.url || (i.at && Date.parse(i.at) < cutoff) || FLUFF.test(i.title) || RUMOR.test(i.title) || (i.pay && !payWorth(i))) continue;
-      const kind = moveOf(i.title) || moveOf(i.desc.slice(0, 260)); if (!kind) continue;
+      /* the same stories get in as before; a story let in by a move word is then labeled by what it really is */
+      let kind = moveOf(i.title) || moveOf(i.desc.slice(0, 260)); if (!kind) continue;
+      if (kind === 'move') kind = lgKind(i.title, i.desc, i.athletes, i.at);
+      if (celebOnly(kind, i.title)) continue;
       if (out.some(o => similar(o.title, i.title, new Set()))) continue;
       out.push({ kind, title: i.title, desc: clip(i.desc, 700), url: i.url, outlet: i.outlet, at: i.at, img: i.img || null, athletes: i.athletes || [], pay: !!i.pay });
     }
     out.sort((a, b) => Date.parse(b.at || 0) - Date.parse(a.at || 0));
-    const v = { updated: new Date().toISOString(), items: out.slice(0, 80) };
+    /* outlets only list their newest stories, so the last week of them is kept in the shared store: everyone gets
+       the same seven days, however recently they first opened the site */
+    let items = out.slice(0, 80);
+    try { items = await archiveMerge('league_news', items, { days: 7, max: 300, same: (a, b) => similar(a.title, b.title, new Set()) }); } catch { }
+    /* stories saved before the labels changed get the new ones too */
+    items.forEach(x => { if (x && x.kind !== 'trade' && x.kind !== 'inj' && x.kind !== 'role') x.kind = lgKind(x.title, x.desc, x.athletes, x.at); });
+    items = items.filter(x => !celebOnly(x.kind, x.title));
+    const v = { updated: new Date().toISOString(), items };
     cache.set('league', { at: Date.now(), v });
     res.setHeader('Cache-Control', 'public, max-age=0, s-maxage=600');
     return res.status(200).json(v);

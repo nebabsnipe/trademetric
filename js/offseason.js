@@ -25,7 +25,7 @@ function tmoOverride(){try{return localStorage.getItem(TMO_MODE_KEY)}catch(e){re
 function tmoMode(){
   const o=tmoOverride();if(o==='off'||o==='in')return o;
   /* No league connected (signed out, or still on the sample league) -> offseason */
-  const hasLeague=typeof USER!=='undefined'&&USER&&typeof S!=='undefined'&&S&&!S.example;
+  const hasLeague=typeof USER!=='undefined'&&USER&&typeof S!=='undefined'&&S&&!S.example&&!S.noLeague;
   return hasLeague?'in':'off';
 }
 function tmoApplyMode(){

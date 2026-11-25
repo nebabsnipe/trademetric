@@ -33,7 +33,7 @@
   const scrim=document.createElement('div');scrim.className='m-sheet-scrim';
   const sheet=document.createElement('div');sheet.className='m-sheet';sheet.setAttribute('role','dialog');sheet.setAttribute('aria-label','More');
   // Offseason mode lists the Pro tools (m-off); in-season lists the league pages (m-in). The css shows the right set.
-  const LINKS=[['recap','Recap','m-off'],['drafttools','Draft Tools','m-off'],['leaguefit','League Fit','m-off'],['season','Season Sim','m-in'],['hub','League','m-in'],['draft','Draft','m-in'],['account','Account',''],['help','How it works','']];
+  const LINKS=[['recap','Recap','m-off'],['drafttools','Draft Tools','m-off'],['leaguefit','League Fit','m-off'],['season','Season Sim','m-in'],['hub','League','m-in'],['account','Account',''],['help','How it works','']];
   sheet.innerHTML=LINKS.map(([t,l,c])=>`<a href="#${t}" data-m="${t}"${c?` class="${c}"`:''}>${svg(IC[t])}${l}${c==='m-off'?`<span class="nav-lock">${svg(IC.lock)}Pro</span>`:''}</a>`).join('')+`<button type="button" data-m="theme">${svg(IC.theme)}Dark mode<small></small></button>`;
   document.body.append(scrim,sheet);
   const isDark=()=>{const t=document.documentElement.getAttribute('data-theme');return t?t==='dark':matchMedia('(prefers-color-scheme: dark)').matches};
@@ -45,7 +45,9 @@
   more.addEventListener('click',()=>setMore(!document.body.classList.contains('m-more')));
   scrim.addEventListener('click',()=>setMore(false));
   sheet.addEventListener('click',e=>{const x=e.target.closest('[data-m]');if(!x)return;
-    if(x.dataset.m==='theme'){const t=document.getElementById('theme-btn');if(t)t.click();sheet.querySelector('small').textContent=isDark()?'On':'Off';return}
+    if(x.dataset.m==='theme'){const lbl=()=>{sheet.querySelector('small').textContent=isDark()?'On':'Off'};
+      if(window.tmToggleTheme){const r=x.getBoundingClientRect();tmToggleTheme(r.left+r.width/2,r.top+r.height/2).then(lbl)}
+      else{const t=document.getElementById('theme-btn');if(t)t.click();lbl()}return}
     setMore(false)});
   window.addEventListener('hashchange',()=>setMore(false));
   document.addEventListener('keydown',e=>{if(e.key==='Escape')setMore(false)});
