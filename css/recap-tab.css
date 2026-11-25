@@ -1,0 +1,99 @@
+/* Recap tab: the screen before the recap slideshow (js/recap-tab.js). Every class starts with rc-.
+   Page colours come from the site's own variables; the phone frame keeps the recap's dark palette so it matches the cards. */
+.rc-tab{--rc-bg:#0d0d0d;--rc-text:#f4f4f5;--rc-muted:#a1a1aa;--rc-panel:#141417;--rc-border:#2a2a30;
+  --rc-fw:300px;--rc-fh:600px;--rc-gap:20px;--rc-aw:56px;
+  display:flex;flex-direction:column;align-items:center;gap:16px;min-width:0}
+.rc-h{margin:0;font-family:var(--f-display);font-style:italic;font-weight:800;font-size:clamp(34px,4.4vw,46px);letter-spacing:.01em;text-transform:uppercase;line-height:.92;text-align:center}
+.rc-h span{color:var(--accent)}
+
+/* the row: arrow, side cards + frame, arrow. It is wider than the site's column on purpose, and never scrolls sideways. */
+.rc-row{display:flex;align-items:center;gap:var(--rc-gap);width:min(1232px,100vw - 32px);overflow:hidden;flex:none}
+@supports (overflow:clip){.rc-row{overflow-x:clip;overflow-y:visible}}
+.rc-rail{position:relative;flex:1;min-width:0;height:var(--rc-fh)}
+.rc-rail::before{content:"";position:absolute;left:50%;top:50%;width:620px;height:620px;transform:translate(-50%,-50%);border-radius:50%;
+  background:radial-gradient(closest-side,color-mix(in srgb,var(--accent) 34%,transparent),transparent 72%);pointer-events:none}
+
+.rc-arrow{appearance:none;flex:none;width:var(--rc-aw);height:var(--rc-aw);border-radius:50%;border:1px solid var(--line);background:var(--surface);color:var(--ink);
+  display:grid;place-items:center;cursor:pointer;transition:border-color .15s,opacity .2s}
+.rc-arrow:hover:not(:disabled){border-color:var(--ink)}
+.rc-arrow:disabled{opacity:.3;cursor:default}
+
+/* side cards: one per recap card. js sets where each one sits (--x), its size (--s) and how faded it is (--o). */
+.rc-side{appearance:none;position:absolute;left:50%;top:50%;width:200px;height:400px;margin:-200px 0 0 -100px;padding:22px 20px;border-radius:26px;
+  border:1px solid var(--line);background:var(--surface);color:var(--ink);font:inherit;text-align:left;
+  display:flex;flex-direction:column;justify-content:space-between;gap:10px;
+  transform:translateX(var(--x,0px)) scale(var(--s,1));opacity:var(--o,0);
+  transition:transform .45s cubic-bezier(.3,.9,.3,1),opacity .4s ease,border-color .15s;cursor:default}
+.rc-side[data-off]{pointer-events:none;visibility:hidden;transition:transform .45s cubic-bezier(.3,.9,.3,1),opacity .4s ease,visibility 0s .4s}
+.rc-side-n,.rc-side-s,.rc-badge{font-size:11px;font-weight:700;letter-spacing:.16em;text-transform:uppercase}
+.rc-side-n{color:var(--muted);font-variant-numeric:tabular-nums}
+.rc-side-t{font-family:var(--f-display);font-style:italic;font-weight:800;font-size:30px;line-height:.98;text-transform:uppercase;letter-spacing:.01em;text-wrap:balance}
+.rc-side-s{display:flex;align-items:center;gap:7px;min-height:20px;color:var(--muted)}
+.rc-side-s svg{flex:none}
+.rc-tab[data-state="unlocked"] .rc-side{cursor:pointer}
+.rc-tab[data-state="unlocked"] .rc-side:hover{border-color:var(--ink)}
+.rc-tab[data-state="unlocked"] .rc-side-s{color:var(--accent)}
+.rc-lock{transition:opacity .4s ease}
+
+/* the phone-shaped frame that plays the preview */
+.rc-frame{position:absolute;left:50%;top:0;width:var(--rc-fw);height:var(--rc-fh);margin-left:calc(var(--rc-fw) / -2);border-radius:34px;overflow:hidden;z-index:2;
+  border:1px solid var(--rc-border);color:var(--rc-text);
+  background-color:var(--rc-bg);background-image:linear-gradient(rgba(255,255,255,.035) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.035) 1px,transparent 1px);background-size:26px 26px;background-position:center;
+  box-shadow:0 34px 80px rgba(0,0,0,.5),0 10px 26px rgba(0,0,0,.3)}
+.rc-clip{position:absolute;inset:0;width:100%;height:100%;border:0;background:transparent;pointer-events:none;color-scheme:light}
+.rc-frame::after{content:"";position:absolute;left:0;right:0;bottom:0;height:150px;background:linear-gradient(transparent,rgba(13,13,13,.92) 62%);pointer-events:none}
+.rc-badge{position:absolute;top:14px;right:14px;z-index:2;padding:6px 10px;border-radius:99px;background:rgba(13,13,13,.72);border:1px solid var(--rc-border);color:var(--rc-text);
+  -webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);font-size:10px}
+.rc-save{appearance:none;position:absolute;left:10px;right:10px;bottom:78px;z-index:2;height:44px;border-radius:99px;border:1px solid var(--rc-border);background:rgba(20,20,23,.86);color:var(--rc-text);font:600 13px var(--f-body);cursor:pointer}
+
+/* slide to play */
+.rc-track{appearance:none;position:absolute;left:10px;right:10px;bottom:10px;z-index:2;height:58px;padding:0;border-radius:99px;overflow:hidden;
+  border:1px solid color-mix(in srgb,var(--accent) 40%,transparent);background:rgba(13,13,13,.72);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);
+  color:var(--rc-text);font:inherit;cursor:grab;touch-action:none;-webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent;--kx:0px;--p:0}
+.rc-track:active{cursor:grabbing}
+.rc-track:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+.rc-trail{position:absolute;left:0;top:0;bottom:0;width:calc(var(--kx) + 34px);background:linear-gradient(90deg,transparent,color-mix(in srgb,var(--accent) 35%,transparent));pointer-events:none}
+.rc-tlabel{position:absolute;left:58px;right:52px;top:0;bottom:0;display:grid;place-items:center;font-size:14px;font-weight:600;letter-spacing:.01em;white-space:nowrap;pointer-events:none;
+  opacity:calc(1 - var(--p) / .6);
+  color:transparent;background:linear-gradient(100deg,rgba(244,244,245,.6) 0 38%,#fff 50%,rgba(244,244,245,.6) 62% 100%) 0 0/250% 100%;-webkit-background-clip:text;background-clip:text;
+  animation:rc-shimmer 2.4s linear infinite}
+@keyframes rc-shimmer{from{background-position:125% 0}to{background-position:-25% 0}}
+.rc-ring{position:absolute;right:10px;top:50%;width:36px;height:36px;margin-top:-18px;border-radius:50%;border:1.5px dashed color-mix(in srgb,var(--accent) 70%,transparent);pointer-events:none}
+.rc-knob{position:absolute;left:4px;top:4px;width:48px;height:48px;border-radius:50%;background:var(--accent);color:#0d0d0d;display:grid;place-items:center;pointer-events:none;
+  box-shadow:0 0 22px color-mix(in srgb,var(--accent) 55%,transparent),0 2px 6px rgba(0,0,0,.4);transform:translateX(var(--kx))}
+.rc-knob svg{margin-left:3px}
+.rc-track.rc-go .rc-knob,.rc-track.rc-go .rc-trail{transition:transform .3s ease-out,width .3s ease-out}
+.rc-track.rc-go .rc-tlabel{transition:opacity .2s}
+.rc-track.rc-back .rc-knob{transition:transform .4s cubic-bezier(.3,1.2,.5,1)}
+.rc-track.rc-back .rc-trail{transition:width .4s cubic-bezier(.3,1.2,.5,1)}
+.rc-track.rc-back .rc-tlabel{transition:opacity .3s}
+
+.rc-hint{margin:0;color:var(--muted);font-size:13.5px;text-align:center;text-wrap:balance}
+
+/* phone: the list of cards, a row you swipe sideways */
+.rc-chips{display:none}
+.rc-chip{appearance:none;flex:none;height:44px;padding:0 16px;border-radius:99px;border:1px solid var(--line);background:var(--surface);color:var(--ink);font:600 13px var(--f-body);white-space:nowrap;display:inline-flex;align-items:center;gap:8px;cursor:pointer;transition:opacity .4s}
+.rc-chip b{font-weight:700;color:var(--muted);font-variant-numeric:tabular-nums;letter-spacing:.06em}
+.rc-chip:disabled{opacity:.45;cursor:default}
+.rc-tab[data-state="unlocked"] .rc-chip b{color:var(--accent)}
+
+/* this tab uses less of the page's top and bottom space, so the whole screen fits without scrolling */
+body[data-tab="recap"].rc-on main{padding-block:18px 24px}
+
+/* tablet: smaller arrows; js drops the two outer cards */
+@media (max-width:1279px){.rc-tab{--rc-gap:12px;--rc-aw:48px}}
+/* phone */
+@media (max-width:699px){
+  .rc-tab{--rc-fw:280px;--rc-fh:590px;gap:14px}
+  .rc-row{width:100vw;gap:0}
+  .rc-arrow{display:none}
+  .rc-rail::before{width:440px;height:440px}
+  .rc-chips{display:flex;gap:8px;width:100vw;overflow-x:auto;padding:2px 16px 6px;scrollbar-width:none;-webkit-overflow-scrolling:touch;scroll-snap-type:x proximity}
+  .rc-chips::-webkit-scrollbar{display:none}
+  .rc-chip{scroll-snap-align:start}
+  .rc-hint{padding:0 20px}
+}
+@media (prefers-reduced-motion:reduce){
+  .rc-tlabel{animation:none;color:var(--rc-text);background:none}
+  .rc-side,.rc-side[data-off],.rc-track .rc-knob,.rc-track .rc-trail,.rc-track .rc-tlabel,.rc-chip,.rc-lock{transition:none!important}
+}

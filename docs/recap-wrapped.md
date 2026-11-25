@@ -203,3 +203,13 @@ The card list is now the 12-card build prompt (league trades, your trades + podi
 - **How:** drawn on a canvas and recorded in the person's own browser. Nothing is uploaded and no server function was added. A sheet shows the video being made (about 15 seconds, the tab has to stay open), then plays it back with Save video, Share (where the device supports sharing a file) and Done.
 - **File type:** MP4 where the browser can record it (Chrome, Safari), otherwise WebM. A browser that cannot record video gets a short message and the image option.
 - **Checked:** recorded from the sample recap in headless Chrome: a 16.4 second, 1080x1920 MP4 of about 5 MB. Not yet tried on a real phone.
+
+## Recap tab: slide-to-play screen (phase 1, 2026-11-25)
+
+- **What:** signed-in users now land on a new Recap tab screen instead of the old text + "Open your recap" page. A phone-shaped frame plays a small silent loop of the recap, a slide-to-play track at the bottom of the frame opens the slideshow at card 1, and one side card per recap card sits either side (arrows move them along). On a phone the side cards only peek in and a swipeable row of card chips sits under the frame. Signed-out visitors still get the locked Pro page with the sign-in button.
+- **Files:** `js/recap-tab.js` and `css/recap-tab.css` (all classes `rc-`). `renderProTab` in `js/offseason.js` hands the Recap tab to `rcTabRender`; `tmoRecapOpen(card)` can now start on a given card and announces when the recap is closed.
+- **The preview is the real cards, not a video file.** The frame loads the slideshow page itself in its preview mode (`/recap?demo=1&sample=1`), so the preview always matches the cards. In that mode the buttons and card counter are hidden. `media/recap-sample.mp4` is now only used on the signed-out page.
+- **Colours:** the page uses the site's own colours (orange accent, light and dark). The frame keeps the recap's dark look.
+- **Two states.** Before watching: badge "Sample league", side cards faded with a lock, chips dimmed. After watching: badge "Your league", "Slide to watch again", side cards and chips open the slideshow at that card.
+- **Not done yet (phase 2):** remembering that the recap was watched (on the account, per league and year), playing the user's own league in the frame, and the one-time unlock animation. Until then `?unlocked=1` in the address shows the "after" look for review, still with the sample league. **Phase 3:** the Save video button in the frame stays hidden.
+

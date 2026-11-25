@@ -302,6 +302,8 @@ function renderProTab(){
     if(signed){if(code){try{sessionStorage.removeItem('md-join')}catch(e){}MD.join=code}mdRender();return}
     document.body.classList.remove('md-in-room');
   }
+  /* Recap, signed in: the slide-to-play screen (js/recap-tab.js). Signed out keeps the locked page below. */
+  if(key==='recap'&&typeof rcTabRender==='function'){if(signed&&pro){el.dataset.k='';rcTabRender(el);return}rcTabOff()}
   const live=key==='recap';/* the Season Recap slideshow is built (recap.html); the other pages are still on the way */
   /* the Recap page keeps its preview video running: only rebuild it when what it shows would change */
   const stamp=key+'|'+signed+'|'+pro;if(live&&el.dataset.k===stamp&&el.firstElementChild)return;el.dataset.k=live?stamp:'';
@@ -330,15 +332,15 @@ function renderProTab(){
 }
 
 /* ---------- Season Recap, opened on top of the site (the page behind stays, dimmed) ---------- */
-function tmoRecapOpen(){
+function tmoRecapOpen(card){/* card: start on that card (skips the cover) */
   if(document.getElementById('rcx'))return;
   const w=document.createElement('div');w.id='rcx';w.className='rcx';w.setAttribute('role','dialog');w.setAttribute('aria-modal','true');w.setAttribute('aria-label','Season Recap');
-  w.innerHTML=`<iframe class="rcx-f" title="Season Recap" src="/recap?embed=1" style="color-scheme:light" allow="web-share"></iframe>
+  w.innerHTML=`<iframe class="rcx-f" title="Season Recap" src="/recap?embed=1${card?'#card='+card:''}" style="color-scheme:light" allow="web-share"></iframe>
     <button class="rcx-x" type="button" data-recap-close aria-label="Close recap"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>`;
   TMO.recapBack=document.activeElement;document.body.appendChild(w);document.documentElement.classList.add('rcx-open');
   const f=w.querySelector('iframe');f.addEventListener('load',()=>{try{f.contentWindow.focus()}catch(e){}});
 }
-function tmoRecapClose(){const w=document.getElementById('rcx');if(!w)return;w.remove();document.documentElement.classList.remove('rcx-open');try{TMO.recapBack&&TMO.recapBack.focus()}catch(e){}TMO.recapBack=null}
+function tmoRecapClose(){const w=document.getElementById('rcx');if(!w)return;w.remove();document.documentElement.classList.remove('rcx-open');try{TMO.recapBack&&TMO.recapBack.focus()}catch(e){}TMO.recapBack=null;document.dispatchEvent(new CustomEvent('tm-recap-close'))}
 addEventListener('message',e=>{if(e.origin===location.origin&&e.data&&e.data.rc==='close')tmoRecapClose()});
 document.addEventListener('keydown',e=>{if(e.key==='Escape'&&document.getElementById('rcx'))tmoRecapClose();});
 
