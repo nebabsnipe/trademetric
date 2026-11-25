@@ -39,6 +39,12 @@ const REPLY = 'support@trademetric.app';
 export const TYPES = {
   welcome:    {},
   sync_broke: {},
+  // billing (sent by api/_billing.js from what Stripe reports): account emails, always sent, no unsubscribe
+  trial_ending:   {},
+  receipt:        {},
+  payment_failed: {},
+  renewal:        {},
+  cancelled:      {},
   champ:      { group: 'big', capH: 24, rank: 4, sw: ['champ'] },
   clinch:     { group: 'big', capH: 24, rank: 3, sw: ['clinch'] },
   recap:      { group: 'big', capH: 24, rank: 2, sw: ['recap'], on: false },   // switch on when the season recap feature is live

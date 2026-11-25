@@ -1,4 +1,4 @@
-# Plans: free and Pro (no payments yet)
+# Plans: free and Pro
 
 **Status: on the `pro-gating` branch. The beta switch is ON**, so every signed-in account has Pro and the site works exactly as before.
 
@@ -27,7 +27,10 @@
 | `/api/plan` | Free (answers what this person gets) |
 | `/api/live`, `/api/proj`, `/api/market`, `/api/players` | Free (same public data for everyone; rankings need it) |
 | `/api/espn` | Free (copies the user's own private ESPN league in) |
-| `/api/report` | Free (problem reports) |
+| `/api/report` | Free (problem reports; now answered by `api/push.js`) |
+| `/api/stripe-webhook` | Stripe only (signature checked) |
+| `/api/billing/status`, `/checkout`, `/portal` | Signed in (any plan). Checkout is refused while the beta is on |
+| `/api/billing/cron` | Server job (CRON_SECRET) |
 | `/api/news?league=` / `?trades=` / `?recap=` / `?probe=` | Free (top stories) |
 | `/api/news?feed=` / `?batch=` / `?name=` | **Pro** (news about your own players) |
 | `/api/feed` (clips) | **Pro** |
@@ -43,8 +46,11 @@ Refusals: signed out → 401 `signed_out`; free → 403 `pro_required`. During t
 - `supabase/plans.sql` adds `beta_users` (one row per account that existed during the beta) and marks every current account. While the beta is on, the server also marks each account when it opens the site (needs `SUPABASE_SECRET_KEY`, so production only). Run the file once more on the day the switch goes off.
 
 ## Prices
-- `TM_PRICES` in `js/plan.js`: $5 a month, $40 a year, 7-day free trial. The button says "Coming soon".
-- PostHog feature flag `price-test` (off): variant `higher` shows the second price set; anything else, or no flag, shows $5 / $40.
+- Payments are built (`payments` branch, see `docs/payments.md`). The amounts shown come from Stripe itself (the two
+  price ids in Vercel), with a 7-day free trial. `TM_PRICES` in `js/plan.js` is only the fallback for the beta pricing
+  grid before Stripe is connected.
+- PostHog feature flag `price-test` (off): only changes the fallback numbers. Once Stripe is connected, running a price
+  test needs a second pair of Stripe prices.
 
 ## Analytics
 `upgrade_screen_shown` (feature, price_variant), `upgrade_button_clicked`, `locked_tab_clicked`. Person properties `plan` (`beta` / `free` / `pro`) and `beta_user`.

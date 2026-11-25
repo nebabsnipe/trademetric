@@ -118,6 +118,10 @@
   "cleanUrls": true,
   "rewrites": [
     {
+      "source": "/api/report",
+      "destination": "/api/push?do=report"
+    },
+    {
       "source": "/api/plan",
       "destination": "/api/push?do=plan"
     },
@@ -128,6 +132,10 @@
     {
       "source": "/api/email/:do",
       "destination": "/api/email?do=:do"
+    },
+    {
+      "source": "/api/billing/:do",
+      "destination": "/api/stripe-webhook?do=:do"
     }
   ],
   "functions": {
@@ -138,6 +146,9 @@
     "api/email.js": {
       "maxDuration": 60,
       "includeFiles": "data/nfl.json"
+    },
+    "api/stripe-webhook.js": {
+      "maxDuration": 60
     }
   }
 }

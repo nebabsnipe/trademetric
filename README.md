@@ -23,7 +23,8 @@ Fantasy football trades, rankings and lineup advice built on your league's exact
 | `api/players.js` | Compact Sleeper player list used to sync rosters in the background |
 | `api/_shared.js` | The shared news store: injury status history, story recaps and the league news archive, saved in Supabase so they are built once and sent to everyone (see "Shared news store" below) |
 | `api/_plan.js`, `js/plan.js` | Free vs Pro: the beta switch (`TM_BETA_PRO` in Vercel), the plan check every Pro route uses, and the upgrade screen. See `docs/plans.md` |
-| `api/push.js`, `api/_push.js` | Push notifications: saving devices, the test button, and the scheduled injury check with all its rules. See `docs/push-notifications.md` |
+| `api/push.js`, `api/_push.js` | Push notifications: saving devices, the test button, and the scheduled injury check with all its rules. Also answers `/api/report` (problem reports). See `docs/push-notifications.md` |
+| `api/stripe-webhook.js`, `api/_billing.js`, `supabase/billing.sql`, `supabase/billing_cron.sql` | Payments for Pro through Stripe: the webhook, checkout, the billing portal, the hourly grace/reminder check. Tests: `node scripts/test-billing.mjs`. See `docs/payments.md` |
 | `sw.js`, `manifest.webmanifest`, `js/push.js` | The push-only service worker, the Home Screen app details, and the Push notifications card in Account |
 | `api/espn.js` | Reads private ESPN leagues with the user's espn_s2 and SWID codes (never stored) |
 | `supabase/schema.sql` | Table that stores each user's saved league. Run once in Supabase's SQL Editor |

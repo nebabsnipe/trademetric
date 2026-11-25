@@ -105,5 +105,15 @@ export async function planRoute(req, res) {
   const v = await viewerOf(req, { fresh: true });
   if (v.error) return res.status(503).json({ error: 'plan_unavailable' });
   if (v.beta && v.signedIn && !v.betaUser) v.betaUser = await markBetaUser(v.id);
-  return res.status(200).json({ beta: v.beta, signedIn: v.signedIn, plan: v.signedIn ? v.plan : null, pro: v.pro, betaUser: v.betaUser });
+  const billing = v.signedIn ? await paymentTrouble(req, v.id) : null;
+  return res.status(200).json({ beta: v.beta, signedIn: v.signedIn, plan: v.signedIn ? v.plan : null, pro: v.pro, betaUser: v.betaUser, billing });
+}
+
+/* A payment that failed and is inside its 7-day grace period (supabase/billing.sql): the page shows a banner.
+   Read with the person's own token, so row-level security limits it to their own subscription.
+   -> { grace_until } or null (nothing wrong, or billing isn't set up yet). */
+async function paymentTrouble(req, id) {
+  const r = await getJson(`${SUPA}/rest/v1/subscriptions?user_id=eq.${encodeURIComponent(id)}&status=in.(past_due,unpaid)&grace_until=gt.${encodeURIComponent(new Date().toISOString())}&select=grace_until&order=grace_until.desc&limit=1`,
+    { apikey: PUB, authorization: 'Bearer ' + tokenOf(req) });
+  return r.ok && Array.isArray(r.data) && r.data[0] ? { grace_until: r.data[0].grace_until } : null;
 }

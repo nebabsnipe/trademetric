@@ -33,6 +33,7 @@ const FEEDS = [
   [/^api\.anthropic\.com$/, 'ai'],
   [/\.supabase\.co$/, 'database'],
   [/^api\.resend\.com$/, 'email-service'],
+  [/^api\.stripe\.com$/, 'stripe'],
 ];
 const feedOf = host => { for (const [re, name] of FEEDS) if (re.test(host)) return name; return host; };
 

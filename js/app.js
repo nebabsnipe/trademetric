@@ -2368,6 +2368,7 @@ function authFail(t){AUTH_BUSY=false;AUTH_MSG={bad:true,html:esc(friendly(t))};r
 function authNote(h){AUTH_BUSY=false;AUTH_MSG={bad:false,html:h};renderSignin()}
 /* Everything that happens once someone is signed in, however they got there (form, code, link, Google, another tab). */
 async function signedIn(user,fresh){SIGNING=true;USER=user;window.TMT&&TMT.auth(user,fresh);if(typeof emailWelcome==='function')setTimeout(()=>emailWelcome(user),4000);startSessionClock(fresh);acctUI();cloudReset();cloudPull('signin');try{await Promise.all([loadProfile(),typeof tmPlanLoad==='function'?tmPlanLoad(2500):0])}finally{SIGNING=false}if(!USER||USER.id!==user.id)return;
+  if(typeof tmCheckoutReturn==='function')tmCheckoutReturn();
   if(AUTH_MODE==='recover')return;
   if(!PROFILE&&PROFILE_OK&&!lsGet(SKIP_UN+user.id)){AUTH_MODE='username';AUTH_MSG=null;AUTH_BUSY=false;AUTH_VALS={};UN_STATE=null;showSignin();return}
   if(AUTH_MODE==='confirmed'||AUTH_MODE==='reset'){AUTH_BUSY=false;showSignin();return}
@@ -2825,26 +2826,30 @@ function accLeagues(){const L=S.leagues||[],me=typeof myTeam==='function'&&S.tea
 /* Pricing grid: Free vs Pro with a Monthly/Annual toggle. Prices come from TM_PRICES in js/plan.js (and the PostHog
    "price-test" flag, off for now). Checkout isn't connected, so Pro says "Coming soon". */
 var PR_ANNUAL=false;
-function prTiers(){const P=typeof tmPrices==='function'?tmPrices():{monthly:5,annual:40,trialDays:7};return [
+function prTiers(){const B=typeof tmBill==='function'?tmBill():null,SP=B&&B.ready&&B.prices;
+  const P=SP?{monthly:SP.monthly.amount/100,annual:SP.yearly.amount/100,trialDays:B.trialDays||7}:typeof tmPrices==='function'?tmPrices():{monthly:5,annual:40,trialDays:7};return [
   {key:'free',name:'Free',monthly:0,annual:0,desc:'Rankings and top stories, free for everyone.',feat:['Rankings scored to your league','Top news stories around the league','Join a friend\'s mock draft by invite link']},
   {key:'pro',name:'Pro',monthly:P.monthly,annual:P.annual,trial:P.trialDays,desc:'Every tool for winning trades and your league.',feat:typeof TM_PRO_LIST!=='undefined'?TM_PRO_LIST:[],featured:true}]}
 const PR_CHECK='<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>';
 function prPrice(t){if(!t.monthly)return '0';const v=PR_ANNUAL?t.annual/12:t.monthly;return Number.isInteger(v)?String(v):v.toFixed(2)}
+const prAmt=v=>Number.isInteger(v)?String(v):v.toFixed(2);
 function accPricing(){const k=planOf().key,beta=k==='beta',PR_TIERS=prTiers(),PR_SAVE=Math.round((1-PR_TIERS[1].annual/(PR_TIERS[1].monthly*12))*100);
   return `<section class="acc-pricing">
     <div class="pr-toggle" role="group" aria-label="Billing period"><button type="button" data-pr-bill="m" aria-pressed="${!PR_ANNUAL}">Monthly</button><button type="button" data-pr-bill="a" aria-pressed="${PR_ANNUAL}">Annual <span class="pr-save">-${PR_SAVE}%</span></button></div>
     <div class="pr-grid">${PR_TIERS.map(t=>`<div class="card pr-card${t.featured?' featured':''}">
       <div class="pr-card-h"><h3>${t.name}</h3>${t.featured?`<span class="pr-pop">${beta?'Free during beta':`${t.trial}-day free trial`}</span>`:''}</div>
       <p class="pr-desc">${t.desc}</p>
-      <div><p class="pr-price"><b>$${prPrice(t)}</b><span>/month</span></p><p class="pr-billed">${PR_ANNUAL&&t.annual?`$${t.annual} billed yearly`:t.monthly?'Billed monthly':'&nbsp;'}</p></div>
+      <div><p class="pr-price"><b>$${prPrice(t)}</b><span>/month</span></p><p class="pr-billed">${PR_ANNUAL&&t.annual?`$${prAmt(t.annual)} billed yearly`:t.monthly?'Billed monthly':'&nbsp;'}</p></div>
       <ul class="pr-feat">${t.feat.map(f=>`<li>${PR_CHECK}<span>${f}</span></li>`).join('')}</ul>
-      ${t.featured?(beta?'<button class="btn accent" type="button" disabled>Unlocked during beta</button>':k==='pro'?'<button class="btn accent" type="button" disabled>Your plan</button>':'<button class="btn accent" type="button" id="upg-go">Coming soon</button>'):'<button class="btn" type="button" disabled>Always free</button>'}
+      ${t.featured?(beta?'<button class="btn accent" type="button" disabled>Unlocked during beta</button>':k==='pro'?'<button class="btn accent" type="button" disabled>Your plan</button>':`<button class="btn accent" type="button" id="upg-go">${typeof tmBill==='function'&&tmBill()&&tmBill().ready&&tmBill().prices?(tmBill().trialEligible===false?'Get Pro':`Start ${t.trial}-day free trial`):'Coming soon'}</button>`):'<button class="btn" type="button" disabled>Always free</button>'}
     </div>`).join('')}</div>
     ${beta?'<p class="pr-note">You have every Pro feature free while TradeMetric is in beta. Paid plans start later.</p>':''}</section>`}
-function accPlan(){
-  return `${typeof tmPlanCard==='function'?tmPlanCard():''}${accPricing()}
-    <section class="card acc-sec"><header class="acc-sec-h"><h2>Billing</h2><p>Payment details and receipts will live here.</p></header>
-      ${accRow('Payment method','<span class="note">None on file</span>')}${accRow('Receipts','<span class="note">No receipts yet</span>')}</section>`}
+function accPlan(){const B=typeof tmBill==='function'?tmBill():null,sub=B&&B.sub,live=sub&&typeof tmLiveSub==='function'&&tmLiveSub(sub);
+  const card=sub&&sub.last4?`Card ending <b>${esc(sub.last4)}</b>`:'<span class="note">None on file</span>';
+  return `${typeof tmPlanCard==='function'?tmPlanCard():''}${live?'':accPricing()}
+    <section class="card acc-sec"><header class="acc-sec-h"><h2>Billing</h2><p>${sub?'Payments are handled by Stripe. Your card details never reach TradeMetric.':'Payment details and receipts will show here once you have a plan.'}</p></header>
+      ${accRow('Payment method',card,sub?'<button class="btn" type="button" data-bill-portal="">Change</button>':'')}
+      ${accRow('Receipts',sub?'<span class="note">Every receipt is emailed to you and kept in billing.</span>':'<span class="note">No receipts yet</span>',sub?'<button class="btn" type="button" data-bill-portal="">View</button>':'')}</section>`}
 function accSecurity(){const until=lsGet(UNTIL_KEY),pw=hasPassword(),soc=socialName();
   const pwForm=`<form class="acc-form" id="acc-form" data-kind="password" novalidate>${pwField('acc-pw','New password','new-password','minlength="8" placeholder="At least 8 characters"')}${pwField('acc-pw2','Type it again','new-password','minlength="8"')}${accMsg()}<div class="acc-form-act">${accBtn(pw?'Change password':'Set password')}<button class="btn" type="button" data-acc-cancel>Cancel</button></div></form>`;
   const delForm=`<form class="acc-form" id="acc-form" data-kind="delete" novalidate><p class="note">This deletes your account and every league saved to it. It can't be undone.</p><label><span>Type <b>${esc(acctName()||'delete')}</b> to confirm</span><input type="text" id="acc-del" autocapitalize="none" autocorrect="off" spellcheck="false" autocomplete="off" required></label>${accMsg()}<div class="acc-form-act"><button class="btn danger" type="submit" ${ACC_BUSY?'disabled':''}>${ACC_BUSY?'Deleting...':'Delete my account'}</button><button class="btn" type="button" data-acc-cancel>Cancel</button></div></form>`;
@@ -2869,7 +2874,8 @@ async function accSubmit(kind){if(ACC_BUSY)return;ACC_MSG=null;
     if(kind==='password'){const a=$('acc-pw').value,b=$('acc-pw2').value;if(a.length<8)return accFail('Use at least 8 characters.');if(a!==b)return accFail("Those passwords don't match.");
       ACC_BUSY=true;renderAccount();const {data,error}=await SB.auth.updateUser({password:a});if(error)return accFail(error.message);if(data&&data.user)USER=data.user;
       ACC_BUSY=false;ACC_EDIT=null;toast('Password saved');renderAccount();return}
-    if(kind==='delete'){const want=acctName()||'delete';if(($('acc-del').value||'').trim().toLowerCase()!==want.toLowerCase())return accFail(`Type ${want} exactly to confirm.`);
+    if(kind==='delete'){if(typeof tmBillLoad==='function')await tmBillLoad();if(typeof tmBillBlocksDelete==='function'&&tmBillBlocksDelete())return accFail('Cancel your Pro plan first (Account, then Subscription) so you are not charged again. Then you can delete your account.');
+      const want=acctName()||'delete';if(($('acc-del').value||'').trim().toLowerCase()!==want.toLowerCase())return accFail(`Type ${want} exactly to confirm.`);
       ACC_BUSY=true;renderAccount();const {error}=await SB.rpc('delete_my_account');if(error)return accFail(/could not find|does not exist/i.test(error.message)?"Account deletion isn't switched on yet. Run supabase/accounts_v2.sql in Supabase.":error.message);
       ACC_BUSY=false;ACC_EDIT=null;try{localStorage.removeItem(KEY)}catch(e){}lsDel(UNTIL_KEY);await SB.auth.signOut({scope:'local'}).catch(()=>{});location.hash='signin';location.reload();return}
   }catch(e){accFail(e&&e.message)}}

@@ -7,13 +7,14 @@
 //   POST /api/push/test         send a test notification to every device on the account
 //   GET  /api/plan              is the beta on, and does this person have Pro (the code is in api/_plan.js)
 //   GET  /api/push/cron         the scheduled check (injuries, trade deadlines, lineup fixes). Needs the CRON_SECRET.
+//   POST /api/report            problem reports from the page (moved here from its own file to make room for billing)
 //
 // Signed-in routes act as the user (their own sign-in token, checked by Supabase), so the database's
 // row-level security is what guarantees people only ever see and change their own devices.
 
 import { timingSafeEqual } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
-import { sharedOn, rest, statusTrack } from './_shared.js';
+import { sharedOn, rest, statusTrack, reportPut } from './_shared.js';
 import { injuries, notes, ESPN_ST } from './live.js';
 import { weekInfo, alertsFor } from './_alerts.js';
 import { withSentry } from './_sentry.js';
@@ -50,12 +51,35 @@ const bodyOf = req => { const b = req.body; if (b && typeof b === 'object') retu
 const publicDevice = d => ({ id: d.id, label: d.label || 'Device', created_at: d.created_at, last_used_at: d.last_used_at });
 const NOT_SET_UP = { error: 'not_set_up', message: 'Notifications aren\'t switched on for this site yet.' };
 
+/* Problem reports: each visitor's browser sends a short technical note when something on the site fails to load or
+   breaks (see diagSend in js/app.js), so problems on other people's computers can be seen, not guessed at.
+   Saved to the client_reports table (supabase/reports.sql), which only the site owner's account can read.
+   Holds no league contents, emails or passwords. */
+const clip = (v, n) => (v == null ? null : String(v).slice(0, n));
+async function problemReport(req, res) {
+  if (req.method !== 'POST') return res.status(405).end();
+  let b = req.body;
+  if (typeof b === 'string') { try { b = JSON.parse(b); } catch { b = null; } }
+  if (!b || typeof b !== 'object' || JSON.stringify(b).length > 20000) return res.status(400).end();
+  const row = {
+    sid: clip(b.sid, 16),
+    uid: /^[0-9a-f-]{36}$/i.test(b.uid || '') ? b.uid : null,          // sent by the page, so a hint, not proof
+    username: clip(b.user, 40),
+    snap: b.snap && typeof b.snap === 'object' ? b.snap : {},
+    notes: Array.isArray(b.notes) ? b.notes.slice(0, 40).map(x => ({ k: clip(x && x.k, 40), m: clip(x && x.m, 300), t: +(x && x.t) || 0 })) : [],
+    country: clip(req.headers['x-vercel-ip-country'], 4),
+  };
+  if (sharedOn()) await reportPut(row);
+  return res.status(204).end();
+}
+
 async function handler(req, res) {
   res.setHeader('Cache-Control', 'no-store');
   const act = String((req.query && req.query.do) || '');
   try {
     if (act === 'cron') return await cron(req, res);
     if (act === 'plan') return await planRoute(req, res);
+    if (act === 'report') return await problemReport(req, res);
     if (act === 'key') return pushOn() ? res.status(200).json({ key: vapidPublicKey() }) : res.status(503).json(NOT_SET_UP);
 
     const token = tokenOf(req), user = await userOf(token);

@@ -7,7 +7,7 @@
 //   account, always sent      welcome · sync_broke        (sign-in codes come from Supabase, see supabase/email/)
 //   updates, each can be off  weekly (matchup, standout games, #1 at his position, highlights) · injury · deadline
 //                             · clinch · champ · recap · moves · draft
-//   billing, NOT wired yet    trial_ending · receipt · payment_failed · renewal · cancelled
+//   billing, always sent      trial_ending · receipt · payment_failed · renewal · cancelled   (api/_billing.js)
 //
 // render(type, data, ctx) -> { subject, html, text }
 //   data: the facts for this email (league name, record ...). Everything is escaped here.
@@ -119,7 +119,7 @@ const COPY = {
     };
   },
 
-  /* ---- billing: ready for the payments work, not sent by anything yet ---- */
+  /* ---- billing: sent by api/_billing.js with the amounts and dates Stripe reports ---- */
   trial_ending: d => ({
     subject: `Your free trial ends ${d.when || 'soon'}`,
     pre: `Your card will be charged ${money(d.amount)} unless you cancel first.`,

@@ -2563,6 +2563,23 @@ body.tm-free .alerts-wrap,body.tm-free .ai-fab{display:none}
 .upg-go{width:100%;padding:12px 14px;font-size:15px}
 .upg-soon{margin:-8px 0 0;text-align:center;visibility:hidden}
 .upg-soon.on{visibility:visible}
+.upg-soon.bad{color:var(--bad)}
+/* billing: the monthly / yearly choice, the terms line, the plan card and the failed-payment banner */
+button.upg-opt{font:inherit;color:inherit;text-align:left;cursor:pointer;align-items:flex-start;transition:border-color .15s,box-shadow .15s,background .15s}
+button.upg-opt:hover{border-color:var(--muted)}
+button.upg-opt[aria-checked="true"]{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent);background:var(--accent-soft)}
+.upg-opt .upg-opt-t{color:var(--ink);font-size:13px;font-weight:700;margin-bottom:4px;display:flex;flex-wrap:wrap;gap:2px 6px;align-items:baseline}
+.upg-opt .upg-opt-t em{margin-left:0;font-size:12px}
+.upg-terms{margin:0;font-size:13.5px;line-height:1.5;color:var(--muted)}
+.upg-terms b{color:var(--ink)}
+.upg-secure{margin:-6px 0 0;text-align:center;font-size:12px}
+.bill-bad{color:var(--bad);font-weight:700}
+.bill-acts{gap:8px;flex-wrap:wrap}
+.bill-err:empty{display:none}
+.tm-grace{background:var(--warn-soft);border-bottom:1px solid var(--warn);color:var(--ink)}
+.tm-grace-in{max-width:1200px;margin:0 auto;padding:10px 16px;display:flex;align-items:center;justify-content:space-between;gap:12px;font-size:14px}
+.tm-grace-in b{color:var(--warn)}
+@media (max-width:700px){.tm-grace-in{flex-direction:column;align-items:flex-start;gap:8px;font-size:13.5px}}
 .upg-back{margin:0;text-align:center;font-size:13.5px}
 .upg-back a{color:var(--muted)}
 .upg-plan-row{display:flex;align-items:center;justify-content:space-between;gap:14px}

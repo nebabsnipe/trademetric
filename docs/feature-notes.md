@@ -82,3 +82,6 @@ All in `js/deadline.js` (loaded after app.js) plus small hooks in news.js (banne
 
 ## Emails (added 2026-11-25, on the `emails` branch, NOT live)
 Account emails (welcome, league stopped updating) plus update emails with their own switches: weekly recap (matchup, standout games, #1 at his position, highlights), injuries (off by default), trade deadline, clinch, championship, and offseason season recap (built, off), player moves and the August draft reminder. Everything goes through `api/_email.js`; `EMAIL_LIVE` is off so emails only reach the owner. Full notes, rules and setup steps: `docs/emails.md`.
+
+## Payments (added 2026-11-25, on the `payments` branch, test mode only, NOT live)
+Pro through Stripe: monthly or yearly, 7-day free trial with a card up front, one trial per account ever, 7-day grace after a failed payment with a banner. Stripe's own pages for paying and for card / plan / cancel. Prices are read from Stripe. Billing emails (trial ending in 2 days, receipt, payment failed, yearly renewal 7 days before, cancelled) are always sent. Beta users' deal and the refunds wording are waiting on the owner. Full setup and the go-live checklist: `docs/payments.md`.
