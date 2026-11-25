@@ -348,8 +348,9 @@ export async function buildRecap({ league, year, teamId, creds }) {
     if (day === 0) return 'Sunday';
     return null;
   };
-  let comeback = null;
+  const comebacks = [];
   for (const g of myGames.filter(g => g.won)) {
+    let comeback = null;
     const pl = (t) => g.sps.flatMap(sp => ((LU[sp] && LU[sp][t]) || []).filter(e => !BENCH.has(e.slot)).map(e => ({ ...e, at: (gameAt[(P[e.id] || {}).proTeam] || {})[sp] || 0 })));
     const mine = pl(teamId), theirs = pl(g.oppId);
     const kicks = [...new Set([...mine, ...theirs].map(e => e.at).filter(Boolean))].sort((a, b) => a - b);
@@ -358,15 +359,22 @@ export async function buildRecap({ league, year, teamId, creds }) {
       const deficit = b - a, label = when(k);
       if (deficit > 0 && label && (!comeback || deficit > comeback.deficit)) {
         const rest = mine.filter(e => e.at >= k).sort((x, y) => y.pts - x.pts)[0];
-        comeback = { week: g.week, deficit: r1(deficit), goingInto: label, finalMargin: r1(g.me - g.opp), player: rest ? (P[rest.id] || {}).name : null, playerPoints: rest ? r1(rest.pts) : null };
+        comeback = { week: g.week, oppName: tName[g.oppId], deficit: r1(deficit), goingInto: label, finalMargin: r1(g.me - g.opp), player: rest ? (P[rest.id] || {}).name : null, playerPoints: rest ? r1(rest.pts) : null };
       }
     }
+    if (comeback && comeback.deficit >= 10) comebacks.push(comeback);   // one per game: the deepest hole that week
   }
-  if (comeback && comeback.deficit < 10) comeback = null;
+  comebacks.sort((a, b) => b.deficit - a.deficit); comebacks.splice(3);
+  const comeback = comebacks[0] || null;
+  // "Clutch" is only said when it is true: a winning record in close games (at least two of them), a win in an
+  // elimination game without a losing record in them, or a real comeback. Otherwise the card is left out.
+  const closeW = close.filter(g => g.won).length, closeL = close.length - closeW, elimW = elim.filter(g => g.won).length, elimL = elim.length - elimW;
+  const isClutch = (close.length >= 2 && closeW > closeL) || (elimW >= 1 && elimW >= elimL) || comebacks.length > 0;
   const clutch = {
     closeRecord: { wins: close.filter(g => g.won).length, losses: close.filter(g => !g.won).length },
     eliminationRecord: elim.length ? { wins: elim.filter(g => g.won).length, losses: elim.filter(g => !g.won).length } : null,
     comeback,
+    comebacks,
   };
 
   // ---- waivers: starter points the pickup gave the team that added him ----
@@ -473,7 +481,7 @@ export async function buildRecap({ league, year, teamId, creds }) {
       timelapse: lastReg >= 2,
       bestWeeks: bestWeeks.length > 0,
       beatdown: !!beatdown,
-      clutch: close.length > 0 || elim.length > 0 || !!comeback,
+      clutch: isClutch,
     },
   };
   // internal checks, not for the page

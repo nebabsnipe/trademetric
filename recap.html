@@ -10,7 +10,7 @@
 <link rel="apple-touch-icon" href="/apple-touch-icon.png?v=2">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Kanit:ital,wght@0,700;0,800;1,700;1,800;1,900&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/css/recap.css?v=3">
+<link rel="stylesheet" href="/css/recap.css?v=4">
 <script>(function(){var q=location.search,c="";if(/[?&]embed=/.test(q))c="rc-embed";if(/[?&]demo=/.test(q))c="rc-embed rc-demo";if(c)document.documentElement.className=c})()</script>
 </head>
 <body>
@@ -377,7 +377,7 @@
   <div class="rc-if" data-if="s10" hidden>
     <div style="position: absolute; inset: 0; padding: 100px 24px 40px; display: flex; flex-direction: column; gap: 14px; pointer-events: none">
       <div class="rc-lbl rc-fu">Clutch</div>
-      <div class="rc-k rc-fu rc-d1" style="font-size: 46px">You showed up when it mattered</div>
+      <div class="rc-k rc-fu rc-d1" style="font-size: 46px"><span data-v="clHead">You showed up when it mattered</span></div>
       <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-top: 10px">
         <div class="rc-if" data-if="clClose" hidden>
           <div class="rc-fu rc-d2" data-span="clClose" style="padding: 16px; border-radius: 14px; background: #141417; border: 1px solid #2a2a30; display: flex; flex-direction: column; gap: 4px">
@@ -397,6 +397,11 @@
           <div class="rc-lbl" style="color: #4ade80">Biggest comeback · Week <span data-v="clComeWeek"></span></div>
           <div class="rc-k" style="font-size: 30px; line-height: 1.05"><span data-v="clComeLine"></span></div>
           <div class="rc-if" data-if="clComePlayer" hidden><div style="font-size: 13px; color: #a1a1aa"><span data-v="clComeSub"></span></div></div>
+        </div>
+      </div>
+      <div class="rc-if" data-if="clMore" hidden>
+        <div class="rc-fu rc-d6 rc-cbs"><div class="rc-lbl">More comebacks</div>
+          <template data-for="clMore"><div class="rc-cb"><i>W{{c.week}}</i><span><b>Down {{c.deficit}}</b> going into {{c.goingInto}}</span><em>Won by {{c.finalMargin}}</em></div></template><div class="rc-cbs-l"></div>
         </div>
       </div>
     </div>
@@ -458,6 +463,6 @@
 </div>
 <aside id="rc-side" hidden aria-label="Recap cards"></aside>
 </div>
-<script src="/js/recap.js?v=4"></script>
+<script src="/js/recap.js?v=5"></script>
 </body>
 </html>
