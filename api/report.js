@@ -4,10 +4,11 @@
 // Holds no league contents, emails or passwords.
 
 import { sharedOn, reportPut } from './_shared.js';
+import { withSentry } from './_sentry.js';
 
 const clip = (v, n) => (v == null ? null : String(v).slice(0, n));
 
-export default async function handler(req, res) {
+async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).end();
   let b = req.body;
   if (typeof b === 'string') { try { b = JSON.parse(b); } catch { b = null; } }
@@ -23,3 +24,5 @@ export default async function handler(req, res) {
   if (sharedOn()) await reportPut(row);
   res.status(204).end();
 }
+
+export default withSentry(handler, 'report');

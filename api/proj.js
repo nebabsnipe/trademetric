@@ -2,6 +2,7 @@
 // can score them with each league's exact settings. Both platforms update these
 // through the week as injury news and depth charts change. Cached at Vercel's
 // edge for 5 minutes so every visitor shares one fetch.
+import { withSentry } from './_sentry.js';
 
 const TEAM = { WSH: 'WAS', LA: 'LAR', JAC: 'JAX' };
 const fix = t => TEAM[t] || t;
@@ -73,7 +74,7 @@ async function espn(season, week) {
   return out;
 }
 
-export default async function handler(req, res) {
+async function handler(req, res) {
   try {
     const state = await j('https://api.sleeper.app/v1/state/nfl');
     const season = +state.season;
@@ -94,3 +95,5 @@ export default async function handler(req, res) {
     return res.status(502).json({ error: 'Projections unavailable', detail: String(err.message || err).slice(0, 300) });
   }
 }
+
+export default withSentry(handler, 'proj');

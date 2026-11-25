@@ -5,6 +5,7 @@
 // Cached at Vercel's edge, so every visitor shares one fetch per window.
 // If ESPN changes shape or is unreachable this returns ok:false and the page falls back to
 // comparing live stat totals between checks.
+import { withSentry } from './_sentry.js';
 
 const TEAM = { WSH: 'WAS', LA: 'LAR', JAC: 'JAX' };
 const fix = t => TEAM[t] || t;
@@ -67,7 +68,7 @@ function plays(sum, ev) {
   return out;
 }
 
-export default async function handler(req, res) {
+async function handler(req, res) {
   try {
     const state = await j('https://api.sleeper.app/v1/state/nfl');
     const season = +state.season;
@@ -93,3 +94,5 @@ export default async function handler(req, res) {
 }
 
 export { parse };
+
+export default withSentry(handler, 'plays');

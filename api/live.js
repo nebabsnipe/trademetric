@@ -5,6 +5,7 @@
 // which include practice participation through the week.
 
 import { sharedOn, statusTrack, statusLog } from './_shared.js';
+import { withSentry } from './_sentry.js';
 
 const TEAM = { WSH: 'WAS', LA: 'LAR', JAC: 'JAX' };
 const fix = t => TEAM[t] || t;
@@ -126,7 +127,7 @@ function statLine(s, pos) {
   };
 }
 
-export default async function handler(req, res) {
+async function handler(req, res) {
   try {
     const state = await j('https://api.sleeper.app/v1/state/nfl');
     const season = +state.season;
@@ -159,3 +160,5 @@ export default async function handler(req, res) {
     return res.status(502).json({ error: 'Live data unavailable' });
   }
 }
+
+export default withSentry(handler, 'live');
