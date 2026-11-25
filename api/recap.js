@@ -26,7 +26,7 @@ const DAY = 864e5;
 // RECAP_GRADE_W environment variable ("a,b,c,d"). Never shown on the site.
 const GRADE_W = (() => {
   const v = String(process.env.RECAP_GRADE_W || '').split(',').map(Number);
-  return v.length === 4 && v.every(x => x >= 0) ? v : [35, 25, 20, 20];
+  return v.length === 4 && v.every(x => x >= 0) ? v : [30, 25, 30, 15];
 })();
 
 const r1 = x => Math.round(x * 10) / 10;

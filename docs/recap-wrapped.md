@@ -169,7 +169,7 @@ The card list is now the 12-card build prompt (league trades, your trades + podi
 - **Comeback:** uses NFL kickoff times to work out the score as each game window started ("down X going into Monday night").
 - **In-progress seasons:** the recap uses finished weeks only and says `seasonComplete: false`.
 - **Empty states:** the response has a `cards` list saying which cards have real data; the slideshow skips the rest.
-- **Manager grade:** blends final finish, start/sit accuracy, trade results and waiver value. Provisional until the owner approves it. The blend can be set with the `RECAP_GRADE_W` environment variable and is never shown on the site.
+- **Manager grade:** blends final finish, start/sit accuracy, trade results and waiver value. The owner approved the blend on 2026-11-25. The blend can be set with the `RECAP_GRADE_W` environment variable and is never shown on the site.
 
 ## Build notes — Phase 2 (slideshow), Nov 2026
 
