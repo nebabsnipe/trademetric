@@ -9,6 +9,7 @@
     "node": ">=18"
   },
   "dependencies": {
-    "@sentry/node": "^11.17.0"
+    "@sentry/node": "^11.17.0",
+    "web-push": "^4.0.0"
   }
 }
