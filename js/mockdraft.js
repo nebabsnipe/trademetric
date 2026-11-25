@@ -392,9 +392,11 @@ function mdClock(){
 }
 function mdPaintStrip(){
   const r=MD.room,n=r.settings.teams,T=mdTotal(),el=document.getElementById('md-strip'),from=MD.shown,items=[];
-  for(let k=from;k<Math.min(T,from+14);k++){const si=mdSeatAt(k,n),s=r.seats[si];items.push(`<div class="md-up${k===from?' md-now':''}${si===MD.you?' md-me':''}" data-k="${k}">${mdAv(s,'md-av-sm')}<span><small>${mdPickLabel(k)}</small><b>${si===MD.you?'You':esc(s.name)}</b></span></div>`)}
+  for(let k=from;k<Math.min(T,from+16);k++){const si=mdSeatAt(k,n),s=r.seats[si],now=k===from;
+    if(k>from&&k%n===0)items.push(`<div class="md-up-rd"><span>R${k/n+1}</span></div>`);
+    items.push(`<div class="md-up${now?' md-now':''}${si===MD.you?' md-me':''}" data-k="${k}"><small>${now?'On the clock':mdPickLabel(k)}</small><b>${si===MD.you?'You':esc(s.name)}</b></div>`)}
   if(el.dataset.from!==String(from)&&el.dataset.from!==undefined&&!mdCalm()){el.classList.remove('md-slide');void el.offsetWidth;el.classList.add('md-slide')}
-  el.dataset.from=String(from);el.innerHTML=items.join('')||'<div class="md-up md-done-t">Draft complete</div>';
+  el.dataset.from=String(from);el.innerHTML=items.length?`<div class="md-strip-in">${items.join('')}</div>`:'<div class="md-strip-in"><div class="md-up md-now"><small>Final</small><b>Draft complete</b></div></div>';
 }
 function mdValueTag(o,k){const d=(k+1)-o.adp;return o.pos!=='K'&&o.pos!=='DST'&&d>=Math.max(6,.15*(k+1))}
 function mdIsReach(o,k){return o.pos!=='K'&&o.pos!=='DST'&&o.adp-(k+1)>=Math.max(8,.25*(k+1))}
