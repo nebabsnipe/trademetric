@@ -30,6 +30,7 @@ var LU_CFG = {
   var ELIG = { QB: ['QB'], RB: ['RB'], WR: ['WR'], TE: ['TE'], FLEX: ['RB', 'WR', 'TE'], SF: ['QB', 'RB', 'WR', 'TE'], K: ['K'], DST: ['DST'] };
   var r1 = function (x) { return Math.round(x * 10) / 10; };
   var r2 = function (x) { return Math.round(x * 100) / 100; };
+  var f1 = function (x) { return (Math.round(x * 10) / 10).toFixed(1); };
   var slotName = function (l) { return l === 'SF' ? 'superflex' : l === 'DST' ? 'defense' : l === 'K' ? 'kicker' : l; };
 
   /* the level for a projection gap (rounded to 2 decimals so 0.7 is exactly 0.7) */
@@ -72,20 +73,20 @@ var LU_CFG = {
       if (o.gap != null) a.gap = r1(o.gap);
       if (o.kind === 'empty') {
         a.title = 'You have an empty ' + lab + ' slot';
-        a.detail = bn ? 'Start ' + bn.name + ' there (' + a.benchProj + ' projected).' : 'Pick up a player who fits it.';
+        a.detail = bn ? 'Start ' + bn.name + ' there (' + f1(a.benchProj) + ' projected).' : 'Pick up a player who fits it.';
       } else if (o.kind === 'out' || o.kind === 'bye') {
         var why = o.kind === 'bye' ? 'is on bye' : CANT[st.status];
         a.title = bn ? 'Start ' + bn.name + ' over ' + st.name : 'Replace ' + st.name;
-        a.detail = st.name + ' ' + why + '.' + (bn ? ' ' + bn.name + ' is projected for ' + a.benchProj + '.' : ' Nobody on your bench fits the ' + lab + ' slot.');
+        a.detail = st.name + ' ' + why + '.' + (bn ? ' ' + bn.name + ' is projected for ' + f1(a.benchProj) + '.' : ' Nobody on your bench fits the ' + lab + ' slot.');
       } else if (o.level === 'start') {
         a.title = 'Start ' + bn.name + ' over ' + st.name;
-        a.detail = a.benchProj + ' vs ' + a.starterProj + ' projected (' + a.gap.toFixed(1) + ' more).';
+        a.detail = f1(a.benchProj) + ' vs ' + f1(a.starterProj) + ' projected (' + f1(a.gap) + ' more).';
       } else {
-        a.title = 'Consider starting ' + bn.name + ' over ' + st.name + ' (' + a.gap.toFixed(1) + ' more projected)';
-        a.detail = a.benchProj + ' vs ' + a.starterProj + ' projected.';
+        a.title = 'Consider starting ' + bn.name + ' over ' + st.name + ' (' + f1(a.gap) + ' more projected)';
+        a.detail = f1(a.benchProj) + ' vs ' + f1(a.starterProj) + ' projected.';
       }
       /* one line for the bar at the top of My Team */
-      a.banner = a.title + (o.kind === 'gap' ? ' (' + a.benchProj + ' vs ' + a.starterProj + ' projected)'
+      a.banner = a.title + (o.kind === 'gap' ? ' (' + f1(a.benchProj) + ' vs ' + f1(a.starterProj) + ' projected)'
         : o.kind === 'empty' ? (bn ? '. Start ' + bn.name + '.' : '. Pick up a player for it.')
         : '. ' + st.name + ' ' + (o.kind === 'bye' ? 'is on bye' : CANT[st.status]) + '.');
       /* swapKey names the change itself, so the same swap is never pushed twice; key adds the level so a
