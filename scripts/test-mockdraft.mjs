@@ -84,6 +84,16 @@ ok(r.room.seats.every((s, i) => i === 3 || s.strat), 'CPU strategies are shown o
 x = await call('user-a1', { action: 'home' }); ok(x.results.length === 1 && x.results[0].grade, 'result saved to history');
 
 /* ---- solo with no tables: the draft travels with the request ---- */
+{ // changing draft spot before the first pick
+  let y = await call('user-s1', { action: 'create', mode: 'solo', settings: { teams: 10, slot: 0, clock: 60, speed: 'fast' } }); const id = y.room.id, was = y.you, to = was === 7 ? 2 : 7;
+  ok(y.ok && y.picks.length === was, 'random spot: CPU picks up to the user');
+  let z = await call('user-s1', { action: 'slot', room: id, slot: to + 1 }); ok(z.ok && z.you === to && z.picks.length === to && z.room.cur === to && z.room.seats.filter(q => q.k === 'h').length === 1, 'changing spot restarts the draft from the new spot');
+  z = await call('user-s1', { action: 'slot', room: id, slot: 99 }); ok(!z.ok, 'a spot outside the room is refused');
+  const p = y.pool.find(q => !new Set((z.picks || []).map(k => k[0])).has(q[0])); z = await call('user-s1', { action: 'state', room: id });
+  const free = y.pool.find(q => !z.picks.some(k => k[0] === q[0]) && q[2] !== 'K' && q[2] !== 'DST')[0];
+  z = await call('user-s1', { action: 'pick', room: id, player: free }); ok(z.ok, 'pick from the new spot');
+  z = await call('user-s1', { action: 'slot', room: id, slot: 1 }); ok(!z.ok && z.code === 'late', 'no changing spot after your first pick');
+}
 console.log('API: solo without the database'); _t.mem = null;
 r = await call('user-b1', { action: 'create', mode: 'solo', settings: { teams: 10, slot: 1, clock: 0 } });
 ok(r.ok && r.carry && r.picks.length === 0, 'create returns the draft to carry');
@@ -128,9 +138,17 @@ console.log('API: online lobbies'); fresh();
 r = await call('on-01', { action: 'lobbies' }); ok(r.ok && r.lobbies.length === 3 && r.lobbies.every(l => l.filled === 0 && !l.startsAt), 'three open lobbies, no countdown yet');
 x = await call('on-01', { action: 'quick' }); const pub = x.room.id; ok(x.ok && x.room.mode === 'public' && x.room.startsAt === clock + 180e3, 'quick join starts the 3 minute countdown');
 x = await call('on-02', { action: 'quick' }); ok(x.room.id === pub, 'quick join picks the lobby starting soonest');
+{ // choosing a spot in the lobby
+  const open = x.room.seats.map((q, k) => q.k === 'o' ? k : -1).filter(k => k >= 0), other = x.room.seats.findIndex((q, k) => q.k === 'h' && k !== x.you);
+  let y = await call('on-02', { action: 'seat', room: pub, seat: other }); ok(!y.ok && y.code === 'taken', 'a taken spot is refused');
+  y = await call('on-02', { action: 'seat', room: pub, seat: open[0] }); ok(y.ok && y.you === open[0] && y.room.seats.filter(q => q.k === 'h').length === 2, 'moving to an open spot');
+  y = await call('on-zz', { action: 'seat', room: pub, seat: open[1] }); ok(!y.ok, 'outsiders cannot take a spot');
+  globalThis.__spot = open[0];
+}
 x = await call('on-02', { action: 'rename', room: pub, name: 'Custom' }); ok(!x.ok, 'no custom names in public rooms');
 x = await call('on-01', { action: 'chat', room: pub, text: 'hi' }); ok(!x.ok, 'no chat in public rooms');
 clock += 181e3; x = await call('on-01', { action: 'tick', room: pub }); ok(x.room.status === 'live' && x.room.seats.filter(s => s.k === 'c').length === x.room.settings.teams - 2, 'countdown ends: draft starts with CPU teams in the empty seats');
+{ const y = await call('on-02', { action: 'state', room: pub }); ok(y.you === globalThis.__spot, 'the spot chosen in the lobby is kept when the draft starts'); }
 r = await call('on-03', { action: 'lobbies' }); ok(r.lobbies.length === 3 && r.lobbies.every(l => l.room !== pub), 'a new lobby opens for that preset');
 x = await call('on-02', { action: 'leave', room: pub }); x = await call('on-01', { action: 'state', room: pub }); ok(x.room.seats.some(s => s.left && s.auto), 'leaving early puts the seat on autopick');
 

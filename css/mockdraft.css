@@ -397,3 +397,17 @@ body.md-in-room main.wrap{padding-bottom:0}
 .md-range-t{display:flex;justify-content:space-between;font:500 11px/1 var(--f-mono);color:var(--muted)}
 @media (max-width:1000px){.md-hl-r{display:none}}
 @media (max-width:700px){.md-row .md-jy{width:28px;height:28px}.md-hl{order:3;flex:1 1 100%;justify-content:stretch}.md-top-r{order:4}.md-hl-in{padding:5px 10px 5px 6px}.md-hl b{font-size:15px}.md-hl-in{width:100%}.md-hl-r{display:flex;flex-direction:row;margin-left:auto}}
+
+/* solo: "You pick 7th", with the choice of another spot */
+.md-spot{transition:none}
+.md-spot-in{width:min(420px,92%);background:var(--surface);border:1px solid var(--line);border-radius:16px;box-shadow:0 24px 70px rgba(0,0,0,.28);padding:26px 24px 22px;overflow:visible;animation:md-in .4s var(--md-spring) backwards}
+.md-spot-t{margin:6px 0 0;font:italic 800 34px/1 var(--f-display);text-transform:uppercase;letter-spacing:.005em}
+.md-spot-t b{color:var(--accent);display:inline-block;min-width:2.6ch;font-variant-numeric:tabular-nums}
+.md-spot-t b.md-land{animation:md-in .35s var(--md-spring)}
+.md-spot-in .note{margin:8px 0 0}
+.md-spot-g{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:6px;margin:16px 0 18px}
+.md-spot-g button{height:40px;border-radius:9px;border:1px solid var(--line);background:var(--surface-2);color:var(--ink);font:600 14px var(--f-mono);cursor:pointer;transition:background .12s ease,border-color .12s ease,transform .12s ease}
+.md-spot-g button:hover{border-color:var(--accent)}
+.md-spot-g button:active{transform:scale(.96)}
+.md-spot-g button[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:#fff}
+.md-seats-n{margin:0 0 10px}

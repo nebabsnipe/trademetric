@@ -241,7 +241,16 @@ function mdConfirm(title,text,yes,act){mdDlg('confirm',`<div class="md-sheet-h">
 /* ---------- starting, joining, leaving ---------- */
 async function mdBusy(fn){if(MD.busy)return;MD.busy=true;document.body.classList.add('md-busy');try{await fn()}finally{MD.busy=false;document.body.classList.remove('md-busy')}}
 function mdStartSolo(){return mdBusy(async()=>{if(!MD.ui.set)mdSetInit('solo');const set=MD.ui.set;mdAcctSet('mdSet2',set);mdDlgClose();MD.carry=null;
-  const j=await mdApi('create',{mode:'solo',settings:set});if(!j.ok)return mdFail(j);MD.home=null;mdApply(j)})}
+  const j=await mdApi('create',{mode:'solo',settings:set});if(!j.ok)return mdFail(j);MD.home=null;MD.ui.spot=!set.slot;MD.ui.spotAnim=true;mdApply(j,{instant:!set.slot})})}
+/* solo, random spot: say where you landed and let you take a different spot before you start */
+function mdSpotHtml(){const r=MD.room,n=r.settings.teams;return `<div class="md-shuffle-in md-spot-in"><div class="kicker">Draft order</div>
+  <h2 class="md-spot-t">You pick <b id="md-spot-n">${mdOrd(MD.you+1)}</b></h2><p class="note">That spot was picked at random. Keep it, or choose the one you want.</p>
+  <div class="md-spot-g" role="group" aria-label="Draft spot">${Array.from({length:n},(_,i)=>`<button type="button" data-md="spot" data-v="${i+1}" aria-pressed="${i===MD.you}">${i+1}</button>`).join('')}</div>
+  <button class="btn accent md-big md-wide" type="button" data-md="spot-go">Start drafting</button></div>`}
+function mdSpot(){const box=document.getElementById('md-spot'),r=MD.room;if(!box)return;box.innerHTML=mdSpotHtml();
+  if(MD.ui.spotAnim&&!mdCalm()){MD.ui.spotAnim=false;const e=document.getElementById('md-spot-n'),n=r.settings.teams,t0=Date.now(),iv=setInterval(()=>{const x=document.getElementById('md-spot-n');if(!x){clearInterval(iv);return}
+    if(Date.now()-t0>900){clearInterval(iv);x.textContent=mdOrd(MD.you+1);x.classList.add('md-land')}else x.textContent=mdOrd(1+Math.floor(Math.random()*n))},70)}else MD.ui.spotAnim=false}
+function mdSpotPick(v){if(v===MD.you+1)return;return mdBusy(async()=>{clearTimeout(MD.revT);const j=await mdApi('slot',{room:MD.room.id,slot:v});if(j.ok){MD.paused=false;mdApply(j,{instant:true})}else{if(j.code==='late')MD.ui.spot=false;mdFail(j);mdRender()}})}
 function mdCreateFriends(){return mdBusy(async()=>{const set=MD.ui.set;mdAcctSet('mdSet2',set);mdDlgClose();const j=await mdApi('create',{mode:'friends',settings:set});if(!j.ok)return mdFail(j);MD.home=null;mdApply(j);try{history.replaceState(null,'','#draft/'+j.room.code)}catch(e){}})}
 function mdJoinCode(code){return mdBusy(async()=>{code=String(code||'').replace(/[^A-Za-z0-9]/g,'').toUpperCase();if(code.length<4)return mdToast('That code looks too short.','bad');
   const j=await mdApi('join',{code});if(!j.ok){try{history.replaceState(null,'','#drafttools')}catch(e){}return mdFail(j)}MD.home=null;mdApply(j)})}
@@ -265,18 +274,20 @@ function mdLobbyRender(el){
       <p class="md-lobby-s">${n} teams · ${MD_SC[r.settings.scoring]} · ${r.rounds} rounds · ${r.settings.clock}s clock${r.settings.roster.SF?' · Superflex':''}</p></div>
       <button class="btn" type="button" data-md="ask-leave">Leave</button></div>
     <div class="md-lobby-g">
-      <section class="card md-seats-c"><div class="card-h"><h2>Seats</h2><span class="note">${filled} of ${n} filled${host?' · drag to set the draft order':''}</span></div>
+      <section class="card md-seats-c"><div class="card-h"><h2>${pub?'Choose your spot':'Seats'}</h2><span class="note">${filled} of ${n} filled${host?' · drag to set the draft order':''}</span></div>
+        ${pub?`<p class="note md-seats-n">You’re in spot ${MD.you+1}, so you pick ${mdOrd(MD.you+1)} in round 1. Tap any open spot to draft from there instead.</p>`:''}
         <ol class="md-seats${host?' md-sortable':''}" data-md-sort="seats">${r.seats.map((s,i)=>`<li class="md-seat${i===MD.you?' md-me':''}${s.k==='o'?' md-open':''}" data-i="${i}">
           ${host?`<span class="md-grip" data-md-grip aria-hidden="true">${MD_IC.grip}</span>`:''}<span class="md-seat-n">${i+1}</span>
           <span class="md-av-w">${mdAv(s)}${s.k==='h'?`<i class="md-dot${here(i)?' md-on':''}" title="${here(i)?'Here':'Away'}"></i>`:''}</span>
-          <span class="md-seat-m"><b>${s.k==='o'?'Open seat':esc(s.name)}</b><small>${s.k==='o'?(pub?'CPU team if nobody joins':'Waiting for a friend'):s.k==='c'?'CPU team':i===r.host?'Host':i===MD.you?'You':'Joined'}</small></span>
+          <span class="md-seat-m"><b>${s.k==='o'?(pub?'Open spot':'Open seat'):esc(s.name)}</b><small>${s.k==='o'?(pub?'CPU team if nobody takes it':'Waiting for a friend'):s.k==='c'?'CPU team':i===r.host?'Host':i===MD.you?'You':'Joined'}</small></span>
           ${s.k==='c'?'<span class="md-cpu">CPU</span>':''}
+          ${pub&&s.k==='o'?`<button class="btn small" type="button" data-md="seat" data-i="${i}">Draft here</button>`:''}
           ${i===MD.you&&!pub?`<button class="btn small" type="button" data-md="rename">Rename</button>`:''}
           ${host&&s.k!=='h'?`<button class="btn small ghost" type="button" data-md="cpu" data-i="${i}">${s.k==='c'?'Open seat':'Make CPU'}</button>`:''}
           ${host&&s.k==='h'&&i!==MD.you?`<button class="btn small ghost" type="button" data-md="kick" data-i="${i}">Remove</button>`:''}</li>`).join('')}</ol>
       </section>
       <div class="md-lobby-side">
-        ${pub?`<section class="card md-count"><div class="md-count-t" id="md-count">${r.startsAt?mdCountdown(r.startsAt-mdNow()):'3:00'}</div><b>${r.startsAt?'Draft starts in':'Countdown starts when someone joins'}</b><p class="note">Empty seats are filled by CPU teams, so the draft always starts on time. The draft order is random.</p></section>`
+        ${pub?`<section class="card md-count"><div class="md-count-t" id="md-count">${r.startsAt?mdCountdown(r.startsAt-mdNow()):'3:00'}</div><b>${r.startsAt?'Draft starts in':'Countdown starts when someone joins'}</b><p class="note">Empty seats are filled by CPU teams, so the draft always starts on time. The spot you choose is your pick in round 1.</p></section>`
         :`<section class="card md-invite"><div class="card-h"><h2>Invite friends</h2></div><p class="note">Anyone with this link and a free account can join.</p>
           <div class="md-link"><input type="text" readonly value="${esc(link)}" aria-label="Invite link" onfocus="this.select()"><button class="btn" type="button" data-md="copy" data-v="${esc(link)}">Copy</button>${navigator.share?`<button class="btn" type="button" data-md="share-link" data-v="${esc(link)}">Share</button>`:''}</div>
           <div class="md-codebig"><span>Room code</span><b>${esc(r.code||'')}</b></div></section>
@@ -348,8 +359,9 @@ function mdRoomRender(el){
     </div>
     <nav class="md-ptabs" aria-label="Draft room">${ptabs.map(([k,l])=>`<button type="button" data-md="ptab" data-v="${k}" aria-pressed="${MD.ui.ptab===k}">${l}</button>`).join('')}</nav>
     ${MD.ui.shuffle?'<div class="md-shuffle" id="md-shuffle"></div>':''}
+    ${solo&&MD.ui.spot&&r.status!=='done'?'<div class="md-shuffle md-spot" id="md-spot"></div>':''}
   </div>`;
-  mdSize();mdPaint();if(MD.ui.shuffle)mdShuffle();
+  mdSize();mdPaint();if(MD.ui.shuffle)mdShuffle();mdSpot();
 }
 function mdSize(){const rm=document.querySelector('.md-room');if(!rm)return;const top=rm.getBoundingClientRect().top+window.scrollY;rm.style.setProperty('--md-h',Math.max(420,window.innerHeight-top-(parseFloat(getComputedStyle(document.body).marginBottom)||0)-(mdPhone()?0:14))+'px')}
 addEventListener('resize',()=>{if(MD.page==='room'&&mdOn())mdSize()});
@@ -617,6 +629,9 @@ document.addEventListener('click',e=>{
     case 'sim':mdFlush();break;
     case 'pause':mdPause();break;
     case 'undo':mdUndo();break;
+    case 'spot':mdSpotPick(+b.dataset.v);break;
+    case 'spot-go':{MD.ui.spot=false;const x=document.getElementById('md-spot');if(x)x.remove();break}
+    case 'seat':mdLobbyAct('seat',{seat:+b.dataset.i});break;
     case 'back':mdBusy(async()=>{const j=await mdApi('back',{room:MD.room.id});if(j.ok){mdApply(j,{quiet:true});mdPing()}else mdFail(j)});break;
     case 'q':e.stopPropagation();mdQueueToggle(id);break;
     case 'draft':e.stopPropagation();mdDraft(id,b.dataset.sure==='1');break;

@@ -562,7 +562,8 @@ async function run(action, body, user) {
       }
       if (room.status !== 'lobby') throw new Fail('started', 'That draft has already started.', 409);
       room = await lobbyPatch(room, r => {
-        const i = r.seats.findIndex(s => s.k === 'o'); if (i < 0) throw new Fail('full', 'That room is full.', 409);
+        const open = r.seats.map((s, k) => s.k === 'o' ? k : -1).filter(k => k >= 0); if (!open.length) throw new Fail('full', 'That room is full.', 409);
+        const i = r.mode === 'public' ? open[Math.floor(rnd() * open.length)] : open[0];   // online: a random spot, which you can then change
         const seats = r.seats.slice(); seats[i] = newSeat('h', user, i, new Set());
         const patch = { seats, members: [...new Set([...(r.members || []), user.id])] };
         if (r.mode === 'public' && !r.starts_at) patch.starts_at = iso(now + LOBBY_MS);
@@ -600,6 +601,32 @@ async function run(action, body, user) {
         return { seats };
       });
       recolor(room); return pack(room, { pool: action === 'settings' });
+    }
+    /* ----- choosing where you draft from ----- */
+    case 'seat': {                                                 // online lobby: move to an open spot
+      needStore(); let room = await load(); member(room);
+      if (room.mode !== 'public') throw new Fail('bad', 'The host sets the draft order in this room.');
+      if (room.status !== 'lobby') throw new Fail('started', 'The draft has already started.', 409);
+      room = await lobbyPatch(room, r => {
+        const seats = r.seats.map(s => ({ ...s })), i = seatOf(r, user.id), to = Math.round(+body.seat);
+        if (i < 0) throw new Fail('not_member', 'You’re not in this draft room.', 403);
+        if (to === i) return { seats };
+        if (!(to >= 0 && to < seats.length) || seats[to].k !== 'o') throw new Fail('taken', 'That spot was just taken. Pick another.', 409);
+        seats[to] = seats[i]; seats[i] = { k: 'o' }; return { seats };
+      });
+      recolor(room); return pack(room);
+    }
+    case 'slot': {                                                 // solo: change your draft spot before your first pick; the draft restarts from pick 1
+      const room = await load(), i = member(room); if (room.mode !== 'solo') throw new Fail('bad', 'Only solo drafts can change spot this way.');
+      if (room.status !== 'live' && room.status !== 'paused') throw new Fail('not_live', 'This draft isn’t running.', 409);
+      const to = Math.round(+body.slot) - 1; if (!(to >= 0 && to < room.seats.length)) throw new Fail('bad', 'No such draft spot.');
+      const picks = await S.picksGet(room.id);
+      if (picks.some(p => p.seat === i && p.how === 'user')) throw new Fail('late', 'You’ve already made a pick. Start a new draft to change your spot.', 409);
+      if (to === i && !picks.some(p => p.seat === i)) return pack(room);
+      const me = room.seats[i]; room.seats[i] = room.seats[to]; room.seats[to] = me; me.miss = 0; me.auto = false; recolor(room);
+      await S.picksDeleteFrom(room.id, 0); room.cur = 0; room.status = 'live'; room.paused_left = null; setClock(room, now);
+      await S.roomPatch(room.id, null, { v: room.v || 0, status: 'live', cur: 0, pick_deadline: room.pick_deadline, paused_left: null, seats: room.seats }); room.v = (room.v || 0) + 1;
+      const r = await sync(room); return pack(r.room, { made: r.made.map(m => [m.player_id, m.how, m.delay]) });
     }
     case 'rename': {
       needStore(); let room = await load(); const i = member(room);
@@ -729,7 +756,7 @@ async function lobbyList(S, now, raw) {
 /* a public lobby whose countdown has run out starts, with CPU teams in the empty seats */
 async function lobbyTick(S, room, now, sync) {
   if (room.mode !== 'public' || !room.starts_at || now < ms(room.starts_at)) return room;
-  const c = { ...room, seats: room.seats.map(s => ({ ...s })) }; startRoom(c, now, true);
+  const c = { ...room, seats: room.seats.map(s => ({ ...s })) }; startRoom(c, now, false);   // people chose their spots in the lobby
   if (!(await S.roomPatch(room.id, room.v || 0, { seats: c.seats, status: 'live', cur: 0, pick_deadline: c.pick_deadline, starts_at: null }))) return (await S.roomGet(room.id)) || room;
   c.v = (room.v || 0) + 1; await S.ping(room.id);
   const r = await sync(c); return r.room;

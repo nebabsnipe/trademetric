@@ -45,7 +45,7 @@ The live site's changes through 2026-11-25 (account sync, shared news store, New
 
 The Draft Tools tab (`#drafttools`) is now the mock draft entry page for anyone signed in. Signed out it stays the locked page, with a small looping board preview. Draft pick values is still Coming soon.
 
-- **Three ways to draft, one draft room:** Draft vs CPU (starts at once), Draft with friends (private room, invite link `#draft/<code>`), Join an online draft (three public lobbies from presets, 3-minute countdown from the first person in, Quick join). Empty seats are always filled by CPU teams.
+- **Three ways to draft, one draft room:** Draft vs CPU (starts at once), Draft with friends (private room, invite link `#draft/<code>`), Join an online draft (three public lobbies from presets, 3-minute countdown from the first person in, Quick join, choose your spot). Empty seats are always filled by CPU teams.
 - **Files:** `js/mockdraft.js` (everything on the page), `css/mockdraft.css` (all classes start with `md-`), `api/draft.js` (rooms, rules, CPU drafting, clock, grades), `supabase/mockdraft.sql` (tables), `scripts/test-mockdraft.mjs` (checks). Small hooks: `renderProTab` in `js/offseason.js`, `go()` and `enterApp()` in `js/app.js` (the `#draft/<code>` link), `index.html` (files, FAQ entry "Mock drafts"), `vercel.json` (data files bundled with the function).
 - **Player order:** "ADP" in the room is the blend of expert rank and market value the rankings already load, adjusted for the room's scoring (and the superflex market numbers in superflex rooms). The source is never named. TM rank and the vs-market chip sit beside it; the pool can be sorted by TM rank with tier dividers. Kickers and defenses are in the data, so they are in the pool, placed in the last three rounds.
 - **CPU teams:** each gets a hidden plan at random (balanced, running backs early, receivers early, early tight end, early quarterback, late quarterback) that only steers the first six rounds. Picks are weighted toward the best few by ADP, with a wider spread in later rounds. They fill starting spots before the bench, take no second QB or TE before the starters are in (except superflex), no K or D/ST before the last three rounds, and always end with a full legal lineup. The plan is shown on the results page once the draft is over.
@@ -66,6 +66,11 @@ The Draft Tools tab (`#drafttools`) is now the mock draft entry page for anyone 
 - **Team is clearer everywhere:** jersey in team colors plus a team tag in the team's color on pool rows, the queue, rosters, the picks feed and the player card.
 - **Queue button** is now a + (a check once queued), so the star only means favorite.
 - **Draft button** is smaller. A reach turns it into a small outlined "Confirm" with a one-line note under the name, and it goes back by itself after 4 seconds.
+
+### Choosing your draft spot (2026-11-25, owner's request)
+- **Solo, random spot:** the draft opens on a small "You pick 7th" card with every spot as a button. Keep it and press Start drafting, or tap another spot. Changing spot restarts the draft from pick 1 at the new spot, and is allowed until your first pick (server action `slot`). Choosing a spot in the settings skips the card.
+- **Online lobbies:** joining puts you in a random open spot, and the lobby is now a "Choose your spot" screen: tap "Draft here" on any open spot to move (server action `seat`). The order is no longer shuffled when the countdown ends, so the spot you chose is your pick in round 1.
+- Friends rooms are unchanged: the host sets the order.
 
 ### Setup needed (not done yet)
 1. Run `supabase/mockdraft.sql` in the Supabase SQL editor.
