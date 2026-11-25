@@ -2532,3 +2532,14 @@ body[data-tab="news"] .tmn-chips{display:none}
 .tdl-big{margin-left:auto;font-size:26px;font-variant-numeric:tabular-nums;text-shadow:0 0 14px rgba(255,77,79,.5)}
 @media (max-width:700px){.tmn-ban.tdl.final h3{font-size:20px}.tdl-cd{grid-column:2;flex-direction:row!important;align-items:baseline!important;gap:6px}.tdl-cd b{font-size:26px!important}.tdl-big{font-size:21px}.tdl-seal.fin{width:44px;height:44px}}
 @media (prefers-reduced-motion:reduce){.tdl-seal.fin,.tdl-seal.fin svg .tdl-hand,.tmn-chip.tdl.final i{animation:none!important}}
+
+/* ===== Phone alerts (js/push.js), in Account → Leagues → Notifications ===== */
+.push-sec{margin-top:18px;padding-top:16px;border-top:1px solid var(--line)}
+.push-sec h3{margin:0 0 6px;font:italic 800 17px var(--f-display);text-transform:uppercase;letter-spacing:.01em}
+.push-sec .note{margin:0 0 10px}
+.push-steps{margin:4px 0 0;padding-left:20px;display:grid;gap:6px;font-size:14px}
+.push-steps svg{vertical-align:-2px;color:var(--accent)}
+.push-on{display:flex;align-items:center;gap:8px;margin:0 0 6px;font-weight:700;font-size:14px}
+.push-on i{width:9px;height:9px;border-radius:50%;background:var(--good);box-shadow:0 0 0 3px var(--good-soft)}
+.push-tb{margin-top:12px;flex-wrap:wrap;gap:8px}
+.push-msg{margin-top:10px!important}

@@ -9,11 +9,16 @@ if(location.hostname==='trademetric-rho.vercel.app')location.replace('https://ww
 <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png?v=3">
 <link rel="icon" type="image/png" sizes="512x512" href="/icon-512.png?v=3">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png?v=3">
+<link rel="manifest" href="/manifest.webmanifest?v=1">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="TradeMetric">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
 <meta name="theme-color" content="#141414">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600;700;800&family=Kanit:ital,wght@0,700;0,800;1,600;1,700;1,800&display=swap">
 <meta name="description" content="Fantasy football trades, rankings and lineup advice built on your league's exact settings.">
-<link rel="stylesheet" href="css/styles.css?v=47">
+<link rel="stylesheet" href="css/styles.css?v=48">
 </head>
 <body class="signed-out">
 <div class="topbar">
@@ -333,7 +338,7 @@ if(location.hostname==='trademetric-rho.vercel.app')location.replace('https://ww
 <script>
 /* Load the stats snapshot, then start the app */
 fetch('data/nfl.json',{cache:'no-cache'}).then(r=>r.json()).then(d=>{
-  window.NFL_DATA=d;const n=document.createElement('script');n.src='js/news.js?v=29';n.onload=n.onerror=()=>{const s=document.createElement('script');s.src='js/app.js?v=39';s.onload=()=>{const dl=document.createElement('script');dl.src='js/deadline.js?v=1';document.body.appendChild(dl);const m=document.createElement('script');m.src='js/mobile.js?v=4';document.body.appendChild(m);const q=document.createElement('script');q.src='js/polish.js?v=5';document.body.appendChild(q)};document.body.appendChild(s)};document.body.appendChild(n);
+  window.NFL_DATA=d;const n=document.createElement('script');n.src='js/news.js?v=30';n.onload=n.onerror=()=>{const s=document.createElement('script');s.src='js/app.js?v=40';s.onload=()=>{const dl=document.createElement('script');dl.src='js/deadline.js?v=2';document.body.appendChild(dl);const pu=document.createElement('script');pu.src='js/push.js?v=1';document.body.appendChild(pu);const m=document.createElement('script');m.src='js/mobile.js?v=4';document.body.appendChild(m);const q=document.createElement('script');q.src='js/polish.js?v=5';document.body.appendChild(q)};document.body.appendChild(s)};document.body.appendChild(n);
 }).catch(()=>{document.body.insertAdjacentHTML('afterbegin','<p style="padding:20px;font-family:sans-serif">Could not load player data. Refresh to try again.</p>')});
 </script>
 </body>
