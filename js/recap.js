@@ -222,7 +222,12 @@
     }
     // 11: clutch
     var CL = R.clutch || {}, cr = CL.closeRecord, er = CL.eliminationRecord, cb = CL.comeback;
-    var hasClose = !!(cr && cr.wins + cr.losses > 0), hasElim = !!(er && er.wins + er.losses > 0);
+    /* only the parts that are actually clutch are shown: a close-game record that isn't a losing one, and at least one elimination win */
+    var hasClose = !!(cr && cr.wins + cr.losses > 0 && cr.wins >= cr.losses), hasElim = !!(er && er.wins >= 1);
+    var cbs = CL.comebacks && CL.comebacks.length ? CL.comebacks : cb ? [cb] : [];
+    setV('clHead', !hasClose && !hasElim && cbs.length ? (cbs.length > 1 ? 'You were never out of it' : 'You came back from the dead') : 'You showed up when it mattered');
+    setIf('clMore', cbs.length > 1);
+    if (cbs.length > 1) renderList('clMore', cbs.slice(1, 3).map(function (c) { return { week: c.week, deficit: f1(c.deficit), goingInto: c.goingInto, finalMargin: f1(c.finalMargin) }; }));
     setIf('clClose', hasClose); setIf('clElim', hasElim);
     if (hasClose) setV('clCloseRec', rec(cr));
     if (hasElim) setV('clElimRec', rec(er));
@@ -265,8 +270,9 @@
     facts.push({ n: 1, l: 'final grade' });
     renderList('coverFacts', facts);
     side.innerHTML = '<div class="rc-side-h"><div class="rc-lbl">Season Recap · ' + esc(yr) + '</div><div class="rc-k rc-side-t">' + esc(R.me.teamName) + '</div><div class="rc-side-s">' + esc(R.league.name) + '</div></div>' +
-      '<ol class="rc-ch">' + CARDS.map(function (c, i) { return '<li><button type="button" data-go="' + i + '" disabled><i>' + (i < 9 ? '0' : '') + (i + 1) + '</i>' + TITLES[c.key] + '</button></li>'; }).join('') + '</ol>' +
-      '<div class="rc-side-f"><kbd>←</kbd><kbd>→</kbd> move between cards<br><kbd>Space</kbd> pause</div>';
+      '<div class="rc-np"><div class="rc-np-n"><b data-sv="num">01</b><span>/ ' + (CARDS.length < 10 ? '0' : '') + CARDS.length + '</span></div><div class="rc-np-t" data-sv="title">' + esc(TITLES[CARDS[0].key]) + '</div><div class="rc-np-x" data-sv="next"></div></div>' +
+      '<div class="rc-dots" role="list">' + CARDS.map(function (c, i) { return '<button type="button" role="listitem" data-go="' + i + '" disabled title="' + esc(TITLES[c.key]) + '" aria-label="' + (i + 1) + '. ' + esc(TITLES[c.key]) + '"></button>'; }).join('') + '</div>' +
+      '<div class="rc-side-f"><kbd>←</kbd><kbd>→</kbd> move between cards<br><kbd>Space</kbd> pause · tap a bar to jump</div>';
     sideEls = Array.prototype.slice.call(side.querySelectorAll('[data-go]'));
 
     segEls = renderList('segs', CARDS.map(function () { return { w: '0%' }; })).map(function (s) { return s.firstElementChild; });
@@ -355,6 +361,9 @@
     seen = Math.max(seen, c);
     var tone = /^#/.test(card.glow[1]) ? card.glow[1] : '#a78bfa';
     sideEls.forEach(function (b, i) { b.disabled = false; b.className = i === c ? 'rc-now' : i <= seen ? 'rc-seen' : ''; if (i === c) { b.style.setProperty('--rc-now', tone); b.setAttribute('aria-current', 'true'); } else b.removeAttribute('aria-current'); });
+    var sv = function (k, v) { var e = side.querySelector('[data-sv="' + k + '"]'); if (e && e.textContent !== v) { e.textContent = v; e.classList.remove('rc-sv-in'); void e.offsetWidth; e.classList.add('rc-sv-in'); } };
+    side.style.setProperty('--rc-now', tone);
+    sv('num', (c < 9 ? '0' : '') + (c + 1)); sv('title', TITLES[card.key]); sv('next', CARDS[c + 1] ? 'Next: ' + TITLES[CARDS[c + 1].key] : 'Last card');
     setIf('toast', false);
     draw();
   }
@@ -422,10 +431,10 @@
     else if (EMBED) s = Math.min((vw - 12) / 390, (vh - 60) / 844); // leaves room for the site's close button above the card
     stage.style.transform = 'scale(' + s.toFixed(4) + ')';
     stage.style.margin = ((844 * s - 844) / 2) + 'px ' + ((390 * s - 390) / 2) + 'px';
-    var sw = Math.min(340, Math.max(260, Math.round(300 * s)));
+    var sw = Math.min(250, Math.max(210, Math.round(220 * s)));
     var wide = !DEMO && sideReady && vw >= 760 && vw >= 390 * s + sw + 16 + 32;
     side.hidden = !wide;
-    if (wide) { side.style.width = sw + 'px'; side.style.height = Math.round(844 * s) + 'px'; }
+    if (wide) { side.style.width = sw + 'px'; side.style.height = ''; }
   }
   var sideReady = false, onCover = false;
   window.addEventListener('resize', fit); fit();

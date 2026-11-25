@@ -187,3 +187,10 @@ The card list is now the 12-card build prompt (league trades, your trades + podi
 - **Team badges (owner's request, 2026-11-25):** every player on the trade, fleece and waiver cards has a small badge in his NFL team's colors with the team's letters, so you can tell who is who at a glance. Colors are the same list the main site uses (`TC` in `js/recap.js`).
 - **Waiver card:** under "Your best waiver add" there is now a smaller "Your next best adds" list (up to three, from `waivers.myNext` in the API). The league top 5 rows also carry the team badge.
 - **Not done yet:** a public link/preview image for sharing (only the image is shareable for now).
+
+## Clutch card and side panel (2026-11-25, owner's notes)
+
+- **Clutch is only shown when it is true.** The card appears if you had a winning record in games decided by under 10 points (at least two of them), or won an elimination game without a losing record in them, or made a real comeback (down 10 or more at a kickoff window and won). Otherwise the card is left out and the recap is one card shorter. Inside the card, a losing close-game record or a winless elimination record is not shown.
+- **Biggest comebacks.** The API now returns `clutch.comebacks` (up to three, one per game, biggest hole first; `clutch.comeback` is still the biggest). The card shows the biggest as before and the next two as short rows under it. With comebacks but no clutch records the headline changes ("You were never out of it").
+- **Side panel is smaller.** The full list of card names is gone. It now shows the card number in the card's color, its name, what's next, and one small bar per card (tap a bar to jump). It is about two thirds the old width and only as tall as its content.
+- Checked with the sample recap (`/recap?sample`) in three cases: clutch, not clutch (card skipped, 11 cards), and comebacks only.
