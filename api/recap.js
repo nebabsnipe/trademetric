@@ -13,6 +13,8 @@
 //     player at the same position each week.
 //   - weekly scores, lineups and player points come from the weekly box scores.
 
+import { betaOn, viewerOf } from './_plan.js';
+
 const SUPA_URL = process.env.SUPABASE_URL || 'https://rltmfnmgbfgecbaevfvc.supabase.co';
 const SUPA_ANON = process.env.SUPABASE_ANON_KEY || 'sb_publishable_AFX79aKgqorAx3zgOyKatw_o_3_ERWG';
 const ESPN = 'https://lm-api-reads.fantasy.espn.com/apis/v3/games/ffl/seasons/';
@@ -523,6 +525,8 @@ export default async function handler(req, res) {
 
   const tok = String(req.headers.authorization || '').replace(/^Bearer\s+/i, '').trim();
   if (!tok) return res.status(401).json({ code: 'sign_in', error: 'Sign in to see your recap.' });
+  /* the season recap is Pro (during the beta every signed-in account has it): api/_plan.js */
+  if (!betaOn() && !(await viewerOf(req)).pro) return res.status(403).json({ code: 'pro', error: 'Your season recap is part of TradeMetric Pro.' });
   let who;
   try { who = await ownerTeam(tok, league); } catch (e) { return res.status(502).json({ code: 'upstream', error: "Couldn't check your sign-in. Try again." }); }
   if (who.error === 401) return res.status(401).json({ code: 'sign_in', error: 'Sign in to see your recap.' });

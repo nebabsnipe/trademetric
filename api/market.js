@@ -2,6 +2,7 @@
 // at Vercel's edge. The daily data job still saves a copy (data/market.json) as the fallback,
 // along with KeepTradeCut, which only updates daily.
 import players from './_players.js';
+import { planRoute } from './_plan.js';
 
 async function fc(qbs) {
   const r = await fetch(`https://api.fantasycalc.com/values/current?isDynasty=false&numQbs=${qbs}&numTeams=12&ppr=1`, {
@@ -19,6 +20,8 @@ async function fc(qbs) {
 export default async function handler(req, res) {
   /* /api/players is served from here too (see the rewrite in vercel.json), to stay inside Vercel's limit of 12 functions */
   if (req.query && req.query.fn === 'players') return players(req, res);
+  /* /api/plan too: is the beta on, and does this person have Pro (api/_plan.js) */
+  if (req.query && req.query.fn === 'plan') return planRoute(req, res);
   try {
     const [one, two] = await Promise.all([fc(1).catch(() => []), fc(2).catch(() => [])]);
     if (one.length < 50 && two.length < 50) throw new Error('empty');

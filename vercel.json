@@ -118,6 +118,10 @@
     {
       "source": "/api/players",
       "destination": "/api/market?fn=players"
+    },
+    {
+      "source": "/api/plan",
+      "destination": "/api/market?fn=plan"
     }
   ]
 }

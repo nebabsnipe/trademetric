@@ -2,6 +2,8 @@
 // Runs on Vercel. Your Anthropic API key lives in the ANTHROPIC_API_KEY
 // (or APIKEY1) environment variable, never in the browser.
 
+import { proOnly } from './_plan.js';
+
 const API_KEY = process.env.ANTHROPIC_API_KEY || process.env.APIKEY1;
 const MODEL = process.env.ANTHROPIC_MODEL || 'claude-sonnet-5-5';
 const MAX_PROMPT = 60000;          // characters
@@ -25,7 +27,7 @@ function parseJSON(text) {
   return undefined;
 }
 
-export default async function handler(req, res) {
+async function handler(req, res) {
   if (req.method === 'GET') {
     return res.status(200).json({ ok: !!API_KEY });
   }
@@ -74,3 +76,6 @@ export default async function handler(req, res) {
 }
 
 export const config = { maxDuration: 60 };
+
+/* GET only says whether the AI is set up. Asking it anything is Pro: refused for signed-out visitors and free accounts once the beta switch is off (api/_plan.js) */
+export default proOnly(handler, req => req.method !== 'GET');

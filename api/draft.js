@@ -21,8 +21,8 @@ import { randomUUID, randomInt } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 
-/* BETA: keep in step with TMO_BETA_PRO in js/offseason.js. While true every signed-in account counts as Pro. */
-const BETA_PRO = true;
+/* Who has Pro: the one beta switch and profiles.plan, in api/_plan.js */
+import { isProPlan } from './_plan.js';
 const SUPA_URL = (process.env.SUPABASE_URL || 'https://rltmfnmgbfgecbaevfvc.supabase.co').replace(/\/+$/, '');
 const SUPA_ANON = process.env.SUPABASE_ANON_KEY || 'sb_publishable_AFX79aKgqorAx3zgOyKatw_o_3_ERWG';
 const SUPA_KEY = process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY || '';
@@ -84,7 +84,7 @@ async function userOf(req) {
       if (u && u.id) {
         const p = await fetch(`${SUPA_URL}/rest/v1/profiles?id=eq.${u.id}&select=username,plan`, { headers: h });
         const rows = p.ok ? await p.json() : [], pr = rows[0] || {};
-        v = { id: u.id, name: clean(pr.username || (u.email || '').split('@')[0] || 'Player', 24) || 'Player', pro: BETA_PRO || !!(pr.plan && pr.plan !== 'free') };
+        v = { id: u.id, name: clean(pr.username || (u.email || '').split('@')[0] || 'Player', 24) || 'Player', pro: isProPlan(pr.plan) };
       }
     }
   } catch { return null; }

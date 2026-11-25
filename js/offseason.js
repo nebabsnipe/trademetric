@@ -8,10 +8,8 @@
    Preview data note: until offseason consensus and ADP feeds exist, consensus = rest-of-season expert
    ranks (data/nfl.json "ros") and market = FantasyCalc redraft values (data/market.json "fc1"). */
 var TMO_W={cons:.40,adp:.275,tm:.325};
-/* BETA: while true, every signed-in account gets Pro for free. Set to false when the beta ends
-   to bring back the paywall (and the 7-day free trial, once checkout is built). */
-var TMO_BETA_PRO=true;
-var TMO_MODE_KEY='tm_mode_override',TMO_PRO_KEY='tm_pro_preview';
+/* Who has Pro is decided by the server (the beta switch and profiles.plan): see js/plan.js and api/_plan.js. */
+var TMO_MODE_KEY='tm_mode_override';
 var TMO={rows:null,pos:'ALL',view:'all',q:'',open:null,limit:100,market:null,takes:{}};
 /* Pro tools that have a tab in the offseason nav. Signed out they show a locked page; signed in, a Coming soon page. */
 var TMO_PRO_TABS=['recap','drafttools','leaguefit'];
@@ -42,11 +40,8 @@ function tmoSetMode(m){
 }
 function tmoHomeTab(){return tmoMode()==='off'?'home':'team'}
 function tmoSignedIn(){return typeof USER!=='undefined'&&!!USER}
-function tmoIsPro(){
-  if(TMO_BETA_PRO&&tmoSignedIn())return true;
-  if(typeof PROFILE!=='undefined'&&PROFILE&&PROFILE.plan&&PROFILE.plan!=='free')return true;
-  try{return TMO_IS_PREVIEW&&localStorage.getItem(TMO_PRO_KEY)==='1'}catch(e){return false}
-}
+function tmoIsPro(){return typeof tmIsPro==='function'?tmIsPro():tmoSignedIn()}
+const tmoBeta=()=>typeof tmBeta!=='function'||tmBeta();
 
 /* ---------- the TM Score ---------- */
 var TMO_PEAK={QB:[26,33],RB:[23,26],WR:[24,28],TE:[25,29]};
@@ -183,12 +178,12 @@ function renderOffHome(){
   <section class="tmo-pro">
     <div class="tmo-pro-h">
       <div><div class="kicker">TradeMetric Pro</div><h2>Built for your league, not everyone's.</h2>
-      <p>The rankings are free. Pro turns them into decisions for your team.${TMO_BETA_PRO?' <b>Free for every account during the beta.</b>':''}</p></div>
-      ${pro?`<span class="tmo-pro-on">${TMO_BETA_PRO?'Pro active · free during beta':'Pro active'}</span>`:`<a class="btn accent" href="${signed?'#account':'#signin'}">${signed?'See Pro plans':TMO_BETA_PRO?'Sign in for free Pro':'Sign in to get Pro'}</a>`}
+      <p>The rankings are free. Pro turns them into decisions for your team.${tmoBeta()?' <b>Free for every account during the beta.</b>':''}</p></div>
+      ${pro?`<span class="tmo-pro-on">${tmoBeta()?'Pro active · free during beta':'Pro active'}</span>`:`<a class="btn accent" href="${signed?'#upgrade-pro':'#signin'}">${signed?'See Pro':tmoBeta()?'Sign in for free Pro':'Sign in to get Pro'}</a>`}
     </div>
     <div class="tmo-tools">${TOOLS.map(([h,p,k])=>`<div class="tmo-tool"><div class="tmo-tool-h"><h3>${h}</h3>${pro?'':'<span class="tmo-lock">'+TMO_LOCK+'Pro</span>'}</div><p>${p}</p>${k==='trade'||k==='picks'||k==='fit'?'<span class="tmo-soon">Coming soon</span>':k==='recap'?'<a class="tmo-link" href="#recap">Open Recap →</a>':k==='mock'?'<a class="tmo-link" href="#drafttools">Open Draft Tools →</a>':''}</div>`).join('')}</div>
   </section>
-  ${TMO_IS_PREVIEW&&!TMO_BETA_PRO?`<p class="tmo-dev note">Preview only: <button class="btn small" type="button" data-tmo-pro>${pro?'View as free':'View as Pro'}</button> Consensus and market numbers use this season's rest-of-season data until the offseason feeds are added.</p>`:''}`;
+  ${TMO_IS_PREVIEW?`<p class="tmo-dev note">Preview only: consensus and market numbers use this season's rest-of-season data until the offseason feeds are added.</p>`:''}`;
 }
 
 /* ---------- Rankings ---------- */
@@ -242,7 +237,7 @@ function tmoWhy(o,pro){
       ${f('Expected points per game',o.xfpg!=null?o.xfpg.toFixed(1)+pct(o.xfpgP):'—')}
       ${o.pos!=='QB'?f('Receiving role (WOPR)',o.wopr!=null?o.wopr.toFixed(2)+pct(o.woprP):'—'):''}</ul></div>
     <div class="tmo-why-col tmo-take" data-tmo-take="${o.id}">${pro?tmoTakeHtml(o):tmoTakeGhost()}</div></div>`;
-  return pro?inner:`<div class="tmo-locked"><div class="tmo-blur" aria-hidden="true">${inner}</div><div class="tmo-unlock">${TMO_LOCK}<b>See why we rank ${esc(o.n.replace(/\s+(Jr\.?|Sr\.?|II|III|IV|V)$/,'').split(' ').slice(-1)[0])} #${o.rank}</b><span>${TMO_BETA_PRO?'Sign in to see the score breakdown and our take on him. Pro is free during the beta.':'The score breakdown and our take on him are part of TradeMetric Pro.'}</span><a class="btn accent small" href="${tmoSignedIn()?'#account':'#signin'}">${TMO_BETA_PRO?'Sign in free':'Get Pro'}</a></div></div>`;
+  return pro?inner:`<div class="tmo-locked"><div class="tmo-blur" aria-hidden="true">${inner}</div><div class="tmo-unlock">${TMO_LOCK}<b>See why we rank ${esc(o.n.replace(/\s+(Jr\.?|Sr\.?|II|III|IV|V)$/,'').split(' ').slice(-1)[0])} #${o.rank}</b><span>${tmoBeta()?'Sign in to see the score breakdown and our take on him. Pro is free during the beta.':'The score breakdown and our take on him are part of TradeMetric Pro.'}</span><a class="btn accent small" href="${tmoSignedIn()?'#upgrade-pro':'#signin'}">${tmoBeta()?'Sign in free':'Get Pro'}</a></div></div>`;
 }
 
 /* ---------- the TradeMetric take (Pro): written on the server by AI the first time a panel is opened ---------- */
@@ -302,6 +297,8 @@ function renderProTab(){
     if(signed){if(code){try{sessionStorage.removeItem('md-join')}catch(e){}MD.join=code}mdRender();return}
     document.body.classList.remove('md-in-room');
   }
+  /* a free account (only once the beta is over) gets the one upgrade screen (js/plan.js) */
+  if(signed&&!pro&&key!=='drafttools'&&typeof tmRenderUpgrade==='function'){if(key==='recap'&&typeof rcTabOff==='function')rcTabOff();el.dataset.k='';TM_UPG.feat=key;tmRenderUpgrade(el);return}
   /* Recap, signed in: the slide-to-play screen (js/recap-tab.js). Signed out keeps the locked page below. */
   if(key==='recap'&&typeof rcTabRender==='function'){if(signed&&pro){el.dataset.k='';rcTabRender(el);return}rcTabOff()}
   const live=key==='recap';/* the Season Recap slideshow is built (recap.html); the other pages are still on the way */
@@ -310,11 +307,11 @@ function renderProTab(){
   const chip=pro?(live?'':'<span class="tmo-soon-chip">Coming soon</span>'):`<span class="tmo-lock">${TMO_LOCK}Pro</span>`;
   const cta=pro&&live?`<p class="tmo-pp-note"><b>Your recap is ready.</b> It plays like a slideshow, about a minute start to finish. Tap to move through the cards.</p>
       <div class="tmo-cta"><a class="btn accent tmo-big" href="/recap" data-recap-open="mine">Open your recap</a></div>`
-    :pro?`<p class="tmo-pp-note"><b>You’re in.</b> ${TMO_BETA_PRO?'Pro is free for your account during the beta, and ':'It’s part of your Pro plan, and '}${esc(P.h)} will show up here as soon as it’s ready.</p>
+    :pro?`<p class="tmo-pp-note"><b>You’re in.</b> ${tmoBeta()?'Pro is free for your account during the beta, and ':'It’s part of your Pro plan, and '}${esc(P.h)} will show up here as soon as it’s ready.</p>
       <div class="tmo-cta"><a class="btn tmo-big" href="#tmrank">See the rankings</a></div>`
-    :signed?`<p class="tmo-pp-note">${esc(P.h)} is part of TradeMetric Pro.</p><div class="tmo-cta"><a class="btn accent tmo-big" href="#account-plan">See Pro plans</a></div>`
-    :`<p class="tmo-pp-note">${TMO_BETA_PRO?'<b>Pro is free during the beta.</b> Sign in and it’s yours, no card needed.':'Sign in to get TradeMetric Pro.'}</p>
-      <div class="tmo-cta"><a class="btn accent tmo-big" href="#signin">${TMO_BETA_PRO?'Sign in free':'Sign in'}</a><a class="btn tmo-big" href="#tmrank">See the free rankings</a></div>`;
+    :signed?`<p class="tmo-pp-note">${esc(P.h)} is part of TradeMetric Pro.</p><div class="tmo-cta"><a class="btn accent tmo-big" href="#upgrade-${key}">See Pro</a></div>`
+    :`<p class="tmo-pp-note">${tmoBeta()?'<b>Pro is free during the beta.</b> Sign in and it’s yours, no card needed.':'Sign in to get TradeMetric Pro.'}</p>
+      <div class="tmo-cta"><a class="btn accent tmo-big" href="#signin">${tmoBeta()?'Sign in free':'Sign in'}</a><a class="btn tmo-big" href="#tmrank">See the free rankings</a></div>`;
   el.innerHTML=`<div class="tmo-pp">
     <div class="tmo-pp-main">
       <div class="tmo-pp-k"><span class="kicker">TradeMetric Pro</span>${chip}</div>
@@ -354,7 +351,6 @@ document.addEventListener('click',e=>{
   const p=t.closest('[data-tmo-pos]');if(p){TMO.pos=p.dataset.tmoPos;TMO.open=null;TMO.limit=100;renderTmRank();return}
   if(t.closest('[data-tmo-more]')){TMO.limit+=50;renderTmRank();return}
   const tr=t.closest('[data-tmo-take-retry]');if(tr){const o=tmoRows().find(r=>r.id===tr.dataset.tmoTakeRetry);if(o)tmoTakeLoad(o,true);return}
-  if(t.closest('[data-tmo-pro]')){try{localStorage.setItem(TMO_PRO_KEY,tmoIsPro()?'0':'1')}catch(x){}render();return}
   const g=t.closest('[data-tmo-go]');if(g){TMO.open=g.dataset.tmoGo;TMO.view='all';TMO.pos='ALL';TMO.q='';const o=tmoRows().find(r=>r.id===TMO.open);if(o&&o.rank>TMO.limit)TMO.limit=Math.ceil(o.rank/50)*50;
     setTimeout(()=>{const r=document.querySelector(`[data-tmo-row="${TMO.open}"]`);if(r)r.scrollIntoView({block:'center'})},60);return}
   const row=t.closest('[data-tmo-row]');if(row&&!t.closest('a,button')){TMO.open=TMO.open===row.dataset.tmoRow?null:row.dataset.tmoRow;renderTmRank();return}

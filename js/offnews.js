@@ -121,7 +121,7 @@ function ofnHead(x,p){const R=typeof tmnRecaps==='function'&&x.url?tmnRecaps()[x
   return {t:x.kind==='sign'?`${p.n} signed with ${tn(x.to)}`:`${p.n} is now with ${tn(x.to)}`,pts:[x.from?`Moved from the ${teamName(x.from)} to the ${teamName(x.to)}.`:'']}}
 /* Pro: how the move shows up in the TradeMetric Rankings, plus his role outlook from an existing take */
 function ofnImpact(x){if(!x.pid||!x.rank&&x.rank!==0)return '';
-  if(!tmoIsPro())return `<p class="ofn-imp lock">${TMO_LOCK}<span><b>Pro impact</b> How this moves his TradeMetric rank.</span><a href="${tmoSignedIn()?'#account-plan':'#signin'}">${tmoSignedIn()?'See Pro':'Sign in free'}</a></p>`;
+  if(!tmoIsPro())return `<p class="ofn-imp lock">${TMO_LOCK}<span><b>Pro impact</b> How this moves his TradeMetric rank.</span><a href="${tmoSignedIn()?'#upgrade-pro':'#signin'}">${tmoSignedIn()?'See Pro':'Sign in free'}</a></p>`;
   const R=ofnRanks()[x.pid],now=R?R.rank:null,day=new Date(x.at).toISOString().slice(0,10),was=OFN.hist?ofnHistRank(x.pid,day):null;
   let rk=now?`TM rank <b class="num">#${now}</b>`:'<b>Unranked</b> now';
   if(was&&now&&was!==now){const d=was-now;rk+=` <em class="tmo-diff ${d>0?'up':'dn'}" title="Was #${was} the day before">${d>0?'▲':'▼'} ${Math.abs(d)}</em> <small>since the move</small>`}

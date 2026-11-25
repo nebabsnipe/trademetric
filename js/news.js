@@ -81,7 +81,7 @@ function tmnFind(name,team){if(!name||!team)return null;const L=tmnIndex()[team]
 
 /* ---------- play-by-play ---------- */
 async function tmnLoadPlays(){if(TMN.plays&&Date.now()-TMN.playsAt<55e3)return;
-  try{const r=await fetch('/api/plays?week='+WEEK+'&b='+Math.floor(Date.now()/60000));const j=r.ok?await r.json():null;
+  try{const r=await tmFetch('/api/plays?week='+WEEK+'&b='+Math.floor(Date.now()/60000));const j=r.ok?await r.json():null;
     if(j&&j.ok&&Array.isArray(j.plays)&&(!j.week||j.week===WEEK)){TMN.plays=j.plays;TMN.ok=true}else TMN.ok=false}catch(e){TMN.ok=false}
   TMN.playsAt=Date.now()}
 
@@ -138,6 +138,7 @@ function tmnVars(p,c,extra){const gm=p&&LIVE&&LIVE.games&&LIVE.games[p.t],o=c&&c
 
 /* ---------- detection: runs after every live update ---------- */
 async function tmnTick(){try{
+  if(tmnLite())return;
   if(!S||!S.teams||!LIVE||LIVE.week!==WEEK)return;tmnWeek();const gs=Object.values(LIVE.games||{});
   const Ls=tmnLeagues(),own=tmnOwners(Ls),fresh=[],first=TMN.first;
   const started=gs.some(g=>g.state!=='pre');
@@ -201,7 +202,7 @@ function tmnPlayEvent(e,fresh){const p=byId[e.id];if(!p||TMN.fired.has(e.k))retu
     leagues:theirs.map(o=>({key:o.c.key,name:o.c.name,st:true,wp0:TMN.prev[o.c.key]?TMN.prev[o.c.key].wp:null,wp1:o.c.opp?o.c.opp.wp:null,their:true})),head:tmnHead(oc,k,vars(lc))},fresh)}}
 function tmnAdd(ev,fresh){if(TMN.fired.has(ev.k))return;TMN.fired.add(ev.k);ev.at=ev.at||Date.now();TMN.items.unshift(ev);if(fresh)fresh.push(ev)}
 /* a banner only for leagues with banners on, and only when he's in your lineup there */
-function tmnShould(ev){if(typeof USER!=='undefined'&&!USER)return false;if(ev.type==='res'||ev.quiet)return false;const on=ev.leagues.filter(l=>tmnOn(l.key));
+function tmnShould(ev){if(typeof USER!=='undefined'&&!USER)return false;if(tmnLite())return false;if(ev.type==='res'||ev.quiet)return false;const on=ev.leagues.filter(l=>tmnOn(l.key));
   if(ev.type==='opp')return tmnNotif().opp&&on.length>0;if(ev.type==='minj')return (ev.cls==='myinj'||ev.cls==='myworse')&&on.some(l=>l.st);if(ev.type==='play')return on.some(l=>l.st);return on.length>0}
 
 /* ---------- your players' injuries ----------
@@ -388,7 +389,7 @@ function tmnPurgeTrades(){const D=window.NFL_DATA;if(!D||!Array.isArray(D.moves)
   const gone=new Set(T.items.filter(e=>e.type==='mytrade'&&!good(e.k)).map(e=>e.k));T.items=T.items.filter(e=>!gone.has(e.k));
   if(gone.size){TMN.chips=(TMN.chips||[]).filter(c=>!gone.has(c.k));TMN.queue=(TMN.queue||[]).filter(e=>!gone.has(e.k));if(typeof tmnPaintChips==='function')try{tmnPaintChips()}catch(e){}}
   const n=n0-T.trd.length-T.items.length;if(n)tmnTopSave();return n}
-function tmnTradeAlerts(){if(typeof USER!=='undefined'&&!USER)return;tmnPurgeTrades();const T=tmnTop(),Ls=tmnLeagues();T.trd=T.trd||[];let n=0;
+function tmnTradeAlerts(){if((typeof USER!=='undefined'&&!USER)||tmnLite())return;tmnPurgeTrades();const T=tmnTop(),Ls=tmnLeagues();T.trd=T.trd||[];let n=0;
   tmnMyTrades().forEach(x=>{const p=byId[x.pid],k='mytr:'+x.pid+':'+x.to;if(!p||T.trd.includes(k))return;T.trd.push(k);n++;
     const L=Ls.filter(c=>c.roster.has(x.pid)).map(c=>({key:c.key,name:c.name,st:c.starters.has(x.pid)}));
     /* builds before this one alerted from the weekly store: those were already seen */
@@ -400,7 +401,7 @@ function tmnTradeAlerts(){if(typeof USER!=='undefined'&&!USER)return;tmnPurgeTra
    later), then sit in the corner on every visit until you close them or 7 days have passed since it happened */
 const TMN_POP=7*864e5;
 const tmnPopOK=e=>(e.type==='top'||e.type==='mytrade')&&Date.now()-(e.at||0)<TMN_POP&&tmnShould({...e,quiet:false});
-function tmnTopBanners(){if(typeof USER!=='undefined'&&!USER)return;tmnTradeAlerts();const T=tmnTop();
+function tmnTopBanners(){if((typeof USER!=='undefined'&&!USER)||tmnLite())return;tmnTradeAlerts();const T=tmnTop();
   const pops=T.items.filter(tmnPopOK),fresh=pops.filter(e=>!e.shown).sort((a,b)=>(a.type==='top'?0:1)-(b.type==='top'?0:1)||(b.overall-a.overall)||((b.pts||0)-(a.pts||0))||(b.at-a.at));
   let n=0;T.items.forEach(e=>{if(!e.shown&&(e.type==='top'||e.type==='mytrade')){e.shown=true;n++}});
   /* one #1 banner (the overall #1, else the biggest score; other #1s go to chips); every new trade of yours gets one too */
@@ -408,7 +409,7 @@ function tmnTopBanners(){if(typeof USER!=='undefined'&&!USER)return;tmnTradeAler
   /* seen before, not closed, still inside 7 days: back in the corner */
   pops.forEach(e=>{if(e.dis||fresh.includes(e))return;if(TMN.chips.some(c=>c.k===e.k)||(TMN.showing&&TMN.showing.k===e.k)||TMN.queue.some(q=>q.k===e.k))return;tmnChip(e)});
   if(n)tmnTopSave();if(fresh.length){tmnPump();if(typeof renderAlerts==='function')renderAlerts()}if(n&&tab==='news'&&$('tmn-feed'))tmnRenderBody()}
-async function tmnTopCatchUp(Ls){const w=WEEK-1,T=tmnTop();if((typeof USER!=='undefined'&&!USER)||w<1||(T.done.includes(w)&&(T.done2||[]).includes(w))||TMN.topBusy||Date.now()-(TMN.topAt||0)<10*60e3)return;
+async function tmnTopCatchUp(Ls){const w=WEEK-1,T=tmnTop();if((typeof USER!=='undefined'&&!USER)||tmnLite()||w<1||(T.done.includes(w)&&(T.done2||[]).includes(w))||TMN.topBusy||Date.now()-(TMN.topAt||0)<10*60e3)return;
   Ls=Ls||tmnLeagues();if(!Ls.length)return;TMN.topBusy=true;TMN.topAt=Date.now();
   try{const r=await fetch('/api/live?week='+w+'&b='+Math.floor(Date.now()/600000));const j=r.ok?await r.json():null;
     if(j&&j.week===w&&j.games&&Array.isArray(j.players)){const st={};j.players.forEach(x=>{const p=x.pos==='DST'?byId['dst-'+String(x.t).toLowerCase()]:findExact(x.n);if(p&&p.pos===x.pos)st[p.id]=x.s});
@@ -418,9 +419,9 @@ async function tmnTopCatchUp(Ls){const w=WEEK-1,T=tmnTop();if((typeof USER!=='un
    A browser that was open last week already has them (TMN.last, saved with the account). Anything else rebuilds
    them once from the server's play-by-play and final stats for that week, so the last 7 days are there from the
    first visit. Quiet: no banners. */
-async function tmnBackfillLast(Ls){const w=WEEK-1;if(w<1||TMN.week!==WEEK||TMN.last||TMN.bfBusy||TMN.bfDone===w||(typeof USER!=='undefined'&&!USER))return;
+async function tmnBackfillLast(Ls){const w=WEEK-1;if(tmnLite()||w<1||TMN.week!==WEEK||TMN.last||TMN.bfBusy||TMN.bfDone===w||(typeof USER!=='undefined'&&!USER))return;
   Ls=Ls||tmnLeagues();if(!Ls.length)return;TMN.bfBusy=true;
-  try{const get=u=>fetch(u+'&b='+Math.floor(Date.now()/600000)).then(r=>r.ok?r.json():null).catch(()=>null);
+  try{const get=u=>tmFetch(u+'&b='+Math.floor(Date.now()/600000)).then(r=>r.ok?r.json():null).catch(()=>null);
     const [a,b]=await Promise.all([get('/api/plays?week='+w),get('/api/live?week='+w)]);
     if(a&&a.ok&&Array.isArray(a.plays)&&(!a.week||a.week===w)&&b&&b.week===w&&b.games&&TMN.week===WEEK&&!TMN.last){
       const st={};(b.players||[]).forEach(x=>{const p=x.pos==='DST'?byId['dst-'+String(x.t).toLowerCase()]:findExact(x.n);if(p&&p.pos===x.pos)st[p.id]=x.s});
@@ -462,7 +463,7 @@ async function tmnLoadArt(Ls){const L=tmnArtPlayers(Ls);if(!L.length||TMN.artBus
   const q=L.map(x=>{const p=byId[x.id];return [p.n,p.t,p.pos,x.inj?'i':''].join('|')}).join(';');
   if(TMN.art&&TMN.art.key===q&&Date.now()-TMN.art.at<10*60e3)return;TMN.artBusy=true;
   let ok=false;
-  try{const r=await fetch('/api/news?feed='+encodeURIComponent(q)+'&b='+Math.floor(Date.now()/600000));const j=r.ok?await r.json():null;
+  try{const r=await tmFetch('/api/news?feed='+encodeURIComponent(q)+'&b='+Math.floor(Date.now()/600000));const j=r.ok?await r.json():null;
     if(j&&Array.isArray(j.items)){ok=true;TMN.art={key:q,at:Date.now(),items:j.items};try{localStorage.setItem(TMN_ART_LS,JSON.stringify(TMN.art))}catch(e){}}
     else tmnFail('art','status '+r.status)}catch(e){tmnFail('art',e)}
   TMN.artBusy=false;tmnLoadState('art',ok);if(tab==='news')tmnRenderBody()}
@@ -577,36 +578,38 @@ const tmnInjOut=m=>!!(m&&m.lv==='out');
 const tmnInjLbl=m=>`<span class="tmn-lbl tmn-injl"><i class="tmn-inj-ic">${TMN_INJ_ICON}</i>Injury · ${m.tag}</span>`;
 const tmnInjBadge=m=>m?`<span class="tmn-injb${m.lv==='doubt'?' doubt':''}" title="${m.tip}">${TMN_INJ_BADGE}</span>`:'';
 /* Feed filter: Yours and League can each be switched off, never both. Remembered with your account. */
-function tmnFilt(){if(TMN.show)return TMN.show;let v=null;try{v=acctGet('show',null)}catch(e){}
+/* no Pro (a free account, or signed out once the beta is over): only the league-wide top stories (js/plan.js) */
+const tmnLite=()=>typeof tmIsPro==='function'&&!tmIsPro();
+function tmnFilt(){if(tmnLite())return {mine:false,lg:true};if(TMN.show)return TMN.show;let v=null;try{v=acctGet('show',null)}catch(e){}
   return TMN.show=v&&(v.mine||v.lg)?{mine:!!v.mine,lg:!!v.lg}:{mine:true,lg:true}}
 function tmnFiltFlip(k){const sh=tmnFilt(),o=k==='mine'?'lg':'mine';sh[k]=!sh[k];if(!sh[k]&&!sh[o])sh[o]=true;acctSet('show',{mine:sh.mine,lg:sh.lg});tmnRenderBody()}
-function tmnRender(){const el=$('news-body');if(!el)return;if(!TMN_F.some(([k])=>k===TMN.f))TMN.f='all';tmnWeek();TMN.unread=0;
-  if(typeof FEED!=='undefined'&&typeof loadFeed==='function'&&(!FEED||Date.now()-FEED_AT>4*60e3))Promise.resolve(loadFeed()).then(()=>{if(tab==='news'&&FEED)tmnRenderBody()});
+function tmnRender(){const el=$('news-body');if(!el)return;if(!TMN_F.some(([k])=>k===TMN.f))TMN.f='all';tmnWeek();TMN.unread=0;const lite=tmnLite();if(lite)TMN.f='all';
+  if(!lite&&typeof FEED!=='undefined'&&typeof loadFeed==='function'&&(!FEED||Date.now()-FEED_AT>4*60e3))Promise.resolve(loadFeed()).then(()=>{if(tab==='news'&&FEED)tmnRenderBody()});
   const Ls=tmnLeagues();if(TMN.lg!=='all'&&!Ls.some(c=>c.key===TMN.lg))TMN.lg='all';const mood=tmnMood();
-  try{const fr=[];tmnMyInj(Ls,fr,Date.now());tmnResults(Ls,fr,Date.now());if(fr.length)tmnSave()}catch(e){}
-  tmnLoadArt(Ls);tmnLoadLeague();tmnTopCatchUp(Ls);tmnTopBanners();tmnBackfillLast(Ls);
+  if(!lite){try{const fr=[];tmnMyInj(Ls,fr,Date.now());tmnResults(Ls,fr,Date.now());if(fr.length)tmnSave()}catch(e){}
+  tmnLoadArt(Ls);tmnTopCatchUp(Ls);tmnTopBanners();tmnBackfillLast(Ls)}tmnLoadLeague();
   const sh=tmnFilt();
   const side=`
-      <header class="hero tmn-head"><div class="kicker">Week ${WEEK} · ${Ls.length>1?`all ${Ls.length} leagues`:'your league'}</div><h1>News${mood==='live'?' <span class="tmn-live"><span class="live-dot on"></span>Live</span>':''}</h1></header>
+      <header class="hero tmn-head"><div class="kicker">Week ${WEEK} · ${lite?'around the league':Ls.length>1?`all ${Ls.length} leagues`:'your league'}</div><h1>News${mood==='live'?' <span class="tmn-live"><span class="live-dot on"></span>Live</span>':''}</h1></header>
       <div class="tmn-nav" role="group" aria-label="Show" id="tmn-seg"></div>
       ${Ls.length>1?`<select id="tmn-lg" class="tmn-lgsel" aria-label="League"><option value="all">All leagues</option>${Ls.map(c=>`<option value="${esc(c.key)}" ${TMN.lg===c.key?'selected':''}>${esc(c.name)}</option>`).join('')}</select>`:''}
       <div class="tmn-tog" role="group" aria-label="Filter the Feed" id="tmn-tog"><button type="button" class="y" data-nshow="mine" aria-pressed="${sh.mine}"><i aria-hidden="true"></i>Yours</button><button type="button" data-nshow="lg" aria-pressed="${sh.lg}"><i aria-hidden="true"></i>League</button></div>
-      <a class="tmn-gear" href="#account-leagues" data-notif-go="1" title="Notification settings" aria-label="Notification settings">${TMN_GEAR}</a>`;
+      ${lite?'':`<a class="tmn-gear" href="#account-leagues" data-notif-go="1" title="Notification settings" aria-label="Notification settings">${TMN_GEAR}</a>`}`;
   /* the rail and the feed are only rebuilt when they change: a button replaced mid-tap never gets its click on a phone */
   if(TMN.sideH!==side||!$('tmn-feed')){el.innerHTML=`<div class="tmn-lay"><aside class="tmn-side" aria-label="News sections">${side}</aside>
     <div class="tmn-feed" id="tmn-feed"></div></div>`;TMN.sideH=side;TMN.segH=TMN.bodyH=null}
   tmnRenderBody(Ls)}
-function tmnRenderBody(Ls){const el=$('tmn-feed');if(!el)return;Ls=Ls||tmnLeagues();
+function tmnRenderBody(Ls){const el=$('tmn-feed');if(!el)return;Ls=Ls||tmnLeagues();const lite=tmnLite();if(lite){TMN.f='all';Ls=[]}
   const inLg=l=>TMN.lg==='all'||(l||[]).some(x=>(x.key||x)===TMN.lg),f=TMN.f;tmnBuildClips(Ls);const CM=tmnClipMap();
   /* big plays: your players' plays, crunch-time swings, clinchers, opponents hurt (and their plays if you turned that on) */
   const PLAY_T=['play','clinch','swing','oinj','opp'];
-  const evs=TMN.items.filter(e=>PLAY_T.includes(e.type)&&inLg(e.leagues)&&(e.type!=='opp'||tmnNotif().opp));
-  const injList=tmnInjured(Ls),injUp=TMN.items.filter(e=>e.type==='minj'&&inLg(e.leagues)).sort((a,b)=>tmnAt(b)-tmnAt(a));
-  const res=TMN.items.filter(e=>e.type==='res'&&inLg(e.leagues));
-  const tops=tmnTopNow().filter(e=>inLg(e.leagues));
+  const evs=lite?[]:TMN.items.filter(e=>PLAY_T.includes(e.type)&&inLg(e.leagues)&&(e.type!=='opp'||tmnNotif().opp));
+  const injList=tmnInjured(Ls),injUp=lite?[]:TMN.items.filter(e=>e.type==='minj'&&inLg(e.leagues)).sort((a,b)=>tmnAt(b)-tmnAt(a));
+  const res=lite?[]:TMN.items.filter(e=>e.type==='res'&&inLg(e.leagues));
+  const tops=lite?[]:tmnTopNow().filter(e=>inLg(e.leagues));
   const stories=tmnStories(Ls),picked=tmnPickStories(stories);
   const opps=tmnOppGroups(Ls);
-  const clipsAll=typeof CLIPS!=='undefined'?CLIPS.filter(v=>!v.game):[];
+  const clipsAll=!lite&&typeof CLIPS!=='undefined'?CLIPS.filter(v=>!v.game):[];
   const cnt={all:0,team:evs.length,inj:injList.length,clips:clipsAll.length};
   const seg=$('tmn-seg');if(seg){const h=TMN_F.map(([k,l])=>`<button type="button" data-nf="${k}" aria-pressed="${f===k}">${l}${cnt[k]?` <span class="tmn-n">${cnt[k]}</span>`:''}</button>`).join('');if(TMN.segH!==h||!seg.firstChild){seg.innerHTML=h;TMN.segH=h}}
   const sh=tmnFilt(),feedTab=f==='all';document.querySelectorAll('#tmn-tog [data-nshow]').forEach(b=>{b.setAttribute('aria-pressed',String(!!sh[b.dataset.nshow]));b.disabled=!feedTab;b.title=feedTab?'':'Filters the Feed tab'});
@@ -627,14 +630,15 @@ function tmnRenderBody(Ls){const el=$('tmn-feed');if(!el)return;Ls=Ls||tmnLeague
     const news=tmnDedupe([...trades,...picked,...lgNews]);
     /* strictly by time, whatever the source: Yours and League cards interleave by the time they show. Sorted again
        after bundling, since a bundled card shows its lead story's time, which can be older than the newest one in it. */
-    const byT=(a,b)=>tmnAt(b)-tmnAt(a),all0=tmnBundle([...evs,...injUp,...res,...news,...tmnRankFeed().filter(e=>inLg(e.leagues))].sort(byT)).sort(byT);tmnLoadRecaps([...picked,...lgNews,...trades]);
+    const byT=(a,b)=>tmnAt(b)-tmnAt(a),all0=tmnBundle([...evs,...injUp,...res,...news,...(lite?[]:tmnRankFeed()).filter(e=>inLg(e.leagues))].sort(byT)).sort(byT);tmnLoadRecaps([...picked,...lgNews,...trades]);
     /* the Yours / League switches in the rail (Feed only). A league story about one of your players counts as both. */
     const keep=e=>{const w=whose(e);return w==='mine'?sh.mine:w==='mine lg'?(sh.mine||sh.lg):sh.lg},cut=act&&!(sh.mine&&sh.lg),all=cut?all0.filter(keep):all0;
     if(cut&&!sh.mine)tops.length=0;
     /* the biggest #1 gets the full card; any others this week sit in a row of smaller orange cards under it */
     const tp=[...tops].sort((a,b)=>(b.overall-a.overall)||(b.pts-a.pts));
-    html=(tp.length?`<div class="tmn-tops">${tmnTopCard(tp[0])}${tp.length>1?`<div class="tmn-tops-more">${tp.slice(1).map(tmnTopMini).join('')}</div>`:''}</div>`:'')+tl(all,act)
-      +(cut&&!all.length&&!tops.length&&all0.length?`<div class="card tmn-empty"><h2>${sh.mine?'Nothing about your team yet':'No league news right now'}</h2><p class="note">${sh.mine?'League news is switched off. Turn <b>League</b> back on in the rail to see trades, signings and injuries around the league.':'Your team is switched off. Turn <b>Yours</b> back on in the rail to see your players.'}</p></div>`:'')
+    html=(lite?`<div class="card tmn-pro"><div><b>Follow your own players with Pro</b><p class="note">Injury news, big plays and results for everyone on your rosters, as they happen.</p></div><button type="button" class="btn small" data-tm-follow>See Pro</button></div>`:'')+(tp.length?`<div class="tmn-tops">${tmnTopCard(tp[0])}${tp.length>1?`<div class="tmn-tops-more">${tp.slice(1).map(tmnTopMini).join('')}</div>`:''}</div>`:'')+tl(all,act)
+      +(lite&&!all.length?`<div class="card tmn-empty"><h2>No league news right now</h2><p class="note">Trades, signings and big injuries around the league show up here as they happen.</p></div>`:'')
+      +(!lite&&cut&&!all.length&&!tops.length&&all0.length?`<div class="card tmn-empty"><h2>${sh.mine?'Nothing about your team yet':'No league news right now'}</h2><p class="note">${sh.mine?'League news is switched off. Turn <b>League</b> back on in the rail to see trades, signings and injuries around the league.':'Your team is switched off. Turn <b>Yours</b> back on in the rail to see your players.'}</p></div>`:'')
       +(!picked.length&&TMN.artBusy?(typeof skel==='function'?skel(3,true):'<p class="note tmn-loading"><span class="spin"></span> Pulling the latest on your players…</p>'):'')
       +(act&&(TMN.fail.lg||TMN.fail.art)&&!(TMN.lgn&&TMN.lgn.items.length&&TMN.art)?'<p class="note tmn-loading">Some news didn\'t load. Trying again in a minute.</p>':'')}
   const empty={all:['Nothing yet this week','Everything about your team lands here as it happens, plus the trades, signings and big injuries around the league that move fantasy value.'],

@@ -259,3 +259,6 @@ Clean and professional: roomy rows, position color chips (QB purple, RB green, W
 - **Recap name**: "Recap" is the working title — finalize before launch
 - **Supabase redirect URL** for the preview domain so sign-in works on the preview
 - **Home page tool grid:** Recap and Mock drafts link to their tabs; League fit, Draft pick values and Trade analyzer are marked Coming soon.
+
+## Free vs Pro (2026-11-25)
+`TMO_BETA_PRO` is gone. Who has Pro is decided on the server by the one beta switch (`TM_BETA_PRO` in Vercel) and `profiles.plan`: see `docs/plans.md`. `tmoIsPro()` now asks `tmIsPro()` (js/plan.js). The "View as Pro" preview button was removed, since the page no longer decides this on its own; set the switch to `off` on a preview to see the free view. Invite links opened while signed out now keep the room code through sign-in.

@@ -6,6 +6,7 @@
 // GET /api/news?probe=1&name=...   -> which sources answered and how many stories matched (no AI)
 
 import { sharedOn, recapsGet, recapsPut, archiveMerge } from './_shared.js';
+import { proOnly } from './_plan.js';
 
 const API_KEY = process.env.ANTHROPIC_API_KEY || process.env.APIKEY1;
 const MODEL = process.env.NEWS_MODEL || 'claude-haiku-5-5';
@@ -378,7 +379,7 @@ const cache = new Map();
 
 export { lgKind, recapAll, celebOnly };
 
-export default async function handler(req, res) {
+async function handler(req, res) {
   const q = req.query || {};
   /* recap mode for the News tab: POST {items:[{u,n,pos,t,title,desc,outlet}]} -> {items:{[url]:{t,pts}}} */
   if (req.method === 'POST' && q.recap) {
@@ -540,3 +541,7 @@ export default async function handler(req, res) {
   res.setHeader('Cache-Control', 's-maxage=1800, stale-while-revalidate=3600');
   return res.status(200).json(v);
 }
+
+/* Free for everyone: the league-wide top stories (league, trades), their recaps and the offseason feed (off).
+   Pro: news about your own players (feed, batch, one player's card). Refused for non-Pro callers once the beta switch is off (api/_plan.js). */
+export default proOnly(handler, req => { const q = req.query || {}; return !(q.league || q.trades || q.recap || q.probe || q.off); });

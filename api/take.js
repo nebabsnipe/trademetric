@@ -19,8 +19,8 @@ import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { API_KEY, ESPN_TEAM, collect, getText, parseRSS, parseESPN, norm, similar, moveOf, FLUFF, RUMOR, askClaude, lastErr, cleanLine } from './news.js';
 
-/* BETA: keep in step with TMO_BETA_PRO in js/offseason.js. While true every signed-in account counts as Pro. */
-const BETA_PRO = true;
+/* Who has Pro: the one beta switch and profiles.plan, in api/_plan.js */
+import { betaOn, isProPlan } from './_plan.js';
 const SUPA_URL = process.env.SUPABASE_URL || 'https://rltmfnmgbfgecbaevfvc.supabase.co';
 const SUPA_ANON = process.env.SUPABASE_ANON_KEY || 'sb_publishable_AFX79aKgqorAx3zgOyKatw_o_3_ERWG';
 const SUPA_SERVICE = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
@@ -48,10 +48,10 @@ async function userOf(req) {
     if (r.ok) {
       const u = await r.json();
       if (u && u.id) {
-        v = { id: u.id, pro: BETA_PRO };
-        if (!BETA_PRO) {
+        v = { id: u.id, pro: betaOn() };
+        if (!betaOn()) {
           const p = await fetch(`${SUPA_URL}/rest/v1/profiles?id=eq.${u.id}&select=plan`, { headers: { apikey: SUPA_ANON, Authorization: 'Bearer ' + tok } });
-          const rows = p.ok ? await p.json() : []; v.pro = !!(rows[0] && rows[0].plan && rows[0].plan !== 'free');
+          const rows = p.ok ? await p.json() : []; v.pro = isProPlan(rows[0] && rows[0].plan);
         }
       }
     }
