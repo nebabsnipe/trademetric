@@ -39,5 +39,5 @@
 ## Open
 - Apple sign-in and its logo.
 - The code input assumes 6-digit codes. If Supabase's email code length changes, update `maxlength` and the slot count in `codeField()`.
-- Paid plans (Stripe webhook sets `profiles.plan`, which users can't write themselves).
+- Paid plans (Stripe webhook sets `profiles.plan`, which users can't write themselves). Free vs Pro gating is built: see `docs/plans.md`.
 - Rotate the Resend API key (it was once pasted into a chat).
