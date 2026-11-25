@@ -119,7 +119,7 @@ const TMN_COPY={
 };
 const TMN_LBL={mytrade:['Traded','accent'],mymove:['New team','accent'],clinch:['Clincher','gold'],clinch0:['Clincher','gold'],swing:['Lead change','good'],longtd:['Long touchdown','good'],td:['Touchdown','good'],td2:['Second TD','good'],td3:['Hat trick','good'],tdN:['Touchdown','good'],
   bigrun:['Breakaway','accent'],run:['Big run','accent'],catch:['Deep ball','accent'],game:['Going off','accent'],gameX:['Going off','accent'],oinj:['Opponent hurt','warn'],myinj:['New injury','bad'],myworse:['Downgraded','bad'],mybetter:['Upgraded','good'],myclear:['Cleared','good'],opp:['Against you','muted'],oppTd:['Against you','muted'],
-  top:['#1 at his position','top'],second:['#2 at his position','silver'],topAll:['#1 in the NFL','top'],res:['Final','muted']};
+  tdl:['Trade deadline','warn'],tdlfinal:['Final call','bad'],top:['#1 at his position','top'],second:['#2 at his position','silver'],topAll:['#1 in the NFL','top'],res:['Final','muted']};
 function tmnHash(s){let h=0;for(let i=0;i<s.length;i++)h=(h*31+s.charCodeAt(i))|0;return Math.abs(h)}
 const TMN_Q=['','in the 1st','in the 2nd','in the 3rd','in the 4th','in overtime'];
 /* pick a template this play has every detail for, skipping ones used recently for this type */
@@ -257,12 +257,12 @@ function tmnQueue(ev,hold){TMN.unread++;TMN.queue.push(ev);if(!hold)tmnPump()}
 function tmnPump(){clearTimeout(TMN.timer);if(TMN.showing||!TMN.queue.length)return;
   const wait=TMN.lastShow?TMN.gapFor-(Date.now()-TMN.lastShow):0;
   /* most important first (clincher, then crunch time), newest first; anything older than 3 minutes, or past the next two, goes straight to a chip */
-  const pri=e=>e.type==='top'?4:e.type==='mytrade'?3.5:e.type==='clinch'?3:e.type==='swing'?2:1;TMN.queue.sort((a,b)=>pri(b)-pri(a)||b.at-a.at);
-  TMN.queue=TMN.queue.filter((e,i)=>{if(e.type==='clinch'||e.type==='top'||(e.type==='mytrade'&&i<2)||(i<2&&Date.now()-e.at<=TMN_R.stale))return true;tmnChip(e);return false});
+  const pri=e=>e.cls==='tdlfinal'?3.8:e.type==='tdl'?2.5:e.type==='top'?4:e.type==='mytrade'?3.5:e.type==='clinch'?3:e.type==='swing'?2:1;TMN.queue.sort((a,b)=>pri(b)-pri(a)||b.at-a.at);
+  TMN.queue=TMN.queue.filter((e,i)=>{if(e.type==='clinch'||e.type==='top'||e.type==='tdl'||(e.type==='mytrade'&&i<2)||(i<2&&Date.now()-e.at<=TMN_R.stale))return true;tmnChip(e);return false});
   if(!TMN.queue.length)return;if(wait>0&&TMN.queue[0].type!=='clinch'&&TMN.queue[0].type!=='top'){TMN.timer=setTimeout(tmnPump,wait);return}
   tmnShow(TMN.queue.shift())}
 TMN.gapFor=TMN_R.gap;
-function tmnBody(ev,big){const p=ev.pid&&byId[ev.pid],[lbl,tone]=TMN_LBL[ev.cls]||['News','accent'];
+function tmnBody(ev,big){if(ev.type==='tdl'&&typeof tdlBody==='function')return tdlBody(ev,big);const p=ev.pid&&byId[ev.pid],[lbl,tone]=TMN_LBL[ev.cls]||['News','accent'];
   const lg=ev.leagues.map(l=>{const d=l.wp0!=null&&l.wp1!=null&&!l.bench?Math.round((l.wp1-l.wp0)*100):null;
     return `<span class="tmn-lchip${l.bench?' bench':''}${l.their?' their':''}">${esc(l.name)}${l.bench?' · bench':''}${l.wp1!=null&&!l.bench?` · <b>${wpPct(l.wp1)}</b>${d?` <em class="${d>0?'up':'dn'}">${d>0?'+':'−'}${Math.abs(d)}</em>`:''}`:''}</span>`}).join('');
   if(ev.type==='mytrade')return `<div class="tmn-b-av">${p?av(p,big?'lg':''):''}</div>
@@ -273,22 +273,25 @@ function tmnBody(ev,big){const p=ev.pid&&byId[ev.pid],[lbl,tone]=TMN_LBL[ev.cls]
   return `<div class="tmn-b-av">${p?av(p,big?'lg':''):'<span class="tmn-seal">W</span>'}</div>
     <div class="tmn-b-main"><span class="tmn-lbl ${tone}">${lbl}</span><h3>${esc(ev.head)}</h3>${ev.sub?`<p>${esc(ev.sub)}</p>`:''}${lg?`<div class="tmn-lgs">${lg}</div>`:''}</div>
     ${ev.pts!=null&&ev.type!=='clinch'&&ev.type!=='swing'&&ev.type!=='oinj'?`<div class="tmn-b-pts"><b class="num">${ev.type==='play'&&(ev.cls==='game'||ev.cls==='gameX')?'':'+'}${f1(ev.pts)}</b><small>pts</small></div>`:''}`}
-function tmnShow(ev){const s=tmnStage(),tone=(TMN_LBL[ev.cls]||[])[1]||'accent',hold=ev.type==='clinch'?TMN_R.clinchHold:ev.type==='top'?14e3:TMN_R.hold;
+function tmnShow(ev){const s=tmnStage(),tone=(TMN_LBL[ev.cls]||[])[1]||'accent',hold=ev.type==='clinch'||ev.cls==='tdlfinal'?TMN_R.clinchHold:ev.type==='top'?14e3:ev.type==='tdl'?10e3:TMN_R.hold;
   TMN.showing=ev;TMN.lastShow=Date.now();
-  s.innerHTML=`<div class="tmn-ban tone-${tone} ${ev.type==='clinch'?'clinch':''}${ev.type==='top'?' top'+(ev.overall?' all':''):''}" role="status" data-nk="${esc(ev.k)}" tabindex="0">${ev.type==='top'?tmnConfetti():''}${tmnBody(ev,true)}<button class="tmn-x" type="button" data-nx="1" aria-label="Dismiss">×</button><i class="tmn-timer" style="animation-duration:${hold}ms"></i></div>`;
+  s.innerHTML=`<div class="tmn-ban tone-${tone} ${ev.type==='clinch'?'clinch':''}${ev.type==='top'?' top'+(ev.overall?' all':''):''}${ev.type==='tdl'?' tdl'+(ev.stage==='final'?' final':''):''}" role="status" data-nk="${esc(ev.k)}" tabindex="0">${ev.type==='top'?tmnConfetti():''}${tmnBody(ev,true)}<button class="tmn-x" type="button" data-nx="1" aria-label="Dismiss">×</button><i class="tmn-timer" style="animation-duration:${hold}ms"></i></div>`;
   const b=s.firstElementChild;requestAnimationFrame(()=>b.classList.add('in'));
   TMN.hideT=setTimeout(()=>tmnMin(),hold)}
 function tmnMin(dismiss){clearTimeout(TMN.hideT);const s=$('tmn-stage'),b=s&&s.firstElementChild,ev=TMN.showing;TMN.showing=null;if(ev&&dismiss)tmnTopDismiss(ev.k);
   if(b){b.classList.remove('in');b.classList.add(dismiss?'out':'min');setTimeout(()=>{if(b.parentNode)b.remove()},420)}
   if(ev&&!dismiss)setTimeout(()=>tmnChip(ev),260);setTimeout(tmnPump,500)}
-function tmnChip(ev){const box=$('tmn-chips')||(tmnStage(),$('tmn-chips'));TMN.chips=TMN.chips.filter(c=>c.k!==ev.k);TMN.chips.push({k:ev.k,until:ev.type==='top'||ev.type==='mytrade'?(ev.at||Date.now())+TMN_POP:Date.now()+TMN_R.chipLife});tmnPaintChips()}
-function tmnPaintChips(){const box=$('tmn-chips');if(!box)return;TMN.chips=TMN.chips.filter(c=>c.until>Date.now());const show=TMN.chips.slice(-1),more=TMN.chips.length-show.length;
-  box.innerHTML=show.map(c=>{const ev=TMN.items.find(x=>x.k===c.k)||tmnTop().items.find(x=>x.k===c.k);if(!ev)return '';const p=ev.pid&&byId[ev.pid],tone=(TMN_LBL[ev.cls]||[])[1]||'accent';
+function tmnChip(ev){const box=$('tmn-chips')||(tmnStage(),$('tmn-chips'));TMN.chips=TMN.chips.filter(c=>c.k!==ev.k);TMN.chips.push({k:ev.k,until:ev.type==='tdl'?(ev.stage==='final'?ev.dl:Math.min(ev.dl,Date.now()+TMN_R.chipLife)):ev.type==='top'||ev.type==='mytrade'?(ev.at||Date.now())+TMN_POP:Date.now()+TMN_R.chipLife});tmnPaintChips()}
+function tmnPaintChips(){const box=$('tmn-chips');if(!box)return;TMN.chips=TMN.chips.filter(c=>c.until>Date.now());
+  /* a final-day trade deadline countdown stays the visible chip */TMN.chips.sort((a,b)=>(/^tdl:.*:final$/.test(a.k)?1:0)-(/^tdl:.*:final$/.test(b.k)?1:0));const show=TMN.chips.slice(-1),more=TMN.chips.length-show.length;
+  box.innerHTML=show.map(c=>{const ev=TMN.items.find(x=>x.k===c.k)||tmnTop().items.find(x=>x.k===c.k)||(typeof tdlFind==='function'&&tdlFind(c.k));if(!ev)return '';
+    if(ev.type==='tdl')return `<div class="tmn-chip tdl${ev.stage==='final'?' final':''}" data-nk="${esc(ev.k)}" role="button" tabindex="0"><i></i><span>${esc(ev.stage==='final'?'Trade deadline':ev.name)}</span>${tdlChipTxt(ev)}<button type="button" data-nxc="${esc(ev.k)}" aria-label="Dismiss">×</button></div>`;const p=ev.pid&&byId[ev.pid],tone=(TMN_LBL[ev.cls]||[])[1]||'accent';
     return `<div class="tmn-chip tone-${tone}${ev.type==='top'?' top':''}" data-nk="${esc(ev.k)}" role="button" tabindex="0"><i></i><span>${p?esc(p.pos==='DST'?p.n:tmnShort(p.n)):'Your week'}</span>${ev.type==='top'?`<b>#1 ${esc(ev.overall?'overall':tmnPosN(ev.pos))}</b>`:ev.pts!=null&&ev.type==='play'?`<b class="num">${ev.cls==='game'||ev.cls==='gameX'?'':'+'}${f1(ev.pts)}</b>`:`<b>${esc((TMN_LBL[ev.cls]||['News'])[0])}</b>`}<button type="button" data-nxc="${esc(ev.k)}" aria-label="Dismiss">×</button></div>`}).join('')
     +(more>0?`<a class="tmn-chip more" href="#news" aria-label="${more} more alerts in News">+${more}</a>`:'');
   clearTimeout(TMN.chipT);if(TMN.chips.length)TMN.chipT=setTimeout(tmnPaintChips,15e3)}
 function tmnUnread(){return TMN.unread||0}
-function tmnOpen(k){TMN.focus=String(k).startsWith('mytr:')?'tr:'+String(k).split(':')[1]:k;tmnTopDismiss(k);TMN.chips=TMN.chips.filter(c=>c.k!==k);tmnPaintChips();if(TMN.showing&&TMN.showing.k===k)tmnMin(true);
+function tmnOpen(k){if(String(k).startsWith('tdl:')){tmnTopDismiss(k);TMN.chips=TMN.chips.filter(c=>c.k!==k);tmnPaintChips();if(TMN.showing&&TMN.showing.k===k)tmnMin(true);location.hash='trade';return}
+  TMN.focus=String(k).startsWith('mytr:')?'tr:'+String(k).split(':')[1]:k;tmnTopDismiss(k);TMN.chips=TMN.chips.filter(c=>c.k!==k);tmnPaintChips();if(TMN.showing&&TMN.showing.k===k)tmnMin(true);
   if(location.hash==='#news'){TMN.f='all';TMN.lg='all';tmnRender()}else location.hash='news'}
 
 /* ---------- clips → the play they show ----------
@@ -336,7 +339,7 @@ function tmnWeekThu(w){if(!w||typeof KICK==='undefined'||typeof DATA==='undefine
   d.setDate(d.getDate()+7*(w+1-DATA.week));return d.getTime()}
 const tmnTopLive=e=>e&&e.type==='top'&&Date.now()<tmnTopUntil(e);
 /* closing the #1 banner or chip (or tapping through to it) keeps it off the corner until Thursday; it stays pinned in News */
-function tmnTopDismiss(k){const e=tmnTop().items.find(x=>x.k===k&&(x.type==='top'||x.type==='mytrade'));if(e&&!e.dis){e.dis=true;tmnTopSave()}}
+function tmnTopDismiss(k){if(String(k).startsWith('tdl:')){if(typeof tdlDismiss==='function')tdlDismiss(k);return}const e=tmnTop().items.find(x=>x.k===k&&(x.type==='top'||x.type==='mytrade'));if(e&&!e.dis){e.dis=true;tmnTopSave()}}
 const TMN_SEC_POS=['QB','RB','WR','TE'];
 /* the week is over only when every team with a game that week (from the schedule, so Monday night counts even
    before ESPN lists it) has a final, and the last of those games kicked off on Monday or later */
@@ -407,7 +410,7 @@ function tmnTopBanners(){if(typeof USER!=='undefined'&&!USER)return;tmnTradeAler
   let one=false;fresh.forEach(e=>{if(e.type==='top'&&one){TMN.unread++;tmnChip(e);return}if(e.type==='top')one=true;tmnQueue(e,true)});
   /* seen before, not closed, still inside 7 days: back in the corner */
   pops.forEach(e=>{if(e.dis||fresh.includes(e))return;if(TMN.chips.some(c=>c.k===e.k)||(TMN.showing&&TMN.showing.k===e.k)||TMN.queue.some(q=>q.k===e.k))return;tmnChip(e)});
-  if(n)tmnTopSave();if(fresh.length){tmnPump();if(typeof renderAlerts==='function')renderAlerts()}if(n&&tab==='news'&&$('tmn-feed'))tmnRenderBody()}
+  if(n)tmnTopSave();if(fresh.length){tmnPump();if(typeof renderAlerts==='function')renderAlerts()}if(n&&tab==='news'&&$('tmn-feed'))tmnRenderBody();if(typeof tdlTick==='function')tdlTick()}
 async function tmnTopCatchUp(Ls){const w=WEEK-1,T=tmnTop();if((typeof USER!=='undefined'&&!USER)||w<1||(T.done.includes(w)&&(T.done2||[]).includes(w))||TMN.topBusy||Date.now()-(TMN.topAt||0)<10*60e3)return;
   Ls=Ls||tmnLeagues();if(!Ls.length)return;TMN.topBusy=true;TMN.topAt=Date.now();
   try{const r=await fetch('/api/live?week='+w+'&b='+Math.floor(Date.now()/600000));const j=r.ok?await r.json():null;
