@@ -100,6 +100,9 @@
   "functions": {
     "api/take.js": {
       "includeFiles": "data/nfl.json"
+    },
+    "api/draft.js": {
+      "includeFiles": "data/{nfl,market,tmhist}.json"
     }
   },
   "cleanUrls": true

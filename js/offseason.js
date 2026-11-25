@@ -186,7 +186,7 @@ function renderOffHome(){
       <p>The rankings are free. Pro turns them into decisions for your team.${TMO_BETA_PRO?' <b>Free for every account during the beta.</b>':''}</p></div>
       ${pro?`<span class="tmo-pro-on">${TMO_BETA_PRO?'Pro active · free during beta':'Pro active'}</span>`:`<a class="btn accent" href="${signed?'#account':'#signin'}">${signed?'See Pro plans':TMO_BETA_PRO?'Sign in for free Pro':'Sign in to get Pro'}</a>`}
     </div>
-    <div class="tmo-tools">${TOOLS.map(([h,p,k])=>`<div class="tmo-tool"><div class="tmo-tool-h"><h3>${h}</h3>${pro?'':'<span class="tmo-lock">'+TMO_LOCK+'Pro</span>'}</div><p>${p}</p>${k==='trade'||k==='mock'||k==='picks'?'<span class="tmo-soon">Coming soon</span>':''}</div>`).join('')}</div>
+    <div class="tmo-tools">${TOOLS.map(([h,p,k])=>`<div class="tmo-tool"><div class="tmo-tool-h"><h3>${h}</h3>${pro?'':'<span class="tmo-lock">'+TMO_LOCK+'Pro</span>'}</div><p>${p}</p>${k==='trade'||k==='picks'?'<span class="tmo-soon">Coming soon</span>':''}</div>`).join('')}</div>
   </section>
   ${TMO_IS_PREVIEW&&!TMO_BETA_PRO?`<p class="tmo-dev note">Preview only: <button class="btn small" type="button" data-tmo-pro>${pro?'View as free':'View as Pro'}</button> Consensus and market numbers use this season's rest-of-season data until the offseason feeds are added.</p>`:''}`;
 }
@@ -287,14 +287,20 @@ var TMO_PAGES={
     pts:['Your best and worst trades, graded with what happened after','Your best waiver pickup and the points it added','How your standing moved week to week','A final card you can save and share'],
     cards:[['Trades, graded again','Every deal you made, re-graded with how the players really finished.'],['Your season in numbers','Points for and against, luck, your best week and your worst.'],['A card to share','One clean summary card to drop in your league chat.']]},
   drafttools:{nav:'Draft Tools',h:'Draft Tools',lead:'Go into your draft with a plan. Know what every pick is worth, and practice until the board stops surprising you.',
-    pts:['Pick values for every slot in your draft','Grade any pick-for-pick or pick-for-player trade','Mock drafts against opponents that change strategy every run','A draft grade when you finish'],
-    cards:[['Pick values','Is 1.04 worth more than 1.07 plus a 3rd? See the answer before you say yes.'],['Mock drafts','Practice from your real draft slot against opponents that draft like real leagues.'],['Draft grade','Finish a mock and see where you won value and where you reached.']]},
+    pts:['Mock drafts against CPU teams that change strategy every run','Draft with friends from an invite link, or join an online lobby','A live pick clock, a queue and a board that fills in','A draft grade when you finish'],
+    cards:[['Mock drafts','Practice from your real draft slot against opponents that draft like real leagues.'],['Draft grade','Finish a mock and see where you won value and where you reached.'],['Pick values (coming soon)','Is 1.04 worth more than 1.07 plus a 3rd? See the answer before you say yes.']]},
   leaguefit:{nav:'League Fit',h:'League Fit',lead:'The TradeMetric Rankings, re-sorted for your league. Your scoring, your roster spots and what your team needs.',
     pts:['Rankings adjusted to your league’s scoring','Position value based on your roster spots and league size','Players who fit your roster needs moved up','Works with the league you already connected'],
     cards:[['Your scoring','PPR, half-PPR, bonuses, TE premium. The order changes with the rules.'],['Your roster spots','Two flex spots or superflex changes what a position is worth.'],['Your needs','Thin at running back? The players who fix it rise to the top.']]}};
 function renderProTab(){
   const key=document.body.dataset.tab,P=TMO_PAGES[key],el=document.getElementById('pro-'+key);if(!P||!el)return;
   const signed=tmoSignedIn(),pro=tmoIsPro();
+  /* Draft Tools: mock drafts (js/mockdraft.js) for anyone signed in; signed out keeps the locked page, with a board preview */
+  if(key==='drafttools'&&typeof mdRender==='function'){
+    let code=null;try{code=sessionStorage.getItem('md-join')}catch(e){}
+    if(signed){if(code){try{sessionStorage.removeItem('md-join')}catch(e){}MD.join=code}mdRender();return}
+    document.body.classList.remove('md-in-room');
+  }
   const chip=pro?'<span class="tmo-soon-chip">Coming soon</span>':`<span class="tmo-lock">${TMO_LOCK}Pro</span>`;
   const cta=pro?`<p class="tmo-pp-note"><b>You’re in.</b> ${TMO_BETA_PRO?'Pro is free for your account during the beta, and ':'It’s part of your Pro plan, and '}${esc(P.h)} will show up here as soon as it’s ready.</p>
       <div class="tmo-cta"><a class="btn tmo-big" href="#tmrank">See the rankings</a></div>`
@@ -311,6 +317,7 @@ function renderProTab(){
     </div>
     <div class="tmo-pp-cards">${P.cards.map(([h,p],i)=>`<div class="tmo-pp-card"><span class="tmo-pp-n">${i+1}</span><div><h3>${h}</h3><p>${p}</p></div></div>`).join('')}</div>
   </div>`;
+  if(key==='drafttools'&&typeof mdPreview==='function')mdPreview(el);
 }
 
 /* ---------- events ---------- */
