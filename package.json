@@ -5,10 +5,5 @@
   "scripts": {
     "dev": "npx --yes serve . -l 3000"
   },
-  "engines": {
-    "node": ">=18"
-  },
-  "dependencies": {
-    "web-push": "3.6.7"
-  }
+  "engines": { "node": ">=18" }
 }

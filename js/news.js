@@ -988,7 +988,7 @@ function tmnNotifHtml(){const L=S.leagues&&S.leagues.length?S.leagues:[{key:S.le
   return `<section class="card acc-sec" id="acc-notif"><header class="acc-sec-h"><h2>Notifications</h2><p>Which leagues can pop up big-play banners.</p></header>
     <ul class="tmn-nl">${L.map(x=>`<li><span class="acc-lg-t"><b>${esc(x.name||'League')}</b><span class="note">${tmnOn(x.key)?'Banners on':'News tab only'}</span></span><label class="tmn-sw"><input type="checkbox" data-notif="${esc(x.key)}" ${tmnOn(x.key)?'checked':''}><i aria-hidden="true"></i><span class="sr">Banners for ${esc(x.name||'League')}</span></label></li>`).join('')}
       <li class="tmn-nl-opp"><span class="acc-lg-t"><b>Your opponents' big plays</b><span class="note">A quieter banner when the team you're playing hits a big one</span></span><label class="tmn-sw"><input type="checkbox" data-notif-opp="1" ${n.opp?'checked':''}><i aria-hidden="true"></i><span class="sr">Opponent banners</span></label></li></ul>
-    <p class="note tmn-nl-f">Banners show while TradeMetric is open. For alerts when it's closed, turn on phone alerts below.</p>${typeof pushHtml==='function'?pushHtml():''}</section>`}
+    <p class="note tmn-nl-f">Banners show while TradeMetric is open in a tab. Phone alerts come with the app.</p></section>`}
 
 /* ---------- events ---------- */
 document.addEventListener('click',e=>{const t=e.target;if(!t.closest)return;

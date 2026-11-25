@@ -39,15 +39,6 @@ async function rest(path, { method = 'GET', body, prefer, ms = 2500 } = {}) {
   } catch (e) { LAST = String(e && e.message || e).slice(0, 160); return null; } finally { clearTimeout(t); }
 }
 
-/* raw table access for other server functions (push notifications) */
-export const sbRest = (path, opt) => rest(path, opt);
-export const sbAuthUser = async token => {
-  if (!token) return null;
-  // the publishable key is public (it's in the page too); the user's own sign-in token proves who they are
-  const pub = process.env.SUPABASE_PUBLISHABLE_KEY || 'sb_publishable_AFX79aKgqorAx3zgOyKatw_o_3_ERWG';
-  try { const r = await fetch(`${URL_}/auth/v1/user`, { headers: { apikey: pub, authorization: 'Bearer ' + token } }); return r.ok ? await r.json() : null; } catch { return null; }
-};
-
 /* ---- small key/value documents ---- */
 export async function kvGet(key) {
   const r = await rest(`shared_kv?key=eq.${encodeURIComponent(key)}&select=value,updated_at`);
