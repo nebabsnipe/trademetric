@@ -130,7 +130,7 @@ export function espnLineup(d, team, week) {
 }
 
 /* every saved league in an account, with what the server needs to look it up */
-function leaguesOf(S) {
+export function leaguesOf(S) {
   const L = S.leagues && S.leagues.length ? S.leagues : [{ key: S.leagueKey, name: S.league && S.league.name }], out = [];
   for (const e of L) {
     const cur = e.key === S.leagueKey, snap = cur ? S : e.snap; if (!snap) continue;

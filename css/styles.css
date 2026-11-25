@@ -2580,3 +2580,7 @@ body.tm-free .alerts-wrap,body.tm-free .ai-fab{display:none}
   .upg-opt b{font-size:30px}
   .tmn-pro{flex-direction:column;align-items:flex-start}
 }
+
+/* Account -> Email card: group headings and their one-line notes */
+.acc-sec h3.push-h.em-first{margin-top:6px}
+.em-sub{margin:2px 0 0}

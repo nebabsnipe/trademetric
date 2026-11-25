@@ -32,7 +32,8 @@ Fantasy football trades, rankings and lineup advice built on your league's exact
 | `supabase/shared.sql` | Tables for the shared news store. Run once after accounts_v2.sql |
 | `supabase/plans.sql` | The "was here during the beta" marker for each account. Run once after accounts_v2.sql. See `docs/plans.md` |
 | `supabase/push.sql` | Devices that have notifications on, and the record of what was sent. Run once after shared.sql |
-| `supabase/email/` | TradeMetric-branded confirmation and password-reset emails to paste into Supabase |
+| `supabase/email/` | The sign-in emails to paste into Supabase, and samples of the billing emails. Rebuilt by `node scripts/build-emails.mjs` |
+| `api/email.js`, `api/_email.js`, `api/_email_templates.js`, `api/_league_check.js`, `supabase/emails.sql` | The few emails TradeMetric sends (welcome, league stopped updating, clinch, championship, draft reminder). Every send goes through `api/_email.js`. See `docs/emails.md` |
 | `scripts/update_data.py` | Downloads fresh stats, injuries, schedules, betting lines and expert rankings |
 
 Handy places in `js/app.js`:

@@ -107,7 +107,7 @@ export function userRosters(st, players) {
    games: { TEAM: { start, state } }), with the same checks: his feed says healthy now, and either the other feed
    agrees or it has held for 10+ minutes. */
 const BACK_FROM = new Set(['Q', 'D', 'O', 'IR', 'PUP', 'SUS']);
-export function injuryEvents({ roster, src, log, cur, now = Date.now(), games = null }) {
+export function injuryEvents({ roster, src, log, cur, now = Date.now(), games = null, maxAgeH = RULES.maxAgeH }) {
   const mine = cur[src];
   if (!mine) return [];                                 // the user's feed didn't load this time: say nothing
   const other = cur[src === 'espn' ? 'sleeper' : 'espn'];
@@ -120,7 +120,7 @@ export function injuryEvents({ roster, src, log, cur, now = Date.now(), games = 
     const who = roster[k];
     if (who.team && r.team && who.team !== r.team && who.team !== 'FA') continue;   // same name, different player
     const age = now - r.at;
-    if (age < 0 || age > RULES.maxAgeH * 3600e3) continue;
+    if (age < 0 || age > maxAgeH * 3600e3) continue;
     if (back) {
       const g = games && games[r.team || who.team];
       if (!g || g.state !== 'pre' || g.start <= now || g.start - now > 3 * 864e5) continue;   // only before his game
