@@ -155,7 +155,7 @@ async function cron(req, res) {
   ]);
   if (!Array.isArray(logRows) || !players) return res.status(502).json({ error: 'data' });
   const log = logRows.map(r => ({ ...r, at: Date.parse(r.at) }));
-  const anyInj = log.some(r => ['Q', 'D', 'O', 'IR'].includes(r.st));
+  const anyInj = log.length > 0;
   // trade deadlines and lineup fixes (api/_alerts.js): this week's games, read once for everyone
   const W = await weekInfo(now);
   stats.deadline = 0; stats.lineup = 0;
@@ -179,7 +179,7 @@ async function cron(req, res) {
       const mineSent = sentRows.filter(r => r.user_id === uid), had = new Set(mineSent.map(r => r.key));
       if (Array.isArray(oldRows)) oldRows.forEach(r => { if (r.user_id === uid) had.add(r.key); });
       const { roster, src } = userRosters(st, players);
-      const events = anyInj && !offKinds.includes('inj') ? injuryEvents({ roster, src, log, cur, now }).filter(e => !had.has(e.key)) : [];   // the Injuries switch
+      const events = anyInj && !offKinds.includes('inj') ? injuryEvents({ roster, src, log, cur, now, games: W && W.games }).filter(e => !had.has(e.key)) : [];   // the Injuries switch
       if (isQuiet(devices[0].tz, now)) { stats.quiet += events.length; continue; }               // everything waits until 8am
       // deadline notices and lineup fixes go out as their own notifications (one per league at most)
       const extraJobs = W ? (await alertsFor(st, W, devices[0].tz, offKinds, had)).filter(a => a.keys.some(k => !had.has(k))) : [];

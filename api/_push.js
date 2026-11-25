@@ -101,8 +101,13 @@ export function userRosters(st, players) {
      3. the feed still says the same thing right now (so a blip that was corrected is dropped)
      4. it's confirmed: either the other feed also lists him as hurt, or it has stayed that way for 10+ minutes,
         which means two separate reads of the feed agree. Never a single unconfirmed data point.
-     5. it's less than 12 hours old */
-export function injuryEvents({ roster, src, log, cur, now = Date.now() }) {
+     5. it's less than 12 hours old
+   Cleared to play ("in", owner 2026-11-25): a player going from questionable / doubtful / out / IR back to no
+   designation is sent too, but only in the run-up to his game (it kicks off within 3 days and hasn't started;
+   games: { TEAM: { start, state } }), with the same checks: his feed says healthy now, and either the other feed
+   agrees or it has held for 10+ minutes. */
+const BACK_FROM = new Set(['Q', 'D', 'O', 'IR', 'PUP', 'SUS']);
+export function injuryEvents({ roster, src, log, cur, now = Date.now(), games = null }) {
   const mine = cur[src];
   if (!mine) return [];                                 // the user's feed didn't load this time: say nothing
   const other = cur[src === 'espn' ? 'sleeper' : 'espn'];
@@ -110,11 +115,21 @@ export function injuryEvents({ roster, src, log, cur, now = Date.now() }) {
   for (const r of log) { if (r.src !== src) continue; const k = norm(r.name); if (!roster[k]) continue; if (!latest[k] || r.at >= latest[k].at) latest[k] = r; }
   const out = [];
   for (const [k, r] of Object.entries(latest)) {
-    if (!PUSH_ST.has(r.st) || r.st === (r.was || '')) continue;
+    const back = r.st === '' && BACK_FROM.has(r.was || '');
+    if ((!PUSH_ST.has(r.st) && !back) || r.st === (r.was || '')) continue;
     const who = roster[k];
     if (who.team && r.team && who.team !== r.team && who.team !== 'FA') continue;   // same name, different player
     const age = now - r.at;
     if (age < 0 || age > RULES.maxAgeH * 3600e3) continue;
+    if (back) {
+      const g = games && games[r.team || who.team];
+      if (!g || g.state !== 'pre' || g.start <= now || g.start - now > 3 * 864e5) continue;   // only before his game
+      if (mine[k]) continue;                                                                    // his feed still lists him
+      const agree = !!other && !other[k];
+      if (!agree && age < RULES.confirmMin * 60e3) continue;
+      out.push({ key: `inj:${k}:in:${Math.floor(r.at / (12 * 3600e3))}`, k, name: who.name, team: r.team || who.team, was: r.was || '', st: '', body: '', leagues: who.leagues, at: r.at, kick: g.start });
+      continue;
+    }
     if (mine[k] !== r.st) continue;
     const both = !!(other && other[k]);
     if (!both && age < RULES.confirmMin * 60e3) continue;
@@ -125,6 +140,7 @@ export function injuryEvents({ roster, src, log, cur, now = Date.now() }) {
 
 const ST_WORD = { Q: 'questionable', D: 'doubtful', O: 'out', IR: 'on injured reserve' };
 function injTitle(e) {
+  if (e.st === '') return e.was === 'IR' || e.was === 'PUP' ? `${e.name} activated: he's in` : `${e.name} is in: cleared to play`;
   if (e.st === 'IR') return `${e.name} placed on injured reserve`;
   const up = e.was && (SEV[e.st] || 0) < (SEV[e.was] || 0);
   return up ? `${e.name} upgraded to ${ST_WORD[e.st]}` : `${e.name} is ${ST_WORD[e.st]}`;
@@ -135,10 +151,11 @@ const inLeagues = L => L.length === 1 ? L[0] : L.length === 2 ? `${L[0]} and ${L
    replaces the earlier notification on the phone instead of stacking under it. */
 export function injuryPayload(e) {
   const bits = [e.team, e.body && !/^(undisclosed|na|n\/a)$/i.test(e.body) ? e.body.toLowerCase() : ''].filter(Boolean).join(' · ');
+  if (e.st === '') return { title: injTitle(e), body: `${e.team ? e.team + '. ' : ''}No injury designation for ${new Date(e.kick).toLocaleDateString('en-US', { weekday: 'long', timeZone: 'America/New_York' })}'s game. Check your lineup in ${inLeagues(e.leagues)}.`, tag: 'inj-' + e.k.replace(/ /g, '-'), url: '/#team' };
   return { title: injTitle(e), body: `${bits ? bits + '. ' : ''}On your team in ${inLeagues(e.leagues)}.`, tag: 'inj-' + e.k.replace(/ /g, '-'), url: '/#news' };
 }
 export function summaryPayload(list) {
-  const short = e => `${e.name} (${e.st === 'IR' ? 'IR' : ST_WORD[e.st]})`;
+  const short = e => `${e.name} (${e.st === '' ? 'in' : e.st === 'IR' ? 'IR' : ST_WORD[e.st]})`;
   const shown = list.slice(0, 4).map(short).join(', ');
   return { title: `${list.length} more status changes on your teams`, body: shown + (list.length > 4 ? ` and ${list.length - 4} more` : '') + '.', tag: 'inj-summary', url: '/#news' };
 }

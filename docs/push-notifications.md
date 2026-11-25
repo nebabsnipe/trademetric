@@ -82,13 +82,17 @@ Part of the same scheduled check (`/api/push/cron`), rules in `api/_alerts.js`, 
 - **Lineup fixes:** read straight from Sleeper/ESPN: an empty starting slot, a starter who is out / on IR /
   suspended / on bye, or a bench player projected 5+ points more and about double the starter (the site's rule),
   only for players whose game hasn't started. One notification per league ("Plus 2 more"). Tapping opens My Team.
-  **When (owner, 2026-11-25):** Thursday games (and any other midweek game): 6 pm the day before and 4 hours
+  **When (owner, 2026-11-25):** Thursday games (and any other midweek game): 6 pm the day before and 1.5 hours
   before kickoff. Saturday/Sunday/Monday games: Friday 6 pm and 1 hour before kickoff. In between, a NEW problem
   (starter ruled out, slot left empty) goes out right away. Bench swaps only at the 6 pm heads-up and the
   pre-kickoff reminder (projections move all week). 6 pm is in the user's own time zone; quiet hours still apply.
   Logic: `gameSchedule` and `lineupTiming` in `api/_alerts.js`.
 - Private ESPN leagues: deadline notices only (their login codes stay in the browser).
 - Checked with `node scripts/test-push.mjs` and a full run of the scheduled check with every outside service faked.
+
+- **Cleared to play ("in"):** injury alerts now also send when a player on your team goes from questionable /
+  doubtful / out / IR back to no designation, but only in the 3 days before his game and before kickoff, with
+  the same confirmation as other injury alerts. Ruled out ("out") was already sent at any time.
 
 ## Not done yet
 

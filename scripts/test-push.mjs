@@ -105,7 +105,7 @@ t('lineup: bench swap only when 5+ more AND about double, and never once a game 
   assert.equal(lineupIssues(mk(4, 12, 'DAL'), G, now, 12).length, 0);   // his game already started: no
 });
 
-/* when lineup alerts go out (owner, 2026-11-25): Thursday games -> 6 pm the day before + 4 hours before;
+/* when lineup alerts go out (owner, 2026-11-25): Thursday games -> 6 pm the day before + 1.5 hours before;
    Sat/Sun/Mon games -> Friday 6 pm + 1 hour before; new problems in between go out right away */
 const ET = 'America/New_York', Z = s => Date.parse(s);
 const THU = Z('2026-11-27T01:15:00Z'), SUN = Z('2026-11-29T18:00:00Z'), MON = Z('2026-12-01T01:15:00Z');   // Thu 8:15pm, Sun 1pm, Mon 8:15pm ET
@@ -113,17 +113,18 @@ const GW = { DAL: { start: THU, state: 'pre' }, BUF: { start: SUN, state: 'pre' 
 const keyOf = (iss, at) => lineupTiming(iss, GW, Z(at), ET).map(x => x.when + ' ' + x.k);
 t('timing: the heads-up times and reminder leads', () => {
   assert.equal(new Date(gameSchedule(THU, ET).eve).toISOString(), '2026-11-25T23:00:00.000Z');          // Wed 6pm ET
-  assert.equal(gameSchedule(THU, ET).lead, 4 * H);
+  assert.equal(gameSchedule(THU, ET).lead, 1.5 * H);
   assert.equal(new Date(gameSchedule(SUN, ET).eve).toISOString(), '2026-11-27T23:00:00.000Z');          // Fri 6pm ET
   assert.equal(new Date(gameSchedule(MON, ET).eve).toISOString(), '2026-11-27T23:00:00.000Z');          // Monday night: same Friday
   assert.equal(gameSchedule(SUN, ET).lead, H);
   assert.equal(new Date(gameSchedule(SUN, 'America/Los_Angeles').eve).toISOString(), '2026-11-28T02:00:00.000Z');   // Fri 6pm Pacific
 });
-t('timing: Thursday player out -> nothing before Wed 6pm, heads-up after, reminder 4 hours before', () => {
+t('timing: Thursday player out -> nothing before Wed 6pm, heads-up after, reminder 1.5 hours before', () => {
   const iss = [{ k: 'o', kind: 'out', kick: THU }];
   assert.deepEqual(keyOf(iss, '2026-11-25T22:30:00Z'), []);                                             // Wed 5:30pm
   assert.deepEqual(keyOf(iss, '2026-11-25T23:05:00Z'), ['eve o:wd2026-11-26']);                          // Wed 6:05pm
-  assert.deepEqual(keyOf(iss, '2026-11-26T21:30:00Z'), ['pre o:p' + THU]);                               // Thu 4:30pm
+  assert.deepEqual(keyOf(iss, '2026-11-26T21:30:00Z'), ['change o:wd2026-11-26']);                       // Thu 4:30pm: same key as the heads-up, already sent
+  assert.deepEqual(keyOf(iss, '2026-11-26T23:50:00Z'), ['pre o:p' + THU]);                               // Thu 6:50pm
 });
 t('timing: Sunday player ruled out on Saturday -> sent right away as a change; then the 1-hour reminder', () => {
   const iss = [{ k: 'o', kind: 'out', kick: SUN }];
@@ -143,6 +144,18 @@ t('timing: an empty slot follows the next game: Thursday heads-up, then the week
   const after = { ...GW, DAL: { start: THU, state: 'in' } };
   assert.deepEqual(lineupTiming(iss, after, Z('2026-11-27T23:05:00Z'), ET).map(x => x.k), ['e:wwknd']);
   assert.deepEqual(lineupTiming(iss, after, Z('2026-11-29T17:05:00Z'), ET).map(x => x.k), ['e:pwknd']);
+});
+
+t('cleared to play ("in"): sent in the run-up to his game, confirmed, and not once it has started', () => {
+  const games = { CIN: { start: now + 20 * H, state: 'pre' } };
+  const back = (ago, other, g = games) => injuryEvents({ ...U, log: [row('sleeper', "Ja'Marr Chase", 'CIN', 'Q', '', ago, '')], cur: { sleeper: {}, espn: other }, now, games: g });
+  const e = back(12, {});
+  assert.equal(e.length, 1); assert.match(injuryPayload(e[0]).title, /Ja'Marr Chase is in/); assert.equal(injuryPayload(e[0]).url, '/#team');
+  assert.equal(back(3, { 'jamarr chase': 'Q' }).length, 0);                               // just seen, other feed disagrees: wait
+  assert.equal(back(3, {}).length, 1);                                                     // both feeds agree: right away
+  assert.equal(back(12, {}, { CIN: { start: now - H, state: 'in' } }).length, 0);          // game started: too late
+  assert.equal(back(12, {}, { CIN: { start: now + 5 * D, state: 'pre' } }).length, 0);     // game days away: not news yet
+  assert.equal(back(12, {}, {}).length, 0);                                                // no game (bye)
 });
 
 console.log(`\n${n} checks passed`);

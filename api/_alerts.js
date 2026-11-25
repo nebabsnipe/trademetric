@@ -3,7 +3,7 @@
 //   - trade deadline: about a week out, about 3 days out, and a final one in the last 24 hours
 //   - lineup fixes: an empty starting slot, a starter who is out / on IR / suspended / on bye, or a bench player
 //     projected at least 5 points more (and about double) than the starter he'd replace. When (owner, 2026-11-25):
-//       Thursday games (and any other midweek game): 6 pm the day before, and 4 hours before kickoff
+//       Thursday games (and any other midweek game): 6 pm the day before, and 1.5 hours before kickoff
 //       Saturday / Sunday / Monday games: Friday at 6 pm, and 1 hour before kickoff
 //       and in between, any NEW problem (a starter ruled out, a slot left empty) is sent right away
 //     The same rules as the lineup alerts on the site (lineupAlerts in js/app.js); projections are the league
@@ -152,19 +152,19 @@ function tzOff(ms, tz) {
 function atLocal(y, m, d, h, tz) { let t = Date.UTC(y, m - 1, d, h); t -= tzOff(t, tz); return Date.UTC(y, m - 1, d, h) - tzOff(t, tz); }
 /* the schedule for a game kicking off at `kick`, for someone in time zone tz:
    eve  = when the heads-up goes out (Friday 6 pm for Sat/Sun/Mon games, otherwise 6 pm the day before)
-   lead = how long before kickoff the reminder goes out (1 hour for Sat/Sun/Mon games, otherwise 4 hours) */
+   lead = how long before kickoff the reminder goes out (1 hour for Sat/Sun/Mon games, otherwise 1.5 hours) */
 export function gameSchedule(kick, tz) {
   const wd = dayIn(kick, 'America/New_York'), weekend = WEEKEND.includes(wd);
   const p = new Intl.DateTimeFormat('en-US', { timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit', weekday: 'long' }).formatToParts(kick);
   const g = t => p.find(x => x.type === t).value, local = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'].indexOf(g('weekday'));
   const back = weekend ? (local - 5 + 7) % 7 || 7 : 1;
   const ymd = new Date(kick).toLocaleDateString('en-CA', { timeZone: 'America/New_York' });
-  return { id: weekend ? 'wknd' : 'd' + ymd, eve: atLocal(+g('year'), +g('month'), +g('day') - back, 18, tz), lead: weekend ? H : 4 * H };
+  return { id: weekend ? 'wknd' : 'd' + ymd, eve: atLocal(+g('year'), +g('month'), +g('day') - back, 18, tz), lead: weekend ? H : 1.5 * H };
 }
 /* Which lineup problems to send now, and under which record key (so each goes once per moment):
    - ':w<group>'  the heads-up (night before / Friday 6 pm). A problem first seen later in that window, like a starter
                   ruled out on Saturday, gets the same key, so it goes out the moment it appears.
-   - ':p<kickoff>' the reminder before kickoff (4 hours / 1 hour), for anything still not fixed.
+   - ':p<kickoff>' the reminder before kickoff (1.5 hours / 1 hour), for anything still not fixed.
    Bench swaps follow projections, which move all week: only at the heads-up and the reminder, never as a "change". */
 export function lineupTiming(issues, games, now, tz) {
   const upcoming = Object.values(games).filter(g => g.state === 'pre' && g.start > now).map(g => g.start).sort((a, b) => a - b);
