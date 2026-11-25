@@ -99,7 +99,7 @@ function mdApply(j,o){
 }
 function mdFail(j){const m=(j&&j.msg)||'Something went wrong. Try again.';mdToast(m,'bad');return false}
 var MD_SAVE_T=null;
-function mdSaveCarry(){clearTimeout(MD_SAVE_T);MD_SAVE_T=setTimeout(()=>{const c=MD.carry;mdAcctSet('mdSolo',c&&c.room&&c.room.status!=='done'?c:null)},1200)}
+function mdSaveCarry(){const c=MD.carry;mdAcctSet('mdSolo',c&&c.room&&c.room.status!=='done'?c:null)}
 /* solo: CPU picks arrive as one list and are shown one at a time at the chosen speed */
 function mdReveal(){
   clearTimeout(MD.revT);if(MD.paused||MD.shown>=MD.picks.length)return;
@@ -612,4 +612,4 @@ document.addEventListener('keydown',e=>{
   if(e.key==='Enter'&&tg.classList&&tg.classList.contains('md-row'))mdSheet(tg.dataset.id)});
 document.addEventListener('pointermove',e=>{const c=e.target.closest&&e.target.closest('[data-md-spot]');if(!c)return;const r=c.getBoundingClientRect();c.style.setProperty('--mx',(e.clientX-r.left)+'px');c.style.setProperty('--my',(e.clientY-r.top)+'px')});
 addEventListener('beforeunload',e=>{const r=MD.room;if(r&&r.mode!=='solo'&&(r.status==='live'||r.status==='paused')&&MD.page==='room'){e.preventDefault();e.returnValue=''}});
-addEventListener('hashchange',()=>{if(!mdOn()){mdTitle(false);document.body.classList.remove('md-in-room')}});
+addEventListener('hashchange',()=>setTimeout(()=>{if(!mdOn()){mdTitle(false);document.body.classList.remove('md-in-room')}},0));

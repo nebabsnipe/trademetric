@@ -221,7 +221,7 @@ body.md-in-room main.wrap{padding-bottom:0}
 .md-re-pop button{appearance:none;border:0;background:none;font-size:17px;width:30px;height:30px;border-radius:50%;cursor:pointer}.md-re-pop button:hover{background:var(--surface-2)}
 .md-chat{display:flex;flex-direction:column;height:100%;min-height:200px}
 .md-chat-l{flex:1;min-height:0;overflow:auto;display:flex;flex-direction:column;gap:8px;padding-bottom:8px}
-.md-chat-l li{display:flex;gap:7px;align-items:flex-start;font-size:13px;line-height:1.4;overflow-wrap:anywhere}.md-chat-l li span{display:flex;flex-direction:column;padding:6px 10px;border-radius:10px;background:var(--surface-2)}.md-chat-l li small{font-size:10.5px;color:var(--muted);font-weight:600}
+.md-chat-l li{display:flex;gap:7px;align-items:flex-start;font-size:13px;line-height:1.4;overflow-wrap:anywhere}.md-chat-l li>span:not(.md-av){display:flex;flex-direction:column;padding:6px 10px;border-radius:10px;background:var(--surface-2)}.md-chat-l li small{font-size:10.5px;color:var(--muted);font-weight:600}
 .md-chat-l li.md-me span{background:var(--accent-soft)}.md-chat-0{color:var(--muted);justify-content:center;padding:20px 0}
 .md-chat-f{display:flex;gap:6px;padding-top:8px;border-top:1px solid var(--line)}.md-chat-f input{flex:1;min-width:0;height:34px;padding:0 10px;border:1px solid var(--line);border-radius:99px;background:var(--surface);color:var(--ink);font-size:13px}
 

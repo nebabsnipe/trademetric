@@ -41,6 +41,36 @@ The live site's changes through 2026-11-25 (account sync, shared news store, New
 
 ---
 
+## Mock drafts (built 2026-11-25, on the preview branch)
+
+The Draft Tools tab (`#drafttools`) is now the mock draft entry page for anyone signed in. Signed out it stays the locked page, with a small looping board preview. Draft pick values is still Coming soon.
+
+- **Three ways to draft, one draft room:** Draft vs CPU (starts at once), Draft with friends (private room, invite link `#draft/<code>`), Join an online draft (three public lobbies from presets, 3-minute countdown from the first person in, Quick join). Empty seats are always filled by CPU teams.
+- **Files:** `js/mockdraft.js` (everything on the page), `css/mockdraft.css` (all classes start with `md-`), `api/draft.js` (rooms, rules, CPU drafting, clock, grades), `supabase/mockdraft.sql` (tables), `scripts/test-mockdraft.mjs` (checks). Small hooks: `renderProTab` in `js/offseason.js`, `go()` and `enterApp()` in `js/app.js` (the `#draft/<code>` link), `index.html` (files, FAQ entry "Mock drafts"), `vercel.json` (data files bundled with the function).
+- **Player order:** "ADP" in the room is the blend of expert rank and market value the rankings already load, adjusted for the room's scoring (and the superflex market numbers in superflex rooms). The source is never named. TM rank and the vs-market chip sit beside it; the pool can be sorted by TM rank with tier dividers. Kickers and defenses are in the data, so they are in the pool, placed in the last three rounds.
+- **CPU teams:** each gets a hidden plan at random (balanced, running backs early, receivers early, early tight end, early quarterback, late quarterback) that only steers the first six rounds. Picks are weighted toward the best few by ADP, with a wider spread in later rounds. They fill starting spots before the bench, take no second QB or TE before the starters are in (except superflex), no K or D/ST before the last three rounds, and always end with a full legal lineup. The plan is shown on the results page once the draft is over.
+- **The clock:** the server stores when the pick runs out. Pages count down to it and nudge the server when it passes; the server checks the time itself, so many pages nudging at once still make one pick. Out of time: top of your queue, else best available that fits. Two misses in a row (rooms with other people) puts you on autopick until "I'm back".
+- **Solo extras:** Pause, Sim to my pick, Undo (back to your previous pick), resume later, pick-clock "No limit".
+- **Friends rooms:** host changes settings, drags the draft order or randomizes, turns empty seats into CPU teams, removes people, starts, and can pause (5 minutes at most). Team rename, room chat (200 characters, plain text, rate limited), emoji reactions on picks. Host leaving hands the room to the next person; everyone leaving finishes the draft on autopick and saves it for each member.
+- **Online lobbies:** names are account usernames, no chat, no pause, 60-second clock. Leaving puts the seat on autopick.
+- **Results:** grade A+ to F with a rank in the room, by-position bars, best value, biggest reach, projected lineup, round by round with ADP, the full board, any team's result, Draft again, Share (image of the grade card), and a "My mock drafts" list (last 20).
+- **Grade:** blends value against ADP, TM rank of the roster, lineup strength and roster balance, each compared with the other teams in the room. The blend can be set with the `DRAFT_GRADE_W` environment variable ("a,b,c,d"). **Provisional until the owner approves it.** Never shown on the site.
+- **Saved on the account:** last settings used, the sound switch, and (until the tables exist) the solo draft in progress and the history list.
+
+### Setup needed (not done yet)
+1. Run `supabase/mockdraft.sql` in the Supabase SQL editor.
+2. `SUPABASE_SECRET_KEY` set in Vercel for **Preview** as well as Production (the preview does not have it today).
+3. Supabase Realtime left on (it is by default). Nothing to add to a publication.
+
+Until 1 and 2 are done, **solo drafts work anyway**: the page sends the draft back to the server with each request, the server checks and advances it, and the draft in progress is kept on the account. Friends rooms and online lobbies say they are not switched on yet.
+
+### Not verified yet
+- The server was tested with the real code against an in-memory stand-in for the database (200 simulated drafts, solo, friends with three browser sessions, online lobbies). **It has not run against the real Supabase tables**, and Realtime could not be tested here; the tests used the 2-second fallback check.
+- 21st.dev's Magic connector was not available in the session, so the motion pieces were written by hand from those component patterns (ring countdown, number ticker, animated list, strip, command-style search, avatar group, drag to reorder, bottom sheet, toasts, spotlight cards, shine), not copied from pulled code.
+- Clicking a player opens a small card made for the draft room, not the in-season player card (that one needs a connected league).
+
+---
+
 ## Offseason News (built 2026-11-23, not deployed yet)
 
 The News tab in offseason mode. Code in `js/offnews.js`; the in-season News (`js/news.js`) is untouched.
@@ -178,7 +208,7 @@ Gap-based: a new tier starts where the drop to the next player is much bigger th
 - Store raw data at time of trade so grades can be recalculated if formula improves
 - Needs to be live by ~Dec 28 (fantasy playoffs end)
 
-### 3. Draft Tools (Pro) — tab and Coming soon page built; tools not built
+### 3. Draft Tools (Pro) — mock drafts built (see above); pick values not built
 **Draft pick values**
 - Reuses trade calculator UI, aimed at draft picks
 - "Is 1.04 worth more than 1.07 + a 3rd?"
