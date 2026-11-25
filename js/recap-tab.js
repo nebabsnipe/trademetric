@@ -47,7 +47,7 @@
     return a || l;
   }
   /* what the frame plays: the user's own league once they have watched it, the sample league before that */
-  function clipSrc() { var l = myLeague(); return T.unlocked && l && T.noReal !== l ? '/recap?demo=1&league=' + encodeURIComponent(l) + '&year=' + season() : '/recap?demo=1&sample=1'; }
+  function clipSrc() { var l = myLeague(); return T.unlocked && l && T.noReal !== l ? '/recap?reel=1&league=' + encodeURIComponent(l) + '&year=' + season() : '/recap?reel=1&sample=1'; }
   function setClip() { var f = q('.rc-clip'), u = clipSrc(); if (f && T.clip !== u) { T.clip = u; T.mine = false; f.src = u; badge(); } }
   function badge() { var b = q('.rc-badge'); if (b) b.textContent = T.mine ? 'Your league' : 'Sample league'; }
   function sideHtml() { var n = T.cards.length; return T.cards.map(function (c, i) { return '<button class="rc-side" type="button" data-rc-card="' + (i + 1) + '"><span class="rc-side-n">' + two(i + 1) + ' / ' + two(n) + '</span><span class="rc-side-t">' + c[1] + '</span><span class="rc-side-s"></span></button>'; }).join(''); }

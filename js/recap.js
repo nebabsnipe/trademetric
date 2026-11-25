@@ -9,14 +9,16 @@
   var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   var AUTOPLAY = !reduce;
   var QS = new URLSearchParams(location.search);
-  var DEMO = QS.has('demo');            // the looping preview on the site's Recap tab: no cover, no controls
+  var REEL = QS.has('reel');            // the designed preview on the site's Recap tab: js/recap-reel.js moves this page's cards around like a short video
+  var DEMO = QS.has('demo') || REEL;    // a silent preview in a small frame: plays by itself, nothing in it can be pressed
+  var SPEED = 1;                        // the reel plays some cards faster than normal
   var EMBED = QS.has('embed') || DEMO;  // shown on top of the site, in a frame
   var side = document.getElementById('rc-side');
   var TITLES = { leagueTrades: 'League trades', myTrades: 'Your trades', best: 'Best trade', worst: 'Worst trade', defining: 'Defining trade', fleece: 'Biggest fleece',
     waivers: 'Waiver wire', timelapse: 'Season timelapse', bestWeeks: 'Best weeks', beatdown: 'Biggest beatdown', clutch: 'Clutch', share: 'Your recap card' };
   // the small preview plays by itself and loops; with "reduce motion" on it stays still on the first card.
   // It has no buttons, card counter or TM mark (only the progress bars along the top): nothing in it can be pressed.
-  if (DEMO) { all('[data-act]').forEach(function (el) { el.style.visibility = 'hidden'; }); var dc = one('[data-v="counter"]'); if (dc) dc.parentNode.style.visibility = 'hidden'; var dm = one('a.rc-k[href="/"]'); if (dm) dm.style.visibility = 'hidden'; }
+  if (DEMO && !REEL) { all('[data-act]').forEach(function (el) { el.style.visibility = 'hidden'; }); var dc = one('[data-v="counter"]'); if (dc) dc.parentNode.style.visibility = 'hidden'; var dm = one('a.rc-k[href="/"]'); if (dm) dm.style.visibility = 'hidden'; }
 
   // Every possible card, in order. `on` decides whether this recap has real data for it.
   var ALL = [
@@ -430,10 +432,11 @@
   });
 
   function tick(now) {
-    var dt = Math.min(100, now - last); last = now;
+    var dt = Math.min(100, now - last) * SPEED; last = now;
     if (!st.paused) {
       var e = st.elapsed + dt;
-      if (DEMO && st.card === LAST && e >= 6000) show(0);
+      if (REEL) { if (e < 60000) { st.elapsed = e; draw(); } }   // the reel decides when the card changes
+      else if (DEMO && st.card === LAST && e >= 6000) show(0);
       else if (AUTOPLAY && st.card < LAST && e >= CARDS[st.card].dur) show(st.card + 1);
       else if (e < 20000) { st.elapsed = e; draw(); }
     }
@@ -614,11 +617,30 @@
     setIf('gate', false);
     // the Recap tab's small preview: say which league is playing and which cards it has
     if (DEMO) tellSite({ rc: 'clip', ok: true, sample: !!R.sample, league: String(R.league.id), year: R.league.year, cards: CARDS.map(function (c) { return c.key; }) });
+    if (REEL && window.rcReel) return reel();
     var s = parseInt((location.hash.match(/card=(\d+)/) || [])[1], 10); // #card=6 jumps to card 6
     if (DEMO || s) return begin(s);
     onCover = true;
     root.style.setProperty('--rc-ga', '#7c3aed'); root.style.setProperty('--rc-gb', '#f59e0b');
     setIf('bgAurora', true); setIf('cover', true);
+  }
+  // The reel (js/recap-reel.js) drives the same cards: it asks for the cover or a card, moves the clock and sets the speed.
+  function reel() {
+    function showCover() {
+      ALL.forEach(function (x) { setIf(x.flag, false); });
+      setIf('ready', false); setIf('bgGrid', false); setIf('bgStadium', false); setIf('bgAurora', true);
+      root.style.setProperty('--rc-ga', '#7c3aed'); root.style.setProperty('--rc-gb', '#f59e0b');
+      setIf('cover', false); void root.offsetWidth; setIf('cover', true);
+    }
+    running = true; setPaused(false); last = performance.now(); requestAnimationFrame(tick);
+    window.rcReel.run({
+      root: root, stage: stage, year: D.league.year, reduce: reduce,
+      cards: CARDS.map(function (c) { return { key: c.key, title: TITLES[c.key], dur: c.dur }; }),
+      cover: showCover,
+      show: function (i) { setIf('cover', false); setIf('ready', true); show(i); },
+      seek: function (ms) { st.elapsed = ms; draw(); },
+      speed: function (k) { SPEED = k; }
+    });
   }
   function begin(s) {
     if (running) return;
