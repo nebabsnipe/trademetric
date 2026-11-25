@@ -186,7 +186,7 @@ function renderOffHome(){
       <p>The rankings are free. Pro turns them into decisions for your team.${TMO_BETA_PRO?' <b>Free for every account during the beta.</b>':''}</p></div>
       ${pro?`<span class="tmo-pro-on">${TMO_BETA_PRO?'Pro active · free during beta':'Pro active'}</span>`:`<a class="btn accent" href="${signed?'#account':'#signin'}">${signed?'See Pro plans':TMO_BETA_PRO?'Sign in for free Pro':'Sign in to get Pro'}</a>`}
     </div>
-    <div class="tmo-tools">${TOOLS.map(([h,p,k])=>`<div class="tmo-tool"><div class="tmo-tool-h"><h3>${h}</h3>${pro?'':'<span class="tmo-lock">'+TMO_LOCK+'Pro</span>'}</div><p>${p}</p>${k==='trade'||k==='picks'?'<span class="tmo-soon">Coming soon</span>':''}</div>`).join('')}</div>
+    <div class="tmo-tools">${TOOLS.map(([h,p,k])=>`<div class="tmo-tool"><div class="tmo-tool-h"><h3>${h}</h3>${pro?'':'<span class="tmo-lock">'+TMO_LOCK+'Pro</span>'}</div><p>${p}</p>${k==='trade'||k==='picks'||k==='fit'?'<span class="tmo-soon">Coming soon</span>':k==='recap'?'<a class="tmo-link" href="#recap">Open Recap →</a>':k==='mock'?'<a class="tmo-link" href="#drafttools">Open Draft Tools →</a>':''}</div>`).join('')}</div>
   </section>
   ${TMO_IS_PREVIEW&&!TMO_BETA_PRO?`<p class="tmo-dev note">Preview only: <button class="btn small" type="button" data-tmo-pro>${pro?'View as free':'View as Pro'}</button> Consensus and market numbers use this season's rest-of-season data until the offseason feeds are added.</p>`:''}`;
 }

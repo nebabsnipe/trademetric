@@ -173,7 +173,7 @@ The card list is now the 12-card build prompt (league trades, your trades + podi
 
 ## Build notes — Phase 2 (slideshow), Nov 2026
 
-- **Page:** `recap.html` + `css/recap.css` + `js/recap.js` (all classes `rc-`). Open as `/recap?league=<id>&year=<yyyy>`; with no league it uses the signed-in user's current ESPN league. The script also reads `/recap/<id>/<yyyy>` paths, but that address needs a one-line rewrite in `vercel.json` (not added yet).
+- **Page:** `recap.html` + `css/recap.css` + `js/recap.js` (all classes `rc-`). Open as `/recap?league=<id>&year=<yyyy>`; with no league it uses the signed-in user's current ESPN league. `/recap/<id>/<yyyy>` (and `/recap/<id>`) also work, through rewrites in `vercel.json`.
 - **Look:** copied from the approved reference file; the design is 390×844 and is scaled to fit the window (centred column on desktop).
 - **Skipped cards:** the API's `cards` list decides which cards appear; the progress bar and counter only count those.
 - **Save image / Share:** the share card is redrawn onto a canvas (no libraries) and saved as a PNG; Share uses the phone's share sheet when it can, otherwise saves the image.

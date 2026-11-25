@@ -108,6 +108,14 @@
   "cleanUrls": true,
   "rewrites": [
     {
+      "source": "/recap/:league(\\d+)/:year(\\d{4})",
+      "destination": "/recap.html"
+    },
+    {
+      "source": "/recap/:league(\\d+)",
+      "destination": "/recap.html"
+    },
+    {
       "source": "/api/players",
       "destination": "/api/market?fn=players"
     }

@@ -200,7 +200,7 @@ Gap-based: a new tier starts where the drop to the next player is much bigger th
 ## Offseason Features to Build
 
 ### 1. Rankings — ✅ built (preview), with trimmed breakdown and TradeMetric take
-### 2. Season Recap (Pro) — tab and Coming soon page built; tool not built (see `recap-wrapped.md`)
+### 2. Season Recap (Pro) — ✅ slideshow built (preview) and linked from the Recap tab, with a sample recap (see `recap-wrapped.md`)
 - Private to the account owner — sign-in required, auth-gated route
 - Triggered when a league's final week settles
 - Lives on homepage hero for the recap window, then moves to `/recap/[leagueId]/[year]`
@@ -243,4 +243,4 @@ Clean and professional: roomy rows, position color chips (QB purple, RB green, W
 - **Rankings update cadence**: static until NFL draft, or updated weekly with news?
 - **Recap name**: "Recap" is the working title — finalize before launch
 - **Supabase redirect URL** for the preview domain so sign-in works on the preview
-- **Home page tool grid** still marks only three tools as Coming soon; Recap and League fit are also not built yet.
+- **Home page tool grid:** Recap and Mock drafts link to their tabs; League fit, Draft pick values and Trade analyzer are marked Coming soon.
