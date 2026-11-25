@@ -297,6 +297,25 @@ eq(['matchup', 'perf', 'top', 'clips', 'clinch'].map(k => db.email_prefs[0][k]),
 await POST(R('/api/email?do=unsub&all=1&t=' + tk, { method: 'POST' }));
 ok(['matchup', 'perf', 'top', 'clips', 'inj', 'deadline', 'clinch', 'champ', 'recap', 'moves', 'draft'].every(k => db.email_prefs[0][k] === false), '"turn off all" turns off all eleven');
 
+/* ---- 13b. the one-time announcement ---- */
+reset();
+const annReq = (extra = '') => GET(R('/api/email?do=announce' + extra, { headers: { authorization: 'Bearer ' + process.env.CRON_SECRET } }));
+eq((await GET(R('/api/email?do=announce'))).status, 401, 'announcement needs the password');
+let ann = await (await annReq('&dry=1')).json();
+eq([ann.accounts, ann.would_send, outbox.length], [1, 1, 0], 'not live, dry run: only the owner is considered and nothing is sent');
+await annReq(); await annReq();
+eq(outbox.length, 1, 'not live: one test copy to the owner, and running it again sends nothing more');
+ok(/turn off all update emails/.test(outbox[0].text) && /api\/email\/unsub\?t=/.test(outbox[0].text) && outbox[0].from === 'TradeMetric <updates@trademetric.app>', 'the announcement has the one-click turn-off link and comes from updates@');
+reset();
+process.env.EMAIL_LIVE = '1'; process.env.VERCEL_ENV = 'production';
+db.email_prefs.push({ user_id: U2, matchup: false, perf: false, top: false, clips: false, inj: false, deadline: false, clinch: false, champ: false, recap: false, moves: false, draft: false });
+ann = await (await annReq()).json();
+eq([ann.sent, ann.pref_off, outbox.map(m => m.to[0])], [1, 1, ['owner@example.com']], 'live: everyone gets it once, except someone who already turned everything off');
+await annReq(); eq(outbox.length, 1, 'live: a second run sends nothing');
+await POST(R('/api/email?do=unsub&t=' + unsubToken(OWNER, 'announce'), { method: 'POST' }));
+ok(['matchup', 'perf', 'top', 'clips', 'inj', 'deadline', 'clinch', 'champ', 'recap', 'moves', 'draft'].every(k => db.email_prefs.find(r => r.user_id === OWNER)[k] === false), 'the announcement\'s turn-off link turns off all eleven switches');
+delete process.env.EMAIL_LIVE; delete process.env.VERCEL_ENV;
+
 /* ---- 14. reading a week: ESPN ---- */
 const espnWk = (scores, kona) => async (url, headers) => {
   if (/kona_player_info/.test(url)) return kona(JSON.parse(headers['x-fantasy-filter']));

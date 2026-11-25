@@ -17,6 +17,11 @@ checked against the league's own data.
 | Confirm email, reset password | Sent by Supabase Auth through Resend (`supabase/email/`) |
 | League stopped updating | A saved league can't be read for 48 hours in a row. Once per league per breakage |
 
+**One-time announcement** (`announce`, sent once ever, key `announce:2026-11`): goes to every account with a confirmed
+address, saying the update emails are starting and offering a one-click "turn off all update emails". Whoever does
+nothing keeps getting them. Run by hand with `/api/email/announce` (needs the CRON_SECRET; `?dry=1` shows who it
+would reach). Until `EMAIL_LIVE` is on it only ever goes to the owner's account.
+
 **Update emails** (each has a switch in Account → Leagues → Email, and a one-click unsubscribe), from `updates@`:
 
 | Group | Switch | Default | When | Limit |
