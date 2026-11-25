@@ -16,7 +16,7 @@ var TM_PRICES={
   higher:{monthly:7,annual:50,trialDays:7}};      /* the second arm of the PostHog "price-test" flag (off for now) */
 var TM_PRO_LIST=['Trade analyzer, Trade Score and trade ideas','My Team: lineup, matchups and start or sit','Waiver wire, trade values and Season Sim','News on your players, alerts and big-play banners','AI Helper, mock drafts and your season recap'];
 /* what each locked thing is called on the upgrade screen */
-var TM_FEAT={team:'My Team',trade:'Trades',season:'Season Sim',hub:'League',waivers:'The waiver wire',values:'Trade values',following:'Following your players',injuries:'Injury news',clips:'Clips',alerts:'Alerts',ai:'The AI Helper',push:'Push notifications',draft:'Mock drafts',recap:'Your season recap',news:'Player news'};
+var TM_FEAT={drafttools:'Mock drafts',leaguefit:'League Fit',team:'My Team',trade:'Trades',season:'Season Sim',hub:'League',waivers:'The waiver wire',values:'Trade values',following:'Following your players',injuries:'Injury news',clips:'Clips',alerts:'Alerts',ai:'The AI Helper',push:'Push notifications',draft:'Mock drafts',recap:'Your season recap',news:'Player news'};
 var TM_PRO_TABS=['team','trade','season','hub','draft','recap'];
 var TM_OPEN_TABS=['rankings','news','help'];             /* open to signed-out visitors once the beta is over */
 
@@ -88,7 +88,7 @@ function tmUpgrade(feat){if(!tmUser()){if(typeof showSignin==='function')showSig
   TM_UPG.feat=feat||'';const h='upgrade-'+(feat||'pro');if(location.hash.slice(1)===h&&typeof go==='function')go(h);else location.hash=h}
 
 function tmPrice(n){return Number.isInteger(n)?String(n):n.toFixed(2)}
-function tmRenderUpgrade(){const el=document.getElementById('upgrade-body');if(!el)return;
+function tmRenderUpgrade(into){const el=into||document.getElementById('upgrade-body');if(!el)return;
   const f=TM_UPG.feat,name=TM_FEAT[f],P=tmPrices(),save=Math.round((1-P.annual/(P.monthly*12))*100);
   const check='<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>';
   el.innerHTML=`<div class="upg">
@@ -124,6 +124,7 @@ document.addEventListener('click',e=>{const t=e.target;if(!t||!t.closest||tmIsPr
   else if(t.closest('#tmn-tog [data-nshow="mine"]')||t.closest('[data-tm-follow]'))feat='following';
   else if(t.closest('.tmn-gear'))feat='alerts';
   else if(t.closest('#ai-fab'))feat='ai';
+  else if(tmUser()&&t.closest('[data-md="solo"],[data-md="set-solo"],[data-md="set-friends"]'))feat='drafttools';   /* mock drafts: starting one is Pro, joining a friend's room is free */
   else if(t.closest('#alert-btn'))feat='alerts';
   else if((el=t.closest('.nav button[data-tab], .m-sheet a[data-m]'))){const w=el.dataset.tab||el.dataset.m;
     if(TM_PRO_TABS.includes(w)&&tmUser())window.TMT&&TMT.ev('locked_tab_clicked',{wanted_tab:w,plan:'free'});return}

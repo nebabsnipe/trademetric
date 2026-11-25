@@ -19,7 +19,9 @@
 | AI Helper, alerts bell, big-play banners, push | No | Upgrade screen / hidden | Yes |
 | Player-card news | No | "Part of Pro" line | Yes |
 | Account (plan, leagues, security) | — | Yes | Yes |
-| Mock drafts, season recap | Not on main yet (offseason-mode branch) |
+| Mock drafts: create a room or draft solo | Sign in | Upgrade screen | Yes |
+| Mock drafts: join a friend's room by invite link (or code) | Sign in, then lands in the lobby | Yes | Yes |
+| Season recap, League Fit | Locked page | Upgrade screen | Yes |
 
 ## Server routes
 | Route | Free or Pro |
@@ -36,6 +38,13 @@
 | `/api/push/subscribe`, `/api/push/test` | **Pro** |
 | `/api/push/devices`, `/unsubscribe`, `/key` | Signed in / free (so anyone can always turn notifications off) |
 | `/api/push/cron` | Server job; only sends to Pro accounts |
+| `/api/news?off=` (offseason feed) | Free |
+| `/api/draft` create (solo or friends room) | **Pro** |
+| `/api/draft` join, quick join, picks and the rest | Signed in (free accounts can join rooms) |
+| `/api/take` (TradeMetric takes, outlooks) | **Pro** |
+| `/api/recap` | **Pro** (and only your own league) |
+
+The offseason routes (`draft`, `take`, `recap`, `news?off=`) live on the `offseason-mode` work (`pro-gating-offseason` branch). There `/api/plan` is served by `/api/market` to stay inside Vercel's limit of 12 server functions; on main it is served by `/api/push`.
 
 Refusals: signed out → 401 `signed_out`; free → 403 `pro_required`. During the beta every route answers exactly as before (same caching).
 
