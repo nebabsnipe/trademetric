@@ -52,7 +52,7 @@ function tdlEv(x,st){const left=x.at-Date.now();
   return {k:tdlKey(x,st),type:'tdl',cls:st==='final'?'tdlfinal':'tdl',stage:st,lkey:x.key,dl:x.at,at:Date.now(),name:x.name,
     head:tdlHead(st,x,left),sub:`${x.name} · ${tdlWhen(x)}`,leagues:[{key:x.key,name:x.name}]}}
 TDL.items=[];
-function tdlTick(){try{if(typeof USER!=='undefined'&&!USER)return;if(typeof TMN==='undefined'||typeof tmnPump!=='function')return;
+function tdlTick(){try{if(typeof USER!=='undefined'&&!USER)return;if(typeof tmIsPro==='function'&&!tmIsPro())return;if(typeof TMN==='undefined'||typeof tmnPump!=='function')return;
   const now=Date.now(),s=tdlSeen();let ch=false;TDL.items=[];
   tdlLeagues().forEach(x=>{const st=tdlStage(x.at-now);if(!st)return;const ev=tdlEv(x,st);TDL.items.push(ev);
     const on=typeof tmnOn!=='function'||tmnOn(x.key);if(!on)return;

@@ -6,6 +6,7 @@
 // If ESPN changes shape or is unreachable this returns ok:false and the page falls back to
 // comparing live stat totals between checks.
 import { withSentry } from './_sentry.js';
+import { proOnly } from './_plan.js';
 
 const TEAM = { WSH: 'WAS', LA: 'LAR', JAC: 'JAX' };
 const fix = t => TEAM[t] || t;
@@ -95,4 +96,5 @@ async function handler(req, res) {
 
 export { parse };
 
-export default withSentry(handler, 'plays');
+/* Pro data: refused for signed-out visitors and free accounts once the beta switch is off (api/_plan.js) */
+export default withSentry(proOnly(handler), 'plays');

@@ -1503,7 +1503,7 @@ let AI=null,AIimg=false;
 const ServerAI={
   async json(prompt,opts={}){
     const images=[];for(const b of (opts.images||[]))images.push(await blobToB64(b));
-    const r=await fetch('/api/ai',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({prompt,images})});
+    const r=await tmFetch('/api/ai',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({prompt,images})});
     const j=await r.json().catch(()=>({}));
     if(!r.ok)throw {code:j.code||'error',message:j.error||'AI request failed',text:j.text};
     return j.data},
@@ -1559,7 +1559,7 @@ async function newsContext(q){const items=(FEED&&FEED.news)||[];
   const names=[...ids].map(id=>byId[id]).filter(Boolean),cut=Date.now()-10*864e5,out=[],dt=at=>at?new Date(at).toLocaleDateString('en-US',{month:'short',day:'numeric'}):'';
   /* player news from ESPN, RotoBaller, CBS, Yahoo, PFT and more (raw headlines, cached 10 minutes on the server) */
   try{const qs=names.filter(p=>p.pos!=='DST').slice(0,30).map(p=>encodeURIComponent(p.n+'|'+p.t)).join(';');
-    const r=await Promise.race([fetch('/api/news?batch='+qs+'&b='+Math.floor(Date.now()/300000)),new Promise((_,j)=>setTimeout(()=>j(0),9000))]);
+    const r=await Promise.race([tmFetch('/api/news?batch='+qs+'&b='+Math.floor(Date.now()/300000)),new Promise((_,j)=>setTimeout(()=>j(0),9000))]);
     if(r.ok){const d=await r.json();names.forEach(p=>((d.items||{})[p.n]||[]).forEach(a=>{if(a.at&&Date.parse(a.at)<cut)return;
       out.push({at:a.at,line:`- ${dt(a.at)} [${p.n}] ${a.title}${a.desc&&a.desc!==a.title?': '+a.desc:''} (${a.outlet})`,k:norm(a.title)})}))}}catch(e){}
   items.forEach(a=>{if(a.at&&Date.parse(a.at)<cut)return;const txt=norm((a.title||'')+' '+(a.desc||'')+' '+(a.athletes||[]).join(' '));
@@ -2082,14 +2082,14 @@ $('theme-btn').addEventListener('click',()=>toggleTheme());
 /* ===== Routing & events ===== */
 /* Draft tools are off during the season (no Draft tab); offseason mode switches them back on */
 var DRAFT_ON=false;
-const TABS=['team','news','trade','rankings','hub','season','league','draft','help','welcome','signin','account'];let tab='team';
+const TABS=['team','news','trade','rankings','hub','season','league','draft','help','welcome','signin','account','upgrade'];let tab='team';
 /* tabs that need a league: with none, they show the import prompt */
 const NEED_LG=['team','trade','season'];
 function howLink(k){return `<a class="how how-wrap" href="#help-${k}">How this works</a>`}
 const TAB_ALIAS={players:['rankings','rank'],waivers:['rankings','waiv'],values:['rankings','vals']};
-function go(t){let helpSec=null;if(t&&t.startsWith('help-')){helpSec=t.slice(5);t='help'}if(t&&t.startsWith('account-')){ACC_TAB=t.slice(8);t='account'}else if(t==='account')ACC_TAB='profile';if(t!==tab||t==='account'){ACC_EDIT=null;ACC_MSG=null}if(t==='trade-ideas'||t==='trade-builder'){setTrView(t==='trade-ideas'?'ideas':'build');t='trade'}if(TAB_ALIAS[t]){plView=TAB_ALIAS[t][1];t=TAB_ALIAS[t][0]}if(t==='draft'&&!DRAFT_ON){t='team';history.replaceState(null,'','#team')}if(t==='helper'){if(USER)openAI();t=TABS.includes(tab)?tab:'team';history.replaceState(null,'','#'+t)}if(!USER&&t!=='signin')t='signin';tab=TABS.includes(t)?t:'team';if(S&&S.noLeague&&NEED_LG.includes(tab))tab='welcome';document.body.dataset.tab=tab;if(tab!=='welcome'&&S&&!S.onboarded){S.onboarded=true;save()}document.querySelectorAll('.nav button').forEach(b=>{if(b.dataset.tab===tab)b.setAttribute('aria-current','page');else b.removeAttribute('aria-current')});
+function go(t){let helpSec=null;if(t&&t.startsWith('help-')){helpSec=t.slice(5);t='help'}if(t&&t.startsWith('account-')){ACC_TAB=t.slice(8);t='account'}else if(t==='account')ACC_TAB='profile';if(t!==tab||t==='account'){ACC_EDIT=null;ACC_MSG=null}if(t==='trade-ideas'||t==='trade-builder'){setTrView(t==='trade-ideas'?'ideas':'build');t='trade'}if(TAB_ALIAS[t]){plView=TAB_ALIAS[t][1];t=TAB_ALIAS[t][0]}if(t==='draft'&&!DRAFT_ON){t='team';history.replaceState(null,'','#team')}if(t==='helper'){if(USER)openAI();t=TABS.includes(tab)?tab:'team';history.replaceState(null,'','#'+t)}if(typeof tmGate==='function')t=tmGate(t);else if(!USER&&t!=='signin')t='signin';tab=TABS.includes(t)?t:'team';if(S&&S.noLeague&&NEED_LG.includes(tab))tab='welcome';document.body.dataset.tab=tab;if(tab!=='welcome'&&S&&!S.onboarded){S.onboarded=true;save()}document.querySelectorAll('.nav button').forEach(b=>{if(b.dataset.tab===tab)b.setAttribute('aria-current','page');else b.removeAttribute('aria-current')});
   TABS.forEach(x=>$('v-'+x).hidden=x!==tab);render();window.scrollTo(0,0);if(tab==='help')openHelp(helpSec);window.TMT&&TMT.page(tab)}
-function render(){({team:renderTeam,news:tmnRender,rankings:renderPlayers,draft:renderDraft,help:()=>{},trade:renderTrade,hub:renderHub,season:renderSeason,welcome:renderWelcome,league:fillLeagueForm,signin:renderSignin,account:renderAccount})[tab]();renderAlerts();if(openId&&!$('scrim').hidden)openCard(openId);queueBalance()}
+function render(){({team:renderTeam,news:tmnRender,rankings:renderPlayers,draft:renderDraft,help:()=>{},trade:renderTrade,hub:renderHub,season:renderSeason,welcome:renderWelcome,league:fillLeagueForm,signin:renderSignin,account:renderAccount,upgrade:()=>typeof tmRenderUpgrade==='function'&&tmRenderUpgrade()})[tab]();renderAlerts();if(openId&&!$('scrim').hidden)openCard(openId);queueBalance()}
 document.querySelectorAll('.nav button').forEach(b=>b.addEventListener('click',()=>{location.hash=b.dataset.hash||b.dataset.tab}));
 window.addEventListener('hashchange',()=>{closeCard();go(location.hash.slice(1))});
 function loadTrade(str){setTrView('build');const [g,r]=str.split('|');TD.give=g?g.split(','):[];TD.get=r?r.split(','):[];closeCard();if(tab==='trade')renderTrade();else location.hash='trade';setTimeout(()=>$('rating').scrollIntoView({behavior:'smooth',block:'center'}),60)}
@@ -2360,14 +2360,14 @@ function checkUsername(raw){const u=String(raw||'').trim().toLowerCase();clearTi
   UN_T=setTimeout(async()=>{const {data,error}=await SB.rpc('username_available',{p_username:u});if(!UN_STATE||UN_STATE.u!==u)return;
     UN_STATE=error?{u,ok:null,text:"Can't check that right now"}:{u,ok:data!==false,text:data===false?'Taken. Try another.':'Available'};paintUn()},350)}
 function enterApp(){window.TMT&&TMT.people();stopConfirmWatch();document.body.classList.remove('signed-out');setTimeout(syncNow,300);if(typeof tmnTopBanners==='function')setTimeout(()=>{tmnTopCatchUp();tmnTopBanners()},2000);AUTH_MODE='in';AUTH_MSG=null;PENDING=null;AUTH_VALS={};UN_STATE=null;
-  let t=INTENDED&&TABS.includes(INTENDED.replace(/-.*/,''))&&INTENDED!=='signin'?INTENDED:'team';INTENDED=null;if(!S.onboarded)t='welcome';
+  let t=INTENDED&&TABS.includes(INTENDED.replace(/-.*/,''))&&INTENDED!=='signin'?INTENDED:(typeof tmHome==='function'?tmHome():'team');INTENDED=null;if(!S.onboarded)t='welcome';
   if(location.hash.slice(1)===t)go(t);else location.hash=t}
 function showSignin(){if(tab!=='signin'){if(location.hash==='#signin')go('signin');else location.hash='signin'}else renderSignin()}
-function leaveApp(){window.TMT&&TMT.reset();stopConfirmWatch();document.body.classList.add('signed-out');cloudReset();USER=null;PROFILE=null;PROFILE_OK=false;AUTH_MODE='in';AUTH_MSG=null;ACC_EDIT=null;showSignin();acctUI()}
+function leaveApp(){typeof tmPlanLoad==='function'&&setTimeout(()=>tmPlanLoad(),0);window.TMT&&TMT.reset();stopConfirmWatch();document.body.classList.add('signed-out');cloudReset();USER=null;PROFILE=null;PROFILE_OK=false;AUTH_MODE='in';AUTH_MSG=null;ACC_EDIT=null;showSignin();acctUI()}
 function authFail(t){AUTH_BUSY=false;AUTH_MSG={bad:true,html:esc(friendly(t))};renderSignin()}
 function authNote(h){AUTH_BUSY=false;AUTH_MSG={bad:false,html:h};renderSignin()}
 /* Everything that happens once someone is signed in, however they got there (form, code, link, Google, another tab). */
-async function signedIn(user,fresh){SIGNING=true;USER=user;window.TMT&&TMT.auth(user,fresh);startSessionClock(fresh);acctUI();cloudReset();cloudPull('signin');try{await loadProfile()}finally{SIGNING=false}if(!USER||USER.id!==user.id)return;
+async function signedIn(user,fresh){SIGNING=true;USER=user;window.TMT&&TMT.auth(user,fresh);startSessionClock(fresh);acctUI();cloudReset();cloudPull('signin');try{await Promise.all([loadProfile(),typeof tmPlanLoad==='function'?tmPlanLoad(2500):0])}finally{SIGNING=false}if(!USER||USER.id!==user.id)return;
   if(AUTH_MODE==='recover')return;
   if(!PROFILE&&PROFILE_OK&&!lsGet(SKIP_UN+user.id)){AUTH_MODE='username';AUTH_MSG=null;AUTH_BUSY=false;AUTH_VALS={};UN_STATE=null;showSignin();return}
   if(AUTH_MODE==='confirmed'||AUTH_MODE==='reset'){AUTH_BUSY=false;showSignin();return}
@@ -2537,8 +2537,8 @@ function feedPlayers(){const me=myTeam();if(!me)return [];const out=[],seen=new 
   if(FEED_F!=='mine'){(S.following||[]).forEach(id=>add(id,'<span class="slot-star">★</span>'));(S.followTeams||[]).forEach(t=>teamStars(t).forEach(id=>add(id,t)))}
   return out}
 
-async function loadFeed(force){if(FEED_LOADING||(!force&&FEED&&Date.now()-FEED_AT<4*60e3))return;FEED_LOADING=true;
-  try{const r=await fetch('/api/feed?week='+WEEK+'&b='+Math.floor(Date.now()/300000));if(r.ok){const d=await r.json();if(d&&d.videos){FEED=d;FEED_AT=Date.now();try{localStorage.setItem(FEED_LS,JSON.stringify({at:FEED_AT,d}))}catch(e){}}}}catch(e){}
+async function loadFeed(force){if(typeof tmIsPro==='function'&&USER&&!tmIsPro())return;if(FEED_LOADING||(!force&&FEED&&Date.now()-FEED_AT<4*60e3))return;FEED_LOADING=true;
+  try{const r=await tmFetch('/api/feed?week='+WEEK+'&b='+Math.floor(Date.now()/300000));if(r.ok){const d=await r.json();if(d&&d.videos){FEED=d;FEED_AT=Date.now();try{localStorage.setItem(FEED_LS,JSON.stringify({at:FEED_AT,d}))}catch(e){}}}}catch(e){}
   FEED_LOADING=false;const ch=$('card-hl');if(ch&&openId)ch.innerHTML=cardHighlights(openId)}
 /* show the last copy instantly, then refresh in the background */
 try{const c=JSON.parse(localStorage.getItem(FEED_LS)||'null');if(c&&c.d&&c.d.week===WEEK&&Date.now()-c.at<6*3600e3){FEED=c.d;FEED_AT=c.at-4*60e3}}catch(e){}
@@ -2787,9 +2787,9 @@ const ACC_TABS=[['profile','Profile'],['leagues','Leagues'],['plan','Subscriptio
 const accIc=k=>`<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ACC_IC[k]}</svg>`;
 function fmtDate(d,time){if(!d)return '—';const x=new Date(d);if(isNaN(x))return '—';return x.toLocaleDateString([], {month:'short',day:'numeric',year:'numeric'})+(time?' · '+x.toLocaleTimeString([], {hour:'numeric',minute:'2-digit'}):'')}
 function fmtMonth(d){const x=new Date(d);return isNaN(x)?'':x.toLocaleDateString([], {month:'long',year:'numeric'})}
-/* Plans: everyone is on the beta plan until subscriptions launch. profiles.plan is read if it exists. */
-const PLANS={free:{name:'Beta',price:'Free',blurb:'Every TradeMetric feature is included while the site is in beta.'},pro:{name:'Pro',price:'',blurb:''}};
-function planOf(){const k=PROFILE&&PROFILE.plan||'free';return {key:k,...(PLANS[k]||PLANS.free)}}
+/* Plans: the server decides (api/_plan.js, asked by js/plan.js). 'beta' = Pro unlocked while the beta switch is on. */
+const PLANS={beta:{name:'Beta'},free:{name:'Free'},pro:{name:'Pro'}};
+function planOf(){const k=typeof tmPlanKey==='function'?tmPlanKey():'beta';return {key:k,...(PLANS[k]||PLANS.beta)}}
 function hasPassword(){const ids=USER&&USER.identities;return !ids||!ids.length||ids.some(i=>i.provider==='email')}
 function socialName(){const ids=(USER&&USER.identities||[]).filter(i=>i.provider!=='email');const p=ids[0]&&OAUTH.find(x=>x.id===ids[0].provider);return p?p.name:(ids[0]?ids[0].provider:'')}
 function accRow(k,v,act=''){return `<div class="acc-row"><div class="acc-k">${k}</div><div class="acc-v">${v}</div>${act?`<div class="acc-a">${act}</div>`:''}</div>`}
@@ -2821,28 +2821,27 @@ function accLeagues(){const L=S.leagues||[],me=typeof myTeam==='function'&&S.tea
     ${typeof tmnNotifHtml==='function'?tmnNotifHtml():''}
     ${typeof pushHtml==='function'?pushHtml():''}
     <section class="card acc-sec"><header class="acc-sec-h"><h2>Sync</h2></header>${accRow('Cloud save',sync)}</section>`}
-/* Pricing grid (Annual Savings Pricing Grid layout): Free vs Pro with a Monthly/Annual toggle.
-   Prices are placeholders from the plan in CLAUDE.md; checkout isn't connected, so Pro shows "Free during beta". */
+/* Pricing grid: Free vs Pro with a Monthly/Annual toggle. Prices come from TM_PRICES in js/plan.js (and the PostHog
+   "price-test" flag, off for now). Checkout isn't connected, so Pro says "Coming soon". */
 var PR_ANNUAL=false;
-const PR_TIERS=[
-  {key:'free',name:'Free',monthly:0,annual:0,desc:'Weekly rankings, free for everyone.',feat:['Rankings scored to your league','Player breakdowns and TradeMetric takes']},
-  {key:'pro',name:'Pro',monthly:7,annual:50,desc:'Every tool for winning trades and your league.',feat:['Trade analyzer and Trade Score','Trade ideas for your roster','Season Sim and waivers','News, alerts and big-play banners','League sync for Sleeper and ESPN','AI Helper'],featured:true}];
-const PR_SAVE=Math.round((1-PR_TIERS[1].annual/(PR_TIERS[1].monthly*12))*100);
+function prTiers(){const P=typeof tmPrices==='function'?tmPrices():{monthly:5,annual:30,trialDays:7};return [
+  {key:'free',name:'Free',monthly:0,annual:0,desc:'Rankings and top stories, free for everyone.',feat:['Rankings scored to your league','Top news stories around the league','Join a friend\'s mock draft by invite link']},
+  {key:'pro',name:'Pro',monthly:P.monthly,annual:P.annual,trial:P.trialDays,desc:'Every tool for winning trades and your league.',feat:typeof TM_PRO_LIST!=='undefined'?TM_PRO_LIST:[],featured:true}]}
 const PR_CHECK='<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>';
 function prPrice(t){if(!t.monthly)return '0';const v=PR_ANNUAL?t.annual/12:t.monthly;return Number.isInteger(v)?String(v):v.toFixed(2)}
-function accPricing(){const beta=planOf().key==='free';
+function accPricing(){const k=planOf().key,beta=k==='beta',PR_TIERS=prTiers(),PR_SAVE=Math.round((1-PR_TIERS[1].annual/(PR_TIERS[1].monthly*12))*100);
   return `<section class="acc-pricing">
     <div class="pr-toggle" role="group" aria-label="Billing period"><button type="button" data-pr-bill="m" aria-pressed="${!PR_ANNUAL}">Monthly</button><button type="button" data-pr-bill="a" aria-pressed="${PR_ANNUAL}">Annual <span class="pr-save">-${PR_SAVE}%</span></button></div>
     <div class="pr-grid">${PR_TIERS.map(t=>`<div class="card pr-card${t.featured?' featured':''}">
-      <div class="pr-card-h"><h3>${t.name}</h3>${t.featured?`<span class="pr-pop">${beta?'Free during beta':'7-day free trial'}</span>`:''}</div>
+      <div class="pr-card-h"><h3>${t.name}</h3>${t.featured?`<span class="pr-pop">${beta?'Free during beta':`${t.trial}-day free trial`}</span>`:''}</div>
       <p class="pr-desc">${t.desc}</p>
       <div><p class="pr-price"><b>$${prPrice(t)}</b><span>/month</span></p><p class="pr-billed">${PR_ANNUAL&&t.annual?`$${t.annual} billed yearly`:t.monthly?'Billed monthly':'&nbsp;'}</p></div>
       <ul class="pr-feat">${t.feat.map(f=>`<li>${PR_CHECK}<span>${f}</span></li>`).join('')}</ul>
-      ${t.featured?(beta?'<button class="btn accent" type="button" disabled>Unlocked during beta</button>':'<button class="btn accent" type="button" disabled>Start 7-day free trial</button>'):'<button class="btn" type="button" disabled>Always free</button>'}
+      ${t.featured?(beta?'<button class="btn accent" type="button" disabled>Unlocked during beta</button>':k==='pro'?'<button class="btn accent" type="button" disabled>Your plan</button>':'<button class="btn accent" type="button" id="upg-go">Coming soon</button>'):'<button class="btn" type="button" disabled>Always free</button>'}
     </div>`).join('')}</div>
     ${beta?'<p class="pr-note">You have every Pro feature free while TradeMetric is in beta. Paid plans start later.</p>':''}</section>`}
 function accPlan(){
-  return `${accPricing()}
+  return `${typeof tmPlanCard==='function'?tmPlanCard():''}${accPricing()}
     <section class="card acc-sec"><header class="acc-sec-h"><h2>Billing</h2><p>Payment details and receipts will live here.</p></header>
       ${accRow('Payment method','<span class="note">None on file</span>')}${accRow('Receipts','<span class="note">No receipts yet</span>')}</section>`}
 function accSecurity(){const until=lsGet(UNTIL_KEY),pw=hasPassword(),soc=socialName();
@@ -2884,7 +2883,7 @@ document.addEventListener('click',e=>{const t=e.target;if(!t.closest)return;
 document.addEventListener('submit',e=>{if(e.target.id!=='acc-form')return;e.preventDefault();accSubmit(e.target.dataset.kind)});
 
 /* ===== AI Helper: floating button + slide-over panel on every page ===== */
-function openAI(){const d=$('ai-drawer');if(!d||!USER)return;if(!document.body.classList.contains('ai-open')){document.body.classList.add('ai-open');d.setAttribute('aria-hidden','false');$('ai-scrim').hidden=false;$('ai-fab').setAttribute('aria-expanded','true');renderHelper();setTimeout(()=>{const q=$('helper-q');if(q&&innerWidth>820)q.focus()},250)}}
+function openAI(){const d=$('ai-drawer');if(!d||!USER)return;if(typeof tmIsPro==='function'&&!tmIsPro()){tmUpgrade('ai');return}if(!document.body.classList.contains('ai-open')){document.body.classList.add('ai-open');d.setAttribute('aria-hidden','false');$('ai-scrim').hidden=false;$('ai-fab').setAttribute('aria-expanded','true');renderHelper();setTimeout(()=>{const q=$('helper-q');if(q&&innerWidth>820)q.focus()},250)}}
 function closeAI(){document.body.classList.remove('ai-open');const d=$('ai-drawer');if(d)d.setAttribute('aria-hidden','true');$('ai-scrim').hidden=true;$('ai-fab').setAttribute('aria-expanded','false')}
 document.addEventListener('click',e=>{const t=e.target;if(!t.closest)return;
   if(t.closest('#ai-fab')){document.body.classList.contains('ai-open')?closeAI():openAI();return}
@@ -2907,16 +2906,18 @@ function sparkHtml(g){const pts=g.pts.map((v,i)=>({v,w:g.log[i]&&g.log[i].w})).f
     <path class="sp-area" d="${line}L${X(pts.length-1).toFixed(1)} ${H}L${X(0).toFixed(1)} ${H}Z"/><line class="sp-avg" x1="0" x2="${W}" y1="${Y(av).toFixed(1)}" y2="${Y(av).toFixed(1)}"/><path class="sp-line" d="${line}"/>
     ${pts.map((x,i)=>`<path class="sp-pt${i===pts.length-1?' last':''}" d="M${X(i).toFixed(1)} ${Y(x.v).toFixed(1)}h0"><title>Week ${x.w}: ${f1(x.v)} pts</title></path>`).join('')}</svg>
     <span class="wkspark-rng">High <b>${f1(hi.v)}</b> · Wk ${hi.w}<br>Low <b>${f1(lo.v)}</b> · Wk ${lo.w}</span></div>`}
-function newsHtml(id){const n=NEWS[id];
+function newsHtml(id){const n=NEWS[id];if(n&&n.locked)return `<p class="note upg-inline">The latest news on him is part of Pro. <a href="#upgrade-news">See Pro</a></p>`;
   if(!n||n.loading)return skel(3);
   if(n.error)return `<p class="note">News couldn't load right now. <button class="linkish" data-news-retry="${id}">Try again</button></p>`;
   if(!n.items.length)return `<p class="note">No recent news stories about ${esc(byId[id].n)} in the last three weeks.</p>`;
   return `<div class="nws">${n.items.slice(0,4).map(x=>`<article class="nw"><h5>${esc(x.title)}</h5>${x.summary?`<p>${esc(x.summary)}</p>`:''}
     <div class="nw-meta"><span>${esc(x.outlet)}${x.also&&x.also.length?` <span class="note">+ ${x.also.length} more</span>`:''}</span>${x.at?`<span>${ago(x.at)}</span>`:''}${x.url?`<a href="${esc(x.url)}" target="_blank" rel="noopener">Read story ↗</a>`:x.pay?'<span class="note">Subscribers only, so the key facts are here</span>':''}</div></article>`).join('')}</div>
     ${howLink('news')}`}
-async function loadNews(id){const p=byId[id];if(!p||p.pos==='DST')return;const c=NEWS[id];if(c&&!c.error&&(c.loading||Date.now()-c.at<20*60e3))return;
-  NEWS[id]={loading:true};const paint=()=>{if(openId===id){const el=$('card-news');if(el)el.innerHTML=newsHtml(id)}};paint();
-  try{const r=await fetch(`/api/news?name=${encodeURIComponent(p.n)}&team=${encodeURIComponent(p.t||'')}&pos=${encodeURIComponent(p.pos)}`);if(!r.ok)throw new Error(r.status);const j=await r.json();NEWS[id]={items:j.items||[],ai:j.ai,at:Date.now()}}
+async function loadNews(id){const p=byId[id];if(!p||p.pos==='DST')return;const c=NEWS[id];if(c&&!c.error&&!c.locked&&(c.loading||Date.now()-c.at<20*60e3))return;
+  const paint=()=>{if(openId===id){const el=$('card-news');if(el)el.innerHTML=newsHtml(id)}};
+  if(typeof tmIsPro==='function'&&!tmIsPro()){NEWS[id]={locked:true,at:Date.now()};paint();return}
+  NEWS[id]={loading:true};paint();
+  try{const r=await tmFetch(`/api/news?name=${encodeURIComponent(p.n)}&team=${encodeURIComponent(p.t||'')}&pos=${encodeURIComponent(p.pos)}`);if(!r.ok)throw new Error(r.status);const j=await r.json();NEWS[id]={items:j.items||[],ai:j.ai,at:Date.now()}}
   catch(e){NEWS[id]={error:true,at:Date.now()}}paint()}
 document.addEventListener('click',e=>{const b=e.target.closest&&e.target.closest('[data-news-retry]');if(b){delete NEWS[b.dataset.newsRetry];loadNews(b.dataset.newsRetry)}});
 
@@ -3117,7 +3118,7 @@ function alertsList(){const me=S&&myTeam&&myTeam();if(!me||!V||!G)return [];cons
     .forEach(e=>{const one=e.type==='top';top.push({k:`rank-${e.k}`,lvl:one?'n1':'n2',m:one?1:2,t:e.head,d:`${one?(e.overall?'#1 scorer in the NFL':'#1 '+(e.pos||'')+' in the NFL'):'#2 '+(e.pos||'')+' in the NFL'} · Week ${e.week} · ${f1(e.pts)} pts`,open:e.pid})})}
   const dl=typeof tdlAlerts==='function'?tdlAlerts():[];
   return [...dl.filter(a=>a.go),...top,...out,...dl.filter(a=>!a.go)]}
-function renderAlerts(){const b=$('alert-btn');if(!b)return;const {L,seen}=USER?alertsLive():{L:[],seen:new Set()},n=L.filter(a=>!seen.has(a.k)).length+(USER&&typeof tmnUnread==='function'&&tab!=='news'?tmnUnread():0);
+function renderAlerts(){const b=$('alert-btn');if(!b)return;const pro=USER&&(typeof tmIsPro!=='function'||tmIsPro());const {L,seen}=pro?alertsLive():{L:[],seen:new Set()},n=L.filter(a=>!seen.has(a.k)).length+(pro&&typeof tmnUnread==='function'&&tab!=='news'?tmnUnread():0);
   const c=$('alert-n');c.hidden=!n;c.textContent=n>9?'9+':n;b.setAttribute('aria-label',n?`Alerts, ${n} new`:'Alerts');
   const pop=$('alert-pop');if(!pop.hidden)paintAlerts(L,seen)}
 function paintAlerts(L,seen){const nn=typeof tmnUnread==='function'?tmnUnread():0;$('alert-pop').innerHTML=`<div class="al-h"><b>Alerts</b><span class="note">Week ${WEEK}</span></div>${nn?`<a class="al-news" href="#news"><b>${nn} new in News</b><span>Big plays from your players →</span></a>`:''}${L.length?`<div class="al-list">${alertDays(L).map(([day,A])=>`<div class="al-day">${day}</div>`+A.map(a=>`<button class="al-i ${a.lvl}${seen.has(a.k)?'':' new'}" ${a.go?`data-go="${a.go}"`:`data-open="${a.open}"`}><i>${a.m?a.m:''}</i><span><b>${esc(a.t)}</b><span>${esc(a.d)}</span></span></button>`).join('')).join('')}</div>`:'<p class="empty" style="margin:0">All clear. Nothing needs your attention right now.</p>'}`}

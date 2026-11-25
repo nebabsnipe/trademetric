@@ -7,6 +7,7 @@
 
 import { sharedOn, recapsGet, recapsPut, archiveMerge } from './_shared.js';
 import { withSentry } from './_sentry.js';
+import { proOnly } from './_plan.js';
 
 const API_KEY = process.env.ANTHROPIC_API_KEY || process.env.APIKEY1;
 const MODEL = process.env.NEWS_MODEL || 'claude-haiku-5-5';
@@ -478,4 +479,6 @@ async function handler(req, res) {
   return res.status(200).json(v);
 }
 
-export default withSentry(handler, 'news');
+/* Free for everyone: the league-wide top stories (league, trades) and their recaps. Pro: news about your own
+   players (feed, batch, one player's card). Refused for non-Pro callers once the beta switch is off (api/_plan.js). */
+export default withSentry(proOnly(handler, req => { const q = req.query || {}; return !(q.league || q.trades || q.recap || q.probe); }), 'news');

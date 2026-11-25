@@ -99,7 +99,9 @@ function pushDeviceRow(){const sup=pushSupported(),ios=pushIOS();
     return row('Notifications are blocked on this device',how)}
   if(pushOnHere())return row('On for this device',esc(pushLabel()),`<span class="push-acts"><button class="btn small" type="button" data-push-test ${PUSH.busy?'disabled':''}>${PUSH.busy==='test'?'Sending...':'Send test notification'}</button><button class="btn small" type="button" data-push-off ${PUSH.busy?'disabled':''}>Turn off</button></span>`);
   return row('This device','Get alerts on your lock screen or desktop, even when TradeMetric is closed.',`<button class="btn primary" type="button" data-push-on ${PUSH.busy?'disabled':''}>${PUSH.busy==='on'?'Turning on...':'Turn on notifications on this device'}</button>`)}
-function pushHtml(){if(typeof USER==='undefined'||!USER)return '';if(!PUSH.loaded)setTimeout(pushLoad,0);
+function pushHtml(){if(typeof USER==='undefined'||!USER)return '';
+  if(typeof tmIsPro==='function'&&!tmIsPro())return `<section class="card acc-sec" id="acc-push"><header class="acc-sec-h"><h2>Push notifications</h2><p>Alerts on your phone or computer, even when the site is closed. Part of Pro.</p></header><div class="acc-row"><div class="acc-v"><a class="btn small" href="#upgrade-push">See Pro</a></div></div></section>`;
+  if(!PUSH.loaded)setTimeout(pushLoad,0);
   const here=pushLs(PUSH_ID_LS),D=PUSH.devices||[];
   const others=D.length>0;
   return `<section class="card acc-sec" id="acc-push"><header class="acc-sec-h"><h2>Push notifications</h2><p>Alerts on your phone or computer, even when the site is closed.</p></header>

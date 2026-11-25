@@ -2542,3 +2542,41 @@ body[data-tab="news"] .tmn-chips{display:none}
 .tdl-big{margin-left:auto;font-size:26px;font-variant-numeric:tabular-nums;text-shadow:0 0 14px rgba(255,77,79,.5)}
 @media (max-width:700px){.tmn-ban.tdl.final h3{font-size:20px}.tdl-cd{grid-column:2;flex-direction:row!important;align-items:baseline!important;gap:6px}.tdl-cd b{font-size:26px!important}.tdl-big{font-size:21px}.tdl-seal.fin{width:44px;height:44px}}
 @media (prefers-reduced-motion:reduce){.tdl-seal.fin,.tdl-seal.fin svg .tdl-hand,.tmn-chip.tdl.final i{animation:none!important}}
+
+/* ===== Plans: the upgrade screen and locked bits (js/plan.js). Nothing here shows while the beta switch is on. ===== */
+body.signed-out.tm-open .nav{display:flex}
+body.signed-out.tm-open #acct-btn{display:inline-block}
+body.tm-free .alerts-wrap,body.tm-free .ai-fab{display:none}
+.upg{max-width:600px;margin:20px auto 48px;display:flex;flex-direction:column;gap:18px}
+.upg-head h1{margin:0;font-family:var(--f-display);font-style:italic;font-weight:800;font-size:clamp(29px,4.4vw,43px);letter-spacing:.01em;text-transform:uppercase;line-height:.95;text-wrap:balance}
+.upg-head p{margin:10px 0 0;color:var(--muted);font-size:15px;max-width:52ch}
+.upg-card{display:flex;flex-direction:column;gap:18px;padding:24px;border-color:var(--accent);box-shadow:0 0 0 1px var(--accent),var(--shadow)}
+.upg-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:10px;font-size:14.5px}
+.upg-list li{display:flex;align-items:flex-start;gap:10px}
+.upg-list svg{flex:none;margin-top:2px;color:var(--accent)}
+.upg-price{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;padding-top:16px;border-top:1px solid var(--line)}
+.upg-opt{display:flex;flex-direction:column;gap:2px;padding:12px 14px;border:1px solid var(--line);border-radius:var(--r);background:var(--surface-2)}
+.upg-opt b{font:italic 800 36px/1 var(--f-display);font-variant-numeric:tabular-nums}
+.upg-opt span{color:var(--muted);font-size:13px}
+.upg-opt em{font-style:normal;font-weight:700;color:var(--accent);margin-left:4px}
+.upg-trial{margin:-6px 0 0;color:var(--muted);font-size:13px}
+.upg-go{width:100%;padding:12px 14px;font-size:15px}
+.upg-soon{margin:-8px 0 0;text-align:center;visibility:hidden}
+.upg-soon.on{visibility:visible}
+.upg-back{margin:0;text-align:center;font-size:13.5px}
+.upg-back a{color:var(--muted)}
+.upg-plan-row{display:flex;align-items:center;justify-content:space-between;gap:14px}
+.upg-plan-row p{margin:4px 0 0}
+.upg-plan-name{font-size:16px}
+.upg-inline{margin:0}
+.tmn-pro{display:flex;align-items:center;justify-content:space-between;gap:14px;margin-bottom:14px;padding:14px 16px}
+.tmn-pro p{margin:2px 0 0}
+@media (max-width:700px){
+  body.signed-out.tm-open .nav{display:grid}
+  body.signed-out.tm-open main{padding-bottom:calc(96px + env(safe-area-inset-bottom,0px))}
+  body.signed-out.tm-open footer{padding-bottom:calc(86px + env(safe-area-inset-bottom,0px))}
+  .upg{margin-top:6px}
+  .upg-card{padding:18px}
+  .upg-opt b{font-size:30px}
+  .tmn-pro{flex-direction:column;align-items:flex-start}
+}

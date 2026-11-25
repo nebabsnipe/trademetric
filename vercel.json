@@ -118,6 +118,10 @@
   "cleanUrls": true,
   "rewrites": [
     {
+      "source": "/api/plan",
+      "destination": "/api/push?do=plan"
+    },
+    {
       "source": "/api/push/:do",
       "destination": "/api/push?do=:do"
     }

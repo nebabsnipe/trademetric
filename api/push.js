@@ -5,6 +5,7 @@
 //   POST /api/push/subscribe    turn notifications on for this device (signed-in)
 //   POST /api/push/unsubscribe  remove a device (this one, or any of the account's by id)
 //   POST /api/push/test         send a test notification to every device on the account
+//   GET  /api/plan              is the beta on, and does this person have Pro (the code is in api/_plan.js)
 //   GET  /api/push/cron         the scheduled check (injuries, trade deadlines, lineup fixes). Needs the CRON_SECRET.
 //
 // Signed-in routes act as the user (their own sign-in token, checked by Supabase), so the database's
@@ -16,6 +17,7 @@ import { sharedOn, rest, statusTrack } from './_shared.js';
 import { injuries, notes, ESPN_ST } from './live.js';
 import { weekInfo, alertsFor } from './_alerts.js';
 import { withSentry } from './_sentry.js';
+import { planRoute, viewerOf } from './_plan.js';
 import { pushOn, vapidPublicKey, canPush, sendToDevices, RULES, norm, isQuiet, userRosters, injuryEvents, injuryPayload, summaryPayload, planSends } from './_push.js';
 
 const SUPA = (process.env.SUPABASE_URL || 'https://rltmfnmgbfgecbaevfvc.supabase.co').replace(/\/+$/, '');
@@ -53,6 +55,7 @@ async function handler(req, res) {
   const act = String((req.query && req.query.do) || '');
   try {
     if (act === 'cron') return await cron(req, res);
+    if (act === 'plan') return await planRoute(req, res);
     if (act === 'key') return pushOn() ? res.status(200).json({ key: vapidPublicKey() }) : res.status(503).json(NOT_SET_UP);
 
     const token = tokenOf(req), user = await userOf(token);
@@ -68,7 +71,7 @@ async function handler(req, res) {
 
     if (act === 'subscribe') {
       if (!pushOn()) return res.status(503).json(NOT_SET_UP);
-      if (!canPush()) return res.status(403).json({ error: 'plan' });
+      if (!(await viewerOf(req)).pro) return res.status(403).json({ error: 'pro_required', message: 'Notifications are part of TradeMetric Pro.' });
       const s = b.subscription || {}, k = s.keys || {};
       if (typeof s.endpoint !== 'string' || !/^https:\/\//.test(s.endpoint) || !k.p256dh || !k.auth) return res.status(400).json({ error: 'bad_subscription' });
       const r = await asUser(token, 'rpc/push_claim', { method: 'POST', body: { p_endpoint: s.endpoint, p_p256dh: String(k.p256dh), p_auth: String(k.auth), p_label: String(b.label || '').slice(0, 60), p_tz: String(b.tz || '').slice(0, 60) } });
@@ -83,6 +86,7 @@ async function handler(req, res) {
     }
     if (act === 'test') {
       if (!pushOn()) return res.status(503).json(NOT_SET_UP);
+      if (!(await viewerOf(req)).pro) return res.status(403).json({ error: 'pro_required', message: 'Notifications are part of TradeMetric Pro.' });
       const r = await asUser(token, `push_subscriptions?select=${SUB_COLS}`);
       if (!r.ok) return res.status(502).json({ error: 'db' });
       const subs = r.data || [];

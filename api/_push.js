@@ -6,6 +6,7 @@
 // and for the scheduled injury check also SUPABASE_SECRET_KEY and CRON_SECRET.
 
 import { sendNotification } from 'web-push';
+import { isProPlan } from './_plan.js';
 
 const VAPID_PUB = process.env.VAPID_PUBLIC_KEY || '';
 const VAPID_PRIV = process.env.VAPID_PRIVATE_KEY || '';
@@ -22,9 +23,8 @@ export const RULES = {
   defaultTz: 'America/New_York',
 };
 
-/* Who gets push at all. During the beta everyone has Pro, so everyone does.
-   When paid plans launch, this is the one line to change (for example: return plan === 'pro'). */
-export function canPush(/* plan */) { return true; }
+/* Who gets push at all: Pro accounts. During the beta that is everyone (the switch is in api/_plan.js). */
+export function canPush(plan) { return isProPlan(plan); }
 
 /* ---- sending ---- */
 /* One notification to one device. Returns 'ok', 'gone' (the push service says this device is no longer

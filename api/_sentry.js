@@ -37,11 +37,13 @@ const feedOf = host => { for (const [re, name] of FEEDS) if (re.test(host)) retu
 
 /* expected answers that are not failures */
 const SELF = /(^|\.)trademetric\.app$|\.vercel\.app$/;
-const EXPECTED = (route, feed, status, host) =>
+const EXPECTED = (route, feed, status, host, path = '') =>
   (SELF.test(host) && (status === 401 || status === 403)) ||          // our own site behind preview password protection
 
   (route === 'espn' && feed === 'espn-fantasy' && (status === 401 || status === 403 || status === 404)) ||
-  (feed === 'database' && status === 409);                              // "already saved": the shared store uses this on purpose
+  (feed === 'database' && status === 409) ||
+  (feed === 'database' && (status === 401 || status === 403) && path === '/auth/v1/user') ||   // a stale or made-up sign-in token asking for Pro data
+  (feed === 'database' && status === 404 && path === '/rest/v1/beta_users');                  // supabase/plans.sql not run yet                              // "already saved": the shared store uses this on purpose
 
 const als = new AsyncLocalStorage();
 let Sentry = null, loading = null;
@@ -84,7 +86,7 @@ if (realFetch && !realFetch.__tm) {
 function note(ctx, url, status, err) {
   try {
     const u = new URL(url), feed = feedOf(u.hostname);
-    if (EXPECTED(ctx.route, feed, status, u.hostname)) return;
+    if (EXPECTED(ctx.route, feed, status, u.hostname, u.pathname)) return;
     // the path with numbers and long ids taken out, so league ids and the like never leave the server
     const path = u.pathname.replace(/\/\d+(?=\/|$)/g, '/:n').replace(/\/[A-Za-z0-9_-]{20,}(?=\/|$)/g, '/:id').slice(0, 120);
     ctx.feeds.push({ feed, status: String(status), path, err: err ? String(err.message || err).slice(0, 200) : undefined });

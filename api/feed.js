@@ -4,6 +4,7 @@
 // Game results and news headlines come from ESPN's public site API. Everything is the same for every visitor,
 // so it is cached at Vercel's edge (the page adds a 5-minute time bucket to the URL).
 import { withSentry } from './_sentry.js';
+import { proOnly } from './_plan.js';
 
 const SITE = 'https://site.api.espn.com/apis/site/v2/sports/football/nfl';
 const TEAM = { WSH: 'WAS', LA: 'LAR', JAC: 'JAX' };
@@ -140,4 +141,5 @@ async function handler(req, res) {
   }
 }
 
-export default withSentry(handler, 'feed');
+/* Pro data: refused for signed-out visitors and free accounts once the beta switch is off (api/_plan.js) */
+export default withSentry(proOnly(handler), 'feed');

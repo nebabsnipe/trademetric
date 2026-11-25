@@ -227,10 +227,10 @@
   API.people = safe(function () {
     var U = g('USER'); if (!U || !U.id || DNT) return;
     var ph = PH(); if (!ph) return;
-    var S = g('S'), planOf = g('planOf'), plan = 'free';
-    try { plan = typeof planOf === 'function' ? planOf().key : 'free'; } catch (e) {}
-    var n = ((S && S.leagues) || []).length;
-    ph.setPersonProperties({ plan: plan, leagues: n, platforms: platforms(), account_created: U.created_at ? String(U.created_at).slice(0, 10) : null });
+    var S = g('S'), planKey = g('tmPlanKey'), plan = 'beta';
+    try { plan = typeof planKey === 'function' ? planKey() : 'beta'; } catch (e) {}   // 'beta' (Pro unlocked during the beta), 'free' or 'pro'
+    var n = ((S && S.leagues) || []).length, P = g('TM_PLAN');
+    ph.setPersonProperties({ plan: plan, beta_user: !!(P && P.betaUser), leagues: n, platforms: platforms(), account_created: U.created_at ? String(U.created_at).slice(0, 10) : null });
   });
 
   API.auth = safe(function (user, fresh) {
@@ -288,7 +288,7 @@
   addEventListener('click', safe(function (e) {
     var t = e.target; if (!t || !t.closest) return;
     var c;
-    if (document.body.classList.contains('signed-out') && (c = t.closest('.nav button[data-tab]')) && c.dataset.tab && c.dataset.tab !== 'signin') {
+    if (document.body.classList.contains('signed-out') && (c = t.closest('.nav button[data-tab]')) && c.dataset.tab && c.dataset.tab !== 'signin' && !(document.body.classList.contains('tm-open') && ['rankings', 'news'].indexOf(c.dataset.tab) >= 0)) {
       lockedTab = c.dataset.hash || c.dataset.tab; ev('locked_tab_clicked', { wanted_tab: lockedTab });
     }
     if ((c = t.closest('[data-imp]'))) impStart(c.dataset.imp === 'sleeper' || c.dataset.imp === 'espn' ? c.dataset.imp : 'screenshot');
@@ -315,7 +315,7 @@
   /* signed out, the tabs are hidden; a link or typed address to a tab still counts as wanting that tab */
   addEventListener('hashchange', safe(function () {
     var t = location.hash.slice(1).replace(/-.*/, '');
-    if (t && t !== 'signin' && document.body.classList.contains('signed-out') && !g('USER')) { lockedTab = t; ev('locked_tab_clicked', { wanted_tab: t, how: 'link' }); }
+    if (t && t !== 'signin' && document.body.classList.contains('signed-out') && !g('USER') && !(document.body.classList.contains('tm-open') && ['rankings', 'players', 'news', 'help'].indexOf(t) >= 0)) { lockedTab = t; ev('locked_tab_clicked', { wanted_tab: t, how: 'link' }); }
   }), true);
   addEventListener('submit', safe(function (e) {
     if (e.target && e.target.id === 'tw-form') {
