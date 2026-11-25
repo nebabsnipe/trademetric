@@ -137,6 +137,7 @@ export function sleeperVerdict(lg, rosters, bracket, users, rid) {
   }
   const fin = B.find(m => m.p === 1);
   if (!fin) facts.push(B.length ? 'The championship game can\'t be picked out of the bracket yet.' : 'No playoff bracket yet, so no championship.');
+  else if (ids(fin).length < 2) facts.push('The championship game isn\'t set yet.');
   else if (!ids(fin).includes(meR.roster_id)) facts.push('This team is not in the championship game.');
   else if (typeof fin.w !== 'number') facts.push('This team is in the championship game. It isn\'t finished yet.');
   else if (fin.w !== meR.roster_id) facts.push('The championship game is final. This team lost it.');

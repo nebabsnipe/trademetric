@@ -255,6 +255,7 @@ async function runCron({ dry = false, only = null, get = getJson } = {}) {
      check&league=espn:123          what the clinch / title check concludes for the owner's saved league, and why
      cron&dry=1                     the whole daily check, without sending or writing anything
      unsub&type=clinch              the owner's unsubscribe link for that kind
+     click&type=clinch              makes the same signed-out request that clicking that link makes
      reset                          forget the owner's test-mode send records, so tests can be run again */
 async function test(q) {
   const what = q.get('what') || 'status';
@@ -275,6 +276,12 @@ async function test(q) {
   }
   if (what === 'prefs') return json(200, { prefs: await prefsOf(OWNER_ID) });
   if (what === 'unsub') { const t = q.get('type') || 'clinch'; return TYPES[t] && TYPES[t].big ? json(200, { url: unsubUrl(OWNER_ID, t) }) : json(400, { error: 'type' }); }
+  if (what === 'click') {                                                    // exactly what clicking the link does: the same signed-out request the unsubscribe page makes
+    const t = q.get('type') || 'clinch'; if (!TYPES[t] || !TYPES[t].big) return json(400, { error: 'type' });
+    const u = new URL(unsubUrl(OWNER_ID, t)); if (q.get('all') === '1') u.searchParams.set('all', '1'); if (q.get('on') === '1') u.searchParams.set('on', '1');
+    const r = await unsub(new Request(u, { method: 'POST' }), u.searchParams);
+    return json(200, { clicked: u.pathname, answer: await r.json(), prefsNow: await prefsOf(OWNER_ID) });
+  }
   if (what === 'reset') { await io.rest(`email_sent?user_id=eq.${OWNER_ID}&live=eq.false`, { method: 'DELETE', prefer: 'return=minimal' }); return json(200, { ok: true }); }
   if (what === 'cron') return json(200, await runCron({ dry: true, only: q.get('all') === '1' ? null : [OWNER_ID] }));
   if (what === 'check') {
