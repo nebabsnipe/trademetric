@@ -23,7 +23,7 @@ import { recapWeek, weekClips, leagueWeek, weeklyData, injuryData, deadlinesOf, 
 import { reportIssue } from './_sentry.js';
 import { verdict, getJson } from './_league_check.js';
 import { render, SAMPLE, TEMPLATES, LABEL } from './_email_templates.js';
-import { io, TYPES, SWITCHES, sendEmail, sendBiggest, emailReady, isLive, readUnsubToken, unsubUrl, setPrefs, prefsOf, blockAddress, siteBase } from './_email.js';
+import { io, TYPES, SWITCHES, swOf, sendEmail, sendBiggest, emailReady, isLive, readUnsubToken, unsubUrl, setPrefs, prefsOf, blockAddress, siteBase } from './_email.js';
 
 const SUPA = (process.env.SUPABASE_URL || 'https://rltmfnmgbfgecbaevfvc.supabase.co').replace(/\/+$/, '');
 const PUB = process.env.SUPABASE_PUBLISHABLE_KEY || 'sb_publishable_AFX79aKgqorAx3zgOyKatw_o_3_ERWG';   // public by design (same one the page uses)
@@ -72,6 +72,7 @@ async function route(req) {
     return json(out.error ? 503 : 200, out);
   }
   if (act === 'test') return testOk(req, q) ? test(q) : json(401, { error: 'unauthorized' });
+  if (act === 'announce') return cronOk(req) ? announce(q) : json(401, { error: 'unauthorized' });
   return json(404, { error: 'unknown' });
 }
 
@@ -99,7 +100,7 @@ async function unsub(req, q) {
   if (req.method === 'POST') {
     if (!tok) return json(400, { error: 'bad_link' });
     const all = q.get('all') === '1', on = q.get('on') === '1';
-    const flags = Object.fromEntries((all ? SWITCHES : TYPES[tok.type].sw).map(k => [k, on]));
+    const flags = Object.fromEntries((all ? SWITCHES : swOf(tok.type)).map(k => [k, on]));
     const ok = await setPrefs(tok.userId, flags);
     return json(ok ? 200 : 503, ok ? { ok: true, type: tok.type, label: LABEL[tok.type], all, on } : { error: 'try_again' });
   }
@@ -306,6 +307,25 @@ async function injuryInputs(now) {
   const espnList = note ? note.map(x => [x.n, x.t, ESPN_ST(x.st)]) : null;
   const mapOf = (list, min) => { if (!list || list.length < min) return null; const m = {}; for (const [n, , st] of list) if (n && st) m[norm(n)] = st; return m; };
   return { log: rows.map(r => ({ ...r, at: Date.parse(r.at) })), cur: { sleeper: mapOf(inj, 300), espn: mapOf(espnList, 40) } };
+}
+
+/* ================= the one-time announcement =================
+   One email to every account with a confirmed address: what the new emails are, and a one-click way to turn them
+   all off. Whoever does nothing keeps getting them. It goes through sendEmail() like everything else, so each
+   person gets it once (the key never changes), blocked addresses and people who already switched everything off
+   are skipped, and until EMAIL_LIVE is on it goes only to the owner. ?dry=1 shows who it would reach. */
+async function announce(q) {
+  const dry = q.get('dry') === '1', live = isLive(), key = 'announce:2026-11';
+  const accs = await accounts(live ? null : [OWNER_ID]);               // not live: the owner's own account only, never a stack of test copies
+  if (!accs) return json(503, { error: 'db' });
+  const counts = {};
+  for (const a of accs) {
+    if (!a.confirmed || !a.email) { counts.unconfirmed = (counts.unconfirmed || 0) + 1; continue; }
+    const r = await sendEmail({ id: a.id, email: a.email, name: a.username || '' }, 'announce', key, { name: a.username || '' }, { dry });
+    counts[r.status] = (counts[r.status] || 0) + 1;
+    if (r.status === 'failed') await reportIssue('Email: the announcement failed to send', { route: 'email', tags: { kind: 'email_failed', email_type: 'announce' }, extra: { error: r.error } });
+  }
+  return json(200, { dry, live, accounts: accs.length, ...counts, note: live ? undefined : 'Not live: only the owner\'s own account was considered.' });
 }
 
 /* ================= trying things by hand =================

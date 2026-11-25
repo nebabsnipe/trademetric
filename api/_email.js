@@ -49,6 +49,7 @@ export const TYPES = {
   clinch:     { group: 'big', capH: 24, rank: 3, sw: ['clinch'] },
   recap:      { group: 'big', capH: 24, rank: 2, sw: ['recap'], on: false },   // switch on when the season recap feature is live
   draft:      { group: 'big', capH: 24, rank: 1, sw: ['draft'] },
+  announce:   { group: 'announce', capH: 24 * 365, sw: 'all' },                            // the one-time note to existing accounts; its unsubscribe turns everything off
   weekly:     { group: 'weekly', capH: 96, sw: ['matchup', 'perf', 'top', 'clips'] },
   injury:     { group: 'injury', capH: 20, sw: ['inj'] },
   deadline:   { group: 'deadline', capH: 20, sw: ['deadline'] },
@@ -59,6 +60,7 @@ export const SWITCHES = ['matchup', 'perf', 'top', 'clips', 'inj', 'deadline', '
 export const SWITCH_DEFAULT = { inj: false };
 export const switchOn = (prefs, k) => (prefs && typeof prefs[k] === 'boolean' ? prefs[k] : SWITCH_DEFAULT[k] !== false);
 export const hasSwitch = type => !!(TYPES[type] && TYPES[type].sw);
+export const swOf = type => (TYPES[type].sw === 'all' ? SWITCHES : TYPES[type].sw);
 const groupTypes = g => Object.keys(TYPES).filter(t => TYPES[t].group === g);
 
 /* Outside services, in one object so the tests can swap them for stand-ins. */
@@ -168,11 +170,11 @@ export async function sendEmail(user, type, key, data = {}, opts = {}) {
   if (T.sw) {
     const prefs = await prefsOf(user.id);
     if (!prefs) return out('not_ready');
-    const on = T.sw.filter(k => switchOn(prefs, k));
+    const sw = swOf(type), on = sw.filter(k => switchOn(prefs, k));
     if (!on.length) return out('pref_off');
-    if (T.sw.length > 1) {                                                 // the weekly recap: only the switched-on sections
-      data = { ...data, on: Object.fromEntries(T.sw.map(k => [k, on.includes(k)])) };
-      if (!T.sw.some(k => data.on[k] && Array.isArray(data[k]) && data[k].length)) return out('empty');
+    if (type === 'weekly') {                                               // the weekly recap: only the switched-on sections
+      data = { ...data, on: Object.fromEntries(sw.map(k => [k, on.includes(k)])) };
+      if (!sw.some(k => data.on[k] && Array.isArray(data[k]) && data[k].length)) return out('empty');
     }
     // the group's limit: anything from this group sent (or on its way) in the last capH hours uses it up
     const since = new Date(io.now() - T.capH * 3600e3).toISOString();

@@ -20,7 +20,7 @@ const money = v => (typeof v === 'number' ? '$' + (Number.isInteger(v) ? v : v.t
 const rec = d => [d.wins, d.losses].every(x => Number.isFinite(+x)) ? `${+d.wins}-${+d.losses}${+d.ties ? '-' + +d.ties : ''}` : '';
 
 /* What each kind of email is called in the footer and on the unsubscribe page. */
-export const LABEL = { clinch: 'playoff clinch', champ: 'championship', recap: 'season recap', draft: 'draft season', weekly: 'weekly recap', injury: 'injury', deadline: 'trade deadline', moves: 'player moves' };
+export const LABEL = { clinch: 'playoff clinch', champ: 'championship', recap: 'season recap', draft: 'draft season', announce: 'update', weekly: 'weekly recap', injury: 'injury', deadline: 'trade deadline', moves: 'player moves' };
 
 /* ---- the words ---- each returns { subject, pre, h1, p: [paragraphs], btn: [label, path], code?, foot? } */
 const COPY = {
@@ -73,6 +73,20 @@ const COPY = {
     btn: ['See the rankings', '/#rankings'],
   }),
 
+  /* the one-time note to people who already have an account: what's starting, and how to turn it all off */
+  announce: (d, ctx = {}) => ({
+    subject: 'TradeMetric will now email you about your leagues',
+    pre: 'A weekly recap and a few big moments. One click to turn them all off.',
+    h1: d.name ? `${d.name}, TradeMetric is starting to send email` : 'TradeMetric is starting to send email',
+    p: ['Starting this week, TradeMetric will send you a few emails about your leagues, and only these:',
+      '**A weekly recap** after Monday night\'s game: your result, standout games, who was #1 at his position, and highlights of your players.',
+      '**Trade deadline reminders**, **playoff and championship news**, and in the offseason, **player moves** and a **draft season reminder**.',
+      'Injury emails are off unless you turn them on. We never email lineup alerts, live plays or news.',
+      'You don\'t need to do anything to keep getting them. If you\'d rather not, you can turn them all off in one click, or pick the ones you want.'],
+    btn: ['Choose your emails', '/#account-leagues'],
+    link: ['No thanks, turn off all update emails', ctx.unsubUrl || ''],
+    who: 'you have a TradeMetric account. This is the only email like this we\'ll send.',
+  }),
   weekly: d => {
     const on = d.on || { matchup: true, perf: true, top: true, clips: true }, sec = [];
     const M = on.matchup ? d.matchup || [] : [], P = on.perf ? d.perf || [] : [], T = on.top ? d.top || [] : [], C = on.clips ? d.clips || [] : [];
@@ -217,14 +231,14 @@ const F_MONO = "'IBM Plex Mono',Menlo,Consolas,monospace";
 export function render(type, data = {}, ctx = {}) {
   const make = COPY[type];
   if (!make) throw new Error('unknown email: ' + type);
-  const c = make(data || {}), base = (ctx.base || SITE).replace(/\/+$/, '');
+  const c = make(data || {}, ctx), base = (ctx.base || SITE).replace(/\/+$/, '');
   const url = p => (/^(https?:|\{\{)/.test(p) ? p : base + p);
   const paras = (c.p || []).filter(Boolean), after = (c.after || []).filter(Boolean);
   const big = !!LABEL[type] && !!ctx.unsubUrl;
   const P = s => `<p class="tm-mut" style="margin:0 0 16px;font-size:16px;line-height:1.55;color:#3D424A">${c.raw ? s : rich(s)}</p>`;
 
   const footHtml = big
-    ? `You're getting this because ${esc(LABEL[type])} emails are on for your TradeMetric account. <a class="tm-foot-a" href="${esc(ctx.unsubUrl)}" style="color:#636872;text-decoration:underline">Unsubscribe from these</a> or <a class="tm-foot-a" href="${esc(base + '/#account-leagues')}" style="color:#636872;text-decoration:underline">change your email settings</a>.`
+    ? `You're getting this because ${c.who ? esc(c.who) : esc(LABEL[type]) + ' emails are on for your TradeMetric account.'} <a class="tm-foot-a" href="${esc(ctx.unsubUrl)}" style="color:#636872;text-decoration:underline">Unsubscribe from these</a> or <a class="tm-foot-a" href="${esc(base + '/#account-leagues')}" style="color:#636872;text-decoration:underline">change your email settings</a>.`
     : (c.raw ? c.foot : esc(c.foot || 'This is an account email for your TradeMetric account.'));
 
   const html = `<!doctype html>
@@ -281,6 +295,7 @@ ${after.map(P).join('\n')}
 <table role="presentation" cellpadding="0" cellspacing="0" border="0" class="tm-btn-t" style="margin:8px 0 20px"><tr><td class="tm-btn-td" bgcolor="#FF4F12" style="background:#FF4F12;border-radius:10px">
 <a class="tm-btn" href="${esc(url(c.btn[1]))}" style="display:inline-block;padding:14px 26px;font-family:${F_BODY};font-size:16px;line-height:1.2;font-weight:700;color:#FFFFFF;text-decoration:none;border-radius:10px;background:#FF4F12">${esc(c.btn[0])}</a>
 </td></tr></table>
+${c.link && c.link[1] ? `<p style="margin:-6px 0 18px;font-size:14px;line-height:1.5"><a class="tm-ink" href="${esc(c.link[1])}" style="color:#4A4F57;text-decoration:underline">${esc(c.link[0])}</a></p>` : ''}
 </td></tr>
 <tr><td class="tm-pad tm-foot" style="padding:18px 32px 26px;border-top:1px solid #E2E4E8;font-family:${F_BODY};font-size:12.5px;line-height:1.55;color:#636872">
 ${footHtml}${ctx.postal ? `<br><br>${esc(ctx.postal)}` : ''}
@@ -299,8 +314,9 @@ ${footHtml}${ctx.postal ? `<br><br>${esc(ctx.postal)}` : ''}
     ...(c.code ? [c.code, ''] : []),
     ...after.map(plain).flatMap(s => [s, '']),
     `${c.btn[0]}: ${url(c.btn[1])}`, '',
+    ...(c.link && c.link[1] ? [`${c.link[0]}: ${c.link[1]}`, ''] : []),
     '--',
-    big ? `You're getting this because ${LABEL[type]} emails are on for your TradeMetric account.\nUnsubscribe from these: ${ctx.unsubUrl}\nEmail settings: ${base}/#account-leagues`
+    big ? `You're getting this because ${c.who || LABEL[type] + ' emails are on for your TradeMetric account.'}\nUnsubscribe from these: ${ctx.unsubUrl}\nEmail settings: ${base}/#account-leagues`
       : (c.foot || 'This is an account email for your TradeMetric account.'),
     ...(ctx.postal ? ['', ctx.postal] : []),
   ].join('\n');
@@ -316,6 +332,7 @@ export const SAMPLE = {
   champ: { league: 'Sunday Scaries League', team: 'Gridiron Gurus', season: 2026, score: '142.6 to 118.2' },
   recap: { league: 'Sunday Scaries League', season: 2026 },
   draft: { season: 2027 },
+  announce: { name: 'nebab' },
   weekly: { week: 12, season: 2026,
     matchup: [{ league: 'Sunday Scaries League', team: 'Gridiron Gurus', won: true, me: 131.4, opp: 118.2, oppName: 'Fourth and Wrong', record: '8-4', playoff: false }],
     top: [{ name: 'Ja\'Marr Chase', pos: 'WR', team: 'CIN', pts: 38.4, tied: false, league: 'Sunday Scaries League' }],
