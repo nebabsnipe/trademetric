@@ -1012,33 +1012,25 @@ function myLineup(me,RL){const act=activeOf(me);RL=RL===undefined?realLineup(S.m
     if(add.length){const ord=['QB','RB','WR','TE','FLEX','SF','K','DST'],sl=[...RL.slots,...add].map((x,i)=>({x,i}));
       sl.sort((a,b)=>(ord.indexOf(a.x.label)-ord.indexOf(b.x.label))||a.i-b.i);RL={...RL,slots:sl.map(o=>o.x)}}}
   return RL?{slots:RL.slots,bench:act.filter(id=>!RL.slots.some(x=>x.p&&x.p.id===id)).sort((a,b)=>nextV(b)-nextV(a)),total:sum(RL.slots.filter(x=>x.p),x=>G[x.p.id].projNext),real:true}:lineup(act,nextV)}
-/* ===== Lineup alerts: only obvious problems in your starting lineup =====
-   An empty slot, a starter on bye / Out / Suspended / IR / PUP, or a bench player who fits the slot and is projected
-   at least LU_GAP points more AND about double (LU_X) the starter. Close calls never show. Each alert is dropped once
-   the starter's game has kicked off (and nobody is suggested whose own game has started). */
-var LU_GAP=5,LU_X=1.8,LU_BAD={O:'is out',SUS:'is suspended',IR:'is on injured reserve',PUP:'is on the PUP list'};
+/* ===== Lineup alerts =====
+   The rules and the two thresholds live in js/lineup-alerts.js (LU_CFG at the top). Two levels:
+   Start   = empty slot, a starter who is out / on IR / on bye, or a bench player projected more than LU_CFG.START points more.
+             Shows in Alerts (counts on the bell), the bar at the top of My Team, and goes to the phone.
+   Consider = a bench player projected LU_CFG.CONSIDER to LU_CFG.START more. A quiet line in Alerts only.
+   Projections are the same this-week numbers My Team shows (league scoring). Nobody whose game has started is flagged. */
 function etMs(day,tm){const d=new Date(day+'T'+tm+':00Z');if(isNaN(d))return NaN;
   const f=z=>new Date(d.toLocaleString('en-US',{timeZone:z}));return d.getTime()+(f('UTC')-f('America/New_York'))}
 function kickedOff(id){const l=liveOf(id);if(l&&l.state&&l.state!=='pre')return true;const p=byId[id];
   if(!p||!G[id]||!G[id].next||WEEK!==DATA.week)return false;const k=KICK[p.t];if(!k||!k[1]||!k[2])return false;const t=etMs(k[1],k[2]);return !isNaN(t)&&Date.now()>=t}
-function luApp(){const a=irApp();return a==='your league app'?'your league app':a}
-function lineupAlerts(LU){if(!LU||!S||!myTeam())return [];const out=[],app=luApp(),used=new Set();
-  const elig=x=>x.el||ELIG[x.label]||[x.label],pj=id=>G[id]?G[id].projNext||0:0;
-  const pickTxt=x=>{const pos=elig(x).map(p=>p==='DST'?'defense':p==='K'?'kicker':p);return (pos[0]==='RB'?'an ':'a ')+(pos.length>1?pos.slice(0,-1).join(', ')+' or '+pos.slice(-1):pos[0])};
-  const ok=id=>{const g=G[id];return g&&g.next&&!LU_BAD[stOf(id)]&&!kickedOff(id)};
-  const best=(x,skip)=>LU.bench.filter(id=>byId[id]&&elig(x).includes(byId[id].pos)&&ok(id)&&!used.has(id)&&id!==skip).sort((a,b)=>pj(b)-pj(a))[0];
-  LU.slots.forEach((x,i)=>{const lab=x.label==='SF'?'superflex':x.label;
-    if(!x.p){const b=best(x);if(b){used.add(b);out.push({i,kind:'empty',k:`lu-${WEEK}-${i}-empty-${b}`,sub:b,msg:`Your ${lab} is empty. Start ${byId[b].n} in ${app}.`})}
-      else out.push({i,kind:'empty',k:`lu-${WEEK}-${i}-empty`,msg:`Your ${lab} is empty. Pick up ${pickTxt(x)} in ${app}.`});return}
-    const id=x.p.id;if(kickedOff(id))return;const s=stOf(id),bye=G[id]&&!G[id].next,why=bye?'is on bye':LU_BAD[s];
-    if(why){const b=best(x,id);if(b)used.add(b);out.push({i,kind:bye?'bye':'out',k:`lu-${WEEK}-${i}-${bye?'bye':s}-${id}`,start:id,sub:b,msg:`${x.p.n} ${why}. ${b?`Start ${byId[b].n} in ${app}.`:`Pick up ${pickTxt(x)} in ${app}.`}`});return}
-    const sp=pj(id),b=best(x,id);if(!b)return;const bp=pj(b);
-    if(bp>=sp+LU_GAP&&bp>=sp*LU_X){used.add(b);out.push({i,kind:'bench',k:`lu-${WEEK}-${i}-bench-${id}-${b}`,start:id,sub:b,msg:`Start ${byId[b].n} over ${x.p.n} at ${lab} in ${app} (${f1(bp)} vs ${f1(sp)} projected).`})}});
-  return out}
+function lineupAlerts(LU){if(!LU||!S||!myTeam()||typeof LineupAlerts==='undefined')return [];
+  const ids=[...LU.slots.filter(x=>x.p).map(x=>x.p.id),...LU.bench].filter(id=>byId[id]&&G[id]),info={};
+  ids.forEach(id=>{const p=byId[id],g=G[id];info[id]={name:p.n,pos:p.pos,proj:g.next?g.projNext||0:0,status:stOf(id)||'',bye:!g.next,started:kickedOff(id)}});
+  const R=LineupAlerts.evaluate({week:WEEK,slots:LU.slots.map(x=>{if(x.p&&!info[x.p.id])info[x.p.id]={name:x.p.n||'',pos:'',proj:0,started:true};return {label:x.label,el:x.el,p:x.p?x.p.id:null}}),bench:LU.bench.filter(id=>info[id]),info});
+  return R.map(a=>({...a,i:a.slotIndex,k:a.key,start:a.starter,sub:a.bench,msg:a.banner}))}
 function renderTeam(){
   const me=myTeam(),st=teamStats(),mine=st.rows.find(r=>r.T.id===S.me),RL=realLineup(S.me);
   const IRS=irState(me),act=activeOf(me);
-  const LU=myLineup(me,RL),LA=lineupAlerts(LU),flag=new Set(LA.map(a=>a.i));
+  const LU=myLineup(me,RL),LA=lineupAlerts(LU).filter(a=>a.level==='start'),flag=new Set(LA.map(a=>a.i));
   const started=LU.slots.filter(x=>x.p&&liveOf(x.p.id)),actual=sum(started,x=>liveOf(x.p.id).pts);
   $('team-title').textContent=me.name;$('team-kicker').textContent=`${S.league.name||'My League'} · Week ${WEEK}`;
   const sim=simulate();const byes=me.players.filter(id=>!G[id].next).length,tags=me.players.filter(id=>G[id].tag).length;
@@ -3089,8 +3081,8 @@ function alertsLive(){const raw=alertsList(),now=Date.now(),m={...alertTimes()},
   const L=raw.filter(a=>!alertExpired(m[a.k],now));return {L,seen:new Set(L.filter(a=>m[a.k]&&m[a.k].s).map(a=>a.k))}}
 function alertsList(){const me=S&&myTeam&&myTeam();if(!me||!V||!G)return [];const out=[],RL=realLineup(S.me),lu=RL||lineup(me.players,projV),st=new Set(lu.slots.filter(x=>x.p).map(x=>x.p.id));
   /* lineup alerts first: empty slots, starters who can't play, obvious bench upgrades (fix it in Sleeper/ESPN) */
-  const LA=lineupAlerts(myLineup(me,RL)),laStart=new Set(LA.map(a=>a.start).filter(Boolean));
-  LA.forEach(a=>out.push({k:a.k,lvl:'bad',t:a.kind==='empty'?'Empty lineup slot':a.kind==='bench'?'Lineup fix':'Starter can\'t play',d:a.msg,open:a.sub||a.start||''}));
+  const LA=lineupAlerts(myLineup(me,RL)),laStart=new Set(LA.filter(a=>a.level==='start').map(a=>a.start).filter(Boolean));
+  LA.forEach(a=>out.push(a.level==='start'?{k:a.k,lvl:'bad',t:a.title,d:a.detail,open:a.sub||a.start||''}:{k:a.k,lvl:'quiet',quiet:true,t:a.title,d:a.detail,open:a.sub||a.start||''}));
   me.players.forEach(id=>{const p=byId[id],g=G[id];if(!p||!g)return;const s=stOf(id);
     if(laStart.has(id)){}
     else if(st.has(id)&&s&&s!=='Q')out.push({k:`out-${WEEK}-${id}-${s}`,lvl:'bad',t:`${p.n}: ${ST_LABEL[s].toLowerCase()}`,d:RL?'He is in your starting lineup. Swap him out.':'One of your usual starters. Your lineup on My Team already works around him.',open:id});
@@ -3107,10 +3099,10 @@ function alertsList(){const me=S&&myTeam&&myTeam();if(!me||!V||!G)return [];cons
   if(typeof tmnTop==='function'){const cut=Date.now()-5*864e5;tmnTop().items.filter(e=>(e.type==='top'||e.type==='second')&&(e.at||0)>cut&&byId[e.pid]).sort((a,b)=>(a.type==='top'?0:1)-(b.type==='top'?0:1)||b.pts-a.pts).slice(0,3)
     .forEach(e=>{const one=e.type==='top';top.push({k:`rank-${e.k}`,lvl:one?'n1':'n2',m:one?1:2,t:e.head,d:`${one?(e.overall?'#1 scorer in the NFL':'#1 '+(e.pos||'')+' in the NFL'):'#2 '+(e.pos||'')+' in the NFL'} · Week ${e.week} · ${f1(e.pts)} pts`,open:e.pid})})}
   return [...top,...out]}
-function renderAlerts(){const b=$('alert-btn');if(!b)return;const {L,seen}=USER?alertsLive():{L:[],seen:new Set()},n=L.filter(a=>!seen.has(a.k)).length+(USER&&typeof tmnUnread==='function'&&tab!=='news'?tmnUnread():0);
+function renderAlerts(){const b=$('alert-btn');if(!b)return;const {L,seen}=USER?alertsLive():{L:[],seen:new Set()},n=L.filter(a=>!seen.has(a.k)&&!a.quiet).length+(USER&&typeof tmnUnread==='function'&&tab!=='news'?tmnUnread():0);
   const c=$('alert-n');c.hidden=!n;c.textContent=n>9?'9+':n;b.setAttribute('aria-label',n?`Alerts, ${n} new`:'Alerts');
   const pop=$('alert-pop');if(!pop.hidden)paintAlerts(L,seen)}
-function paintAlerts(L,seen){const nn=typeof tmnUnread==='function'?tmnUnread():0;$('alert-pop').innerHTML=`<div class="al-h"><b>Alerts</b><span class="note">Week ${WEEK}</span></div>${nn?`<a class="al-news" href="#news"><b>${nn} new in News</b><span>Big plays from your players →</span></a>`:''}${L.length?`<div class="al-list">${alertDays(L).map(([day,A])=>`<div class="al-day">${day}</div>`+A.map(a=>`<button class="al-i ${a.lvl}${seen.has(a.k)?'':' new'}" data-open="${a.open}"><i>${a.m?a.m:''}</i><span><b>${esc(a.t)}</b><span>${esc(a.d)}</span></span></button>`).join('')).join('')}</div>`:'<p class="empty" style="margin:0">All clear. Nothing needs your attention right now.</p>'}`}
+function paintAlerts(L,seen){const nn=typeof tmnUnread==='function'?tmnUnread():0;$('alert-pop').innerHTML=`<div class="al-h"><b>Alerts</b><span class="note">Week ${WEEK}</span></div>${nn?`<a class="al-news" href="#news"><b>${nn} new in News</b><span>Big plays from your players →</span></a>`:''}${L.length?`<div class="al-list">${alertDays(L).map(([day,A])=>`<div class="al-day">${day}</div>`+A.map(a=>`<button class="al-i ${a.lvl}${seen.has(a.k)||a.quiet?'':' new'}" data-open="${a.open}"><i>${a.m?a.m:''}</i><span><b>${esc(a.t)}</b><span>${esc(a.d)}</span></span></button>`).join('')).join('')}</div>`:'<p class="empty" style="margin:0">All clear. Nothing needs your attention right now.</p>'}`}
 /* alerts split into Today / Yesterday / weekday by when each first showed up; most important first inside each day */
 function alertDays(L){const m=alertTimes(),now=new Date(),d0=new Date(now.getFullYear(),now.getMonth(),now.getDate()).getTime(),D=864e5,out=new Map();
   L.forEach(a=>{const c=(m[a.k]&&m[a.k].c)||Date.now(),k=c>=d0?0:Math.ceil((d0-c)/D);(out.get(k)||out.set(k,[]).get(k)).push(a)});

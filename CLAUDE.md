@@ -53,7 +53,11 @@ Longer plans and build notes are in `docs/`: offseason mode, season recap, trade
 - No "Week X · stats through Week Y" line at the top. "Load sample league" is removed entirely.
 - "Weakest spot" must never pick DEF or K.
 - Matchup position comparison: show a "peek" (first few slots, then a fade and a "see all positions" link).
-- Lineup alerts only for obvious mismatches: an empty slot, or a bench player projected **at least 5 points more** than the starter.
+- Lineup alerts have two levels, by how many more points the best eligible bench player is projected than the starter (league scoring, the same projections the site shows). Thresholds live in `LU_CFG` at the top of `js/lineup-alerts.js` (currently 0.7 and 2.3):
+  - under 0.7: nothing. 0.7 to 2.3: **Consider**, a quiet "consider swapping" line in Alerts only (no banner, no bell count, no push, no email).
+  - over 2.3, or an empty slot, or a starter who is Out / on IR / on bye: **Start**, a normal alert, the My Team banner and a phone push.
+  - K and DST gaps are Consider at most (an empty or Out K/DST is still Start). Bench players who are Questionable or worse are never suggested. Nobody whose game has started is flagged. One bench player is never suggested for two slots.
+  - Lineup push: at most one per league per day, bundled, sent the morning of the first affected game (8am-11pm user time, 90+ min before kickoff; a starter ruled Out inside 90 min goes right away). Never the same swap twice. Never email.
 - Injury opportunities: only backups projected over about 7 pts/game with the extra work; can include players to trade for.
 
 ## Trades tab

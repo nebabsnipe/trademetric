@@ -1248,6 +1248,8 @@ a.btn{text-decoration:none;display:inline-flex;align-items:center}
 .al-i:hover{background:var(--surface-2)}
 .al-i i{width:8px;height:8px;border-radius:50%;margin-top:6px;background:var(--muted)}
 .al-i.bad i{background:var(--bad)}.al-i.warn i{background:var(--warn)}.al-i.good i{background:var(--good)}.al-i.info i{background:var(--accent)}
+/* lineup "Consider" lines: quiet, never counted on the bell */
+.al-i.quiet i{background:transparent;border:1.5px solid var(--muted);box-sizing:border-box}.al-i.quiet b{font-weight:500;color:var(--muted)}
 .al-i b{display:block;font-size:13.5px}.al-i span span{display:block;font-size:12.5px;color:var(--muted);line-height:1.4}
 .al-i.new b::after{content:"New";margin-left:6px;font-size:9.5px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--accent);vertical-align:1px}
 body.signed-out .alerts-wrap{display:none}

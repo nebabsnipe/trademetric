@@ -73,3 +73,10 @@ All of it lives in `js/polish.js` (loaded last, never changes app.js logic) with
 ## Scoreboard touches (added 2026-11-16, live on main)
 Owner tried two bigger restyles (a red palette, then a fully "turned up" orange version) and kept only three pieces, then put Season Sim and the My Team matchup back to normal the same day; only the trade chart change remains. Everything else stays exactly as on main, including the My Team tiles and colors.
 - **Trade week chart:** playoffs shown as an orange band with an orange top edge and label; bold slanted bar values and week labels.
+
+## Lineup alerts: two levels (built 2026-11-25, `lineup-alerts` branch, not live)
+Replaces the old "5+ points and about double" rule. The rules are in `js/lineup-alerts.js` (shared by the site and, later, the server check); the two thresholds are `LU_CFG.CONSIDER` and `LU_CFG.START` at the top of that file. Tests: `node scripts/test-lineup-alerts.mjs`.
+- **Start:** empty slot, starter Out / IR / bye (also suspended or PUP), or a bench player projected more than START points more. Alerts row (counts on the bell), the bar at the top of My Team, a red mark on the lineup row, and a phone push.
+- **Consider:** CONSIDER to START points more. A quiet grey line in Alerts; never on the bell, banner, push or email. A Consider that grows past START becomes a new Start alert; a Start that falls back just turns into a Consider line (nothing sent).
+- Best bench option per slot, biggest gap assigned first, never the same bench player for two slots. K/DST gaps cap at Consider. Questionable-or-worse bench players are never suggested. Anyone whose game has kicked off is never flagged.
+- **Push:** `planPush()` decides timing (morning of the first affected game, 8am-11pm user time, 90+ min before kickoff, one per league per day, bundled, never the same swap twice; a starter ruled Out inside 90 min goes right away). The send itself is the marked stub `sendLineupPush()`: push notifications are still only on the `push-notifications` branch. Wiring notes are in the comment above the stub.

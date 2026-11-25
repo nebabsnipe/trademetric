@@ -13,7 +13,7 @@ if(location.hostname==='trademetric-rho.vercel.app')location.replace('https://ww
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600;700;800&family=Kanit:ital,wght@0,700;0,800;1,600;1,700;1,800&display=swap">
 <meta name="description" content="Fantasy football trades, rankings and lineup advice built on your league's exact settings.">
-<link rel="stylesheet" href="css/styles.css?v=46">
+<link rel="stylesheet" href="css/styles.css?v=47">
 </head>
 <body class="signed-out">
 <div class="topbar">
@@ -228,7 +228,7 @@ if(location.hostname==='trademetric-rho.vercel.app')location.replace('https://ww
 <p>Each projection starts from his points per game this season, blended with preseason expectations early in the year. It is then adjusted for this week's opponent, his team's expected points from the betting line, his injury status and the factors listed under Player values.</p>
 <p>Roster strength compares your starters at each position with the league average. Weakest spot is the position furthest below it, counting only QB, RB, WR and TE (never kicker or defense).</p>
 <p><b>Matchup:</b> the matchup card shows your first three lineup slots against your opponent's. Tap <b>See all</b> to open every position.</p>
-<p><b>Lineup alerts</b> flag only obvious problems in the lineup you set in Sleeper or ESPN: an empty starting slot, a starter who is on bye, out, suspended, or on IR or the PUP list, or a bench player who fits the slot and is projected at least 5 points more and about double the starter (5 against 12, say). Close calls are never flagged. You'll see a slim bar at the top of My Team, a red mark on that lineup row and a row in the bell. Make the change in Sleeper or ESPN; the alert goes away once that starter's game kicks off.</p></div></details>
+<p><b>Lineup alerts</b> compare the lineup you set in Sleeper or ESPN with your bench, using this week's projections in your league's scoring. <b>Start</b> alerts are for clear problems: an empty starting slot, a starter who is out, on IR or on bye, or a healthy bench player who fits the slot and is projected more than <span data-lu-cfg="START">2.3</span> points higher. They show in a bar at the top of My Team, a red mark on that lineup row and the bell, and can go to your phone. Smaller edges (<span data-lu-cfg="CONSIDER">0.7</span> to <span data-lu-cfg="START">2.3</span> points) show only as a quiet "consider" line in Alerts. Kicker and defense edges are only ever a "consider", bench players who are questionable or worse are never suggested, and nobody is flagged once his game has kicked off. Make the change in Sleeper or ESPN.</p></div></details>
       <details class="faq-i" id="faq-startsit"><summary>Start or sit</summary><div class="faq-b"><p>Your lineup sits under the board, starters and bench. Tap any two or three players to put them on the board and it tells you who to start and who to sit, with each one's projection, matchup, range and risk. Tap a player again, or hit the ×, to take him off. If the board is already full, tap a new player and the board players he could replace light up; tap the one to swap out, or tap him again to cancel. Players on IR are listed but can't be added until you activate them. The board starts empty each time you open the site, so nothing is on it until you pick. You can also type in anyone on your team, or switch to free agents.</p>
 <p><b>Floor and ceiling</b> come from how much his scoring has swung week to week. <b>Clear call</b> means a gap of 3 or more points, <b>Lean</b> 1 to 3, and <b>Coin flip</b> under 1.</p></div></details>
       <details class="faq-i" id="faq-values"><summary>Player values, experts and risk</summary><div class="faq-b"><p>A player's value is the points he is projected to score from here on, compared with the best player you could get off waivers at his position. Current production counts most.</p><p><b>This week's projection</b> is 90% ESPN's and Sleeper's own projections, averaged and scored with your league's settings, and 10% TradeMetric's model. The platforms update theirs through the week as injury news and depth charts change, so the site checks them every 5 minutes. If both platforms leave a player out, they're projecting him for zero, usually because he's out. Each player's card shows all three numbers.</p>
@@ -329,10 +329,11 @@ if(location.hostname==='trademetric-rho.vercel.app')location.replace('https://ww
         <p class="note" id="helper-status" style="margin:0"></p>
     </div>
   </aside>
+<script src="js/lineup-alerts.js?v=1"></script>
 <script>
 /* Load the stats snapshot, then start the app */
 fetch('data/nfl.json',{cache:'no-cache'}).then(r=>r.json()).then(d=>{
-  window.NFL_DATA=d;const n=document.createElement('script');n.src='js/news.js?v=28';n.onload=n.onerror=()=>{const s=document.createElement('script');s.src='js/app.js?v=38';s.onload=()=>{const m=document.createElement('script');m.src='js/mobile.js?v=4';document.body.appendChild(m);const q=document.createElement('script');q.src='js/polish.js?v=5';document.body.appendChild(q)};document.body.appendChild(s)};document.body.appendChild(n);
+  window.NFL_DATA=d;const n=document.createElement('script');n.src='js/news.js?v=28';n.onload=n.onerror=()=>{const s=document.createElement('script');s.src='js/app.js?v=39';s.onload=()=>{const m=document.createElement('script');m.src='js/mobile.js?v=4';document.body.appendChild(m);const q=document.createElement('script');q.src='js/polish.js?v=5';document.body.appendChild(q)};document.body.appendChild(s)};document.body.appendChild(n);
 }).catch(()=>{document.body.insertAdjacentHTML('afterbegin','<p style="padding:20px;font-family:sans-serif">Could not load player data. Refresh to try again.</p>')});
 </script>
 </body>
