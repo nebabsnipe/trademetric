@@ -324,7 +324,7 @@ function renderProTab(){
     </div>
     ${live?`<div class="tmo-rcp" data-recap-open="sample" role="button" tabindex="0" aria-label="Watch a sample recap">
       <div class="tmo-rcp-glow" aria-hidden="true"></div>
-      <div class="tmo-rcp-phone"><video src="/media/recap-sample.mp4?v=1" poster="/media/recap-sample.jpg?v=1" ${matchMedia('(prefers-reduced-motion: reduce)').matches?'':'autoplay'} muted loop playsinline preload="metadata" tabindex="-1" aria-hidden="true" disablepictureinpicture disableremoteplayback></video></div>
+      <div class="tmo-rcp-phone"><video src="/media/recap-sample.mp4?v=2" poster="/media/recap-sample.jpg?v=1" ${matchMedia('(prefers-reduced-motion: reduce)').matches?'':'autoplay'} muted loop playsinline preload="metadata" tabindex="-1" aria-hidden="true" disablepictureinpicture disableremoteplayback></video></div>
       <span class="tmo-rcp-play"><svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path fill="currentColor" d="M7 4.5v15l13-7.500z"/></svg>Watch a sample recap</span>
     </div>`:`<div class="tmo-pp-cards">${P.cards.map(([h,p],i)=>`<div class="tmo-pp-card"><span class="tmo-pp-n">${i+1}</span><div><h3>${h}</h3><p>${p}</p></div></div>`).join('')}</div>`}
   </div>`;
