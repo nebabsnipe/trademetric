@@ -9,7 +9,7 @@
    marquee strip, command-style search, avatar group, drag-to-reorder, bottom sheet, toasts, spotlight cards,
    shine). No libraries. Everything respects "reduce motion". */
 var MD={page:'home',home:null,room:null,picks:[],shown:0,fresh:-1,pool:[],by:{},you:-1,queue:[],off:0,carry:null,busy:false,
-  ui:{pos:'ALL',q:'',sort:'adp',hide:true,tab:'queue',ptab:'players',board:false,mine:false,team:null,limit:80,confirm:null,sheet:null,set:null,setMode:'solo',dlg:null,res:null},
+  ui:{pos:'ALL',q:'',sort:'adp',hide:true,tab:'team',ptab:'players',board:false,mine:false,team:null,limit:80,confirm:null,sheet:null,set:null,setMode:'solo',dlg:null,res:null},
   delays:[],revT:null,paused:false,loopT:null,ch:null,chId:null,rt:false,present:null,lastSync:0,syncing:false,tickAt:0,title:null,titleT:null,wasTurn:false,join:null,err:null};
 var MD_POS=['QB','RB','WR','TE','K','DST'],MD_SLOTS=['QB','RB','WR','TE','FLEX','SF','K','DST','BN'];
 var MD_DEF={teams:12,scoring:'ppr',roster:{QB:1,RB:2,WR:2,TE:1,FLEX:1,SF:0,K:1,DST:1,BN:6},clock:60,speed:'fast',slot:0};
@@ -308,9 +308,9 @@ function mdSortable(list,done){
 /* ---------- the draft room ---------- */
 function mdRoomRender(el){
   const r=MD.room,solo=mdSolo(),friends=r.mode==='friends',host=friends&&r.host===MD.you;
-  if(!friends&&MD.ui.tab==='chat')MD.ui.tab='queue';
-  const tabs=[['queue','Queue'],['team','My team'],['picks','Picks']].concat(friends?[['chat','Chat']]:[]);
-  const ptabs=[['players','Players'],['queue','Queue'],['team','Team'],['board','Board']].concat(friends?[['chat','Chat']]:[]);
+  if(!friends&&MD.ui.tab==='chat')MD.ui.tab='team';
+  const tabs=[['team','My team'],['queue','Queue'],['picks','Picks']].concat(friends?[['chat','Chat']]:[]);
+  const ptabs=[['players','Players'],['team','Team'],['queue','Queue'],['board','Board']].concat(friends?[['chat','Chat']]:[]);
   el.innerHTML=`<div class="md-room" data-ptab="${MD.ui.ptab}">
     <header class="md-top" id="md-top">
       <div class="md-clock" id="md-clock"><svg viewBox="0 0 44 44" aria-hidden="true"><circle class="md-ring-bg" cx="22" cy="22" r="19"/><circle class="md-ring" id="md-ring" cx="22" cy="22" r="19" pathLength="100"/></svg><b id="md-secs"></b></div>
