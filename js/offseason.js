@@ -303,7 +303,7 @@ function renderProTab(){
     document.body.classList.remove('md-in-room');
   }
   const live=key==='recap';/* the Season Recap slideshow is built (recap.html); the other pages are still on the way */
-  /* the Recap page keeps its live preview running: only rebuild it when what it shows would change */
+  /* the Recap page keeps its preview video running: only rebuild it when what it shows would change */
   const stamp=key+'|'+signed+'|'+pro;if(live&&el.dataset.k===stamp&&el.firstElementChild)return;el.dataset.k=live?stamp:'';
   const chip=pro?(live?'':'<span class="tmo-soon-chip">Coming soon</span>'):`<span class="tmo-lock">${TMO_LOCK}Pro</span>`;
   const cta=pro&&live?`<p class="tmo-pp-note"><b>Your recap is ready.</b> It plays like a slideshow, about a minute start to finish. Tap to move through the cards.</p>
@@ -323,7 +323,7 @@ function renderProTab(){
     </div>
     ${live?`<div class="tmo-rcp" aria-hidden="true">
       <div class="tmo-rcp-glow" aria-hidden="true"></div>
-      <div class="tmo-rcp-phone"><iframe src="/recap?sample=1&demo=1" title="Season Recap preview" tabindex="-1" loading="lazy" style="color-scheme:light"></iframe></div>
+      <div class="tmo-rcp-phone"><video src="/media/recap-sample.mp4?v=3" poster="/media/recap-sample.jpg?v=2" ${matchMedia('(prefers-reduced-motion: reduce)').matches?'':'autoplay'} muted loop playsinline preload="metadata" tabindex="-1" aria-hidden="true" disablepictureinpicture disableremoteplayback></video></div>
     </div>`:`<div class="tmo-pp-cards">${P.cards.map(([h,p],i)=>`<div class="tmo-pp-card"><span class="tmo-pp-n">${i+1}</span><div><h3>${h}</h3><p>${p}</p></div></div>`).join('')}</div>`}
   </div>`;
   if(key==='drafttools'&&typeof mdPreview==='function')mdPreview(el);

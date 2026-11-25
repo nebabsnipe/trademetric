@@ -2651,11 +2651,11 @@ body.tmo-is-pro .nav-lock{display:none}
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .tmo-pp-n{background:var(--surface-3)}}
 .tmo-pp-card h3{margin:0;font-size:15.5px}
 .tmo-pp-card p{margin:5px 0 0;color:var(--muted);font-size:13.5px;line-height:1.5}
-/* Recap tab: a live preview of the slideshow, and the recap opened on top of the site */
+/* Recap tab: a short preview video of the slideshow, and the recap opened on top of the site */
 .tmo-rcp{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;padding:28px 20px 24px;border-radius:14px;background:#0B0C0E;border:1px solid #1d2024;overflow:hidden;min-height:560px}
 .tmo-rcp-glow{position:absolute;inset:-20%;background:radial-gradient(38% 34% at 30% 28%,rgba(124,58,237,.38),transparent 70%),radial-gradient(34% 30% at 74% 72%,rgba(245,158,11,.22),transparent 70%);filter:blur(10px);pointer-events:none}
 .tmo-rcp-phone{position:relative;width:min(250px,62vw);aspect-ratio:390/844;border-radius:26px;overflow:hidden;background:#0d0d0d;box-shadow:0 0 0 1px rgba(255,255,255,.1),0 0 0 7px #16181c,0 0 0 8px rgba(255,255,255,.07),0 30px 70px rgba(0,0,0,.6);transition:transform .25s cubic-bezier(.2,.8,.2,1)}
-.tmo-rcp-phone iframe{position:absolute;inset:0;width:100%;height:100%;border:0;pointer-events:none;background:#0d0d0d}
+.tmo-rcp-phone video{position:absolute;inset:0;width:100%;height:100%;border:0;object-fit:cover;pointer-events:none;background:#0d0d0d}
 html.rcx-open{overflow:hidden}
 @keyframes rcx-in{from{opacity:0}to{opacity:1}}
 .rcx{position:fixed;inset:0;z-index:10000;background:rgba(6,7,9,.74);-webkit-backdrop-filter:blur(7px) saturate(.8);backdrop-filter:blur(7px) saturate(.8);animation:rcx-in .25s ease both}
