@@ -2537,7 +2537,7 @@ function feedPlayers(){const me=myTeam();if(!me)return [];const out=[],seen=new 
   if(FEED_F!=='mine'){(S.following||[]).forEach(id=>add(id,'<span class="slot-star">★</span>'));(S.followTeams||[]).forEach(t=>teamStars(t).forEach(id=>add(id,t)))}
   return out}
 
-async function loadFeed(force){if(typeof tmIsPro==='function'&&USER&&!tmIsPro())return;if(FEED_LOADING||(!force&&FEED&&Date.now()-FEED_AT<4*60e3))return;FEED_LOADING=true;
+async function loadFeed(force){if(typeof tmIsPro==='function'&&!tmIsPro()&&!tmBeta())return;   /* clips are Pro once the beta is over */if(FEED_LOADING||(!force&&FEED&&Date.now()-FEED_AT<4*60e3))return;FEED_LOADING=true;
   try{const r=await tmFetch('/api/feed?week='+WEEK+'&b='+Math.floor(Date.now()/300000));if(r.ok){const d=await r.json();if(d&&d.videos){FEED=d;FEED_AT=Date.now();try{localStorage.setItem(FEED_LS,JSON.stringify({at:FEED_AT,d}))}catch(e){}}}}catch(e){}
   FEED_LOADING=false;const ch=$('card-hl');if(ch&&openId)ch.innerHTML=cardHighlights(openId)}
 /* show the last copy instantly, then refresh in the background */
