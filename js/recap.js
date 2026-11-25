@@ -372,7 +372,19 @@
     sv('num', (c < 9 ? '0' : '') + (c + 1)); sv('title', TITLES[card.key]); sv('next', CARDS[c + 1] ? 'Next: ' + TITLES[CARDS[c + 1].key] : 'Last card');
     setIf('toast', false);
     draw();
+    if (c === LAST) watched();
   }
+  // Reaching the last card counts as "watched": the site's Recap tab unlocks after it (js/recap-tab.js).
+  // Kept in this browser straight away; the Recap tab saves it to the account.
+  var toldWatched = false;
+  function watched() {
+    if (toldWatched || DEMO || !D || D.sample || !D.league) return;
+    toldWatched = true;
+    var k = D.league.id + ':' + D.league.year;
+    try { var m = JSON.parse(localStorage.getItem('tm-recap-seen') || '{}') || {}; if (!m[k]) { m[k] = Date.now(); localStorage.setItem('tm-recap-seen', JSON.stringify(m)); } } catch (e) {}
+    tellSite({ rc: 'watched', league: String(D.league.id), year: D.league.year });
+  }
+  function tellSite(msg) { if (window.parent !== window) { try { window.parent.postMessage(msg, location.origin); } catch (e) {} } }
 
   function setPaused(p) {
     st.paused = p;
@@ -600,6 +612,8 @@
     fill(R);
     sideReady = true; fit();
     setIf('gate', false);
+    // the Recap tab's small preview: say which league is playing and which cards it has
+    if (DEMO) tellSite({ rc: 'clip', ok: true, sample: !!R.sample, league: String(R.league.id), year: R.league.year, cards: CARDS.map(function (c) { return c.key; }) });
     var s = parseInt((location.hash.match(/card=(\d+)/) || [])[1], 10); // #card=6 jumps to card 6
     if (DEMO || s) return begin(s);
     onCover = true;
@@ -620,6 +634,7 @@
 
   load().then(start).catch(function (e) {
     var c = (e && e.code) || 'upstream';
+    if (DEMO) tellSite({ rc: 'clip', ok: false, code: c });
     if (c === 'sign_in') gate('Sign in to see your recap', 'Your Season Recap is private to your account.', '/#signin', 'Sign in');
     else if (c === 'not_owner') gate('Not your recap', 'This recap belongs to another account. Sign in with the account that imported this league.', '/', 'Back to TradeMetric');
     else if (c === 'private') gate('Private league', 'Import this league on TradeMetric with your ESPN codes on this device, then open your recap again.', '/#welcome', 'Import league');

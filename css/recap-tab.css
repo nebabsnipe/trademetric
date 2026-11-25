@@ -34,6 +34,13 @@
 .rc-tab[data-state="unlocked"] .rc-side:hover{border-color:var(--ink)}
 .rc-tab[data-state="unlocked"] .rc-side-s{color:var(--accent)}
 .rc-lock{transition:opacity .4s ease}
+/* the one-time unlock: cards come up one after another (--d, set by js), and the "Open card" line fades in where the lock was */
+.rc-tab.rc-unlocking .rc-side{transition-delay:var(--d,0ms)}
+.rc-tab.rc-unlocking .rc-side-s{animation:rc-open .5s ease both;animation-delay:calc(var(--d,0ms) + .15s)}
+.rc-tab.rc-unlocking .rc-chip{transition-delay:var(--d,0ms)}
+.rc-tab.rc-unlocking .rc-badge{animation:rc-flip .5s ease both}
+@keyframes rc-open{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+@keyframes rc-flip{0%{opacity:0;transform:scale(.86)}100%{opacity:1;transform:none}}
 
 /* the phone-shaped frame that plays the preview */
 .rc-frame{position:absolute;left:50%;top:0;width:var(--rc-fw);height:var(--rc-fh);margin-left:calc(var(--rc-fw) / -2);border-radius:34px;overflow:hidden;z-index:2;
@@ -95,5 +102,6 @@ body[data-tab="recap"].rc-on main{padding-block:18px 24px}
 }
 @media (prefers-reduced-motion:reduce){
   .rc-tlabel{animation:none;color:var(--rc-text);background:none}
+  .rc-tab.rc-unlocking .rc-side-s,.rc-tab.rc-unlocking .rc-badge{animation:none}
   .rc-side,.rc-side[data-off],.rc-track .rc-knob,.rc-track .rc-trail,.rc-track .rc-tlabel,.rc-chip,.rc-lock{transition:none!important}
 }
