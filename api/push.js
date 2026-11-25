@@ -15,6 +15,7 @@ import { readFile } from 'node:fs/promises';
 import { sharedOn, rest, statusTrack } from './_shared.js';
 import { injuries, notes, ESPN_ST } from './live.js';
 import { weekInfo, alertsFor } from './_alerts.js';
+import { withSentry } from './_sentry.js';
 import { pushOn, vapidPublicKey, canPush, sendToDevices, RULES, norm, isQuiet, userRosters, injuryEvents, injuryPayload, summaryPayload, planSends } from './_push.js';
 
 const SUPA = (process.env.SUPABASE_URL || 'https://rltmfnmgbfgecbaevfvc.supabase.co').replace(/\/+$/, '');
@@ -47,7 +48,7 @@ const bodyOf = req => { const b = req.body; if (b && typeof b === 'object') retu
 const publicDevice = d => ({ id: d.id, label: d.label || 'Device', created_at: d.created_at, last_used_at: d.last_used_at });
 const NOT_SET_UP = { error: 'not_set_up', message: 'Notifications aren\'t switched on for this site yet.' };
 
-export default async function handler(req, res) {
+async function handler(req, res) {
   res.setHeader('Cache-Control', 'no-store');
   const act = String((req.query && req.query.do) || '');
   try {
@@ -208,3 +209,5 @@ async function cron(req, res) {
   }
   return res.status(200).json({ ok: true, ...stats, ...(dry ? { dry: true, preview } : {}) });
 }
+
+export default withSentry(handler, 'push');
