@@ -1,9 +1,9 @@
 /* Layout: sticky black/white command bar, page hero with scoreboard tiles, then two-column workspaces of cards. Team colors carry the personality. */
 :root{
-  --bg:#F4F5F7; --surface:#FFFFFF; --surface-2:#F0F1F4; --surface-3:#E6E8EC; --ink:#0B0C0E; --muted:#636872; --line:#E2E4E8;
-  --accent:#FF4F12; --accent-ink:#FFFFFF; --accent-soft:#FFEDE4;
+  --bg:#F2F5F6; --surface:#FFFFFF; --surface-2:#ECF1F2; --surface-3:#E0E7E9; --ink:#0B1416; --muted:#5C6A6E; --line:#DCE4E6;
+  --accent:#0B8F86; --accent-ink:#FFFFFF; --accent-soft:#DDF4F1;
   --good:#0F9D4F; --good-soft:#E2F5EA; --bad:#E0373B; --bad-soft:#FCE6E6; --warn:#B87500; --warn-soft:#FFF2D2;
-  --bar:#0B0C0E; --bar-ink:#FFFFFF;
+  --bar:#0E1F26; --bar-ink:#FFFFFF;
   --shadow:0 1px 2px rgba(11,12,14,.05),0 6px 20px rgba(11,12,14,.06);
   --f-display:"Kanit","Arial",sans-serif;
   --f-body:"Inter",system-ui,-apple-system,"Segoe UI",sans-serif;
@@ -11,15 +11,15 @@
   --r:10px; --r-sm:6px;
 }
 @media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
-  --bg:#050607; --surface:#0F1113; --surface-2:#16191C; --surface-3:#1F2327; --ink:#F2F3F5; --muted:#949AA3; --line:#22262A;
-  --accent:#FF6A33; --accent-ink:#170700; --accent-soft:#2B1409;
+  --bg:#040708; --surface:#0B1316; --surface-2:#121C20; --surface-3:#1A272C; --ink:#EDF3F4; --muted:#8B9A9E; --line:#1C2A2F;
+  --accent:#33D1C3; --accent-ink:#00201D; --accent-soft:#0A2A28;
   --good:#3CD88A; --good-soft:#0E2A1B; --bad:#FF6B6E; --bad-soft:#2F1213; --warn:#F5BA42; --warn-soft:#2B2008;
-  --bar:#0F1113; --bar-ink:#F2F3F5; --shadow:0 0 0 1px rgba(255,255,255,.02); color-scheme:dark}}
+  --bar:#0B1316; --bar-ink:#EDF3F4; --shadow:0 0 0 1px rgba(255,255,255,.02); color-scheme:dark}}
 :root[data-theme="dark"]{
-  --bg:#050607; --surface:#0F1113; --surface-2:#16191C; --surface-3:#1F2327; --ink:#F2F3F5; --muted:#949AA3; --line:#22262A;
-  --accent:#FF6A33; --accent-ink:#170700; --accent-soft:#2B1409;
+  --bg:#040708; --surface:#0B1316; --surface-2:#121C20; --surface-3:#1A272C; --ink:#EDF3F4; --muted:#8B9A9E; --line:#1C2A2F;
+  --accent:#33D1C3; --accent-ink:#00201D; --accent-soft:#0A2A28;
   --good:#3CD88A; --good-soft:#0E2A1B; --bad:#FF6B6E; --bad-soft:#2F1213; --warn:#F5BA42; --warn-soft:#2B2008;
-  --bar:#0F1113; --bar-ink:#F2F3F5; --shadow:0 0 0 1px rgba(255,255,255,.02); color-scheme:dark}
+  --bar:#0B1316; --bar-ink:#EDF3F4; --shadow:0 0 0 1px rgba(255,255,255,.02); color-scheme:dark}
 *{box-sizing:border-box}
 [hidden]{display:none!important}
 body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:14px;line-height:1.45;-webkit-font-smoothing:antialiased}
@@ -540,8 +540,8 @@ label.btn.shot-btn{display:inline-flex;align-items:center;gap:8px;white-space:no
 .acct-av{display:grid;place-items:center;width:100%;height:100%}.acct-av img{width:100%;height:100%;object-fit:cover;display:block}
 /* Sign-in page: brand panel + form. One radius (10px), 1px borders throughout. */
 .auth-wrap{--ar:10px;display:grid;grid-template-columns:minmax(0,1.04fr) minmax(0,1fr);max-width:1000px;width:100%;margin:8px auto 40px;background:var(--surface);border:1px solid var(--line);border-radius:var(--ar);overflow:hidden;box-shadow:0 1px 2px rgba(11,12,14,.05),0 24px 60px -28px rgba(11,12,14,.28)}
-.auth-brand{position:relative;padding:34px 36px 32px;background:#0B0C0E;color:#fff;display:flex;flex-direction:column;gap:20px;overflow:hidden;isolation:isolate;border-right:1px solid rgba(255,255,255,.06)}
-.auth-brand::before{content:"";position:absolute;inset:0;z-index:-1;background:radial-gradient(110% 60% at 100% 0%,rgba(255,79,18,.5),transparent 60%),radial-gradient(90% 55% at 0% 100%,rgba(255,79,18,.16),transparent 70%)}
+.auth-brand{position:relative;padding:34px 36px 32px;background:#0C1B21;color:#fff;display:flex;flex-direction:column;gap:20px;overflow:hidden;isolation:isolate;border-right:1px solid rgba(255,255,255,.06)}
+.auth-brand::before{content:"";position:absolute;inset:0;z-index:-1;background:radial-gradient(110% 60% at 100% 0%,rgba(31,209,193,.5),transparent 60%),radial-gradient(90% 55% at 0% 100%,rgba(31,209,193,.16),transparent 70%)}
 .auth-brand::after{content:"";position:absolute;inset:0;z-index:-1;opacity:.07;background:repeating-linear-gradient(90deg,#fff 0 1px,transparent 1px 64px);mask-image:linear-gradient(180deg,transparent,#000 35%,#000 70%,transparent)}
 .auth-brand-top{display:flex;align-items:center;justify-content:space-between;gap:12px}
 .auth-brand-logo{display:flex;align-items:center;gap:10px}.auth-brand-logo img{height:30px;width:auto}
@@ -956,8 +956,8 @@ body.signed-out .league-switch{display:none}
 @media (max-width:620px){.nt{grid-template-columns:58px minmax(0,1fr) 54px;gap:8px}.nt>span:nth-child(2){display:none}.nt-odds{grid-template-columns:minmax(0,1fr) 40px}.need-k{font-size:36px;min-width:50px}}
 /* Account page */
 /* Account area */
-.acc-hero{position:relative;border-radius:18px;overflow:hidden;background:#0B0C0E;color:#fff;isolation:isolate;border:1px solid var(--line)}
-.acc-hero::before{content:"";position:absolute;inset:0;z-index:-1;background:radial-gradient(70% 140% at 100% 0%,rgba(255,79,18,.55),transparent 62%),radial-gradient(50% 120% at 0% 100%,rgba(255,79,18,.16),transparent 70%)}
+.acc-hero{position:relative;border-radius:18px;overflow:hidden;background:#0C1B21;color:#fff;isolation:isolate;border:1px solid var(--line)}
+.acc-hero::before{content:"";position:absolute;inset:0;z-index:-1;background:radial-gradient(70% 140% at 100% 0%,rgba(31,209,193,.55),transparent 62%),radial-gradient(50% 120% at 0% 100%,rgba(31,209,193,.16),transparent 70%)}
 .acc-hero::after{content:"";position:absolute;inset:0;z-index:-1;opacity:.08;background:repeating-linear-gradient(90deg,#fff 0 1px,transparent 1px 64px)}
 .acc-hero-in{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:22px;align-items:center;padding:30px 30px}
 .acc-av{width:84px;height:84px;border-radius:50%;background:var(--accent);color:#fff;display:grid;place-items:center;font:italic 800 38px var(--f-display);overflow:hidden;box-shadow:0 0 0 4px rgba(255,255,255,.12)}

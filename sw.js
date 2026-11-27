@@ -12,7 +12,7 @@ self.addEventListener('push', e => {
   try { d = e.data ? e.data.json() : {}; } catch (err) { d = { body: e.data ? e.data.text() : '' }; }
   const opts = {
     body: d.body || '',
-    icon: '/icon-192.png?v=1',
+    icon: '/icon-192.png?v=2',
     badge: '/badge-96.png?v=1',
     data: { url: d.url || '/' },
   };
