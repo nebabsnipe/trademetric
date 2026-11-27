@@ -65,6 +65,7 @@ async function run(width) {
   await page.goto(BASE + '/#team'); await page.waitForFunction(() => typeof go === 'function' && typeof S === 'object' && S, null, { timeout: 20000 }); await page.waitForTimeout(1200);
   if (STATE === 'league') { await page.evaluate(async u => { await sleeperConnect(u); await sleeperImport(0); }, USER.name); await page.waitForTimeout(2500); }
   await page.evaluate(t => { try { themePref = t; applyTheme(); } catch (e) {} }, THEME);
+  if (arg('eval', '')) { await page.evaluate(h => { location.hash = h; }, TABS[0]); await page.waitForTimeout(1200); console.log(JSON.stringify(await page.evaluate(String(arg('eval'))), null, 1)); await browser.close(); return; }
   fs.mkdirSync(OUT, { recursive: true });
   for (const t of TABS) { await page.evaluate(h => { location.hash = h; }, t); await page.waitForTimeout(1500);
     await page.evaluate(() => window.scrollTo(0, 0));

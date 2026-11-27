@@ -2601,3 +2601,6 @@ button.upg-opt[aria-checked="true"]{border-color:var(--accent);box-shadow:0 0 0 
 /* Account -> Email card: group headings and their one-line notes */
 .acc-sec h3.push-h.em-first{margin-top:6px}
 .em-sub{margin:2px 0 0}
+
+/* Desktop-only pieces (css/desktop.css, js/desktop.js) never show on the phone layout */
+@media (max-width:700px){.d-only{display:none!important}}

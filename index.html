@@ -18,7 +18,9 @@ if(location.hostname==='trademetric-rho.vercel.app')location.replace('https://ww
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600;700;800&family=Kanit:ital,wght@0,700;0,800;1,600;1,700;1,800&display=swap">
 <meta name="description" content="Fantasy football trades, rankings and lineup advice built on your league's exact settings.">
-<link rel="stylesheet" href="css/styles.css?v=51">
+<link rel="stylesheet" href="css/styles.css?v=52">
+<link rel="preload" href="/fonts/outfit-var.woff2" as="font" type="font/woff2" crossorigin media="(min-width:701px)">
+<link rel="stylesheet" href="css/desktop.css?v=1" media="(min-width:701px)">
 <script src="js/telemetry.js?v=6"></script>
 <script src="js/plan.js?v=4"></script>
 </head>
@@ -27,17 +29,20 @@ if(location.hostname==='trademetric-rho.vercel.app')location.replace('https://ww
   <div class="wrap topbar-in">
     <a class="logo" href="#team" aria-label="TradeMetric home"><img class="logo-img" src="/logo-tm.png?v=3" width="398" height="160" alt=""><b>Trade<span>Metric</span></b></a>
     <nav class="nav" aria-label="Sections">
-      <button data-tab="team">My Team</button>
-      <button data-tab="news">News</button>
-      <button data-tab="rankings" data-hash="players">Players</button>
-      <button data-tab="trade">Trades</button>
-      <button data-tab="season"><span class="lbl-l">Season Sim</span><span class="lbl-s">Sim</span></button>
-      <button data-tab="hub">League</button>
+      <button data-tab="team" data-tip="My Team"><span class="nav-lb">My Team</span></button>
+      <button data-tab="news" data-tip="News"><span class="nav-lb">News</span></button>
+      <button data-tab="rankings" data-hash="players" data-tip="Players"><span class="nav-lb">Players</span></button>
+      <button data-tab="trade" data-tip="Trades"><span class="nav-lb">Trades</span></button>
+      <button data-tab="season" data-tip="Season Sim"><span class="nav-lb"><span class="lbl-l">Season Sim</span><span class="lbl-s">Sim</span></span></button>
+      <button data-tab="hub" data-tip="League"><span class="nav-lb">League</span></button>
     </nav>
+    <div class="tmd-live d-only" id="tmd-live" aria-live="polite"></div>
     <div class="topbar-right">
       <select id="league-switch" class="league-switch" aria-label="Switch league" hidden></select>
+      <a class="tmd-ic d-only" id="tmd-search" href="#players" aria-label="Search players" data-tip="Search players"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="m20 20-4.2-4.2"/></svg></a>
       <div class="alerts-wrap"><button class="alert-btn" id="alert-btn" type="button" aria-label="Alerts" aria-expanded="false"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg><span class="alert-n" id="alert-n" hidden></span></button>
         <div class="alert-pop" id="alert-pop" hidden></div></div>
+      <a class="tmd-ic d-only" id="tmd-settings" href="#league" aria-label="League settings" data-tip="League settings"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h9M17 7h3M4 17h3M11 17h9"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="17" r="2"/></svg></a>
       <button class="acct-btn" id="acct-btn" type="button">Sign in</button>
       <button class="theme-btn" id="theme-btn" aria-label="Switch light or dark mode"></button>
     </div>
@@ -50,6 +55,7 @@ if(location.hostname==='trademetric-rho.vercel.app')location.replace('https://ww
     <div class="hero">
       <div><div class="kicker" id="team-kicker"></div><h1 id="team-title">Your Team</h1></div>
     </div>
+    <div class="tmd-dash d-only" id="tmd-dash"></div>
     <div class="lu-alert" id="lu-alert" hidden></div>
     <div class="tiles" id="team-tiles"></div>
     <div class="card" id="matchup"></div>
@@ -341,7 +347,7 @@ if(location.hostname==='trademetric-rho.vercel.app')location.replace('https://ww
 <script>
 /* Load the stats snapshot, then start the app */
 fetch('data/nfl.json',{cache:'no-cache'}).then(r=>r.json()).then(d=>{
-  window.NFL_DATA=d;const n=document.createElement('script');n.src='js/news.js?v=32';n.onload=n.onerror=()=>{const s=document.createElement('script');s.src='js/app.js?v=45';s.onload=()=>{const dl=document.createElement('script');dl.src='js/deadline.js?v=2';document.body.appendChild(dl);const m=document.createElement('script');m.src='js/mobile.js?v=4';document.body.appendChild(m);const q=document.createElement('script');q.src='js/polish.js?v=5';document.body.appendChild(q);const u=document.createElement('script');u.src='js/push.js?v=5';document.body.appendChild(u);const em=document.createElement('script');em.src='js/email.js?v=3';document.body.appendChild(em)};document.body.appendChild(s)};document.body.appendChild(n);
+  window.NFL_DATA=d;const n=document.createElement('script');n.src='js/news.js?v=32';n.onload=n.onerror=()=>{const s=document.createElement('script');s.src='js/app.js?v=45';s.onload=()=>{['js/photos.js?v=1','js/desktop.js?v=1'].forEach(u=>{const x=document.createElement('script');x.src=u;x.async=false;document.body.appendChild(x)});const dl=document.createElement('script');dl.src='js/deadline.js?v=2';document.body.appendChild(dl);const m=document.createElement('script');m.src='js/mobile.js?v=4';document.body.appendChild(m);const q=document.createElement('script');q.src='js/polish.js?v=5';document.body.appendChild(q);const u=document.createElement('script');u.src='js/push.js?v=5';document.body.appendChild(u);const em=document.createElement('script');em.src='js/email.js?v=3';document.body.appendChild(em)};document.body.appendChild(s)};document.body.appendChild(n);
 }).catch(()=>{document.body.insertAdjacentHTML('afterbegin','<p style="padding:20px;font-family:sans-serif">Could not load player data. Refresh to try again.</p>')});
 </script>
 </body>
