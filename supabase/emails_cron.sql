@@ -1,4 +1,5 @@
--- TradeMetric: the schedule for emails. NOT RUN YET. Run it once the emails branch is live on main.
+-- TradeMetric: the schedule for emails. Running since 2026-11-27 (first real run 2026-11-28; that day's
+-- version carries a harmless `where now() >= '2026-11-28'` hold that can be dropped by re-running this file).
 -- Once a day the database's own scheduler calls the email check: leagues that stopped updating, playoff clinches,
 -- championships, and (in August) the draft season reminder. It uses the same password as the push schedule,
 -- already kept encrypted in Supabase Vault as 'tm_cron_secret' (see push_cron.sql). Never written in this file.

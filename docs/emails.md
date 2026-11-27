@@ -1,6 +1,6 @@
 # Emails
 
-Status (2026-11-25): **LIVE on main.** `EMAIL_LIVE` is on in Production, so emails go to real recipients. Previews are never live. The one-time announcement went to the 4 real accounts the same day. **The daily check is not scheduled yet** (`supabase/emails_cron.sql` has not been run), so no update emails go out until it is; the owner is choosing the start date. The two `tmtest_*` accounts' addresses are on the block list (`reason = invalid`).
+Status (2026-11-25): **LIVE on main.** `EMAIL_LIVE` is on in Production, so emails go to real recipients. Previews are never live. The one-time announcement went to the 4 real accounts the same day. **The daily check was scheduled on 2026-11-27** (job `tm-email`, 15:20 UTC daily), with a one-time hold so the first real run is 2026-11-28: that skipped a late Week 11 recap, so the first weekly recap is Week 12 (Tue Dec 1). The two `tmtest_*` accounts' addresses are on the block list (`reason = invalid`).
 the owner's own inbox with the intended person shown in the subject.
 
 **2026-11-25 change (owner):** the first plan emailed almost nothing. The owner widened it the same day to a set of
@@ -57,7 +57,7 @@ would reach). Until `EMAIL_LIVE` is on it only ever goes to the owner's account.
 | `api/email.js` | One server function: `/api/email/welcome`, `/unsub`, `/hook`, `/cron`, `/test` (function 12 of the plan's 12) |
 | `js/email.js` | The Email card in Account -> Leagues, and asking for the welcome email after a first sign-in |
 | `supabase/emails.sql` | `email_sent`, `email_prefs`, `email_block`, `email_watch` |
-| `supabase/emails_cron.sql` | The once-a-day schedule. **Not run yet** |
+| `supabase/emails_cron.sql` | The once-a-day schedule. Running since 2026-11-27 |
 | `supabase/email/` | The Supabase sign-in emails and billing samples. Rebuilt by `node scripts/build-emails.mjs` |
 | `scripts/test-email.mjs` | Checks every rule with the outside services faked. `node scripts/test-email.mjs` |
 
