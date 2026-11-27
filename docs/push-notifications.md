@@ -94,6 +94,10 @@ Part of the same scheduled check (`/api/push/cron`), rules in `api/_alerts.js`, 
   doubtful / out / IR back to no designation, but only in the 3 days before his game and before kickoff, with
   the same confirmation as other injury alerts. Ruled out ("out") was already sent at any time.
 
+- **Card tidy-up (2026-11-27):** the device row is one line with a single small button ("Turn on" / "Turn off").
+  The "Send test notification" button was removed from the page at the owner's request. The `/api/push/test`
+  route is still on the server, just not linked from anywhere.
+
 ## Not done yet
 
 - Big plays, trades and #1 finishes: the switches exist (marked "Coming soon") but nothing

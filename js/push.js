@@ -73,11 +73,6 @@ async function pushDisable(quiet){const sub=PUSH.sub;if(!sub)return;PUSH.busy='o
 async function pushRemove(id){if(id===pushLs(PUSH_ID_LS)&&PUSH.sub){await pushDisable();return}
   PUSH.devices=(PUSH.devices||[]).filter(d=>d.id!==id);pushPaint();await pushApi('unsubscribe',{id});toast('Device removed')}
 
-async function pushTest(){if(PUSH.busy)return;PUSH.busy='test';PUSH.msg='';pushPaint();const r=await pushApi('test',{});PUSH.busy='';
-  if(r.ok&&r.j.sent)toast(r.j.sent>1?'Test sent to '+r.j.sent+' devices':'Test sent. It should show up in a few seconds.');
-  else PUSH.msg=r.ok?'No device could be reached. Turn notifications on again on this device.':'Couldn\'t send the test. Try again in a minute.';
-  if(r.ok&&r.j.removed)await pushLoad(true);else pushPaint()}
-
 /* Once a day, on a device that's already on: tell the server it's still in use (keeps "last used" and the time
    zone fresh, and re-saves the device if the browser quietly gave it a new push address). */
 async function pushSeen(){if(typeof USER==='undefined'||!USER||!pushSupported())return;await pushRead();
@@ -97,8 +92,8 @@ function pushDeviceRow(){const sup=pushSupported(),ios=pushIOS();
   if(PUSH.setup===false)return row('Not available yet','Notifications aren\'t switched on for this copy of the site.');
   if(Notification.permission==='denied'){const how=ios?'Open the Settings app, tap Notifications, then TradeMetric, and switch on Allow Notifications.':/Android/.test(navigator.userAgent)?'Tap the icon at the left of the address bar, then Permissions, and allow Notifications. Then reload this page.':/Safari/.test(pushLabel())?'In the Safari menu choose Settings, then Websites, then Notifications, and set TradeMetric to Allow. Then reload this page.':'Click the icon at the left of the address bar, set Notifications to Allow, then reload this page.';
     return row('Notifications are blocked on this device',how)}
-  if(pushOnHere())return row('On for this device',esc(pushLabel()),`<span class="push-acts"><button class="btn small" type="button" data-push-test ${PUSH.busy?'disabled':''}>${PUSH.busy==='test'?'Sending...':'Send test notification'}</button><button class="btn small" type="button" data-push-off ${PUSH.busy?'disabled':''}>Turn off</button></span>`);
-  return row('This device','Get alerts on your lock screen or desktop, even when TradeMetric is closed.',`<button class="btn primary" type="button" data-push-on ${PUSH.busy?'disabled':''}>${PUSH.busy==='on'?'Turning on...':'Turn on notifications on this device'}</button>`)}
+  if(pushOnHere())return row('On for this device',esc(pushLabel()),`<button class="btn small" type="button" data-push-off ${PUSH.busy?'disabled':''}>${PUSH.busy==='off'?'Turning off...':'Turn off'}</button>`);
+  return row('Off for this device','Get alerts on your lock screen or desktop, even when TradeMetric is closed.',`<button class="btn small primary" type="button" data-push-on ${PUSH.busy?'disabled':''}>${PUSH.busy==='on'?'Turning on...':'Turn on'}</button>`)}
 function pushHtml(){if(typeof USER==='undefined'||!USER)return '';
   if(typeof tmIsPro==='function'&&!tmIsPro())return `<section class="card acc-sec" id="acc-push"><header class="acc-sec-h"><h2>Push notifications</h2><p>Alerts on your phone or computer, even when the site is closed. Part of Pro.</p></header><div class="acc-row"><div class="acc-v"><a class="btn small" href="#upgrade-push">See Pro</a></div></div></section>`;
   if(!PUSH.loaded)setTimeout(pushLoad,0);
@@ -115,7 +110,6 @@ function pushHtml(){if(typeof USER==='undefined'||!USER)return '';
 document.addEventListener('click',e=>{const t=e.target;if(!t.closest)return;
   if(t.closest('[data-push-on]')){pushEnable();return}
   if(t.closest('[data-push-off]')){pushDisable();return}
-  if(t.closest('[data-push-test]')){pushTest();return}
   const rm=t.closest('[data-push-rm]');if(rm){pushRemove(rm.dataset.pushRm);return}
   const h=t.closest('[data-push-hint]');if(h){pushLs(PUSH_HINT_LS,h.dataset.pushHint==='hide'?'1':null);pushPaint();return}});
 document.addEventListener('change',e=>{const t=e.target,k=t&&t.dataset&&t.dataset.pushType;if(!k)return;

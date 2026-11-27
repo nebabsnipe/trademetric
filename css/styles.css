@@ -1765,9 +1765,8 @@ body.signed-out .alerts-wrap{display:none}
 .tmn-sw .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 /* Push notifications card (Account -> Leagues): js/push.js */
 .tmn-sw.sm i{width:34px;height:20px}.tmn-sw.sm i::after{top:2px;left:2px;width:16px;height:16px}.tmn-sw.sm input:checked+i::after{transform:translateX(14px)}
-.push-dev{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;padding:12px 0 4px}
-.push-dev .acc-lg-t{flex:1 1 240px;white-space:normal}.push-dev .acc-lg-t b{white-space:normal}
-.push-acts{display:flex;flex-wrap:wrap;gap:8px}
+.push-dev{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:12px 0 4px}
+.push-dev .acc-lg-t{flex:1 1 0;min-width:0;white-space:normal}.push-dev .btn{flex:none}.push-dev .acc-lg-t b{white-space:normal}
 .acc-sec h3.push-h{margin:22px 0 2px;font-family:var(--f-body);font-style:normal;font-weight:600;font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
 .push-types .acc-lg-t b,.push-devs .acc-lg-t b{white-space:normal;font-weight:600;font-size:14px}
 .push-soon{white-space:nowrap;margin-left:6px;font-size:11px;font-weight:600;color:var(--muted)}
