@@ -583,7 +583,7 @@
     // local testing only: build straight from the league's public data for a given team
     if (p.dev && /^(localhost|127\.0\.0\.1)$/.test(location.hostname)) {
       window.process = window.process || { env: {} };
-      var mod = await import('/api/recap.js');
+      var mod = await import('/api/_recap.js');
       return mod.buildRecap({ league: p.league, year: p.year, teamId: +p.dev });
     }
     var sb;

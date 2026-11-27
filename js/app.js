@@ -549,7 +549,7 @@ function rosterChanged(T,ids){const a=[...T.players].sort().join(),b=[...ids].so
 async function syncSleeper(){const src=S.real&&S.real.src;if(!src||src.type!=='sleeper')return false;let changed=false;
   const [rosters,users,lg]=await Promise.all([getJSON(`https://api.sleeper.app/v1/league/${src.league}/rosters`),getJSON(`https://api.sleeper.app/v1/league/${src.league}/users`),getJSON(`https://api.sleeper.app/v1/league/${src.league}`).catch(()=>null)]);
   if(lg&&lg.settings){const n=lg.settings.reserve_slots||0;if(S.league.slots.IR!==n){S.league.slots.IR=n;changed=true}
-    const ok=sleeperIrOk(lg.settings);if((S.league.irOk||[]).join()!==ok.join()){S.league.irOk=ok;changed=true}}
+    const ok=sleeperIrOk(lg.settings);if((S.league.irOk||[]).join()!==ok.join()){S.league.irOk=ok;changed=true}if(setTdl(S.league,sleeperTdl(lg.settings)))changed=true}
   let ids=await sleeperIds();
   /* re-check saved Sleeper-to-player links against Sleeper's real names; drop any that were matched loosely */
   if(ids&&Object.keys(ids).length)for(const [pid,id] of Object.entries(src.pmap)){const x=ids[pid],q=byId[id];if(x&&(!q||norm(q.n)!==norm(x[0])))delete src.pmap[pid]}
@@ -565,6 +565,7 @@ async function syncSleeper(){const src=S.real&&S.real.src;if(!src||src.type!=='s
 function syncEspnRosters(d){const src=S.real&&S.real.src;if(!d||!src||src.type!=='espn')return false;let changed=false;
   const ls=d.settings&&d.settings.rosterSettings&&d.settings.rosterSettings.lineupSlotCounts;if(ls){const n=+ls[21]||0;if(S.league.slots.IR!==n){S.league.slots.IR=n;changed=true}
     if((S.league.irOk||[]).join()!=='IR,PUP,O'){S.league.irOk=['IR','PUP','O'];changed=true}}
+  if(d.settings&&setTdl(S.league,espnTdl(d.settings)))changed=true;
   (d.teams||[]).forEach(t=>{const tid=src.rid[t.id],T=tid&&teamById(tid);if(!T)return;
     const EP={1:'QB',2:'RB',3:'WR',4:'TE',5:'K'};((t.roster&&t.roster.entries)||[]).forEach(e=>{const pl=e.playerPoolEntry&&e.playerPoolEntry.player;if(pl&&EP[pl.defaultPositionId]&&!findExact(pl.fullName,EP[pl.defaultPositionId])){addExtraPlayer(pl.fullName,EP[pl.defaultPositionId]);POOL_DIRTY=true}});if(POOL_DIRTY)setPool();
     const out=((t.roster&&t.roster.entries)||[]).map(e=>e.playerPoolEntry&&e.playerPoolEntry.player).filter(Boolean).map(pl=>{const q=pl.defaultPositionId===16?(byId['dst-'+String(pl.proTeamAbbreviation||'').toLowerCase()]||findExact(pl.fullName)):findExact(pl.fullName);return q&&q.id}).filter(Boolean);
@@ -597,7 +598,7 @@ async function syncSnapSleeper(Z){const src=Z.real.src,L=src.league;let ch=false
     getJSON(`https://api.sleeper.app/v1/league/${L}`).catch(()=>null),getJSON(`https://api.sleeper.app/v1/league/${L}/matchups/${WEEK}`).catch(()=>null)]);
   if(!Array.isArray(rosters))return false;
   if(lg&&lg.settings&&Z.league&&Z.league.slots){const n=lg.settings.reserve_slots||0;if(Z.league.slots.IR!==n){Z.league.slots.IR=n;ch=true}
-    const ok=sleeperIrOk(lg.settings);if((Z.league.irOk||[]).join()!==ok.join()){Z.league.irOk=ok;ch=true}}
+    const ok=sleeperIrOk(lg.settings);if((Z.league.irOk||[]).join()!==ok.join()){Z.league.irOk=ok;ch=true}if(setTdl(Z.league,sleeperTdl(lg.settings)))ch=true}
   const ids=await sleeperIds();
   for(const r of rosters){const tid=src.rid[r.roster_id],T=tid&&Z.teams.find(t=>t.id===tid);if(!T)continue;
     const out=[...new Set((r.players||[]).map(pid=>snapPid(Z,ids,pid)).filter(Boolean))];if(out.length&&rosterChanged(T,out))ch=true;
@@ -612,6 +613,7 @@ async function syncSnapEspn(Z){const src=Z.real.src;let ch=false;Z.real.rec=Z.re
   const creds=src.priv?(IMP.espnCreds||espnSaved()):null;if(src.priv&&!(creds&&creds.s2))return false;
   const d=await espnFetch(src.league,creds,WEEK);if(!d||!Array.isArray(d.teams))return false;
   const ls=d.settings&&d.settings.rosterSettings&&d.settings.rosterSettings.lineupSlotCounts;if(ls&&Z.league&&Z.league.slots){const n=+ls[21]||0;if(Z.league.slots.IR!==n){Z.league.slots.IR=n;ch=true}}
+  if(d.settings&&Z.league&&setTdl(Z.league,espnTdl(d.settings)))ch=true;
   const who=pl=>{if(!pl)return null;const q=pl.defaultPositionId===16?(byId['dst-'+String(pl.proTeamAbbreviation||'').toLowerCase()]||findExact(pl.fullName)):findExact(pl.fullName);return q?q.id:null},lu={};
   d.teams.forEach(t=>{const tid=src.rid[t.id],T=tid&&Z.teams.find(x=>x.id===tid);if(!T)return;const E=(t.roster&&t.roster.entries)||[];
     const out=[...new Set(E.map(e=>who(e.playerPoolEntry&&e.playerPoolEntry.player)).filter(Boolean))];if(out.length&&rosterChanged(T,out))ch=true;
@@ -1363,7 +1365,7 @@ function twClear(){TW.prefs=null;TW.text='';TW.loose=false;TW.err='';sugSkip=0;t
 function renderTrade(){
   $('trade-kicker').textContent=`${S.league.name||'My League'} · ${leagueTagline(S.league)}`;$('tr-intro').innerHTML=TR_INTRO[trView];
   document.querySelectorAll('#tr-seg button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.trv===trView));$('tr-build').hidden=trView!=='build';$('tr-ideas').hidden=trView!=='ideas';
-  twSync();twPaint();const tw=TW.prefs?twIdeas():null,fitOf=new Map((tw||[]).map(x=>[x.t,x.fit]));
+  if(typeof tdlTrade==='function')tdlTrade();twSync();twPaint();const tw=TW.prefs?twIdeas():null,fitOf=new Map((tw||[]).map(x=>[x.t,x.fit]));
   let sug=tw?tw.map(x=>x.t):pickDiverse(allTrades(),3,sugSkip);if(!tw)sugPool=allTrades().length;
   /* fill with alternatives from other teams; they may reuse one of your players, since you'd only make one of these deals */
   if(!tw&&sug.length<3){const used=new Set(sug.map(t=>t.team)),pool=allTrades(true).filter(t=>!used.has(t.team)&&!sug.some(x=>x.get.some(id=>t.get.includes(id))&&x.give.join()===t.give.join()));sug=sug.concat(pickDiverse(pool,3-sug.length,0,true,sug.some(t=>t.give.concat(t.get).some(id=>byId[id].pos==='QB'))?1:0))}
@@ -1426,7 +1428,7 @@ function weekChart(imp,get){const R=imp.rows;if(!R.length)return '';const n=R.le
 function renderRating(partner){
   const el=$('rating');
   if(!TD.give.length||!TD.get.length){el.innerHTML=`<div class="card-h"><h2>Trade rating</h2></div><div class="rt-empty"><b>Build a deal to see it graded</b></div>`;return}
-  const me=myTeam(),fr=fairness(TD.give,TD.get,partner.id),e=fr.e,hm=RATE_MODE==='hm',over=activeOf(me).filter(x=>!TD.give.includes(x)).length+TD.get.length-e.mine.irIn.length-rosterSize();
+  const me=myTeam(),fr=fairness(TD.give,TD.get,partner.id),e=fr.e;window.TMT&&TMT.rated(TD.give.length,TD.get.length,e.gYou);const hm=RATE_MODE==='hm',over=activeOf(me).filter(x=>!TD.give.includes(x)).length+TD.get.length-e.mine.irIn.length-rosterSize();
   const cls=v=>v>=0?'up':'down',row=(l,v,note)=>`<tr><td>${l}${note?`<span class="note"> · ${note}</span>`:''}</td><td class="r num ${cls(v)}">${sgn(v)}</td></tr>`,P=e.parts,rl=realism(e,TD.give,TD.get);
   const gcard=(who,g,big,line,sub,mine)=>`<div class="gcard ${g}${mine?' mine':''}"><span class="gc-who">${who}</span><b class="gc-g">${big}</b><span class="gc-line">${line}</span><span class="gc-sub">${sub}</span></div>`;
   const tile=(l,v,c,sub)=>`<div class="rt-tile"><span>${l}</span><b class="num ${c||''}">${v}</b>${sub?`<em>${sub}</em>`:''}</div>`;
@@ -1501,7 +1503,7 @@ let AI=null,AIimg=false;
 const ServerAI={
   async json(prompt,opts={}){
     const images=[];for(const b of (opts.images||[]))images.push(await blobToB64(b));
-    const r=await fetch('/api/ai',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({prompt,images})});
+    const r=await tmFetch('/api/ai',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({prompt,images})});
     const j=await r.json().catch(()=>({}));
     if(!r.ok)throw {code:j.code||'error',message:j.error||'AI request failed',text:j.text};
     return j.data},
@@ -1557,7 +1559,7 @@ async function newsContext(q){const items=(FEED&&FEED.news)||[];
   const names=[...ids].map(id=>byId[id]).filter(Boolean),cut=Date.now()-10*864e5,out=[],dt=at=>at?new Date(at).toLocaleDateString('en-US',{month:'short',day:'numeric'}):'';
   /* player news from ESPN, RotoBaller, CBS, Yahoo, PFT and more (raw headlines, cached 10 minutes on the server) */
   try{const qs=names.filter(p=>p.pos!=='DST').slice(0,30).map(p=>encodeURIComponent(p.n+'|'+p.t)).join(';');
-    const r=await Promise.race([fetch('/api/news?batch='+qs+'&b='+Math.floor(Date.now()/300000)),new Promise((_,j)=>setTimeout(()=>j(0),9000))]);
+    const r=await Promise.race([tmFetch('/api/news?batch='+qs+'&b='+Math.floor(Date.now()/300000)),new Promise((_,j)=>setTimeout(()=>j(0),9000))]);
     if(r.ok){const d=await r.json();names.forEach(p=>((d.items||{})[p.n]||[]).forEach(a=>{if(a.at&&Date.parse(a.at)<cut)return;
       out.push({at:a.at,line:`- ${dt(a.at)} [${p.n}] ${a.title}${a.desc&&a.desc!==a.title?': '+a.desc:''} (${a.outlet})`,k:norm(a.title)})}))}}catch(e){}
   items.forEach(a=>{if(a.at&&Date.parse(a.at)<cut)return;const txt=norm((a.title||'')+' '+(a.desc||'')+' '+(a.athletes||[]).join(' '));
@@ -1809,7 +1811,7 @@ function importGridHtml(){
 function renderImport(){const el=$('import-card');if(!el)return;const open=IMP.open??!S.imported;
   el.innerHTML=`<details class="imp-details" id="imp-details" ${open?'open':''}><summary><div><h2>Import your league</h2><span class="note">${S.imported?`Imported ${esc(S.imported.name)} from ${esc(S.imported.src)}. Open to re-import.`:'Pull in every team, roster and scoring setting at once'}</span></div><span class="chev" aria-hidden="true"></span></summary>${importGridHtml()}</details>`}
 function renderWelcome(){$('wl-import').innerHTML=`<div class="card-h"><h2>Connect your league</h2><span class="note">Teams, rosters and scoring in one step</span></div>${importGridHtml()}`}
-function impMsg(html){IMP.html=html;document.querySelectorAll('.imp-status').forEach(el=>el.innerHTML=html)}
+function impMsg(html){window.TMT&&TMT.imp(html);IMP.html=html;document.querySelectorAll('.imp-status').forEach(el=>el.innerHTML=html)}
 const BLOCKED_MSG=`<div class="callout neutral" style="color:var(--ink)"><b>Can't reach that site from this preview.</b> This version of TradeMetric runs in a locked-down preview that can't connect to other websites. The import is built and will work once TradeMetric runs on its own server. Until then, use a screenshot for each team below.</div>`;
 async function getJSON(url){let r;try{r=await fetch(url)}catch(e){const err=new Error('blocked');err.blocked=true;throw err}if(!r.ok)throw new Error('HTTP '+r.status);return r.json()}
 let SLEEPER_PLAYERS=null;
@@ -1844,9 +1846,14 @@ async function sleeperImport(i){
     /* same name: prefer the one on the same NFL team */
     const took=new Set();[true,false].forEach(sameTeam=>cands.forEach(([pid,sp])=>{const q=want.get(norm(sp.full_name));if(took.has(q.id)||(sameTeam&&sp.team!==q.t))return;pmap[pid]=q.id;took.add(q.id)}));rosters.forEach(r=>(r.players||[]).forEach(pid=>{const sp=SLEEPER_PLAYERS[pid];if(sp&&!pmap[pid]&&OFFK.includes(sp.position)){const q=findExact(sp.full_name,sp.position);if(q)pmap[pid]=q.id}}));
     real.src={type:'sleeper',league:lg.league_id,labels:rp.filter(x=>!['BN','IR','TAXI'].includes(x)),rid:Object.fromEntries(rosters.map((r,i)=>[r.roster_id,i])),pmap};
-    applyImport(lg.name,teams,sc,slots,'Sleeper',real,(()=>{const z=lg.settings||{};return {irOk:sleeperIrOk(z),format:['redraft','keeper','dynasty'][z.type]||'redraft',waiver:z.waiver_type===2?'faab':'priority',budget:z.waiver_budget||100}})())}
+    applyImport(lg.name,teams,sc,slots,'Sleeper',real,(()=>{const z=lg.settings||{};return {irOk:sleeperIrOk(z),tdl:sleeperTdl(z),format:['redraft','keeper','dynasty'][z.type]||'redraft',waiver:z.waiver_type===2?'faab':'priority',budget:z.waiver_budget||100}})())}
   catch(e){impMsg(e.blocked?BLOCKED_MSG:`<p class="note" style="color:var(--bad)">Import failed (${esc(e.message)}). Try again.</p>`)}
 }
+/* a league's trade deadline. Sleeper: a week number (the deadline is when that week's last game ends; 99 or 0 = none).
+   ESPN: an exact date and time. Kept on the league as {wk} or {at}; null when there isn't one. */
+function sleeperTdl(z){const w=+(z&&z.trade_deadline)||0;return w>=1&&w<=18?{wk:w}:null}
+function espnTdl(st){const t=+(st&&st.tradeSettings&&st.tradeSettings.deadlineDate)||0;return t>0?{at:t}:null}
+function setTdl(lg,v){if(!lg)return false;if(JSON.stringify(lg.tdl||null)===JSON.stringify(v||null))return false;lg.tdl=v||null;return true}
 /* which injury designations a Sleeper league allows in IR */
 function sleeperIrOk(z){z=z||{};return ['IR','PUP'].concat(z.reserve_allow_out?['O']:[],z.reserve_allow_doubtful?['D']:[],z.reserve_allow_sus?['SUS']:[])}
 const ESPN_KEY='tm-espn-login';
@@ -1897,12 +1904,12 @@ async function espnImport(id,creds){
     (d.teams||[]).forEach((t,i)=>{const L=((t.roster&&t.roster.entries)||[]).filter(e=>ESPN_SLOT[e.lineupSlotId]).map(e=>{const pl=e.playerPoolEntry&&e.playerPoolEntry.player,q=pl&&findExact(pl.fullName);return {label:ESPN_SLOT[e.lineupSlotId],el:SLOT_EL['e'+e.lineupSlotId],id:q?q.id:null}});
       L.sort((a,b)=>SLOT_ORDER.indexOf(a.label)-SLOT_ORDER.indexOf(b.label));if(L.length)real.lineups[i]=L});
     real.src={type:'espn',league:String(id),priv:!!creds,rid:Object.fromEntries((d.teams||[]).map((t,i)=>[t.id,i]))};if(creds)IMP.espnCreds=creds;
-    applyImport((st.name)||'ESPN League',teams,sc,slots,'ESPN',real,(()=>{const a=st.acquisitionSettings||{},dr=st.draftSettings||{};return {irOk:['IR','PUP','O'],format:dr.keeperCount>0?'keeper':'redraft',waiver:a.isUsingAcquisitionBudget?'faab':'priority',budget:a.acquisitionBudget||100}})());readEspnWeek(d)}
+    applyImport((st.name)||'ESPN League',teams,sc,slots,'ESPN',real,(()=>{const a=st.acquisitionSettings||{},dr=st.draftSettings||{};return {irOk:['IR','PUP','O'],tdl:espnTdl(st),format:dr.keeperCount>0?'keeper':'redraft',waiver:a.isUsingAcquisitionBudget?'faab':'priority',budget:a.acquisitionBudget||100}})());readEspnWeek(d)}
   catch(e){impMsg(`<p class="note" style="color:var(--bad)">Couldn't read that ESPN league (${esc(e.message)}).</p>`)}
 }
-function applyImport(name,teams,sc,slots,src,real,extra){
+function applyImport(name,teams,sc,slots,src,real,extra){window.TMT&&setTimeout(()=>{TMT.ev('league_import_succeeded',{platform:String(src).toLowerCase(),teams:teams.length,private_league:!!(real&&real.src&&real.src.priv)});TMT.people()},0);
   saveCurrentLeague();const key=real&&real.src?real.src.type+':'+real.src.league:'import:'+name,prev=(S.leagues||[]).find(x=>x.key===key);
-  let miss=0;S.league={...S.league,name,sc:{...BASE_SC,...((prev&&prev.snap.league.sc)||{}),...sc},slots:{...BASE_SLOTS,...slots}};S.league.teams=teams.length;if(extra){S.league.irOk=extra.irOk||null;S.league.format=extra.format;S.league.waiver=extra.waiver;S.league.budget=extra.budget}
+  let miss=0;S.league={...S.league,name,sc:{...BASE_SC,...((prev&&prev.snap.league.sc)||{}),...sc},slots:{...BASE_SLOTS,...slots}};S.league.teams=teams.length;if(extra){S.league.irOk=extra.irOk||null;S.league.format=extra.format;S.league.waiver=extra.waiver;S.league.budget=extra.budget;S.league.tdl=extra.tdl||null}
   teams.forEach(t=>t.names.forEach(x=>{if(typeof x==='object'&&!findExact(x.n,x.pos))addExtraPlayer(x.n,x.pos,x.t)}));setPool();
   const res=x=>{const p=typeof x==='object'?findExact(x.n,x.pos,x.t):findExact(x);return p&&p.id};
   S.teams=teams.map((t,i)=>({id:'t'+(i+1),name:t.name,players:[...new Set(t.names.map(x=>{const id=res(x);if(!id)miss++;return id}).filter(Boolean))],ir:[...new Set((t.ir||[]).map(res).filter(Boolean))]}));
@@ -2075,14 +2082,14 @@ $('theme-btn').addEventListener('click',()=>toggleTheme());
 /* ===== Routing & events ===== */
 /* Draft tools are off during the season (no Draft tab); offseason mode switches them back on */
 var DRAFT_ON=false;
-const TABS=['team','news','trade','rankings','hub','season','league','draft','help','welcome','signin','account','home','tmrank','recap','drafttools','leaguefit'];let tab='team';
+const TABS=['team','news','trade','rankings','hub','season','league','draft','help','welcome','signin','account','home','tmrank','recap','drafttools','leaguefit','upgrade'];let tab='team';
 /* tabs that need a league: with none, they show the import prompt */
 const NEED_LG=['team','trade','season'];
 function howLink(k){return `<a class="how how-wrap" href="#help-${k}">How this works</a>`}
 const TAB_ALIAS={players:['rankings','rank'],waivers:['rankings','waiv'],values:['rankings','vals']};
-function go(t){let helpSec=null;if(t&&t.startsWith('draft/')){const c=t.slice(6).replace(/[^A-Za-z0-9]/g,'').slice(0,12);if(c){if(USER&&typeof MD!=='undefined')MD.join=c;else{try{sessionStorage.setItem('md-join',c)}catch(e){}}}t='drafttools'}if(t&&t.startsWith('help-')){helpSec=t.slice(5);t='help'}if(t&&t.startsWith('account-')){ACC_TAB=t.slice(8);t='account'}else if(t==='account')ACC_TAB='profile';if(t!==tab||t==='account'){ACC_EDIT=null;ACC_MSG=null}if(t==='trade-ideas'||t==='trade-builder'){setTrView(t==='trade-ideas'?'ideas':'build');t='trade'}if(TAB_ALIAS[t]){plView=TAB_ALIAS[t][1];t=TAB_ALIAS[t][0]}if(t==='draft'&&!DRAFT_ON){t='team';history.replaceState(null,'','#team')}if(t==='helper'){if(USER)openAI();t=TABS.includes(tab)?tab:'team';history.replaceState(null,'','#'+t)}if(!USER&&t!=='signin'&&!tmoPublic(t))t='signin';tab=TABS.includes(t)?t:'team';if(S&&S.noLeague&&NEED_LG.includes(tab))tab='welcome';document.body.dataset.tab=tab;if(tab!=='welcome'&&S&&!S.onboarded){S.onboarded=true;save()}document.querySelectorAll('.nav button').forEach(b=>{if(b.dataset.tab===tab)b.setAttribute('aria-current','page');else b.removeAttribute('aria-current')});
-  TABS.forEach(x=>$('v-'+x).hidden=x!==tab);render();window.scrollTo(0,0);if(tab==='help')openHelp(helpSec)}
-function render(){tmoApplyMode();({home:renderOffHome,tmrank:renderTmRank,recap:renderProTab,drafttools:renderProTab,leaguefit:renderProTab,team:renderTeam,news:()=>tmoMode()==='off'?renderOffNews():tmnRender(),rankings:renderPlayers,draft:renderDraft,help:()=>{},trade:renderTrade,hub:renderHub,season:renderSeason,welcome:renderWelcome,league:fillLeagueForm,signin:renderSignin,account:renderAccount})[tab]();renderAlerts();if(openId&&!$('scrim').hidden)openCard(openId);queueBalance()}
+function go(t){let helpSec=null;if(t&&t.startsWith('draft/')){const c=t.slice(6).replace(/[^A-Za-z0-9]/g,'').slice(0,12);if(c){if(USER&&typeof MD!=='undefined')MD.join=c;else{try{sessionStorage.setItem('md-join',c)}catch(e){}}}t='drafttools'}if(t&&t.startsWith('help-')){helpSec=t.slice(5);t='help'}if(t&&t.startsWith('account-')){ACC_TAB=t.slice(8);t='account'}else if(t==='account')ACC_TAB='profile';if(t!==tab||t==='account'){ACC_EDIT=null;ACC_MSG=null}if(t==='trade-ideas'||t==='trade-builder'){setTrView(t==='trade-ideas'?'ideas':'build');t='trade'}if(TAB_ALIAS[t]){plView=TAB_ALIAS[t][1];t=TAB_ALIAS[t][0]}if(t==='draft'&&!DRAFT_ON){t='team';history.replaceState(null,'','#team')}if(t==='helper'){if(USER)openAI();t=TABS.includes(tab)?tab:'team';history.replaceState(null,'','#'+t)}if(USER){if(typeof tmGate==='function')t=tmGate(t)}else if(t!=='signin'&&!tmoPublic(t))t=typeof tmGate==='function'?tmGate(t):'signin';tab=TABS.includes(t)?t:'team';if(S&&S.noLeague&&NEED_LG.includes(tab))tab='welcome';document.body.dataset.tab=tab;if(tab!=='welcome'&&S&&!S.onboarded){S.onboarded=true;save()}document.querySelectorAll('.nav button').forEach(b=>{if(b.dataset.tab===tab)b.setAttribute('aria-current','page');else b.removeAttribute('aria-current')});
+  TABS.forEach(x=>$('v-'+x).hidden=x!==tab);render();window.scrollTo(0,0);if(tab==='help')openHelp(helpSec);window.TMT&&TMT.page(tab)}
+function render(){tmoApplyMode();({home:renderOffHome,tmrank:renderTmRank,recap:renderProTab,drafttools:renderProTab,leaguefit:renderProTab,team:renderTeam,news:()=>tmoMode()==='off'?renderOffNews():tmnRender(),rankings:renderPlayers,draft:renderDraft,help:()=>{},trade:renderTrade,hub:renderHub,season:renderSeason,welcome:renderWelcome,league:fillLeagueForm,upgrade:()=>typeof tmRenderUpgrade==='function'&&tmRenderUpgrade(),signin:renderSignin,account:renderAccount})[tab]();renderAlerts();if(openId&&!$('scrim').hidden)openCard(openId);queueBalance()}
 document.querySelectorAll('.nav button').forEach(b=>b.addEventListener('click',()=>{location.hash=b.dataset.hash||b.dataset.tab}));
 window.addEventListener('hashchange',()=>{closeCard();go(location.hash.slice(1))});
 function loadTrade(str){setTrView('build');const [g,r]=str.split('|');TD.give=g?g.split(','):[];TD.get=r?r.split(','):[];closeCard();if(tab==='trade')renderTrade();else location.hash='trade';setTimeout(()=>$('rating').scrollIntoView({behavior:'smooth',block:'center'}),60)}
@@ -2095,6 +2102,7 @@ document.addEventListener('click',e=>{
   if(d.hjump){const el=$('msg-'+d.hjump);if(el)el.scrollIntoView({behavior:'smooth',block:'start'});return}
   if(d.compare!==undefined){openCompare(d.compare);return}
   if(d.cmp){const [k,id]=d.cmp.split('|');if(CMP){CMP[k]=id;drawCompare()}return}
+  if(d.go&&t.classList.contains('al-i')){toggleAlerts(false);location.hash=d.go;return}
   if(d.open){openCard(d.open);return}
   if(d.hub){hubSel=d.hub;shotState=null;renderHub();$('team-manager').scrollIntoView({behavior:'smooth',block:'start'});return}
   if(t.id==='mclose'){closeCard();return}
@@ -2351,16 +2359,17 @@ function checkUsername(raw){const u=String(raw||'').trim().toLowerCase();clearTi
   UN_STATE={u,ok:null,text:'Checking...'};paintUn();
   UN_T=setTimeout(async()=>{const {data,error}=await SB.rpc('username_available',{p_username:u});if(!UN_STATE||UN_STATE.u!==u)return;
     UN_STATE=error?{u,ok:null,text:"Can't check that right now"}:{u,ok:data!==false,text:data===false?'Taken. Try another.':'Available'};paintUn()},350)}
-function enterApp(){stopConfirmWatch();document.body.classList.remove('signed-out');setTimeout(syncNow,300);if(typeof tmnTopBanners==='function')setTimeout(()=>{tmnTopCatchUp();tmnTopBanners()},2000);AUTH_MODE='in';AUTH_MSG=null;PENDING=null;AUTH_VALS={};UN_STATE=null;
+function enterApp(){window.TMT&&TMT.people();stopConfirmWatch();document.body.classList.remove('signed-out');setTimeout(syncNow,300);if(typeof tmnTopBanners==='function')setTimeout(()=>{tmnTopCatchUp();tmnTopBanners()},2000);AUTH_MODE='in';AUTH_MSG=null;PENDING=null;AUTH_VALS={};UN_STATE=null;
   try{if(sessionStorage.getItem('md-join'))INTENDED='drafttools'}catch(e){}
-  let t=INTENDED&&TABS.includes(INTENDED.replace(/-.*/,''))&&INTENDED!=='signin'?INTENDED:tmoHomeTab();INTENDED=null;if(!S.onboarded)t='welcome';
+  let t=INTENDED&&TABS.includes(INTENDED.replace(/-.*/,''))&&INTENDED!=='signin'?INTENDED:(typeof tmIsPro==='function'&&!tmIsPro()&&tmoMode()!=='off'?'rankings':tmoHomeTab());INTENDED=null;if(!S.onboarded)t='welcome';
   if(location.hash.slice(1)===t)go(t);else location.hash=t}
 function showSignin(){if(tab!=='signin'){if(location.hash==='#signin')go('signin');else location.hash='signin'}else renderSignin()}
-function leaveApp(){stopConfirmWatch();document.body.classList.add('signed-out');cloudReset();USER=null;PROFILE=null;PROFILE_OK=false;AUTH_MODE='in';AUTH_MSG=null;ACC_EDIT=null;if(tmoPublic(tab))render();else showSignin();acctUI()}
+function leaveApp(){typeof tmPlanLoad==='function'&&setTimeout(()=>tmPlanLoad(),0);window.TMT&&TMT.reset();stopConfirmWatch();document.body.classList.add('signed-out');cloudReset();USER=null;PROFILE=null;PROFILE_OK=false;AUTH_MODE='in';AUTH_MSG=null;ACC_EDIT=null;if(tmoPublic(tab))render();else showSignin();acctUI()}
 function authFail(t){AUTH_BUSY=false;AUTH_MSG={bad:true,html:esc(friendly(t))};renderSignin()}
 function authNote(h){AUTH_BUSY=false;AUTH_MSG={bad:false,html:h};renderSignin()}
 /* Everything that happens once someone is signed in, however they got there (form, code, link, Google, another tab). */
-async function signedIn(user,fresh){SIGNING=true;USER=user;startSessionClock(fresh);acctUI();cloudReset();cloudPull('signin');try{await loadProfile()}finally{SIGNING=false}if(!USER||USER.id!==user.id)return;
+async function signedIn(user,fresh){SIGNING=true;USER=user;window.TMT&&TMT.auth(user,fresh);if(typeof emailWelcome==='function')setTimeout(()=>emailWelcome(user),4000);startSessionClock(fresh);acctUI();cloudReset();cloudPull('signin');try{await Promise.all([loadProfile(),typeof tmPlanLoad==='function'?tmPlanLoad(2500):0])}finally{SIGNING=false}if(!USER||USER.id!==user.id)return;
+  if(typeof tmCheckoutReturn==='function')tmCheckoutReturn();
   if(AUTH_MODE==='recover')return;
   if(!PROFILE&&PROFILE_OK&&!lsGet(SKIP_UN+user.id)){AUTH_MODE='username';AUTH_MSG=null;AUTH_BUSY=false;AUTH_VALS={};UN_STATE=null;showSignin();return}
   if(AUTH_MODE==='confirmed'||AUTH_MODE==='reset'){AUTH_BUSY=false;showSignin();return}
@@ -2530,8 +2539,8 @@ function feedPlayers(){const me=myTeam();if(!me)return [];const out=[],seen=new 
   if(FEED_F!=='mine'){(S.following||[]).forEach(id=>add(id,'<span class="slot-star">★</span>'));(S.followTeams||[]).forEach(t=>teamStars(t).forEach(id=>add(id,t)))}
   return out}
 
-async function loadFeed(force){if(FEED_LOADING||(!force&&FEED&&Date.now()-FEED_AT<4*60e3))return;FEED_LOADING=true;
-  try{const r=await fetch('/api/feed?week='+WEEK+'&b='+Math.floor(Date.now()/300000));if(r.ok){const d=await r.json();if(d&&d.videos){FEED=d;FEED_AT=Date.now();try{localStorage.setItem(FEED_LS,JSON.stringify({at:FEED_AT,d}))}catch(e){}}}}catch(e){}
+async function loadFeed(force){if(typeof tmIsPro==='function'&&!tmIsPro()&&!tmBeta())return;   /* clips are Pro once the beta is over */if(FEED_LOADING||(!force&&FEED&&Date.now()-FEED_AT<4*60e3))return;FEED_LOADING=true;
+  try{const r=await tmFetch('/api/feed?week='+WEEK+'&b='+Math.floor(Date.now()/300000));if(r.ok){const d=await r.json();if(d&&d.videos){FEED=d;FEED_AT=Date.now();try{localStorage.setItem(FEED_LS,JSON.stringify({at:FEED_AT,d}))}catch(e){}}}}catch(e){}
   FEED_LOADING=false;const ch=$('card-hl');if(ch&&openId)ch.innerHTML=cardHighlights(openId)}
 /* show the last copy instantly, then refresh in the background */
 try{const c=JSON.parse(localStorage.getItem(FEED_LS)||'null');if(c&&c.d&&c.d.week===WEEK&&Date.now()-c.at<6*3600e3){FEED=c.d;FEED_AT=c.at-4*60e3}}catch(e){}
@@ -2769,20 +2778,21 @@ addEventListener('resize',queueBalance);
 try{const ro=new ResizeObserver(queueBalance);document.querySelectorAll('.grid2>*').forEach(c=>ro.observe(c));
   document.querySelectorAll('.grid2>.stack>*').forEach(c=>ro.observe(c))}catch(e){}
 
-/* ===== Account area: Profile, Leagues, Subscription, Security. Headed by the username, never the email. ===== */
+/* ===== Account area: Profile, Leagues, Notifications, Subscription, Security. Headed by the username, never the email. ===== */
 var ACC_TAB='profile',ACC_EDIT=null,ACC_MSG=null,ACC_BUSY=false;
 const ACC_IC={
   profile:'<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/>',
   leagues:'<path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0z"/><path d="M17 5h3v2a3 3 0 0 1-3 3M7 5H4v2a3 3 0 0 0 3 3"/>',
+  notifications:'<path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/>',
   plan:'<rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20M6 15h4"/>',
   security:'<rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>'};
-const ACC_TABS=[['profile','Profile'],['leagues','Leagues'],['plan','Subscription'],['security','Security']];
+const ACC_TABS=[['profile','Profile'],['leagues','Leagues'],['notifications','Notifications'],['plan','Subscription'],['security','Security']];
 const accIc=k=>`<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ACC_IC[k]}</svg>`;
 function fmtDate(d,time){if(!d)return '—';const x=new Date(d);if(isNaN(x))return '—';return x.toLocaleDateString([], {month:'short',day:'numeric',year:'numeric'})+(time?' · '+x.toLocaleTimeString([], {hour:'numeric',minute:'2-digit'}):'')}
 function fmtMonth(d){const x=new Date(d);return isNaN(x)?'':x.toLocaleDateString([], {month:'long',year:'numeric'})}
-/* Plans: everyone is on the beta plan until subscriptions launch. profiles.plan is read if it exists. */
-const PLANS={free:{name:'Beta',price:'Free',blurb:'Every TradeMetric feature is included while the site is in beta.'},pro:{name:'Pro',price:'',blurb:''}};
-function planOf(){const k=PROFILE&&PROFILE.plan||'free';return {key:k,...(PLANS[k]||PLANS.free)}}
+/* Plans: the server decides (api/_plan.js, asked by js/plan.js). 'beta' = Pro unlocked while the beta switch is on. */
+const PLANS={beta:{name:'Beta'},free:{name:'Free'},pro:{name:'Pro'}};
+function planOf(){const k=typeof tmPlanKey==='function'?tmPlanKey():'beta';return {key:k,...(PLANS[k]||PLANS.beta)}}
 function hasPassword(){const ids=USER&&USER.identities;return !ids||!ids.length||ids.some(i=>i.provider==='email')}
 function socialName(){const ids=(USER&&USER.identities||[]).filter(i=>i.provider!=='email');const p=ids[0]&&OAUTH.find(x=>x.id===ids[0].provider);return p?p.name:(ids[0]?ids[0].provider:'')}
 function accRow(k,v,act=''){return `<div class="acc-row"><div class="acc-k">${k}</div><div class="acc-v">${v}</div>${act?`<div class="acc-a">${act}</div>`:''}</div>`}
@@ -2796,9 +2806,9 @@ function renderAccount(){const el=$('account-body');if(!el)return;if(!USER){el.i
         <div class="acc-badges"><span class="acc-badge plan">${esc(plan.name)} plan</span>${USER.created_at?`<span class="acc-badge">Member since ${esc(fmtMonth(USER.created_at))}</span>`:''}</div></div>
       <button class="btn acc-out" type="button" id="auth-out">Sign out</button></div></div>`;
   const nav=`<nav class="acc-nav" aria-label="Account sections">${ACC_TABS.map(([k,l])=>`<a href="#account-${k}" ${k===ACC_TAB?'aria-current="page"':''}>${accIc(k)}<span>${l}</span></a>`).join('')}</nav>`;
-  el.innerHTML=head+`<div class="acc-shell">${nav}<div class="acc-main">${({profile:accProfile,leagues:accLeagues,plan:accPlan,security:accSecurity})[ACC_TAB]()}</div></div>`;
+  el.innerHTML=head+`<div class="acc-shell">${nav}<div class="acc-main">${({profile:accProfile,leagues:accLeagues,notifications:accNotifications,plan:accPlan,security:accSecurity})[ACC_TAB]()}</div></div>`;
   const f=el.querySelector('.acc-form input');if(f&&innerWidth>820)setTimeout(()=>f.focus(),0);
-  if(typeof TMN!=='undefined'&&TMN.goNotif&&ACC_TAB==='leagues'){TMN.goNotif=false;const n=$('acc-notif');if(n)setTimeout(()=>n.scrollIntoView({behavior:'smooth',block:'start'}),60)}}
+  if(typeof TMN!=='undefined'&&TMN.goNotif)TMN.goNotif=false}
 function accProfile(){const un=PROFILE&&PROFILE.username,email=USER.email||'';
   const unForm=`<form class="acc-form" id="acc-form" data-kind="username" novalidate><label>New username<input type="text" id="acc-un" value="${esc(un||suggestUsername())}" autocapitalize="none" autocorrect="off" spellcheck="false" maxlength="20" required><span class="hint" id="un-hint" aria-live="polite"></span></label>${accMsg()}<div class="acc-form-act">${accBtn('Save username')}<button class="btn" type="button" data-acc-cancel>Cancel</button></div></form>`;
   return `<section class="card acc-sec"><header class="acc-sec-h"><h2>Profile</h2><p>How you show up on TradeMetric.</p></header>
@@ -2811,32 +2821,39 @@ function accLeagues(){const L=S.leagues||[],me=typeof myTeam==='function'&&S.tea
     :S.noLeague?`<div class="acc-empty"><b>No league yet</b><p class="note">Bring in yours from Sleeper or ESPN.</p></div>`:`<div class="acc-empty"><b>${esc(S.league&&S.league.name||'My League')}</b><p class="note">This is the league on this account.</p></div>`;
   return `<section class="card acc-sec"><header class="acc-sec-h"><h2>Leagues</h2><p>Synced to any device.</p></header>
     ${list}<div class="acc-sec-f"><a class="btn primary" href="#hub">Manage leagues</a><a class="btn" href="#league">League settings</a></div></section>
-    ${typeof tmnNotifHtml==='function'?tmnNotifHtml():''}
     <section class="card acc-sec"><header class="acc-sec-h"><h2>Sync</h2></header>${accRow('Cloud save',sync)}</section>`}
-/* Pricing grid (Annual Savings Pricing Grid layout): Free vs Pro with a Monthly/Annual toggle.
-   Prices are placeholders from the plan in CLAUDE.md; checkout isn't connected, so Pro shows "Free during beta". */
+/* Notifications tab: banners while the site is open (news.js), push alerts (push.js) and email (email.js). Each of those
+   files draws its own card and repaints it in place by id (acc-notif, acc-push, acc-email). */
+function accNotifications(){return `${typeof tmnNotifHtml==='function'?tmnNotifHtml():''}
+    ${typeof pushHtml==='function'?pushHtml():''}
+    ${typeof emailHtml==='function'?emailHtml():''}`}
+/* Pricing grid: Free vs Pro with a Monthly/Annual toggle. Prices come from TM_PRICES in js/plan.js (and the PostHog
+   "price-test" flag, off for now). Checkout isn't connected, so Pro says "Coming soon". */
 var PR_ANNUAL=false;
-const PR_TIERS=[
-  {key:'free',name:'Free',monthly:0,annual:0,desc:'Weekly rankings, free for everyone.',feat:['Rankings scored to your league','Player breakdowns and TradeMetric takes']},
-  {key:'pro',name:'Pro',monthly:7,annual:50,desc:'Every tool for winning trades and your league.',feat:['Trade analyzer and Trade Score','Trade ideas for your roster','Season Sim and waivers','News, alerts and big-play banners','League sync for Sleeper and ESPN','AI Helper'],featured:true}];
-const PR_SAVE=Math.round((1-PR_TIERS[1].annual/(PR_TIERS[1].monthly*12))*100);
+function prTiers(){const B=typeof tmBill==='function'?tmBill():null,SP=B&&B.ready&&B.prices;
+  const P=SP?{monthly:SP.monthly.amount/100,annual:SP.yearly.amount/100,trialDays:B.trialDays||7}:typeof tmPrices==='function'?tmPrices():{monthly:5,annual:40,trialDays:7};return [
+  {key:'free',name:'Free',monthly:0,annual:0,desc:'Rankings and top stories, free for everyone.',feat:['Rankings scored to your league','Top news stories around the league','Join a friend\'s mock draft by invite link']},
+  {key:'pro',name:'Pro',monthly:P.monthly,annual:P.annual,trial:P.trialDays,desc:'Every tool for winning trades and your league.',feat:typeof TM_PRO_LIST!=='undefined'?TM_PRO_LIST:[],featured:true}]}
 const PR_CHECK='<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>';
 function prPrice(t){if(!t.monthly)return '0';const v=PR_ANNUAL?t.annual/12:t.monthly;return Number.isInteger(v)?String(v):v.toFixed(2)}
-function accPricing(){const beta=planOf().key==='free';
+const prAmt=v=>Number.isInteger(v)?String(v):v.toFixed(2);
+function accPricing(){const k=planOf().key,beta=k==='beta',PR_TIERS=prTiers(),PR_SAVE=Math.round((1-PR_TIERS[1].annual/(PR_TIERS[1].monthly*12))*100);
   return `<section class="acc-pricing">
     <div class="pr-toggle" role="group" aria-label="Billing period"><button type="button" data-pr-bill="m" aria-pressed="${!PR_ANNUAL}">Monthly</button><button type="button" data-pr-bill="a" aria-pressed="${PR_ANNUAL}">Annual <span class="pr-save">-${PR_SAVE}%</span></button></div>
     <div class="pr-grid">${PR_TIERS.map(t=>`<div class="card pr-card${t.featured?' featured':''}">
-      <div class="pr-card-h"><h3>${t.name}</h3>${t.featured?`<span class="pr-pop">${beta?'Free during beta':'7-day free trial'}</span>`:''}</div>
+      <div class="pr-card-h"><h3>${t.name}</h3>${t.featured?`<span class="pr-pop">${beta?'Free during beta':`${t.trial}-day free trial`}</span>`:''}</div>
       <p class="pr-desc">${t.desc}</p>
-      <div><p class="pr-price"><b>$${prPrice(t)}</b><span>/month</span></p><p class="pr-billed">${PR_ANNUAL&&t.annual?`$${t.annual} billed yearly`:t.monthly?'Billed monthly':'&nbsp;'}</p></div>
+      <div><p class="pr-price"><b>$${prPrice(t)}</b><span>/month</span></p><p class="pr-billed">${PR_ANNUAL&&t.annual?`$${prAmt(t.annual)} billed yearly`:t.monthly?'Billed monthly':'&nbsp;'}</p></div>
       <ul class="pr-feat">${t.feat.map(f=>`<li>${PR_CHECK}<span>${f}</span></li>`).join('')}</ul>
-      ${t.featured?(beta?'<button class="btn accent" type="button" disabled>Unlocked during beta</button>':'<button class="btn accent" type="button" disabled>Start 7-day free trial</button>'):'<button class="btn" type="button" disabled>Always free</button>'}
+      ${t.featured?(beta?'<button class="btn accent" type="button" disabled>Unlocked during beta</button>':k==='pro'?'<button class="btn accent" type="button" disabled>Your plan</button>':`<button class="btn accent" type="button" id="upg-go">${typeof tmBill==='function'&&tmBill()&&tmBill().ready&&tmBill().prices?(tmBill().trialEligible===false?'Get Pro':`Start ${t.trial}-day free trial`):'Coming soon'}</button>`):'<button class="btn" type="button" disabled>Always free</button>'}
     </div>`).join('')}</div>
     ${beta?'<p class="pr-note">You have every Pro feature free while TradeMetric is in beta. Paid plans start later.</p>':''}</section>`}
-function accPlan(){
-  return `${accPricing()}
-    <section class="card acc-sec"><header class="acc-sec-h"><h2>Billing</h2><p>Payment details and receipts will live here.</p></header>
-      ${accRow('Payment method','<span class="note">None on file</span>')}${accRow('Receipts','<span class="note">No receipts yet</span>')}</section>`}
+function accPlan(){const B=typeof tmBill==='function'?tmBill():null,sub=B&&B.sub,live=sub&&typeof tmLiveSub==='function'&&tmLiveSub(sub);
+  const card=sub&&sub.last4?`Card ending <b>${esc(sub.last4)}</b>`:'<span class="note">None on file</span>';
+  return `${typeof tmPlanCard==='function'?tmPlanCard():''}${live?'':accPricing()}
+    <section class="card acc-sec"><header class="acc-sec-h"><h2>Billing</h2><p>${sub?'Payments are handled by Stripe. Your card details never reach TradeMetric.':'Payment details and receipts will show here once you have a plan.'}</p></header>
+      ${accRow('Payment method',card,sub?'<button class="btn" type="button" data-bill-portal="">Change</button>':'')}
+      ${accRow('Receipts',sub?'<span class="note">Every receipt is emailed to you and kept in billing.</span>':'<span class="note">No receipts yet</span>',sub?'<button class="btn" type="button" data-bill-portal="">View</button>':'')}</section>`}
 function accSecurity(){const until=lsGet(UNTIL_KEY),pw=hasPassword(),soc=socialName();
   const pwForm=`<form class="acc-form" id="acc-form" data-kind="password" novalidate>${pwField('acc-pw','New password','new-password','minlength="8" placeholder="At least 8 characters"')}${pwField('acc-pw2','Type it again','new-password','minlength="8"')}${accMsg()}<div class="acc-form-act">${accBtn(pw?'Change password':'Set password')}<button class="btn" type="button" data-acc-cancel>Cancel</button></div></form>`;
   const delForm=`<form class="acc-form" id="acc-form" data-kind="delete" novalidate><p class="note">This deletes your account and every league saved to it. It can't be undone.</p><label><span>Type <b>${esc(acctName()||'delete')}</b> to confirm</span><input type="text" id="acc-del" autocapitalize="none" autocorrect="off" spellcheck="false" autocomplete="off" required></label>${accMsg()}<div class="acc-form-act"><button class="btn danger" type="submit" ${ACC_BUSY?'disabled':''}>${ACC_BUSY?'Deleting...':'Delete my account'}</button><button class="btn" type="button" data-acc-cancel>Cancel</button></div></form>`;
@@ -2861,7 +2878,8 @@ async function accSubmit(kind){if(ACC_BUSY)return;ACC_MSG=null;
     if(kind==='password'){const a=$('acc-pw').value,b=$('acc-pw2').value;if(a.length<8)return accFail('Use at least 8 characters.');if(a!==b)return accFail("Those passwords don't match.");
       ACC_BUSY=true;renderAccount();const {data,error}=await SB.auth.updateUser({password:a});if(error)return accFail(error.message);if(data&&data.user)USER=data.user;
       ACC_BUSY=false;ACC_EDIT=null;toast('Password saved');renderAccount();return}
-    if(kind==='delete'){const want=acctName()||'delete';if(($('acc-del').value||'').trim().toLowerCase()!==want.toLowerCase())return accFail(`Type ${want} exactly to confirm.`);
+    if(kind==='delete'){if(typeof tmBillLoad==='function')await tmBillLoad();if(typeof tmBillBlocksDelete==='function'&&tmBillBlocksDelete())return accFail('Cancel your Pro plan first (Account, then Subscription) so you are not charged again. Then you can delete your account.');
+      const want=acctName()||'delete';if(($('acc-del').value||'').trim().toLowerCase()!==want.toLowerCase())return accFail(`Type ${want} exactly to confirm.`);
       ACC_BUSY=true;renderAccount();const {error}=await SB.rpc('delete_my_account');if(error)return accFail(/could not find|does not exist/i.test(error.message)?"Account deletion isn't switched on yet. Run supabase/accounts_v2.sql in Supabase.":error.message);
       ACC_BUSY=false;ACC_EDIT=null;try{localStorage.removeItem(KEY)}catch(e){}lsDel(UNTIL_KEY);await SB.auth.signOut({scope:'local'}).catch(()=>{});location.hash='signin';location.reload();return}
   }catch(e){accFail(e&&e.message)}}
@@ -2876,7 +2894,7 @@ document.addEventListener('click',e=>{const t=e.target;if(!t.closest)return;
 document.addEventListener('submit',e=>{if(e.target.id!=='acc-form')return;e.preventDefault();accSubmit(e.target.dataset.kind)});
 
 /* ===== AI Helper: floating button + slide-over panel on every page ===== */
-function openAI(){const d=$('ai-drawer');if(!d||!USER)return;if(!document.body.classList.contains('ai-open')){document.body.classList.add('ai-open');d.setAttribute('aria-hidden','false');$('ai-scrim').hidden=false;$('ai-fab').setAttribute('aria-expanded','true');renderHelper();setTimeout(()=>{const q=$('helper-q');if(q&&innerWidth>820)q.focus()},250)}}
+function openAI(){const d=$('ai-drawer');if(!d||!USER)return;if(typeof tmIsPro==='function'&&!tmIsPro()){tmUpgrade('ai');return}if(!document.body.classList.contains('ai-open')){document.body.classList.add('ai-open');d.setAttribute('aria-hidden','false');$('ai-scrim').hidden=false;$('ai-fab').setAttribute('aria-expanded','true');renderHelper();setTimeout(()=>{const q=$('helper-q');if(q&&innerWidth>820)q.focus()},250)}}
 function closeAI(){document.body.classList.remove('ai-open');const d=$('ai-drawer');if(d)d.setAttribute('aria-hidden','true');$('ai-scrim').hidden=true;$('ai-fab').setAttribute('aria-expanded','false')}
 document.addEventListener('click',e=>{const t=e.target;if(!t.closest)return;
   if(t.closest('#ai-fab')){document.body.classList.contains('ai-open')?closeAI():openAI();return}
@@ -2899,16 +2917,18 @@ function sparkHtml(g){const pts=g.pts.map((v,i)=>({v,w:g.log[i]&&g.log[i].w})).f
     <path class="sp-area" d="${line}L${X(pts.length-1).toFixed(1)} ${H}L${X(0).toFixed(1)} ${H}Z"/><line class="sp-avg" x1="0" x2="${W}" y1="${Y(av).toFixed(1)}" y2="${Y(av).toFixed(1)}"/><path class="sp-line" d="${line}"/>
     ${pts.map((x,i)=>`<path class="sp-pt${i===pts.length-1?' last':''}" d="M${X(i).toFixed(1)} ${Y(x.v).toFixed(1)}h0"><title>Week ${x.w}: ${f1(x.v)} pts</title></path>`).join('')}</svg>
     <span class="wkspark-rng">High <b>${f1(hi.v)}</b> · Wk ${hi.w}<br>Low <b>${f1(lo.v)}</b> · Wk ${lo.w}</span></div>`}
-function newsHtml(id){const n=NEWS[id];
+function newsHtml(id){const n=NEWS[id];if(n&&n.locked)return `<p class="note upg-inline">The latest news on him is part of Pro. <a href="#upgrade-news">See Pro</a></p>`;
   if(!n||n.loading)return skel(3);
   if(n.error)return `<p class="note">News couldn't load right now. <button class="linkish" data-news-retry="${id}">Try again</button></p>`;
   if(!n.items.length)return `<p class="note">No recent news stories about ${esc(byId[id].n)} in the last three weeks.</p>`;
   return `<div class="nws">${n.items.slice(0,4).map(x=>`<article class="nw"><h5>${esc(x.title)}</h5>${x.summary?`<p>${esc(x.summary)}</p>`:''}
     <div class="nw-meta"><span>${esc(x.outlet)}${x.also&&x.also.length?` <span class="note">+ ${x.also.length} more</span>`:''}</span>${x.at?`<span>${ago(x.at)}</span>`:''}${x.url?`<a href="${esc(x.url)}" target="_blank" rel="noopener">Read story ↗</a>`:x.pay?'<span class="note">Subscribers only, so the key facts are here</span>':''}</div></article>`).join('')}</div>
     ${howLink('news')}`}
-async function loadNews(id){const p=byId[id];if(!p||p.pos==='DST')return;const c=NEWS[id];if(c&&!c.error&&(c.loading||Date.now()-c.at<20*60e3))return;
-  NEWS[id]={loading:true};const paint=()=>{if(openId===id){const el=$('card-news');if(el)el.innerHTML=newsHtml(id)}};paint();
-  try{const r=await fetch(`/api/news?name=${encodeURIComponent(p.n)}&team=${encodeURIComponent(p.t||'')}&pos=${encodeURIComponent(p.pos)}`);if(!r.ok)throw new Error(r.status);const j=await r.json();NEWS[id]={items:j.items||[],ai:j.ai,at:Date.now()}}
+async function loadNews(id){const p=byId[id];if(!p||p.pos==='DST')return;const c=NEWS[id];if(c&&!c.error&&!c.locked&&(c.loading||Date.now()-c.at<20*60e3))return;
+  const paint=()=>{if(openId===id){const el=$('card-news');if(el)el.innerHTML=newsHtml(id)}};
+  if(typeof tmIsPro==='function'&&!tmIsPro()){NEWS[id]={locked:true,at:Date.now()};paint();return}
+  NEWS[id]={loading:true};paint();
+  try{const r=await tmFetch(`/api/news?name=${encodeURIComponent(p.n)}&team=${encodeURIComponent(p.t||'')}&pos=${encodeURIComponent(p.pos)}`);if(!r.ok)throw new Error(r.status);const j=await r.json();NEWS[id]={items:j.items||[],ai:j.ai,at:Date.now()}}
   catch(e){NEWS[id]={error:true,at:Date.now()}}paint()}
 document.addEventListener('click',e=>{const b=e.target.closest&&e.target.closest('[data-news-retry]');if(b){delete NEWS[b.dataset.newsRetry];loadNews(b.dataset.newsRetry)}});
 
@@ -3107,11 +3127,12 @@ function alertsList(){if(tmoMode()==='off')return typeof ofnAlerts==='function'?
   if(typeof tmnMyTrades==='function')tmnMyTrades().forEach(x=>{const p=byId[x.pid];if(p)top.push({k:`trade-${x.pid}-${x.to}`,lvl:'trade',t:x.how==='move'?`${p.n} is now with the ${teamName(x.to)}`:`${p.n} was traded to the ${teamName(x.to)}`,d:`${x.from?x.from+' → ':''}${x.to}. Still on your roster; his role and matchups change with the new team.`,open:x.pid})});
   if(typeof tmnTop==='function'){const cut=Date.now()-5*864e5;tmnTop().items.filter(e=>(e.type==='top'||e.type==='second')&&(e.at||0)>cut&&byId[e.pid]).sort((a,b)=>(a.type==='top'?0:1)-(b.type==='top'?0:1)||b.pts-a.pts).slice(0,3)
     .forEach(e=>{const one=e.type==='top';top.push({k:`rank-${e.k}`,lvl:one?'n1':'n2',m:one?1:2,t:e.head,d:`${one?(e.overall?'#1 scorer in the NFL':'#1 '+(e.pos||'')+' in the NFL'):'#2 '+(e.pos||'')+' in the NFL'} · Week ${e.week} · ${f1(e.pts)} pts`,open:e.pid})})}
-  return [...top,...out]}
-function renderAlerts(){const b=$('alert-btn');if(!b)return;const {L,seen}=USER?alertsLive():{L:[],seen:new Set()},n=L.filter(a=>!seen.has(a.k)).length+(USER&&tmoMode()!=='off'&&typeof tmnUnread==='function'&&tab!=='news'?tmnUnread():0);
+  const dl=typeof tdlAlerts==='function'?tdlAlerts():[];
+  return [...dl.filter(a=>a.go),...top,...out,...dl.filter(a=>!a.go)]}
+function renderAlerts(){const b=$('alert-btn');if(!b)return;const pro=USER&&(typeof tmIsPro!=='function'||tmIsPro());const {L,seen}=pro?alertsLive():{L:[],seen:new Set()},n=L.filter(a=>!seen.has(a.k)).length+(pro&&tmoMode()!=='off'&&typeof tmnUnread==='function'&&tab!=='news'?tmnUnread():0);
   const c=$('alert-n');c.hidden=!n;c.textContent=n>9?'9+':n;b.setAttribute('aria-label',n?`Alerts, ${n} new`:'Alerts');
   const pop=$('alert-pop');if(!pop.hidden)paintAlerts(L,seen)}
-function paintAlerts(L,seen){const off=tmoMode()==='off',nn=!off&&typeof tmnUnread==='function'?tmnUnread():0;$('alert-pop').innerHTML=`<div class="al-h"><b>Alerts</b><span class="note">${off?'Players you follow':'Week '+WEEK}</span></div>${nn?`<a class="al-news" href="#news"><b>${nn} new in News</b><span>Big plays from your players →</span></a>`:''}${L.length?`<div class="al-list">${alertDays(L).map(([day,A])=>`<div class="al-day">${day}</div>`+A.map(a=>`<button class="al-i ${a.lvl}${seen.has(a.k)?'':' new'}" data-open="${a.open}"><i>${a.m?a.m:''}</i><span><b>${esc(a.t)}</b><span>${esc(a.d)}</span></span></button>`).join('')).join('')}</div>`:'<p class="empty" style="margin:0">All clear. Nothing needs your attention right now.</p>'}`}
+function paintAlerts(L,seen){const off=tmoMode()==='off',nn=!off&&typeof tmnUnread==='function'?tmnUnread():0;$('alert-pop').innerHTML=`<div class="al-h"><b>Alerts</b><span class="note">${off?'Players you follow':'Week '+WEEK}</span></div>${nn?`<a class="al-news" href="#news"><b>${nn} new in News</b><span>Big plays from your players →</span></a>`:''}${L.length?`<div class="al-list">${alertDays(L).map(([day,A])=>`<div class="al-day">${day}</div>`+A.map(a=>`<button class="al-i ${a.lvl}${seen.has(a.k)?'':' new'}" ${a.go?`data-go="${a.go}"`:`data-open="${a.open}"`}><i>${a.m?a.m:''}</i><span><b>${esc(a.t)}</b><span>${esc(a.d)}</span></span></button>`).join('')).join('')}</div>`:'<p class="empty" style="margin:0">All clear. Nothing needs your attention right now.</p>'}`}
 /* alerts split into Today / Yesterday / weekday by when each first showed up; most important first inside each day */
 function alertDays(L){const m=alertTimes(),now=new Date(),d0=new Date(now.getFullYear(),now.getMonth(),now.getDate()).getTime(),D=864e5,out=new Map();
   L.forEach(a=>{const c=(m[a.k]&&m[a.k].c)||Date.now(),k=c>=d0?0:Math.ceil((d0-c)/D);(out.get(k)||out.set(k,[]).get(k)).push(a)});
@@ -3150,7 +3171,7 @@ function drRec(k){const B=draftBoard(),taken=drTaken(),mine=drMine(),av2=B.list.
 function drBot(k){const B=draftBoard(),taken=drTaken(),t=drTeamAt(k),ids=DR.picks.filter(x=>x.t===t).map(x=>x.id),r=seed('dr'+k+DR.picks.length+(DR.salt||0));
   const av3=B.list.filter(x=>!taken.has(x.id)),kd=['K','DST'].map(P=>av3.find(x=>byId[x.id].pos===P)).filter(Boolean);
   const c=av3.filter(x=>!['K','DST'].includes(byId[x.id].pos)).slice(0,40).concat(kd).map(x=>({id:x.id,s:x.v*drNeedF(ids,byId[x.id].pos,k)*(.8+.4*r())})).sort((a,b)=>b.s-a.s)[0];return c&&c.id}
-function drPick(id){if(!DR||DR.picks.length>=DR.n*DR.R||drTaken().has(id))return;const k=DR.picks.length;DR.picks.push({id,t:drTeamAt(k),k});saveLive();if(DR.mode==='mock')drRun();else renderDraft()}
+function drPick(id){if(!DR||DR.picks.length>=DR.n*DR.R||drTaken().has(id))return;const k=DR.picks.length;DR.picks.push({id,t:drTeamAt(k),k});saveLive();if(DR.mode==='mock'&&DR.picks.length===DR.n*DR.R&&window.TMT)TMT.ev('mock_draft_finished',{teams:DR.n,rounds:DR.R});if(DR.mode==='mock')drRun();else renderDraft()}
 function drRun(){clearTimeout(DR_TIMER);renderDraft();if(!DR||DR.mode!=='mock'||!DR.started)return;const k=DR.picks.length;if(k>=DR.n*DR.R)return;if(drTeamAt(k)===DR.slot-1){if(DR.fast){DR.fast=false;renderDraft()}return}
   DR_TIMER=setTimeout(()=>{if(!DR||tab!=='draft')return;const id=drBot(k);if(!id)return;DR.picks.push({id,t:drTeamAt(k),k});drRun()},DR.fast?0:140)}
 function renderDraft(){document.querySelectorAll('#dr-seg button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.dr===drView));

@@ -16,7 +16,7 @@ TradeMetric (trademetric.app) is a paid fantasy football trade analyzer. Hosted 
 - The owner isn't a programmer: explain changes in plain words, not code terms.
 
 ## Feature plans and history
-Longer plans and build notes are in `docs/`: offseason mode, season recap, trade visuals, advanced stats, accounts, account sync, and a running feature-notes list. Read the relevant one before working on that area, and update it when something ships or a decision changes.
+Longer plans and build notes are in `docs/`: offseason mode, season recap, trade visuals, advanced stats, accounts, account sync, push notifications, emails, and a running feature-notes list. Read the relevant one before working on that area, and update it when something ships or a decision changes.
 
 ## Hard rules — never break these
 - **Never name other fantasy sites or data sources** anywhere on the site.
@@ -68,6 +68,13 @@ Longer plans and build notes are in `docs/`: offseason mode, season recap, trade
 ## Other tabs
 - No Draft tab in the in-season site.
 - Alerts: opening the Alerts tab marks them seen. Seen alerts clear after 3 days, unseen after 7. Trade and #1-finish notifications pop up for users who missed them, only within 7 days.
+
+## Emails
+- Owner's list (changed 2026-11-25; the first plan sent almost nothing). Account emails, always sent: welcome, sign-in codes, a league that stops updating. Update emails, each with its own switch in Account → Email: the weekly recap (matchup result, standout games, #1 at his position, highlights, one email after Monday night), injuries (ruled out or IR only, one morning email at most, **off by default**), trade deadline, clinched, championship, and offseason: season recap, player moves, draft reminder.
+- Never emailed: lineup alerts, live big plays, news or rumors, unverified trades.
+- Every fact in an email comes from the league's own data and is left out rather than risk being wrong (e.g. "#1 at his position" only when the whole position could be checked).
+- Every send goes through `sendEmail()` in `api/_email.js`. Never call the email service from anywhere else.
+- `EMAIL_LIVE` is on in Production (live since 2026-11-25), so real people get these emails. Don't switch on new kinds, change the schedule or send to everyone without the owner's say. See `docs/emails.md`.
 
 ## Phone layout
 - A separate phone layout switches automatically from desktop. It should feel app-like (like a native iPhone app), be easy to scroll, and have fewer click-into screens.

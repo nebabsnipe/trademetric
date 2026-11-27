@@ -1,4 +1,4 @@
-// Season Recap data: GET /api/recap?league=<id>&year=<yyyy>
+// Season Recap data: GET /api/recap?league=<id>&year=<yyyy>  (answered through api/draft.js; see vercel.json)
 // Owner-only. The caller sends their TradeMetric sign-in token (Authorization: Bearer ...).
 // We read their own saved state (row-level security means only they can) to confirm the
 // league is theirs and which team is theirs. Private ESPN leagues: POST the same URL with

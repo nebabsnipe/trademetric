@@ -259,3 +259,9 @@ Clean and professional: roomy rows, position color chips (QB purple, RB green, W
 - **Recap name**: "Recap" is the working title — finalize before launch
 - **Supabase redirect URL** for the preview domain so sign-in works on the preview
 - **Home page tool grid:** Recap and Mock drafts link to their tabs; League fit, Draft pick values and Trade analyzer are marked Coming soon.
+
+## `offseason-main` branch (2026-11-27)
+- `offseason-main` = `offseason-mode` plus everything on `main` as of 2026-11-27 (plans and billing, emails, push notifications, trade deadline, error reporting). `offseason-mode` itself was left as it was.
+- Vercel allows 12 server functions, and the two branches together had 14. `/api/take` and `/api/recap` are now answered through `api/draft.js` (the files are `api/_take.js` and `api/_recap.js`, with rewrites in `vercel.json`), the same way `/api/players` goes through `api/market.js`. The addresses the site calls did not change.
+- Page gating: signed-in people go through the plan check (`tmGate` in `js/plan.js`); signed-out visitors see the offseason public pages, plus whatever the plan check opens once the beta ends.
+- Not yet checked on a real preview: sign-in, takes, mock drafts and the recap going through the combined function.

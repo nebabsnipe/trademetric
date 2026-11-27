@@ -20,6 +20,8 @@
 import { randomUUID, randomInt } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
+import take from './_take.js';
+import recap from './_recap.js';
 
 /* BETA: keep in step with TMO_BETA_PRO in js/offseason.js. While true every signed-in account counts as Pro. */
 const BETA_PRO = true;
@@ -448,6 +450,10 @@ async function finish(S, room, picks, P) {
 
 /* ---------- the endpoint ---------- */
 export default async function handler(req, res) {
+  /* /api/take and /api/recap are served from here too (see the rewrites in vercel.json), to stay inside Vercel's limit of 12 functions */
+  const fn = req.query && req.query.fn;
+  if (fn === 'take') return take(req, res);
+  if (fn === 'recap') return recap(req, res);
   res.setHeader('Cache-Control', 'no-store');
   const send = (code, obj) => res.status(code).json(obj);
   if (req.method !== 'POST') return send(405, { ok: false, code: 'method' });

@@ -71,6 +71,24 @@
           "value": "public, max-age=0, must-revalidate"
         }
       ]
+    },
+    {
+      "source": "/sw.js",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-store, max-age=0, must-revalidate"
+        }
+      ]
+    },
+    {
+      "source": "/manifest.webmanifest",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=0, must-revalidate"
+        }
+      ]
     }
   ],
   "redirects": [
@@ -97,14 +115,6 @@
       "permanent": false
     }
   ],
-  "functions": {
-    "api/take.js": {
-      "includeFiles": "data/nfl.json"
-    },
-    "api/draft.js": {
-      "includeFiles": "data/{nfl,market,tmhist}.json"
-    }
-  },
   "cleanUrls": true,
   "rewrites": [
     {
@@ -116,8 +126,53 @@
       "destination": "/recap.html"
     },
     {
+      "source": "/api/report",
+      "destination": "/api/push?do=report"
+    },
+    {
+      "source": "/api/plan",
+      "destination": "/api/push?do=plan"
+    },
+    {
+      "source": "/api/push/:do",
+      "destination": "/api/push?do=:do"
+    },
+    {
+      "source": "/api/email/:do",
+      "destination": "/api/email?do=:do"
+    },
+    {
+      "source": "/api/billing/:do",
+      "destination": "/api/stripe-webhook?do=:do"
+    },
+    {
       "source": "/api/players",
       "destination": "/api/market?fn=players"
+    },
+    {
+      "source": "/api/take",
+      "destination": "/api/draft?fn=take"
+    },
+    {
+      "source": "/api/recap",
+      "destination": "/api/draft?fn=recap"
     }
-  ]
+  ],
+  "functions": {
+    "api/push.js": {
+      "maxDuration": 60,
+      "includeFiles": "data/nfl.json"
+    },
+    "api/email.js": {
+      "maxDuration": 60,
+      "includeFiles": "data/nfl.json"
+    },
+    "api/stripe-webhook.js": {
+      "maxDuration": 60
+    },
+    "api/draft.js": {
+      "maxDuration": 60,
+      "includeFiles": "data/{nfl,market,tmhist}.json"
+    }
+  }
 }

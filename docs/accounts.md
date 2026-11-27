@@ -36,8 +36,13 @@
 - Discord and Google sign-in enabled (Google app is in production with basic scopes; don't upload a logo on Google's Branding page, it triggers verification).
 - Apple: not set up (needs the $99/yr Apple Developer membership).
 
+## Notifications tab (2026-11-25)
+- The account area now has five tabs: Profile, Leagues, **Notifications**, Subscription, Security (`#account-notifications`).
+- Banners, Push notifications and Email moved out of Leagues into the new tab (`accNotifications()` in js/app.js). Leagues keeps the league list and cloud save.
+- The bell gear on the News tab, the push test notification and the "email settings" links in emails all point to `#account-notifications`. Old emails that link to `#account-leagues` still open the account, just on the Leagues tab.
+
 ## Open
 - Apple sign-in and its logo.
 - The code input assumes 6-digit codes. If Supabase's email code length changes, update `maxlength` and the slot count in `codeField()`.
-- Paid plans (Stripe webhook sets `profiles.plan`, which users can't write themselves).
+- Paid plans (Stripe webhook sets `profiles.plan`, which users can't write themselves). Free vs Pro gating is built: see `docs/plans.md`.
 - Rotate the Resend API key (it was once pasted into a chat).

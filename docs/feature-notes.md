@@ -73,3 +73,15 @@ All of it lives in `js/polish.js` (loaded last, never changes app.js logic) with
 ## Scoreboard touches (added 2026-11-16, live on main)
 Owner tried two bigger restyles (a red palette, then a fully "turned up" orange version) and kept only three pieces, then put Season Sim and the My Team matchup back to normal the same day; only the trade chart change remains. Everything else stays exactly as on main, including the My Team tiles and colors.
 - **Trade week chart:** playoffs shown as an orange band with an orange top edge and label; bold slanted bar values and week labels.
+
+## Trade deadline notifications (added 2026-11-25, LIVE on main, commit 3c9fa96)
+All in `js/deadline.js` (loaded after app.js) plus small hooks in news.js (banners/chips), app.js (bell, league settings) and styles at the end of `css/styles.css`.
+- **Your fantasy leagues (loud):** for every saved league with a deadline, a pop-up banner and a bell alert about a week out, about 3 days out ("Trade deadline this Friday"), and a final one in the last 24 hours. The final one is a dark card with a red glow, a ticking clock, a big live countdown and a "Build a trade" button. It then stays as a countdown chip in the corner until the deadline passes or you close it, and the Trades tab shows a countdown bar. Within the week before, the Trades tab shows a slim amber line instead. Each notice pops once per account; banners follow the per-league switches in Account → Leagues.
+- **Where the deadline comes from:** ESPN gives an exact date and time (`settings.tradeSettings.deadlineDate`). Sleeper gives a week (`settings.trade_deadline`, 99 = no deadline); its deadline is when the last game of that week ends, worked out from the kickoff times. Read at import and on every league sync, so leagues imported earlier pick it up on the next visit.
+- **The real NFL deadline (quiet):** two bell rows only, about a week before and on the day. The date is set per season in `TDL_NFL` at the top of `js/deadline.js` (2026: Tue Nov 10, 4:00 pm ET, already passed). Add next season's date there.
+
+## Emails (added 2026-11-25, on the `emails` branch, NOT live)
+Account emails (welcome, league stopped updating) plus update emails with their own switches: weekly recap (matchup, standout games, #1 at his position, highlights), injuries (off by default), trade deadline, clinch, championship, and offseason season recap (built, off), player moves and the August draft reminder. Everything goes through `api/_email.js`; `EMAIL_LIVE` is off so emails only reach the owner. Full notes, rules and setup steps: `docs/emails.md`.
+
+## Payments (added 2026-11-25, on the `payments` branch, test mode only, NOT live)
+Pro through Stripe: monthly or yearly, 7-day free trial with a card up front, one trial per account ever, 7-day grace after a failed payment with a banner. Stripe's own pages for paying and for card / plan / cancel. Prices are read from Stripe. Billing emails (trial ending in 2 days, receipt, payment failed, yearly renewal 7 days before, cancelled) are always sent. Beta users' deal and the refunds wording are waiting on the owner. Full setup and the go-live checklist: `docs/payments.md`.

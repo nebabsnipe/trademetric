@@ -3,6 +3,8 @@
 // The page keeps only clips of a specific player's plays.
 // Game results and news headlines come from ESPN's public site API. Everything is the same for every visitor,
 // so it is cached at Vercel's edge (the page adds a 5-minute time bucket to the URL).
+import { withSentry } from './_sentry.js';
+import { proOnly } from './_plan.js';
 
 const SITE = 'https://site.api.espn.com/apis/site/v2/sports/football/nfl';
 const TEAM = { WSH: 'WAS', LA: 'LAR', JAC: 'JAX' };
@@ -98,7 +100,7 @@ function ytVideo(v, week, games) {
     thumb: `https://i.ytimg.com/vi/${v.id}/mqdefault.jpg`, url: `https://www.youtube.com/watch?v=${v.id}`, athletes: [], at: v.at };
 }
 
-export default async function handler(req, res) {
+async function handler(req, res) {
   try {
     const state = await cj('https://api.sleeper.app/v1/state/nfl', 10 * 60e3);
     const season = +state.season;
@@ -138,3 +140,6 @@ export default async function handler(req, res) {
     return res.status(502).json({ error: 'Feed unavailable' });
   }
 }
+
+/* Pro data: refused for signed-out visitors and free accounts once the beta switch is off (api/_plan.js) */
+export default withSentry(proOnly(handler), 'feed');
