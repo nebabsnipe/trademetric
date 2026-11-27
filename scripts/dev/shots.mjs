@@ -18,6 +18,7 @@ const HERE = path.dirname(fileURLToPath(import.meta.url)), ROOT = path.resolve(H
 const arg = (k, d) => { const i = process.argv.indexOf('--' + k); return i < 0 ? d : (process.argv[i + 1] && !process.argv[i + 1].startsWith('--') ? process.argv[i + 1] : true); };
 const OUT = path.resolve(arg('out', 'shots')), WIDTHS = String(arg('widths', '1440')).split(',').map(Number);
 const STATE = arg('state', 'league'), THEME = arg('theme', 'dark'), FULL = !!arg('full', false), PORT = +arg('port', 3000);
+const PHOTOS = arg('photos', '');   /* off | licensed | private: overrides TM_PHOTO_MODE for this run */
 const ALL = ['team', 'news', 'players', 'trade', 'season', 'hub', 'account', 'help', 'league', 'signin', 'welcome', 'upgrade'];
 const TABS = arg('tabs', '') ? String(arg('tabs')).split(',') : ALL;
 
@@ -45,13 +46,13 @@ async function wire(ctx, signedIn) {
       if (/^league\/\d+\/users$/.test(p)) return json(route, sleeper.users);
       if (/^league\/\d+$/.test(p)) return json(route, sleeper.league);
       return json(route, null); }
-    if (/fonts\.(googleapis|gstatic)\.com$/.test(u.hostname)) return route.continue();
+    if (/fonts\.(googleapis|gstatic)\.com$/.test(u.hostname) || u.hostname === 'a.espncdn.com' || u.hostname === 'sleepercdn.com') return route.continue();
     return route.abort(); });
-  await ctx.addInitScript(([cfg, now, theme]) => { window.__TM_FAKE = cfg;
+  await ctx.addInitScript(([cfg, now, theme, photos]) => { window.__TM_FAKE = cfg; try { if (photos) localStorage.setItem('tm-photo-mode', photos); } catch (e) {}
     /* freeze "now" at the fixture's moment so week, countdowns and game states never drift */
     const RD = Date, off = now - RD.now(); class FD extends RD { constructor(...a) { a.length ? super(...a) : super(RD.now() + off); } static now() { return RD.now() + off; } } window.Date = FD;
     try { if (!localStorage.getItem('tm-theme-set')) { localStorage.setItem('tm-theme-set', '1'); localStorage.setItem('tm-theme', theme); } } catch (e) {} },
-    [{ signedIn, user: USER }, NOW, THEME]);
+    [{ signedIn, user: USER }, NOW, THEME, PHOTOS]);
 }
 
 const errors = [];
@@ -69,7 +70,7 @@ async function run(width) {
   fs.mkdirSync(OUT, { recursive: true });
   for (const t of TABS) { await page.evaluate(h => { location.hash = h; }, t); await page.waitForTimeout(1500);
     await page.evaluate(() => window.scrollTo(0, 0));
-    const f = path.join(OUT, `${t}-${width}-${THEME}${STATE === 'league' ? '' : '-' + STATE}.png`);
+    const f = path.join(OUT, `${t}-${width}-${THEME}${STATE === 'league' ? '' : '-' + STATE}${PHOTOS ? '-photos-' + PHOTOS : ''}.png`);
     await page.screenshot({ path: f, fullPage: FULL || width <= 700 }); console.log('saved', path.relative(process.cwd(), f)); }
   await browser.close();
 }

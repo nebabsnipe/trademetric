@@ -23,10 +23,13 @@ const badge=(tid,cls)=>{const T=teamById(tid);return `<span class="tmd-badge ${c
 const sel=(id,opts,cur,label)=>`<label class="tmd-sel"><span class="sr">${label}</span><select data-tmd="${id}" aria-label="${label}">${opts.map(([v,t])=>`<option value="${v}"${String(v)===String(cur)?' selected':''}>${esc(t)}</option>`).join('')}</select>${CHEV}</label>`;
 /* what a player's number is right now: his live or final score once his game starts, otherwise this week's projection */
 function valOf(id,f){const l=liveOf(id);return l?{v:l.pts,k:l.state==='post'?'Final':'Live'}:{v:f(id),k:'Proj'}}
-/* the player picture: a real photo when the photo switch allows one, otherwise the team-colour jersey the site already draws */
-function face(p,kind){const src=typeof tmPhoto==='function'?tmPhoto(p.id,kind):null;
-  if(src)return `<img class="tmd-photo ${kind}" src="${esc(src)}" alt="" ${kind==='hero'?'fetchpriority="high"':'loading="lazy"'} decoding="async" onerror="this.closest('[data-face]').classList.add('nophoto');this.remove()">`;
-  return ''}
+/* the player picture, always asked for through js/photos.js. Returns '' when the photo switch gives nothing; the caller
+   then shows the team-colour jersey the site already draws. If a picture fails to load, the jersey takes over too. */
+function face(p,kind){if(typeof tmPhoto!=='function')return '';const dst=p.pos==='DST',src=dst?tmTeamLogo(p.t):tmPhoto(p.id,kind);if(!src)return '';
+  const cut=!dst&&kind==='hero'&&typeof tmPhotoIsCutout==='function'&&tmPhotoIsCutout(p.id);
+  return `<img class="tmd-photo ${kind}${dst?' logo':''}${cut?' cut':''}" src="${esc(src)}" alt="" ${kind==='hero'?'':'loading="lazy"'} decoding="async" onerror="this.closest('[data-face]').classList.add('nophoto');this.remove()">`}
+/* an NFL team's logo, only when the photo switch allows logos */
+function tlogo(t){const src=typeof tmTeamLogo==='function'?tmTeamLogo(t):null;return src?`<img class="tmd-tlogo" src="${esc(src)}" alt="" loading="lazy" decoding="async" onerror="this.remove()">`:''}
 
 /* ---------- top bar ---------- */
 function livePill(){const el=$('tmd-live');if(!el)return;const live=!!(typeof LIVE!=='undefined'&&LIVE&&LIVE.live&&LIVE.week===WEEK);
@@ -65,9 +68,9 @@ function drawHead(){const me=myTeam();$('tmd-head').innerHTML=`<h1>${esc(me.name
   <div class="tmd-over"><b>Overview</b><span>Week ${WEEK}</span><a href="#season">See all</a></div>`}
 function drawFeature(list){const el=$('tmd-feature'),x=list[0];if(!x){el.innerHTML='';return}
   const p=x.p,ph=face(p,'head'),tc=TC[p.t]||['#3a3f47','#8a919c'];
-  el.innerHTML=`<button type="button" class="tmd-feature" data-open="${p.id}" data-face style="--t1:${tc[0]};--t2:${tc[1]}">
-    <span class="tmd-feature-txt"><small>${x.k==='Proj'?'Top projected starter':'Top starter this week'}</small><b>${esc(p.n)}</b><em>${esc(NICK[p.t]||p.t)} · ${p.pos}</em><span class="tmd-feature-meta">${liveOf(p.id)?liveTxt(p.id):oppHtml(p.id)}</span></span>
-    <span class="tmd-feature-pic${ph?'':' nophoto'}">${ph||av(p,'lg')}</span>
+  el.innerHTML=`<button type="button" class="tmd-feature${ph?'':' nophoto'}" data-open="${p.id}" data-face style="--t1:${tc[0]};--t2:${tc[1]}">
+    <span class="tmd-feature-txt"><small>${x.k==='Proj'?'Top projected starter':'Top starter this week'}</small><b>${esc(p.n)}</b><em>${tlogo(p.t)}${esc(NICK[p.t]||p.t)} · ${p.pos}</em><span class="tmd-feature-meta">${liveOf(p.id)?liveTxt(p.id):oppHtml(p.id)}</span></span>
+    <span class="tmd-feature-pic">${ph}<span class="tmd-fb">${av(p,'lg')}</span></span>
     <span class="tmd-score" title="${x.k==='Proj'?'Projected points this week':x.k+' score this week'}"><small>${x.k==='Proj'?'Proj':x.k}</small><b>${f1(x.v)}</b></span></button>`}
 
 /* a team's recent weekly scores as a small line. Real scores only; no line when the league gave fewer than three weeks */
@@ -88,11 +91,12 @@ function drawHero(list){const el=$('tmd-hero');if(!list.length){el.innerHTML='';
   el.innerHTML=`<div class="tmd-stage">${list.map((x,i)=>{const p=x.p,ph=face(p,'hero'),tc=TC[p.t]||['#3a3f47','#8a919c'];
      return `<button type="button" class="tmd-slide${i===ST.hero?' on':''}${ph?'':' nophoto'}" data-open="${p.id}" data-face data-i="${i}" style="--t1:${tc[0]};--t2:${tc[1]}" aria-label="${esc(p.n)}: open player card" ${i===ST.hero?'':'tabindex="-1" aria-hidden="true"'}>
        <span class="tmd-glow" aria-hidden="true"></span>
-       <span class="tmd-figure">${ph||`<span class="tmd-num" aria-hidden="true">${NUM[p.id]!=null?NUM[p.id]:esc(p.t)}</span>${av(p,'lg')}`}</span>
-       <span class="tmd-cap"><small>${esc(x.slot)} · ${esc(NICK[p.t]||p.t)}</small><b>${esc(p.n)}</b>
+       <span class="tmd-figure">${ph}<span class="tmd-fb"><span class="tmd-num" aria-hidden="true">${NUM[p.id]!=null?NUM[p.id]:esc(p.t)}</span>${av(p,'lg')}</span></span>
+       <span class="tmd-cap"><small>${tlogo(p.t)}${esc(x.slot)} · ${esc(NICK[p.t]||p.t)}</small><b>${esc(p.n)}</b>
          <span class="tmd-cap-row"><span class="tmd-pill">${p.pos}</span><span class="tmd-cap-opp">${liveOf(p.id)?liveTxt(p.id):oppHtml(p.id)}</span><span class="tmd-cap-pts"><b class="num">${f1(x.v)}</b> ${x.k==='Proj'?'projected':'pts'}</span></span></span></button>`}).join('')}</div>
    <div class="tmd-dots" role="tablist" aria-label="Your starters">${list.map((x,i)=>`<button type="button" role="tab" aria-selected="${i===ST.hero}" aria-label="${esc(x.p.n)}" data-tmd-dot="${i}"></button>`).join('')}</div>
    <button type="button" class="tmd-next" data-tmd-next aria-label="Next starter">${ARROW}</button>`;
+  const first=list[ST.hero]&&$('tmd-hero').querySelector('.tmd-slide.on .tmd-photo');if(first){first.setAttribute('fetchpriority','high');let l=document.getElementById('tmd-preload');if(!l){l=document.createElement('link');l.id='tmd-preload';l.rel='preload';l.as='image';document.head.appendChild(l)}if(l.href!==first.src)l.href=first.src}
   cycle()}
 function showSlide(i){const el=$('tmd-hero');if(!el)return;const s=[...el.querySelectorAll('.tmd-slide')];if(!s.length)return;ST.hero=(i+s.length)%s.length;
   s.forEach((x,j)=>{const a=j===ST.hero;x.classList.toggle('on',a);if(a){x.removeAttribute('tabindex');x.removeAttribute('aria-hidden')}else{x.tabIndex=-1;x.setAttribute('aria-hidden','true')}});
@@ -172,6 +176,7 @@ document.addEventListener('click',e=>{const t=e.target.closest&&e.target.closest
   else if(t.dataset.tmdOpen!=null)jump(ST.seg);
   else if(t.id==='tmd-search')setTimeout(()=>{const i=$('rank-search');if(i&&!$('v-rankings').hidden)i.focus()},120)});
 document.addEventListener('keydown',e=>{if(!on()||(e.key!=='ArrowRight'&&e.key!=='ArrowLeft'))return;const h=$('tmd-hero');if(!h||!h.contains(document.activeElement))return;showSlide(ST.hero+(e.key==='ArrowRight'?1:-1));const s=h.querySelector('.tmd-slide.on');if(s&&document.activeElement.classList.contains('tmd-slide'))s.focus()});
+window.addEventListener('tm-photos',()=>{ST.sig='';if(typeof tab!=='undefined'&&tab==='team'&&typeof S!=='undefined'&&S&&!S.noLeague&&!$('v-team').hidden)drawDash()});
 MQ.addEventListener('change',()=>{placeTiles();if(typeof tab!=='undefined'&&tab==='team'&&typeof S!=='undefined'&&S&&!S.noLeague)drawDash()});
 /* the top bar turns to glass once the page has scrolled under it */
 const scrolled=()=>document.documentElement.classList.toggle('tmd-scrolled',window.scrollY>8);addEventListener('scroll',scrolled,{passive:true});scrolled();
