@@ -2367,12 +2367,13 @@ function leaveApp(){typeof tmPlanLoad==='function'&&setTimeout(()=>tmPlanLoad(),
 function authFail(t){AUTH_BUSY=false;AUTH_MSG={bad:true,html:esc(friendly(t))};renderSignin()}
 function authNote(h){AUTH_BUSY=false;AUTH_MSG={bad:false,html:h};renderSignin()}
 /* Everything that happens once someone is signed in, however they got there (form, code, link, Google, another tab). */
-async function signedIn(user,fresh){SIGNING=true;USER=user;window.TMT&&TMT.auth(user,fresh);if(typeof emailWelcome==='function')setTimeout(()=>emailWelcome(user),4000);startSessionClock(fresh);acctUI();cloudReset();cloudPull('signin');try{await Promise.all([loadProfile(),typeof tmPlanLoad==='function'?tmPlanLoad(2500):0])}finally{SIGNING=false}if(!USER||USER.id!==user.id)return;
+async function signedIn(user,fresh){const fast=FAST_IN&&!document.body.classList.contains('signed-out');FAST_IN=false;SIGNING=!fast;USER=user;window.TMT&&TMT.auth(user,fresh);if(typeof emailWelcome==='function')setTimeout(()=>emailWelcome(user),4000);startSessionClock(fresh);acctUI();cloudReset();cloudPull('signin');try{await Promise.all([loadProfile(),typeof tmPlanLoad==='function'?tmPlanLoad(2500):0])}finally{SIGNING=false}if(!USER||USER.id!==user.id)return;
   if(typeof tmCheckoutReturn==='function')tmCheckoutReturn();
   if(AUTH_MODE==='recover')return;
-  if(!PROFILE&&PROFILE_OK&&!lsGet(SKIP_UN+user.id)){AUTH_MODE='username';AUTH_MSG=null;AUTH_BUSY=false;AUTH_VALS={};UN_STATE=null;showSignin();return}
+  if(!PROFILE&&PROFILE_OK&&!lsGet(SKIP_UN+user.id)){document.body.classList.add('signed-out');AUTH_MODE='username';AUTH_MSG=null;AUTH_BUSY=false;AUTH_VALS={};UN_STATE=null;showSignin();return}
   if(AUTH_MODE==='confirmed'||AUTH_MODE==='reset'){AUTH_BUSY=false;showSignin();return}
-  AUTH_BUSY=false;enterApp()}
+  AUTH_BUSY=false;if(fast){setTimeout(syncNow,300);return}   /* already inside (fastStart): leave them on the page they're on */
+  enterApp()}
 function adoptSession(s,fresh){if(s&&s.user&&(!USER||USER.id!==s.user.id)){const u=s.user;USER=u;setTimeout(()=>signedIn(u,fresh),0);return true}if(s&&s.user)USER=s.user;return false}
 /* Waiting on an email confirmation: also try the saved-in-memory password every 15s, so confirming on a phone signs this tab in. */
 function startConfirmWatch(){stopConfirmWatch();CONF_T=setInterval(pollConfirm,15000)}
@@ -2459,7 +2460,7 @@ async function unlinkOAuth(id){const idy=identityFor(id);if(!idy||!SB||ACC_BUSY)
 async function initAccounts(){
   acctUI();
   try{const {createClient}=await import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/+esm');
-    SB=createClient(SUPA_URL,SUPA_KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:false,flowType:'implicit'}})}catch(e){SB_FAILED=true;renderSignin();return}
+    SB=createClient(SUPA_URL,SUPA_KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:false,flowType:'implicit'}})}catch(e){SB_FAILED=true;if(FAST_IN){FAST_IN=false;leaveApp()}else renderSignin();return}
   fetch(SUPA_URL+'/auth/v1/settings',{headers:{apikey:SUPA_KEY}}).then(r=>r.ok?r.json():null).then(j=>{if(j&&j.external){PROVIDERS=j.external;if(tab==='signin')renderSignin();else if(tab==='account'&&!ACC_EDIT&&USER)renderAccount()}}).catch(()=>{});
   let fromLink=false,linkId=null;try{linkId=sessionStorage.getItem('tm-link');if(linkId)sessionStorage.removeItem('tm-link')}catch(e){}
   if(AUTH_HASH){const q=new URLSearchParams(AUTH_HASH),type=q.get('type');INTENDED=linkId?'account-security':'team';
@@ -2471,7 +2472,7 @@ async function initAccounts(){
     else if(q.get('error_description')){const msg=friendly(q.get('error_description').replace(/\+/g,' '));
       if(linkId)setTimeout(()=>toast(msg),300);else AUTH_MSG={bad:true,html:esc(msg)}}}
   const {data}=await SB.auth.getSession();const s=data&&data.session;
-  if(s){USER=s.user;if(!(await checkExpiry()))await signedIn(s.user,fromLink)}else renderSignin();
+  if(s){USER=s.user;if(!(await checkExpiry()))await signedIn(s.user,fromLink)}else if(FAST_IN){FAST_IN=false;leaveApp()}else renderSignin();
   acctUI();
   SB.auth.onAuthStateChange((ev,session)=>{
     if(ev==='SIGNED_OUT'){lsDel(UNTIL_KEY);if(USER)leaveApp();return}
@@ -2501,6 +2502,17 @@ document.addEventListener('input',e=>{const t=e.target;
 /* Keep the caret at the end so the highlighted slot is always where the next digit goes. */
 ['focusin','click','keyup'].forEach(ev=>document.addEventListener(ev,e=>{const t=e.target;if(t&&t.id==='auth-code'){const n=t.value.length;if(t.selectionStart!==n||t.selectionEnd!==n)t.setSelectionRange(n,n)}}));
 document.addEventListener('submit',e=>{if(e.target.id!=='auth-form')return;e.preventDefault();if(!AUTH_BUSY)authSubmit(e.target.dataset.mode)});
+/* Someone who is already signed in on this browser goes straight to their page, drawn from what this browser has
+   saved, instead of waiting on a "Signing you in" screen. The sign-in is still checked right behind it
+   (initAccounts): if it turns out to be over, they land on the sign-in page as before. Only when the saved
+   leagues on this browser belong to that same account, so nobody ever sees another account's data. */
+var FAST_IN=false;
+function fastStart(){try{if(AUTH_HASH||!S||!S.onboarded)return;
+    const v=JSON.parse(lsGet('sb-'+SUPA_URL.replace(/^https?:\/\//,'').split('.')[0]+'-auth-token')||'null'),u=v&&v.user;
+    if(!u||!u.id||!v.refresh_token||S.owner!==u.id)return;
+    const until=lsGet(UNTIL_KEY);if(until&&Date.now()>=+until)return;
+    USER=u;FAST_IN=true;acctUI();enterApp()}catch(e){USER=null;FAST_IN=false}}
+fastStart();
 initAccounts();
 
 /* ===== Highlights tab: results, clips (ESPN + NFL on YouTube) and news for your team and everyone you follow ===== */

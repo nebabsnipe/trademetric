@@ -46,3 +46,10 @@
 - The code input assumes 6-digit codes. If Supabase's email code length changes, update `maxlength` and the slot count in `codeField()`.
 - Paid plans (Stripe webhook sets `profiles.plan`, which users can't write themselves). Free vs Pro gating is built: see `docs/plans.md`.
 - Rotate the Resend API key (it was once pasted into a chat).
+
+## Straight in for returning visitors (2026-11-27)
+
+Someone already signed in on a browser no longer sees a "Signing you in" screen on load. The page opens straight
+to their team from what that browser has saved (`fastStart()` in `js/app.js`), and the sign-in is checked right
+behind it. If the sign-in turns out to be over, they land on the sign-in page. Only used when the saved leagues on
+that browser belong to the same account. Signing in by hand (form, code, Google) still shows the short wait.
