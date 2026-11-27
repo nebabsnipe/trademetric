@@ -157,7 +157,7 @@ const STATE_COLS = ['acct', 'notif', 'leagues', 'teams', 'me', 'real', 'league',
 /* A preview: one hand-written notification to ONE account's devices, to see how an alert looks on a real phone.
    Same password as the scheduled check, so only the owner's own scheduler can ask for it; nothing on the page
    links here. /api/push/cron?preview=1&user=<account id>&title=...&body=...&url=/%23team */
-async function preview(req, res) {
+async function previewSend(req, res) {
   const q = req.query || {}, user = String(q.user || ''), title = String(q.title || '').slice(0, 80), body = String(q.body || '').slice(0, 240);
   const url = /^\/#[\w-]*$/.test(String(q.url || '')) ? String(q.url) : '/';
   if (!/^[0-9a-f-]{36}$/i.test(user) || !title || !body) return res.status(400).json({ error: 'bad_preview' });
@@ -170,7 +170,7 @@ async function preview(req, res) {
 async function cron(req, res) {
   if (!secretOk(req)) return res.status(401).json({ error: 'unauthorized' });
   if (!pushOn() || !sharedOn()) return res.status(503).json({ error: 'not_set_up', push: pushOn(), store: sharedOn() });
-  if (req.query && req.query.preview) return await preview(req, res);
+  if (req.query && req.query.preview) return await previewSend(req, res);
   const dry = !!(req.query && req.query.dry), now = Date.now(), stats = { users: 0, devices: 0, events: 0, sent: 0, summaries: 0, quiet: 0, held: 0, removed: 0 };
 
   // 1. read both injury feeds and record what changed, exactly as /api/live does when someone has the site open
