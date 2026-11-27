@@ -29,6 +29,7 @@ Longer plans and build notes are in `docs/`: offseason mode, season recap, trade
 ## Branches & deploys
 - `main` = live site.
 - Offseason mode work goes on the `offseason-mode` branch (Vercel preview), **not** main. It was built as a copy of the real site's code and gets merged in later.
+- The visual redesign goes on the `redesign-desktop` branch (Vercel preview), **not** main, and only ships once player-photo licensing is bought. Read `REDESIGN.md` before touching it.
 
 ## Data & accounts
 - User data (news history, alerts, league data) is saved **on the server, not in the browser**, so every device gets the same state. The site should work for every user exactly as it does on the owner's machine.

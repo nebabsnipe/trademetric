@@ -1,0 +1,38 @@
+/* ===== TradeMetric design tokens =====
+   The one place colours, type sizes, spacing and corner sizes are defined for the redesign.
+   Every redesigned page uses only these: no one-off colours, sizes or spacing.
+   Desktop picks them up in css/redesign.css. The phone layout will use the same file. See REDESIGN.md. */
+:root{
+  /* colour: near-black page, one loud accent */
+  --tm-bg:#0B0D10; --tm-surface-1:#14171C; --tm-surface-2:#1C2026; --tm-surface-3:#262B33;
+  --tm-border:rgba(255,255,255,.08); --tm-border-strong:rgba(255,255,255,.16);
+  --tm-text:#FFFFFF; --tm-text-muted:#9AA3AE;
+  --tm-accent:#FF5A2C; --tm-accent-deep:#D4271C; --tm-on-accent:#FFFFFF;
+  --tm-up:#34D399; --tm-down:#F87171;                       /* gains and losses only, never decoration */
+  --tm-glass:rgba(20,23,28,.72); --tm-glass-border:rgba(255,255,255,.14);
+
+  /* type: Anton for page headlines and big numbers, Inter for everything else */
+  --tm-font-display:"Anton","Kanit","Arial Narrow",Arial,sans-serif;
+  --tm-font-body:"Inter",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --tm-fs-12:12px; --tm-fs-14:14px; --tm-fs-16:16px; --tm-fs-20:20px; --tm-fs-28:28px; --tm-fs-40:40px; --tm-fs-64:64px; --tm-fs-96:96px;
+
+  /* spacing */
+  --tm-sp-4:4px; --tm-sp-8:8px; --tm-sp-12:12px; --tm-sp-16:16px; --tm-sp-24:24px; --tm-sp-32:32px; --tm-sp-48:48px; --tm-sp-64:64px;
+
+  /* shape and motion */
+  --tm-r-card:20px; --tm-r-sm:12px; --tm-r-pill:999px;
+  --tm-ease:180ms ease;
+}
+/* light mode keeps the same shapes and type on a pale page; the hero stays the accent colour */
+@media (prefers-color-scheme: light){:root:not([data-theme="dark"]){
+  --tm-bg:#F3F4F6; --tm-surface-1:#FFFFFF; --tm-surface-2:#EEF0F3; --tm-surface-3:#E3E6EA;
+  --tm-border:rgba(11,13,16,.10); --tm-border-strong:rgba(11,13,16,.20);
+  --tm-text:#0B0D10; --tm-text-muted:#5E6570;
+  --tm-up:#0F9D4F; --tm-down:#D92D32;
+  --tm-glass:rgba(255,255,255,.86); --tm-glass-border:rgba(255,255,255,.6)}}
+:root[data-theme="light"]{
+  --tm-bg:#F3F4F6; --tm-surface-1:#FFFFFF; --tm-surface-2:#EEF0F3; --tm-surface-3:#E3E6EA;
+  --tm-border:rgba(11,13,16,.10); --tm-border-strong:rgba(11,13,16,.20);
+  --tm-text:#0B0D10; --tm-text-muted:#5E6570;
+  --tm-up:#0F9D4F; --tm-down:#D92D32;
+  --tm-glass:rgba(255,255,255,.86); --tm-glass-border:rgba(255,255,255,.6)}

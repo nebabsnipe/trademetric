@@ -944,7 +944,8 @@ function jersey(p,lg){const [c1,c2,ct]=TC[p.t]||['#3a3f47','#8a919c','#fff'],tr=
 ${lg?`<text x="32" y="${L.length>2?19.5:18.5}" text-anchor="middle" font-family="Inter,sans-serif" font-weight="700" font-size="${nm.length>11?4.6:nm.length>9?5.4:6.6}" letter-spacing="1.2" fill="${ct}">${esc(nm)}</text>`:''}
 <text x="32" y="${y}" text-anchor="middle" font-family="Kanit,Arial,sans-serif" font-weight="800" font-size="${fs}" fill="${ct}" stroke="${tr}" stroke-width="${lg?2.2:2}" paint-order="stroke">${esc(L)}</text></g>
 <rect x=".6" y=".6" width="62.8" height="62.8" rx="14.5" fill="none" stroke="#000" stroke-opacity=".22" stroke-width="1.2"/></svg>`}
-const av=(p,cls='')=>`<span class="av jy ${cls}" title="${p.pos==='DST'?esc(p.t)+' defense':NUM[p.id]!=null?'#'+NUM[p.id]:''}">${jersey(p,/\blg\b/.test(cls))}</span>`;
+const tmPhoto=(id,k)=>{const x=window.TM_PHOTOS&&window.TM_PHOTOS[id];return x&&x[k]||null};
+const av=(p,cls='')=>tmPhoto(p.id,'head')?`<span class="av ph ${cls}"><img src="${esc(tmPhoto(p.id,'head'))}" alt="" loading="lazy"></span>`:`<span class="av jy ${cls}" title="${p.pos==='DST'?esc(p.t)+' defense':NUM[p.id]!=null?'#'+NUM[p.id]:''}">${jersey(p,/\blg\b/.test(cls))}</span>`;
 const posTag=p=>`<span class="pos ${p.pos}">${p.pos}${V.posRank[p.id]}</span>`;
 const tagFull=id=>{const t=G[id]&&G[id].tag;return t?`<span class="tag ${t}">${t==='buy'?'Buy low':'Sell high'}</span>`:''};
 const tagHtml=(id,noBuy)=>{let t=G[id]&&G[id].tag;if(noBuy&&t==='buy')t=null;return stHtml(id)+(t?`<span class="badge ${t}" title="${t==='buy'?'Buy low':'Sell high'}">${t==='buy'?'BL':'SH'}</span>`:'')};
@@ -1050,6 +1051,15 @@ function renderTeam(){
    <div class="tile"><div class="lab">Playoff odds</div><div class="val">${sim?pct(sim[S.me].playoff):'-'}</div><div class="sub">Record ${recTxt(S.me)} · power rank #${mine.rank}</div></div>
    <div class="tile"><div class="lab">Weakest spot</div><div class="val">${weak}</div><div class="sub">${sgn(mine.rel[weak])} pts/wk vs. league average</div></div>
    <div class="tile"><div class="lab">Byes and alerts</div><div class="val">${byes}<span class="muted" style="font-size:20px"> / ${tags}</span></div><div class="sub">Players on bye · buy/sell alerts</div></div>`;
+  /* desktop hero: the week's number and the top projected starter (his photo if TM_PHOTOS has one, his jersey tile if not). Hidden on phones. */
+  {const hn=$('team-hero-num'),hs=$('team-hero-star'),ht=$('team-title');
+    if(ht)ht.dataset.len=me.name.length<=14?'s':me.name.length<=24?'m':'l';
+    if(hn)hn.innerHTML=started.length?`<span class="hero-lab">Week ${WEEK} score <span class="live-dot${LIVE&&LIVE.live?' on':''}"></span></span><b>${f1(actual)}</b><span class="hero-sub">Projected ${f1(LU.total)} · ${started.length} of ${LU.slots.filter(x=>x.p).length} playing or done</span>`
+      :`<span class="hero-lab">Week ${WEEK} projection</span><b>${f1(LU.total)}</b><span class="hero-sub">${LU.real?'Your lineup':'Optimal lineup'}</span>`;
+    const pts=id=>{const l=liveOf(id);return l?l.pts:(G[id].next?G[id].projNext:0)};
+    const star=LU.slots.map(x=>x.p).filter(p=>p&&p.pos!=='DST'&&p.pos!=='K').sort((a,b)=>pts(b.id)-pts(a.id))[0];
+    if(hs){if(!star)hs.innerHTML='';else{const ph=tmPhoto(star.id,'hero'),n=NUM[star.id],l=liveOf(star.id);
+      hs.innerHTML=`<button type="button" class="hero-star-in" data-open="${star.id}" aria-label="Open ${esc(star.n)}'s player card">${ph&&n!=null&&n>=0&&n<100?`<span class="hero-ghost" aria-hidden="true">${n}</span>`:''}<span class="hero-fig${ph?' ph':''}">${ph?`<img src="${esc(ph)}" alt="">`:jersey(star,true)}</span><span class="hero-cap"><b>${esc(star.n)}</b><span>${star.pos} · ${star.t} · ${f1(pts(star.id))} ${l?'pts':'proj'}</span></span></button>`}}}
   const row=(label,p,i)=>p?`<div class="lrow${flag.has(i)?' lu-flag':''}" data-open="${p.id}"><span class="slot">${label}</span><div class="pl">${avInj(p)}<div class="meta"><span style="display:flex;gap:6px;align-items:center;min-width:0"><button class="pname" data-open="${p.id}">${esc(p.n)}</button>${tagHtml(p.id,label!=='BN')}${irPill(p.id,IRS)}</span><span class="psub">${p.pos}${V.posRank[p.id]} · ${liveOf(p.id)?liveTxt(p.id)+(liveOf(p.id).state==='post'?'':' live'):oppHtml(p.id)}</span></div></div>${lprojHtml(p.id)}</div>`
     :`<div class="lrow${flag.has(i)?' lu-flag':''}" style="cursor:default"><span class="slot">${label}</span><span class="empty">Empty. Add a player who fits this slot.</span><span></span></div>`;
   $('lineup').innerHTML=LU.slots.map((s,i)=>row(s.label,s.p,i)).join('');

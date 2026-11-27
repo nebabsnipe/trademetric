@@ -1,0 +1,142 @@
+/* ===== TradeMetric redesign: desktop (701px and wider) =====
+   Loaded after styles.css. Everything here is built from css/tokens.css.
+   The phone layout (700px and under) is not touched: every rule below sits inside the desktop block,
+   except the first few lines, which keep the new hero pieces off phones and style licensed photos.
+   Order: 1 tokens onto the old names · 2 top bar · 3 core pieces (cards, buttons, tiles, headings) · 4 My Team. */
+
+/* new hero pieces only exist on desktop for now */
+.hero-star,.hero-num{display:none}
+/* a licensed headshot in a small photo slot (see js/photos.js) */
+.av.ph{background:var(--tm-surface-3);border-radius:50%;overflow:hidden;padding:0;display:block}
+.av.ph img{display:block;width:100%;height:100%;object-fit:cover}
+
+@media (min-width:701px){
+
+/* ---------- 1. Tokens onto the names the rest of the stylesheet already uses ---------- */
+:root{
+  --bg:var(--tm-bg); --surface:var(--tm-surface-1); --surface-2:var(--tm-surface-2); --surface-3:var(--tm-surface-3);
+  --ink:var(--tm-text); --muted:var(--tm-text-muted); --line:var(--tm-border);
+  --accent:var(--tm-accent); --accent-ink:var(--tm-on-accent); --accent-soft:color-mix(in srgb,var(--tm-accent) 14%,var(--tm-surface-1));
+  --good:var(--tm-up); --good-soft:color-mix(in srgb,var(--tm-up) 14%,var(--tm-surface-1));
+  --bad:var(--tm-down); --bad-soft:color-mix(in srgb,var(--tm-down) 14%,var(--tm-surface-1));
+  --bar:#0B0D10; --bar-ink:#FFFFFF; --shadow:none;
+  --f-display:var(--tm-font-body); --f-body:var(--tm-font-body); --f-mono:var(--tm-font-body);
+  --r:var(--tm-r-card); --r-sm:var(--tm-r-sm);
+}
+/* the redesign has no slanted type: small labels are upright Inter, big headlines are Anton.
+   One blunt rule, on purpose, so no old italic heading slips through on any page. */
+html{font-synthesis:weight}
+*{font-style:normal!important}
+body{font-size:var(--tm-fs-14);font-variant-numeric:tabular-nums}
+main{padding-block:var(--tm-sp-32) var(--tm-sp-64)}
+.view{gap:var(--tm-sp-24)}
+.grid2,.grid-even,.stack{gap:var(--tm-sp-24)}
+.grid3{gap:var(--tm-sp-16)}
+
+/* ---------- 2. Top bar: pill navigation, the tab you're on filled white ---------- */
+.topbar-in{min-height:var(--tm-sp-64);gap:var(--tm-sp-24)}
+.logo b{font-weight:800;font-size:var(--tm-fs-20);letter-spacing:.02em}
+.nav{flex:0 1 auto;gap:var(--tm-sp-4);padding:var(--tm-sp-4);background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.08);border-radius:var(--tm-r-pill)}
+.nav button{opacity:1;color:rgba(255,255,255,.66);padding:var(--tm-sp-8) var(--tm-sp-16);font-size:var(--tm-fs-14);font-weight:600;border-radius:var(--tm-r-pill);transition:background var(--tm-ease),color var(--tm-ease)}
+.nav button:hover{color:#FFFFFF}
+.nav button[aria-current="page"]{background:#FFFFFF;color:#0B0D10}
+
+/* ---------- 3. Core pieces ---------- */
+/* card */
+.card{border-radius:var(--tm-r-card);padding:var(--tm-sp-24);box-shadow:none}
+.card-h{margin-bottom:var(--tm-sp-16);align-items:center}
+.card h2,.card h3{font-family:var(--tm-font-body);font-weight:600;font-size:var(--tm-fs-16);letter-spacing:0;text-transform:none;line-height:1.25}
+.card h4{font-size:var(--tm-fs-12);letter-spacing:.08em}
+/* buttons, chips and inputs */
+.btn{padding:var(--tm-sp-8) var(--tm-sp-16);font-size:var(--tm-fs-14);border-radius:var(--tm-r-pill);transition:border-color var(--tm-ease),background var(--tm-ease),color var(--tm-ease)}
+.btn.small{padding:var(--tm-sp-4) var(--tm-sp-12);font-size:var(--tm-fs-12)}
+.seg{padding:var(--tm-sp-4);border-radius:var(--tm-r-pill)}
+.seg button{font-size:var(--tm-fs-12);padding:var(--tm-sp-8) var(--tm-sp-12);transition:color var(--tm-ease)}
+.tag,.badge{border-radius:var(--tm-r-pill)}
+/* page heading */
+.hero h1{font-family:var(--tm-font-display);font-weight:400;font-size:var(--tm-fs-64);line-height:1;letter-spacing:.01em}
+.hero p{font-size:var(--tm-fs-16)}
+.kicker{font-size:var(--tm-fs-12);font-weight:600;letter-spacing:.12em;margin-bottom:var(--tm-sp-8)}
+/* stat tile */
+.tiles{gap:var(--tm-sp-16)}
+.tile{border-radius:var(--tm-r-card);padding:var(--tm-sp-16) var(--tm-sp-24);box-shadow:none}
+.tile.hot{border-left:1px solid var(--line);border-radius:var(--tm-r-card);background:var(--surface)}
+.tile .lab{font-size:var(--tm-fs-12);letter-spacing:.08em}
+.tile .val{font-family:var(--tm-font-display);font-weight:400;font-size:var(--tm-fs-40);line-height:1.1;margin-top:var(--tm-sp-8);letter-spacing:.01em}
+.tile .sub{font-size:var(--tm-fs-12);margin-top:var(--tm-sp-4)}
+/* player row */
+.lrow{grid-template-columns:var(--tm-sp-48) minmax(0,1fr) auto;gap:var(--tm-sp-16);padding:var(--tm-sp-12) 0}
+.slot,#lineup .slot{clip-path:none;border-radius:var(--tm-r-pill);background:var(--surface-2);color:var(--muted);font-size:var(--tm-fs-12);font-weight:700;letter-spacing:.04em;padding:var(--tm-sp-4) 0}
+#lineup .slot{color:var(--ink)}
+.psub{font-size:var(--tm-fs-12)}
+.lproj b{font-size:var(--tm-fs-20);font-weight:700}
+.lproj span{font-size:var(--tm-fs-12)}
+.total{border-top:1px solid var(--line);padding-top:var(--tm-sp-16);margin-top:var(--tm-sp-8);align-items:center}
+.total span{font-weight:600;font-size:var(--tm-fs-14);letter-spacing:0;text-transform:none;color:var(--muted)}
+.total b{font-family:var(--tm-font-display);font-weight:400;font-size:var(--tm-fs-28);letter-spacing:.01em;color:var(--ink)}
+
+/* ---------- 4. My Team ---------- */
+/* lineup problems come first, above the hero */
+#v-team>.lu-alert{order:-1}
+
+/* hero: accent gradient, team name, the top starter, the week's number */
+#v-team .hero-team{position:relative;isolation:isolate;display:grid;grid-template-columns:minmax(0,1fr) 240px auto;align-items:end;gap:var(--tm-sp-32);
+  min-height:384px;padding:var(--tm-sp-48) var(--tm-sp-48) 128px;border-radius:var(--tm-r-card);overflow:hidden;color:#FFFFFF;
+  background:linear-gradient(180deg,rgba(11,13,16,0) 45%,rgba(11,13,16,.5) 100%),radial-gradient(90% 120% at 78% 0%,rgba(255,255,255,.2),rgba(255,255,255,0) 60%),linear-gradient(135deg,var(--tm-accent) 0%,var(--tm-accent-deep) 78%)}
+#v-team .hero-team .kicker{color:#FFFFFF;opacity:.86}
+#v-team .hero-team h1{font-size:var(--tm-fs-96);line-height:.96;overflow-wrap:anywhere}
+#v-team .hero-team h1[data-len="m"]{font-size:var(--tm-fs-64);line-height:1}
+#v-team .hero-team h1[data-len="l"]{font-size:var(--tm-fs-40);line-height:1.05}
+.hero-star,.hero-num{display:block}
+.hero-star-in{position:relative;display:flex;flex-direction:column;align-items:center;gap:var(--tm-sp-16);width:100%;padding:0;border:0;background:none;color:inherit;cursor:pointer;text-align:center}
+.hero-star-in::before{content:"";position:absolute;z-index:-1;left:50%;top:-48px;width:288px;height:288px;margin-left:-144px;border-radius:50%;background:rgba(255,255,255,.14)}
+.hero-ghost{position:absolute;z-index:-1;left:50%;top:-64px;transform:translateX(-50%);font-family:var(--tm-font-display);font-size:240px;line-height:1;color:rgba(255,255,255,.16)}
+.hero-fig{display:block;width:160px;transform:rotate(-6deg);transition:transform var(--tm-ease)}
+.hero-fig svg{display:block;width:100%;height:auto;filter:drop-shadow(0 24px 32px rgba(11,13,16,.4))}
+.hero-fig.ph{width:auto;transform:none}
+.hero-fig.ph img{display:block;height:288px;width:auto;max-width:240px;object-fit:contain;object-position:bottom;filter:drop-shadow(0 24px 32px rgba(11,13,16,.4))}
+.hero-star-in:hover .hero-fig{transform:rotate(-3deg) scale(1.03)}
+.hero-star-in:hover .hero-fig.ph{transform:scale(1.03)}
+.hero-cap{display:flex;flex-direction:column;gap:var(--tm-sp-4)}
+.hero-cap b{font-size:var(--tm-fs-16);font-weight:700}
+.hero-cap span{font-size:var(--tm-fs-12);opacity:.86}
+.hero-num{text-align:right;white-space:nowrap}
+.hero-lab{display:block;font-size:var(--tm-fs-12);font-weight:600;letter-spacing:.12em;text-transform:uppercase;opacity:.86}
+.hero-num b{display:block;font-family:var(--tm-font-display);font-weight:400;font-size:var(--tm-fs-96);line-height:1;letter-spacing:.01em;margin:var(--tm-sp-8) 0 var(--tm-sp-4)}
+.hero-sub{display:block;font-size:var(--tm-fs-14);opacity:.86}
+.hero-num .live-dot{background:#FFFFFF}
+
+/* three glass tiles sit across the bottom edge of the hero (the week's number moved up into the hero) */
+#v-team .tiles{grid-template-columns:repeat(3,minmax(0,1fr));margin:-112px var(--tm-sp-24) 0;position:relative;z-index:1}
+#v-team .tiles .tile.hot{display:none}
+#v-team .tiles .tile{background:var(--tm-glass);border-color:var(--tm-glass-border);-webkit-backdrop-filter:blur(20px) saturate(140%);backdrop-filter:blur(20px) saturate(140%)}
+
+/* matchup: scoreboard numbers in the display face */
+.mu-name{font-family:var(--tm-font-display);font-weight:400;font-size:var(--tm-fs-28);letter-spacing:.02em}
+.mu-team b{font-family:var(--tm-font-display);font-weight:400;font-size:var(--tm-fs-64);letter-spacing:.01em}
+.mu-pct{font-family:var(--tm-font-display);font-weight:400;font-size:var(--tm-fs-40)}
+.mu-bar{height:var(--tm-sp-8);margin:var(--tm-sp-16) 0 var(--tm-sp-4)}
+.mu-all{border-radius:var(--tm-r-pill);font-size:var(--tm-fs-14);transition:border-color var(--tm-ease),color var(--tm-ease)}
+
+/* roster strength */
+.strow .lbl{font-size:var(--tm-fs-12);font-weight:700;letter-spacing:.04em;color:var(--muted)}
+.strow .v{font-size:var(--tm-fs-12)}
+.track{height:var(--tm-sp-8)}
+}
+
+/* narrower desktop windows and tablets: smaller headline, then the top starter steps aside */
+@media (min-width:701px) and (max-width:1100px){
+  #v-team .hero-team{grid-template-columns:minmax(0,1fr) 200px auto;gap:var(--tm-sp-24);padding:var(--tm-sp-32) var(--tm-sp-32) 128px}
+  #v-team .hero-team h1{font-size:var(--tm-fs-64);line-height:1}
+  #v-team .hero-team h1[data-len="m"],#v-team .hero-team h1[data-len="l"]{font-size:var(--tm-fs-40);line-height:1.05}
+  .hero-num b{font-size:var(--tm-fs-64)}
+  .hero-fig{width:128px}
+  .hero-star-in::before{width:240px;height:240px;margin-left:-120px}
+  #v-team .tiles{margin-left:var(--tm-sp-16);margin-right:var(--tm-sp-16)}
+}
+@media (min-width:701px) and (max-width:900px){
+  #v-team .hero-team{grid-template-columns:minmax(0,1fr) auto;min-height:320px}
+  .hero-star{display:none}
+  .mu-team b{font-size:var(--tm-fs-40)}
+  .mu-name{font-size:var(--tm-fs-20)}
+}
