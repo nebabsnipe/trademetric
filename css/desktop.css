@@ -75,7 +75,7 @@ footer .wrap{padding-left:0;padding-right:0}
 .logo-img{height:26px;width:auto}
 .logo b{font-family:var(--tmd-font);font-style:normal;font-weight:700;font-size:19px;letter-spacing:-.01em;text-transform:none;color:var(--tmd-ink)}
 .logo b span{color:var(--tmd-brand)}
-.nav{flex:0 1 auto;gap:8px;overflow:visible;margin-left:10px}
+.nav{flex:none;gap:8px;overflow:visible;margin-left:10px}
 .nav button{position:relative;display:inline-flex;align-items:center;justify-content:center;gap:0;height:42px;min-width:42px;padding:0 12px;border-radius:var(--tmd-r-pill);background:var(--tmd-glass-2);border:1px solid var(--tmd-stroke);color:var(--tmd-ink-2);opacity:1;font-size:13.5px;font-weight:500;transition:background var(--tmd-t),color var(--tmd-t),border-color var(--tmd-t),padding var(--tmd-t)}
 /* the icons are the same ones the phone's tab bar uses (added by js/mobile.js) */
 .nav button .nav-ic{display:block;flex:none;width:18px;height:18px;stroke-width:1.9}
@@ -94,6 +94,7 @@ footer .wrap{padding-left:0;padding-right:0}
 .tmd-live-dot{width:8px;height:8px;border-radius:50%;background:var(--tmd-live);box-shadow:0 0 0 4px color-mix(in srgb,var(--tmd-live) 25%,transparent);flex:none}
 .tmd-live-pill{display:inline-flex;align-items:center;gap:6px;height:32px;padding:0 13px;border-radius:var(--tmd-r-pill);background:var(--tmd-glass-2);border:1px solid var(--tmd-stroke);color:var(--tmd-ink-2);font-weight:500;overflow:hidden;text-overflow:ellipsis;max-width:320px}
 .tmd-live-pill i{font-style:normal;opacity:.5}
+.tmd-lg{overflow:hidden;text-overflow:ellipsis}
 .topbar-right{gap:8px;margin-left:0;flex:none}
 .tmd-ic,.alert-btn,.theme-btn{display:grid;place-items:center;width:42px;height:42px;border-radius:50%;background:var(--tmd-glass-2);border:1px solid var(--tmd-stroke);color:var(--tmd-ink-2);text-decoration:none;transition:background var(--tmd-t),color var(--tmd-t)}
 .tmd-ic:hover,.alert-btn:hover,.theme-btn:hover{background:var(--tmd-glass-3);color:var(--tmd-ink)}
@@ -283,6 +284,7 @@ body :is(#lineup,#bench,#ir-card) .lrow .slot{transform:none;border-radius:9px;b
 #v-team>#matchup{margin-bottom:22px}
 
 /* ---------- 7. Narrower desktops ---------- */
+@media (max-width:1400px){.tmd-badge.xl{width:54px;height:54px;font-size:18px}.tmd-livecard{padding:16px}}
 @media (max-width:1320px){
   .tmd-dash{grid-template-columns:minmax(250px,26fr) minmax(0,46fr) minmax(280px,28fr)}
   .tmd-split{grid-template-columns:minmax(0,1fr)}
@@ -295,8 +297,7 @@ body :is(#lineup,#bench,#ir-card) .lrow .slot{transform:none;border-radius:9px;b
   .tmd-centre{grid-column:1/-1;order:-1}
   .tmd-hero{margin-top:-10px;height:300px}
   .tmd-split{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
-  .tmd-live-pill i,.tmd-live-pill i~*{display:none}
-  .tmd-live-pill{max-width:130px}
+  .tmd-lg{display:none}
 }
 @media (max-width:900px){
   #tmd-search,#tmd-settings{display:none}

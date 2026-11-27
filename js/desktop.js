@@ -29,7 +29,7 @@ function face(p,kind){const src=typeof tmPhoto==='function'?tmPhoto(p.id,kind):n
 /* ---------- top bar ---------- */
 function livePill(){const el=$('tmd-live');if(!el)return;const live=!!(typeof LIVE!=='undefined'&&LIVE&&LIVE.live&&LIVE.week===WEEK);
   const lg=typeof S!=='undefined'&&S&&!S.noLeague&&S.league&&S.league.name&&!document.body.classList.contains('signed-out')?S.league.name:'';
-  el.innerHTML=(live?'<span class="tmd-live-dot"></span><b>Live</b>':'')+`<span class="tmd-live-pill">Week ${WEEK}${lg?` <i>·</i> ${esc(lg)}`:''}</span>`}
+  el.innerHTML=(live?'<span class="tmd-live-dot"></span><b>Live</b>':'')+`<span class="tmd-live-pill">Week ${WEEK}${lg?`<span class="tmd-lg"> <i>·</i> ${esc(lg)}</span>`:''}</span>`}
 function chip(){const b=$('acct-btn');if(!b||!b.classList.contains('in')||b.querySelector('.tmd-chip-n'))return;
   const n=typeof acctName==='function'?acctName():'';b.insertAdjacentHTML('beforeend',`<span class="tmd-chip-n d-only">${esc(n||'Account')}</span><span class="tmd-chip-c d-only">${CHEV}</span>`)}
 
