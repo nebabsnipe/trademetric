@@ -98,6 +98,12 @@ Part of the same scheduled check (`/api/push/cron`), rules in `api/_alerts.js`, 
   The "Send test notification" button was removed from the page at the owner's request. The `/api/push/test`
   route is still on the server, just not linked from anywhere.
 
+- **Preview sends (2026-11-27, live on main):** `/api/push/cron?preview=1&user=<account id>&title=...&body=...&url=/%23team`
+  sends one hand-written notification to that one account's devices, to see how an alert looks on a real phone.
+  Same password as the scheduled check, so it is run from the Supabase SQL Editor with the Vault secret (the way
+  `supabase/push_cron.sql` calls the check). Nothing on the site links to it. First real-device result: three
+  previews were accepted by Apple's push service for the owner's iPhone.
+
 ## Not done yet
 
 - Big plays, trades and #1 finishes: the switches exist (marked "Coming soon") but nothing
