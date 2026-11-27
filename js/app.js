@@ -683,7 +683,7 @@ let TR_CACHE={v:-1,list:[]},TR_LOOSE={v:-1,list:[]};
    3 Will they      market value (FantasyCalc, KeepTradeCut, FantasyPros) + their lineup change + filling a need
    4 Final score    season sim odds + playoff-week points, weighted by team mode, minus injury and stacking risk */
 var MARKET=null;
-let FACES={};fetch('data/faces.json').then(r=>r.ok?r.json():null).then(d=>{if(d)FACES=d}).catch(()=>{});
+let FACES={};fetch('data/faces.json').then(r=>r.ok?r.json():null).then(d=>{if(!d)return;FACES=d;VER++;if(typeof render==='function'&&!['signin','account','league','help','upgrade'].includes(tab))try{render()}catch(e){}}).catch(()=>{});
 fetch('data/market.json',{cache:'no-cache'}).then(r=>r.ok?r.json():null).then(d=>{if(d){MARKET=d;VER++;if(typeof render==='function'&&tab==='trade')render()}}).catch(()=>{});
 const PO_WT=1.75;
 const poWeeks=()=>{const r=(S.real&&S.real.regWeeks)||14;return [r+1,r+2,r+3].filter(w=>w<=18)};
@@ -946,7 +946,15 @@ function jersey(p,lg){const [c1,c2,ct]=TC[p.t]||['#3a3f47','#8a919c','#fff'],tr=
 ${lg?`<text x="32" y="${L.length>2?19.5:18.5}" text-anchor="middle" font-family="Inter,sans-serif" font-weight="700" font-size="${nm.length>11?4.6:nm.length>9?5.4:6.6}" letter-spacing="1.2" fill="${ct}">${esc(nm)}</text>`:''}
 <text x="32" y="${y}" text-anchor="middle" font-family="Kanit,Arial,sans-serif" font-weight="800" font-size="${fs}" fill="${ct}" stroke="${tr}" stroke-width="${lg?2.2:2}" paint-order="stroke">${esc(L)}</text></g>
 <rect x=".6" y=".6" width="62.8" height="62.8" rx="14.5" fill="none" stroke="#000" stroke-opacity=".22" stroke-width="1.2"/></svg>`}
-const av=(p,cls='')=>`<span class="av jy ${cls}" title="${p.pos==='DST'?esc(p.t)+' defense':NUM[p.id]!=null?'#'+NUM[p.id]:''}">${jersey(p,/\blg\b/.test(cls))}</span>`;
+const avJy=(p,cls='')=>`<span class="av jy ${cls}" title="${p.pos==='DST'?esc(p.t)+' defense':NUM[p.id]!=null?'#'+NUM[p.id]:''}">${jersey(p,/\blg\b/.test(cls))}</span>`;
+/* Player photo in a team-colored circle. Defenses, players with no photo and photos that fail to load use the jersey badge.
+   A small copy of the photo is asked for first; if that fails the full-size one is tried, then the jersey. */
+const FACE_BAD=new Set(),faceUrl=(f,w)=>`https://a.espncdn.com/combiner/i?img=/i/headshots/nfl/players/full/${f}.png&w=${w}&h=${Math.round(w*436/600)}`;
+const av=(p,cls='')=>{const f=p.pos!=='DST'&&FACES[p.id];if(!f||FACE_BAD.has(p.id))return avJy(p,cls);
+  return `<span class="av hs ${cls}" style="${tcVars(p.t)}" data-av="${p.id}" data-cls="${cls}" title="${NUM[p.id]!=null?'#'+NUM[p.id]:''}"><img src="${faceUrl(f,/\blg\b/.test(cls)?220:120)}" data-full="https://a.espncdn.com/i/headshots/nfl/players/full/${f}.png" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer"></span>`};
+document.addEventListener('error',e=>{const t=e.target;if(!t||t.tagName!=='IMG')return;const w=t.parentNode;if(!w||!w.dataset||!w.dataset.av)return;
+  if(t.dataset.full){const u=t.dataset.full;delete t.dataset.full;t.src=u;return}
+  const p=byId[w.dataset.av];FACE_BAD.add(w.dataset.av);if(p)w.outerHTML=avJy(p,w.dataset.cls||'')},true);
 const posTag=p=>`<span class="pos ${p.pos}">${p.pos}${V.posRank[p.id]}</span>`;
 const tagFull=id=>{const t=G[id]&&G[id].tag;return t?`<span class="tag ${t}">${t==='buy'?'Buy low':'Sell high'}</span>`:''};
 const tagHtml=(id,noBuy)=>{let t=G[id]&&G[id].tag;if(noBuy&&t==='buy')t=null;return stHtml(id)+(t?`<span class="badge ${t}" title="${t==='buy'?'Buy low':'Sell high'}">${t==='buy'?'BL':'SH'}</span>`:'')};
@@ -2008,7 +2016,7 @@ function heroHtml(p,g,fresh){const id=p.id,f=p.pos!=='DST'&&FACES[id],n=NUM[id],
     <div class="ph-id"><div class="ph-kick">${p.pos} · ${esc(NICK[p.t]||p.t)}${p.pos!=='DST'&&n!=null?` · #${n}`:''}</div>
       <h2 class="${last.length>11?'long':''}">${first?`<span>${esc(first)}</span>`:''}${esc(last)}</h2>
       <div class="msub"><span>Bye Wk ${BYE[p.t]||'—'}</span>${stOf(id)?`<span class="tag" style="background:rgba(0,0,0,.4);color:#fff">${ST_LABEL[stOf(id)]}</span>`:''}${tagFull(id)}${OWN[id]!==S.me?followBtn(id):''}</div></div>
-    <div class="ph-face">${f?`<img class="ph-img" src="https://a.espncdn.com/i/headshots/nfl/players/full/${f}.png" alt="" width="600" height="436" decoding="async" referrerpolicy="no-referrer">`:''}${av(p,'lg')}</div>
+    <div class="ph-face">${f?`<img class="ph-img" src="https://a.espncdn.com/i/headshots/nfl/players/full/${f}.png" alt="" width="600" height="436" decoding="async" referrerpolicy="no-referrer">`:''}${avJy(p,'lg')}</div>
     <div class="ph-stats"><div><b>#${V.rank[id]}</b><span>Overall</span></div><div><b>${p.pos}${V.posRank[id]}</b><span>Position</span></div><div class="hi"><b>${f1(g.season)}</b><span>Avg pts</span></div></div></div>`}
 function muBanner(p,g){const nw=nextWk(p.id),fin=nw.k==='proj'&&nw.w!==WEEK,nx=fin?nw.o:g.next,own=ownerHtml(p.id),WK=fin?nw.w:WEEK;
   if(!nx)return `<div class="mu-line bye"><span class="mu-wk">Week ${WEEK}</span><b>Bye week</b><span class="mu-own">${own}</span></div>`;
