@@ -106,25 +106,46 @@ h1{margin:4px 0 6px;font-family:var(--f-display);font-style:italic;font-weight:8
 }
 
 /* ---------- B · Tug of war ---------- */
-.b-top{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);align-items:center;gap:14px}
-.b-team{display:flex;flex-direction:column;min-width:0}.b-team.r{align-items:flex-end;text-align:right}.b-team .tn{font-size:19px}
-.b-score{display:flex;align-items:baseline;gap:12px}.b-score .big{font-size:44px}.b-score i{font-style:normal;color:var(--muted);font-size:20px}
-.b-win{display:flex;justify-content:space-between;align-items:baseline;gap:10px;margin:14px 0 6px;font-size:12.5px;color:var(--muted)}
-.b-win b{color:var(--accent);font-family:var(--f-display);font-style:italic;font-weight:800;font-size:20px;margin-right:6px}
-.b-row{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,2.1fr) minmax(0,1fr);align-items:center;gap:14px;padding:9px 0;border-bottom:1px solid var(--line)}
-.b-row:last-child{border-bottom:0}
-.b-tug{display:grid;grid-template-columns:minmax(0,1fr) 46px minmax(0,1fr);align-items:center}
-.b-tug .slot{text-align:center;font-size:12.5px}
-.b-half{display:flex;align-items:center;gap:7px}.b-half.l{justify-content:flex-end}
-.b-half .pt{width:38px;flex:none}.b-half.l .pt{text-align:right}
-.b-bar{height:16px;border-radius:3px;flex:0 0 auto;background:var(--tc)}
-.b-bar.up{background:repeating-linear-gradient(135deg,color-mix(in srgb,var(--tc) 55%,transparent) 0 4px,color-mix(in srgb,var(--tc) 22%,transparent) 4px 8px)}
-.b-half.l .b-bar{--tc:var(--me)}.b-half.rt .b-bar{--tc:var(--opp)}
-.b-half.won .pt{font-weight:700;color:var(--ink)}
+.b-panel{border:1px solid var(--line);border-radius:var(--r);background:var(--surface-2);overflow:hidden}
+.b-top{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);align-items:center;gap:16px;padding:18px 20px}
+.b-team{display:flex;align-items:center;gap:12px;min-width:0}.b-team.r{flex-direction:row-reverse;text-align:right}
+.b-logo{flex:none;width:46px;height:46px;border-radius:11px;display:grid;place-items:center;background:var(--tc);color:#fff;font-family:var(--f-display);font-style:italic;font-weight:800;font-size:18px;letter-spacing:.03em;box-shadow:inset 0 -4px 0 rgba(0,0,0,.2)}
+.b-id{display:flex;flex-direction:column;gap:2px;min-width:0}.b-id .tn{font-size:21px}
+.b-score{display:flex;align-items:center;gap:22px}
+.b-sc{display:flex;flex-direction:column;align-items:center;min-width:92px}.b-sc .big{font-size:48px}
+.b-sc small{font:500 11.5px var(--f-mono);color:var(--muted);margin-top:4px}
+.b-div{width:1px;height:44px;background:var(--line)}
+.b-meter{padding:12px 20px 15px;border-top:1px solid var(--line);background:var(--surface)}
+.b-ml{display:grid;grid-template-columns:1fr auto 1fr;align-items:baseline;gap:10px;font-size:12.5px;color:var(--muted);margin-bottom:8px}
+.b-ml b{font:700 14px var(--f-mono);color:var(--ink)}.b-ml span:first-child b{color:var(--accent)}
+.b-ml .c{font-size:11px;font-weight:700;letter-spacing:.07em;text-transform:uppercase}.b-ml span:last-child{text-align:right}
+.b-meter .wbar{height:8px}
+.peek .rows:has(.b-row)::after{display:none}
+.b-hd,.b-row{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,2.3fr) minmax(0,1fr);align-items:center;gap:18px;padding:11px 10px}
+.b-hd{padding-block:8px 6px;font-size:11px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--muted)}
+.b-hd span:nth-child(2){text-align:center}.b-hd span:last-child{text-align:right}
+.b-row{border-top:1px solid var(--line);transition:background .15s}
+.b-row:hover{background:var(--surface-2)}
+.b-tug{display:grid;grid-template-columns:46px minmax(0,1fr) 56px minmax(0,1fr) 46px;align-items:center;gap:10px}
+.b-tr{display:flex;height:10px;border-radius:99px;background:var(--surface-3);overflow:hidden}.b-tr.l{justify-content:flex-end}
+.b-tr i{display:block;height:100%;min-width:6px;border-radius:99px;background:var(--tc);transform-origin:left;animation:b-grow .55s cubic-bezier(.2,.7,.2,1) both}
+.b-tr.l i{transform-origin:right}
+.b-tr i.up{background:color-mix(in srgb,var(--tc) 46%,var(--surface-3))}
+@keyframes b-grow{from{transform:scaleX(0)}}
+@media (prefers-reduced-motion: reduce){.b-tr i{animation:none}.b-row{transition:none}}
+.b-tug .slot{text-align:center;font-size:12px;line-height:1;padding:5px 0;border-radius:6px;background:var(--surface-2);border:1px solid var(--line)}
+.b-v{font-family:var(--f-mono);font-variant-numeric:tabular-nums;font-size:14px;color:var(--muted)}.b-v.l{text-align:right}
+.b-v.won{color:var(--ink);font-weight:700}
+.b-row.tot{border-top:2px solid var(--ink);background:none}
+.b-row.tot .b-tr{height:14px}.b-row.tot .b-v{font-size:16px}.b-row.tot .slot{background:var(--ink);color:var(--surface);border-color:var(--ink)}
+.b-tl{font-family:var(--f-display);font-style:italic;font-weight:700;font-size:15px;letter-spacing:.03em;text-transform:uppercase}
 @container mock (max-width:620px){
-  .b-team .tn{font-size:14px}.b-score{gap:6px}.b-score .big{font-size:30px}.b-score i{font-size:14px}.b-top{gap:8px}
-  .b-row{grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:6px 10px}.b-row .b-tug{grid-column:1/-1;grid-row:2}
-  .b-bar{height:12px}.b-tug{grid-template-columns:minmax(0,1fr) 40px minmax(0,1fr)}
+  .b-top{gap:8px;padding:12px}.b-team,.b-team.r{flex-direction:column;align-items:flex-start;gap:6px}.b-team.r{align-items:flex-end}
+  .b-logo{width:32px;height:32px;border-radius:8px;font-size:13px}.b-id .tn{font-size:13.5px}
+  .b-score{gap:10px}.b-sc{min-width:0}.b-sc .big{font-size:30px}.b-sc small{font-size:10.5px}.b-div{height:34px}
+  .b-meter{padding:10px 12px 12px}.b-ml{font-size:11.5px;gap:6px}.b-ml .c{font-size:10px}
+  .b-hd,.b-row{grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:8px 10px;padding:10px 2px}.b-hd span:nth-child(2){display:none}
+  .b-row.tot .b-v{font-size:13.5px}.b-row.tot .b-tug{grid-template-columns:46px minmax(0,1fr) 46px minmax(0,1fr) 46px}.b-ml span:last-child{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.b-row .b-tug{grid-column:1/-1;grid-row:2}.b-tug{grid-template-columns:38px minmax(0,1fr) 46px minmax(0,1fr) 38px;gap:6px}.b-v{font-size:13px}
 }
 
 /* ---------- C · Edges ---------- */
@@ -286,13 +307,14 @@ a:{name:'Scoreboard',desc:'The scores move next to each other like a real scoreb
   <div class="a-sub"><span>${left(1)} still to play</span><span>${left(2)} still to play</span></div>`,
  body:()=>ROWS.map(([s,a,b],i)=>`<div class="a-row${mo(i)}">${pl(a)}${pt(a)}<span class="a-slot"><i class="car l${a.v>=b.v?' on':''}"></i><span class="slot">${s}</span><i class="car rt${b.v>a.v?' on':''}"></i></span>${pt(b)}${pl(b,1)}</div>`).join(''),key:KEY},
 
-b:{name:'Tug of war',desc:'Every position becomes a pair of bars growing out from the middle, so you can see who wins each spot and by how much without reading a single number. Solid bars are final scores, striped bars are projections.',
- head:()=>`<div class="b-top"><div class="b-team"><span class="tn">${sq('me')}${ME.name}</span><span class="note">${ME.rec} · proj ${f1(ME.proj)}</span></div>
-   <div class="b-score"><span class="big">${f1(ME.pts)}</span><i>–</i><span class="big">${f1(OP.pts)}</span></div>
-   <div class="b-team r"><span class="tn">${sq('opp')}${OP.name}</span><span class="note">${OP.rec} · proj ${f1(OP.proj)}</span></div></div>
-  <div class="b-win"><span><b>${Math.round(PW*100)}%</b>chance you win</span></div>${wbar}`,
- body:()=>{const mx=Math.max(...ROWS.flatMap(r=>[r[1].v,r[2].v]));const half=(p,side,won)=>{const bar=`<i class="b-bar ${p.st==='final'?'':'up'}" style="width:calc((100% - 45px) * ${(p.v/mx).toFixed(3)})"></i>`;return `<div class="b-half ${side}${won?' won':''}">${side==='l'?pt(p)+bar:bar+pt(p)}</div>`};
-  return ROWS.map(([s,a,b],i)=>`<div class="b-row${mo(i)}">${pl(a)}<div class="b-tug">${half(a,'l',a.v>=b.v)}<span class="slot">${s}</span>${half(b,'rt',b.v>a.v)}</div>${pl(b,1)}</div>`).join('')},key:'<span class="key">Solid = final · striped = projected</span>'},
+b:{name:'Tug of war',desc:'Every position is a pair of bars growing out from the middle, so you can see who wins each spot and by how much at a glance. Solid bars are final scores, lighter bars are projections, and the bottom line adds it all up.',
+ head:()=>{const team=(T,k,ini,r)=>`<div class="b-team${r?' r':''}" style="--tc:var(--${k})"><span class="b-logo">${ini}</span><div class="b-id"><span class="tn">${T.name}</span><span class="note">${T.rec}</span></div></div>`,sc=T=>`<div class="b-sc"><span class="big">${f1(T.pts)}</span><small>proj ${f1(T.proj)}</small></div>`,pc=Math.round(PW*100);
+  return `<div class="b-panel"><div class="b-top">${team(ME,'me','NN')}<div class="b-score">${sc(ME)}<i class="b-div"></i>${sc(OP)}</div>${team(OP,'opp','BD',1)}</div>
+   <div class="b-meter"><div class="b-ml"><span><b>${pc}%</b> you</span><span class="c">Chance to win</span><span>${OP.name} <b>${100-pc}%</b></span></div>${wbar}</div></div>`},
+ body:()=>{const mx=Math.max(...ROWS.flatMap(r=>[r[1].v,r[2].v])),bar=(p,m)=>`<i class="${p.st==='final'?'':'up'}" style="width:${(p.v/m*100).toFixed(1)}%"></i>`,
+   tug=(a,b,s,m)=>`<div class="b-tug"><span class="b-v l${a.v>=b.v?' won':''}">${f1(a.v)}</span><div class="b-tr l" style="--tc:var(--me)">${bar(a,m)}</div><span class="slot">${s}</span><div class="b-tr" style="--tc:var(--opp)">${bar(b,m)}</div><span class="b-v${b.v>a.v?' won':''}">${f1(b.v)}</span></div>`;
+  return `<div class="b-hd"><span>You</span><span>Points</span><span>${OP.name}</span></div>`+ROWS.map(([s,a,b],i)=>`<div class="b-row${mo(i)}">${pl(a)}${tug(a,b,s,mx)}${pl(b,1)}</div>`).join('')
+   +`<div class="b-row tot"><span class="b-tl">Projected total</span>${tug({v:ME.proj,st:'up'},{v:OP.proj,st:'up'},'Total',OP.proj)}<span></span></div>`},key:'<span class="key">Solid = final · lighter = projected</span>'},
 
 c:{name:'Position edges',desc:'A box score up top, and one clear number at the end of every row: how many points you are ahead or behind at that position. Green is your edge, red is theirs. The best fit for spotting where a matchup is being lost.',
  head:()=>`<div class="c-top"><div class="c-box">
@@ -325,7 +347,7 @@ f:{name:'Position cards',desc:'A win-chance dial in the middle and one small car
  body:()=>`<div class="f-grid">`+ROWS.map(([s,a,b],i)=>{const w=a.v>=b.v,ln=(p,k,won)=>`<div class="f-line ${k}${won?' won':''}"><i></i>${pl(p)}${pt(p)}</div>`;return `<div class="f-card${mo(i)}"><div class="f-ch"><span class="slot">${s}</span><em class="${w?'up':'dn'}">${sg(a.v-b.v)}</em></div>${ln(a,'me',w)}${ln(b,'op',!w)}</div>`}).join('')+`</div>`,key:KEY}
 };
 
-let cur='a',peek=false;
+let cur='b',peek=false;
 const $=id=>document.getElementById(id),ORDER=Object.keys(D);
 $('opts').innerHTML=ORDER.map(k=>`<button type="button" id="opt-${k}" data-o="${k}" aria-pressed="false"><b>${k.toUpperCase()}</b>${D[k].name}</button>`).join('');
 function draw(){const d=D[cur],m=$('mock');
