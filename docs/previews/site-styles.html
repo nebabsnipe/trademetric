@@ -1,0 +1,280 @@
+<meta name="claude:viewport-fit-sides" content="cover">
+<title>TradeMetric Site Styles</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;800&family=Barlow+Condensed:wght@600;700;800&family=IBM+Plex+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600;700&family=Kanit:ital,wght@1,700;1,800&family=Lexend:wght@400;500;700&family=Manrope:wght@500;700;800&family=Oswald:wght@500;600;700&family=Outfit:wght@400;500;700&family=Sora:wght@400;600;700;800&family=Space+Grotesk:wght@500;700&display=swap">
+<style>
+/* Layout: a picker of ten site styles above one live sample (nav bar + matchup card) that re-skins in place. Page chrome is neutral so the sample carries all the color. */
+:root{--p-bg:#F3F4F6;--p-panel:#FFFFFF;--p-ink:#0D0F12;--p-mut:#626975;--p-line:#DDE0E5;--p-sel:#0D0F12;--p-sel-ink:#FFFFFF}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--p-bg:#0A0B0D;--p-panel:#141619;--p-ink:#F1F2F4;--p-mut:#9097A2;--p-line:#262A30;--p-sel:#F1F2F4;--p-sel-ink:#0D0F12;color-scheme:dark}}
+:root[data-theme="dark"]{--p-bg:#0A0B0D;--p-panel:#141619;--p-ink:#F1F2F4;--p-mut:#9097A2;--p-line:#262A30;--p-sel:#F1F2F4;--p-sel-ink:#0D0F12;color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--p-bg);color:var(--p-ink);font-family:"Inter",system-ui,-apple-system,"Segoe UI",sans-serif;font-size:14px;line-height:1.45;-webkit-font-smoothing:antialiased}
+.page{max-width:1100px;margin:0 auto;padding-block:28px 48px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:flex;flex-direction:column;gap:18px}
+button{font:inherit;color:inherit;cursor:pointer}
+:focus-visible{outline:2px solid var(--p-ink);outline-offset:2px}
+.eyebrow{margin:0;font-size:11.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--p-mut)}
+h1{margin:4px 0 6px;font-family:"Space Grotesk","Inter",sans-serif;font-weight:700;font-size:clamp(26px,4vw,36px);line-height:1.05;letter-spacing:-.01em;text-wrap:balance}
+.lede{margin:0;color:var(--p-mut);max-width:64ch}
+.picker{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px}
+.picker button{display:flex;flex-direction:column;gap:7px;align-items:flex-start;text-align:left;padding:10px 12px;border-radius:10px;border:1px solid var(--p-line);background:var(--p-panel);min-width:0}
+.picker button[aria-pressed="true"]{border-color:var(--p-sel);box-shadow:0 0 0 1px var(--p-sel)}
+.picker .nm{font-weight:600;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.picker .nm b{color:var(--p-mut);font-weight:600;margin-right:6px;font-variant-numeric:tabular-nums}
+.dots{display:flex;width:100%;height:14px;border-radius:4px;overflow:hidden;border:1px solid var(--p-line)}
+.dots i{flex:1}.dots i:first-child{flex:2}
+@media (max-width:760px){.picker{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.ctl{display:flex;flex-wrap:wrap;gap:10px 18px;align-items:center}
+.seg{display:flex;gap:2px;padding:3px;border-radius:9px;background:var(--p-line)}
+.seg button{border:0;background:transparent;padding:6px 12px;border-radius:7px;font-weight:600;font-size:13px;color:var(--p-mut)}
+.seg button[aria-pressed="true"]{background:var(--p-panel);color:var(--p-ink)}
+.ctl-l{font-size:11.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--p-mut);margin-right:-10px}
+@media (max-width:760px){.view-ctl{display:none}}
+.about{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:flex-end;gap:12px 24px}
+.about h2{margin:0;font-family:"Space Grotesk","Inter",sans-serif;font-weight:700;font-size:21px;line-height:1.1}
+.about p{margin:4px 0 0;color:var(--p-mut);max-width:62ch}
+.sw{display:flex;gap:10px;flex-wrap:wrap}
+.sw span{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--p-mut)}
+.sw i{width:18px;height:18px;border-radius:5px;border:1px solid var(--p-line)}
+.stage{container-type:inline-size;container-name:mock;width:100%;margin-inline:auto;transition:max-width .25s ease}
+.stage.phone{max-width:390px}
+@media (prefers-reduced-motion: reduce){.stage{transition:none}}
+.foot{margin:0;font-size:12.5px;color:var(--p-mut);text-align:center}
+
+/* ---------- the themed sample (every color below comes from the chosen style) ---------- */
+.site{background:var(--bg);color:var(--ink);font-family:var(--f-body);border-radius:14px;overflow:hidden;border:1px solid var(--p-line)}
+.disp{font-family:var(--f-display);font-style:var(--d-style);text-transform:var(--d-case);letter-spacing:var(--d-ls);font-weight:var(--d-w)}
+.nav{display:flex;align-items:center;gap:22px;padding:12px 20px;background:var(--surface);border-bottom:1px solid var(--line)}
+.logo{font-size:calc(21px*var(--ds));line-height:1;white-space:nowrap}.logo b{color:var(--accent);font-weight:inherit}
+.tabs{display:flex;gap:4px;flex:1;min-width:0}
+.tabs span{padding:7px 12px;border-radius:var(--r-sm);font-weight:600;font-size:13.5px;color:var(--muted);white-space:nowrap}
+.tabs .on{color:var(--ink);background:var(--surface-2)}
+.cta{padding:8px 14px;border-radius:var(--r-sm);background:var(--accent);color:var(--accent-ink);font-weight:700;font-size:13px;white-space:nowrap}
+.ava{flex:none;width:32px;height:32px;border-radius:50%;display:grid;place-items:center;background:var(--surface-3);font-weight:700;font-size:13px}
+.site-b{padding:20px}
+.card{background:var(--surface);border-radius:var(--r);border:1px solid var(--line);padding:18px}
+.card-h{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:14px}
+.card-h h2{margin:0;font-size:calc(19px*var(--ds));line-height:1.1;white-space:nowrap}
+.kick{display:inline-flex;align-items:center;gap:7px;font-size:12px;color:var(--muted);white-space:nowrap;padding:4px 10px;border-radius:99px;border:1px solid var(--line)}
+.kick::before{content:"";width:6px;height:6px;border-radius:50%;background:var(--accent)}
+.num{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+.tn{line-height:1.05;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.big{line-height:.95;font-variant-numeric:tabular-nums}
+.me{--c1:var(--me);--c2:var(--me2)}.op{--c1:var(--opp);--c2:var(--opp2)}
+.b-hero .me{--c1:var(--hme);--c2:var(--hme2);--li:var(--logo-ink)}.b-hero .op{--c1:var(--hopp);--c2:var(--hopp2);--li:var(--logo-ink-op)}
+.b-hero{--hero-line:color-mix(in srgb,var(--hero-ink) 13%,transparent);position:relative;border-radius:calc(var(--r) + 2px);overflow:hidden;color:var(--hero-ink);background:var(--hero)}
+[data-hero="flat"] .b-hero{border:1px solid var(--line)}
+[data-hero="glow"] .b-hero{border:1px solid var(--hero-line);background:radial-gradient(55% 130% at 0% 0%,color-mix(in srgb,var(--hme) 32%,transparent),transparent 62%),radial-gradient(55% 130% at 100% 0%,color-mix(in srgb,var(--hopp) 28%,transparent),transparent 62%),var(--hero)}
+[data-hero="glow"] .b-hero::before{content:"";position:absolute;inset:0;pointer-events:none;background:repeating-linear-gradient(90deg,color-mix(in srgb,var(--hero-ink) 4%,transparent) 0 1px,transparent 1px 10%)}
+.b-hero>*{position:relative}
+.b-top{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);align-items:center;gap:16px;padding:22px 22px 18px}
+.b-team{display:flex;align-items:center;gap:13px;min-width:0}.b-team.r{flex-direction:row-reverse;text-align:right}
+.b-logo{flex:none;width:50px;height:50px;border-radius:calc(var(--r) + 1px);display:grid;place-items:center;background:linear-gradient(140deg,var(--c2),var(--c1));color:var(--li);font-size:calc(19px*var(--ds))}
+[data-hero="glow"] .b-logo{box-shadow:0 0 0 1px color-mix(in srgb,var(--hero-ink) 18%,transparent),0 10px 26px color-mix(in srgb,var(--c1) 45%,transparent)}
+.b-id{display:flex;flex-direction:column;gap:5px;min-width:0;align-items:flex-start}.b-team.r .b-id{align-items:flex-end}
+.b-id .tn{font-size:calc(22px*var(--ds))}
+.b-rec{font:600 11px var(--f-mono);padding:2px 7px;border-radius:99px;border:1px solid var(--hero-line);color:var(--hero-mut)}
+.b-score{display:flex;align-items:center;gap:18px}
+.b-sc{display:flex;flex-direction:column;align-items:center;min-width:104px}.b-sc .big{font-size:calc(58px*var(--ds))}
+[data-hero="glow"] .b-sc:not(.dim) .big{text-shadow:0 0 28px color-mix(in srgb,var(--c1) 55%,transparent)}
+.b-sc.dim .big{opacity:.55}
+.b-sc small{font:600 11px var(--f-mono);letter-spacing:.06em;color:var(--hero-mut);margin-top:6px}
+.b-vs{font:700 10.5px var(--f-mono);letter-spacing:.1em;color:var(--hero-mut);padding:4px 7px;border-radius:6px;border:1px solid var(--hero-line)}
+.b-meter{padding:0 22px 18px}
+.b-ml{display:grid;grid-template-columns:1fr auto 1fr;align-items:baseline;gap:10px;font-size:12.5px;color:var(--hero-mut);margin-bottom:8px}
+.b-ml b{font-size:calc(22px*var(--ds));line-height:1;color:var(--c2)}
+[data-hero="solid"] .b-ml b{color:var(--hero-ink)}
+.b-ml .me b{margin-right:6px}.b-ml .op b{margin-left:6px}
+.b-ml .c{font-size:10.5px;font-weight:700;letter-spacing:.12em;text-transform:uppercase}.b-ml .op{text-align:right;white-space:nowrap}
+.b-wb{display:flex;gap:3px;height:10px}
+.b-wb i{display:block;height:100%;border-radius:var(--br);min-width:10px}
+.b-wb i:first-child{background:linear-gradient(90deg,var(--hme),var(--hme2))}.b-wb i:last-child{background:linear-gradient(90deg,var(--hopp),var(--hopp2))}
+[data-hero="glow"] .b-wb i:first-child{box-shadow:0 0 16px color-mix(in srgb,var(--hme2) 65%,transparent)}
+.b-stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));border-top:1px solid var(--hero-line);background:color-mix(in srgb,var(--hero-ink) 4%,transparent)}
+.b-stats div{padding:11px 14px;text-align:center}.b-stats div+div{border-left:1px solid var(--hero-line)}
+.b-stats b{display:block;font:700 15px var(--f-mono);font-variant-numeric:tabular-nums}
+.b-stats span{font-size:10.5px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:var(--hero-mut)}
+.sec-h{display:flex;justify-content:space-between;align-items:baseline;gap:10px;margin:16px 0 4px;padding-top:12px;border-top:1px solid var(--line)}
+.sec-h b{font-size:11.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.key{font-size:12px;color:var(--muted)}
+.pl{display:flex;align-items:center;gap:9px;min-width:0}.pl.r{flex-direction:row-reverse;text-align:right}
+.jy{width:28px;height:28px;flex:none}
+.meta{display:flex;flex-direction:column;min-width:0}
+.pn{font-weight:600;font-size:13.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ps{font-size:11.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sh{display:none}
+.chip{display:inline-block;font:600 10.5px var(--f-mono);padding:1px 5px;border-radius:4px;background:var(--surface-2);color:var(--muted);margin-left:2px}
+.chip.easy{background:color-mix(in srgb,var(--good) 15%,transparent);color:var(--good)}.chip.hard{background:color-mix(in srgb,var(--bad) 15%,transparent);color:var(--bad)}
+.fin{font:600 10.5px var(--f-mono);padding:1px 5px;border-radius:4px;background:var(--surface-3);color:var(--ink)}
+.b-hd,.b-row{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,2.3fr) minmax(0,1fr);align-items:center;gap:18px;padding:12px 10px}
+.b-hd{padding-block:8px 6px;font-size:10.5px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.b-hd span:nth-child(2){text-align:center}.b-hd span:last-child{text-align:right}
+.b-row{border-top:1px solid var(--line)}
+.b-row.wl{background:linear-gradient(90deg,color-mix(in srgb,var(--me) 8%,transparent),transparent 36%)}
+.b-row.wr{background:linear-gradient(270deg,color-mix(in srgb,var(--opp) 8%,transparent),transparent 36%)}
+.b-tug{display:grid;grid-template-columns:46px minmax(0,1fr) 56px minmax(0,1fr) 46px;align-items:center;gap:10px}
+.b-tr{display:flex;align-items:center;height:var(--bh);border-radius:var(--br);background:var(--surface-3)}.b-tr.l{justify-content:flex-end}
+.b-tr i{display:block;height:100%;min-width:8px;border-radius:var(--br);background:linear-gradient(to right,var(--c1),var(--c2));transform-origin:left;animation:b-grow .6s cubic-bezier(.2,.7,.2,1) both}
+.b-tr.l i{background:linear-gradient(to left,var(--c1),var(--c2));transform-origin:right}
+.b-tr i.up,.b-tr.l i.up{background:color-mix(in srgb,var(--c1) 24%,transparent);box-shadow:inset 0 0 0 1.5px color-mix(in srgb,var(--c1) 80%,transparent)}
+[data-bar="thin"] .b-tr{height:4px}[data-bar="thin"] .b-tr i{height:10px;flex:none}
+[data-hero="glow"] .b-tr.won i:not(.up){box-shadow:0 0 14px color-mix(in srgb,var(--c1) 55%,transparent)}
+@keyframes b-grow{from{transform:scaleX(0)}}
+@media (prefers-reduced-motion: reduce){.b-tr i{animation:none}}
+.slot{display:block;text-align:center;font-size:calc(12px*var(--ds));line-height:1;padding:6px 0;border-radius:var(--r-sm);background:var(--surface-2);border:1px solid var(--line)}
+.b-v{font-family:var(--f-mono);font-variant-numeric:tabular-nums;font-size:14px;color:var(--muted)}.b-v.l{text-align:right}
+.b-v.won{color:var(--c1);font-weight:700}
+.b-row.tot{margin-top:6px;padding-block:14px;border-radius:var(--r);background:var(--surface-2);border:1px solid var(--line)}
+.b-row.tot .b-tug{grid-template-columns:76px minmax(0,1fr) 62px minmax(0,1fr) 76px}
+.b-row.tot .b-tr{height:calc(var(--bh) + 4px)}[data-bar="thin"] .b-row.tot .b-tr{height:4px}
+.b-row.tot .b-v{font-family:var(--f-display);font-style:var(--d-style);font-weight:var(--d-w);font-size:calc(24px*var(--ds));line-height:1}
+.b-row.tot .slot{background:var(--ink);color:var(--surface);border-color:var(--ink)}
+.b-tl{font-size:calc(15px*var(--ds))}
+@container mock (max-width:620px){
+  .nav{gap:10px;padding:10px 12px}.tabs{visibility:hidden}.logo{font-size:calc(18px*var(--ds))}.cta{padding:7px 10px;font-size:12px}
+  .site-b{padding:10px}.card{padding:14px}.card-h h2{font-size:calc(16px*var(--ds))}.kick{font-size:11px;padding:3px 8px}
+  .fl{display:none}.sh{display:inline}.chip{display:none}.jy{width:22px;height:22px}.pl{gap:6px}.pn{font-size:13px}.tn{white-space:normal}
+  .sec-h{flex-direction:column;gap:2px}
+  .b-top{gap:8px;padding:14px 12px 12px}.b-team,.b-team.r{flex-direction:column;align-items:flex-start;gap:7px}.b-team.r{align-items:flex-end}
+  .b-logo{width:34px;height:34px;font-size:calc(13.5px*var(--ds))}.b-id .tn{font-size:calc(13.5px*var(--ds))}.b-id{gap:4px}
+  .b-score{gap:6px}.b-sc{min-width:0}.b-sc .big{font-size:calc(32px*var(--ds))}.b-sc small{font-size:9.5px}.b-vs{font-size:9px;padding:3px 4px}
+  .b-meter{padding:0 12px 14px}.b-ml{font-size:11.5px;gap:6px}.b-ml b{font-size:calc(18px*var(--ds))}.b-ml .on{display:none}.b-ml .c{font-size:9px;letter-spacing:.08em}
+  .b-stats div{padding:9px 4px}.b-stats b{font-size:13px}.b-stats span{font-size:9px;letter-spacing:.04em;display:block;line-height:1.25}
+  .b-hd,.b-row{grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:8px 10px;padding:11px 4px}.b-hd span:nth-child(2){display:none}
+  .b-row .b-tug{grid-column:1/-1;grid-row:2}.b-tug{grid-template-columns:38px minmax(0,1fr) 46px minmax(0,1fr) 38px;gap:6px}.b-v{font-size:13px}
+  .b-row.tot{padding:12px 8px}.b-row.tot .b-tug{grid-template-columns:56px minmax(0,1fr) 46px minmax(0,1fr) 56px}.b-row.tot .b-v{font-size:calc(18px*var(--ds))}
+}
+</style>
+
+<div class="page">
+  <header>
+    <p class="eyebrow">TradeMetric · look and feel</p>
+    <h1>Ten site styles</h1>
+    <p class="lede">The same matchup card and menu bar in ten different color and type styles. Pick one and it becomes the look for the whole site. Every style comes in light and dark.</p>
+  </header>
+
+  <div class="picker" id="picker" role="group" aria-label="Site style"></div>
+
+  <div class="ctl">
+    <span class="ctl-l">Mode</span>
+    <div class="seg" role="group" aria-label="Light or dark">
+      <button type="button" id="mode-dark" data-m="dark" aria-pressed="false">Dark</button>
+      <button type="button" id="mode-light" data-m="light" aria-pressed="false">Light</button>
+    </div>
+    <span class="ctl-l view-ctl">Width</span>
+    <div class="seg view-ctl" role="group" aria-label="Preview width">
+      <button type="button" id="view-desktop" data-v="desktop" aria-pressed="true">Desktop</button>
+      <button type="button" id="view-phone" data-v="phone" aria-pressed="false">Phone</button>
+    </div>
+  </div>
+
+  <div class="about"><div><h2 id="o-name"></h2><p id="o-desc"></p></div><div class="sw" id="sw"></div></div>
+  <div class="stage" id="stage"><div class="site" id="site"></div></div>
+  <p class="foot">Preview only. Nothing on trademetric.app has changed.</p>
+</div>
+
+<script>
+const ME={name:'Naughty Nathan',rec:'5-6',pts:5.8,proj:99.4},OP={name:'Burrow It Deep',rec:'3-8',pts:57.4,proj:136.8},PW=.06;
+const P=(n,pos,num,c,opp,rk,tone,v,st,ct)=>({n,pos,num,c,opp,rk,tone,v,st,ct:ct||'#fff'});
+const ROWS=[
+ ['QB',P('Kirk Cousins','QB',8,'#4F2683','vs ATL','27th','easy',19.9,'up'),P('Joe Burrow','QB',9,'#FB4F14','vs NO','15th','',26.8,'up')],
+ ['RB',P('Chase Brown','RB',30,'#FB4F14','vs NO','31st','easy',19.4,'up'),P('Omarion Hampton','RB',8,'#0080C6','vs NE','18th','',9.8,'up')],
+ ['RB',P('Samaje Perine','RB',34,'#FB4F14','vs NO','31st','easy',9.5,'up'),P('Jordan Mason','RB',27,'#4F2683','vs ATL','28th','easy',8.1,'up')],
+ ['WR',P('Justin Jefferson','WR',18,'#4F2683','vs ATL','27th','easy',17.0,'up'),P('DeVonta Smith','WR',6,'#004C54','','','',43.0,'final')],
+ ['WR',P('DJ Moore','WR',2,'#0B2A6F','','','',3.5,'final'),P('Ladd McConkey','WR',15,'#0080C6','vs NE','31st','easy',11.7,'up')],
+ ['TE',P('Brock Bowers','TE',89,'#15171A','at CLE','22nd','',15.4,'up'),P('Sam LaPorta','TE',87,'#0076B6','','','',14.4,'final')],
+ ['FLEX',P('Josh Downs','WR',12,'#C8102E','','','',2.3,'final'),P('Jordyn Tyson','WR',0,'#D3BC8D','at CIN','9th','hard',6.5,'up','#1A1A1A')],
+ ['K',P('Cameron Dicker','K',11,'#0080C6','vs NE','16th','',6.9,'up'),P('Will Reichard','K',16,'#4F2683','vs ATL','10th','',9.8,'up')],
+ ['D/ST',P('Browns D/ST','DST','D','#4B2A14','vs LV','','',5.6,'up'),P('Bengals D/ST','DST','D','#FB4F14','vs NO','','',6.7,'up')]
+];
+const SANS='system-ui,-apple-system,"Segoe UI",sans-serif',PLEX='"IBM Plex Mono",ui-monospace,Menlo,monospace';
+const INTER=`"Inter",${SANS}`;
+/* each style: fonts + shape, then a dark and a light palette */
+const THEMES=[
+ {name:'Midnight',desc:'Deep navy with electric blue against amber. Glowing scoreboard, sporty italic headlines. The version you just saw.',
+  fd:`"Kanit","Arial",sans-serif`,fb:INTER,fm:PLEX,style:'italic',cas:'uppercase',ls:'.01em',w:800,ds:1,r:12,hero:'glow',bar:'pill',
+  dark:{bg:'#05070D',sf:'#0A0E19',s2:'#111728',s3:'#1A2237',ink:'#EEF2FF',mut:'#8C98B5',line:'#1C2540',me:'#4A8CFF',me2:'#6FE0FF',opp:'#FF8A3D',opp2:'#FFC857',acc:'#4A8CFF',ai:'#04102A',hero:'linear-gradient(180deg,#101A38,#090E1F)',hi:'#F1F5FF',hm:'#97A5C8'},
+  light:{bg:'#F3F5FA',sf:'#FFFFFF',s2:'#EEF1F7',s3:'#E2E7F0',ink:'#0A1022',mut:'#5D6880',line:'#DFE4EE',me:'#2B6BFF',me2:'#35C3FF',opp:'#EA5A0C',opp2:'#FFB020',acc:'#2B6BFF',ai:'#FFFFFF',hero:'linear-gradient(180deg,#101A38,#090E1F)',hi:'#F1F5FF',hm:'#97A5C8',hme:'#4A8CFF',hme2:'#6FE0FF',hopp:'#FF8A3D',hopp2:'#FFC857'}},
+ {name:'Graphite',desc:'Neutral charcoal with one icy blue highlight. Thin precise bars and squared corners, like a trading terminal. The most understated option.',
+  fd:`"Space Grotesk",${SANS}`,fb:INTER,fm:`"JetBrains Mono",ui-monospace,Menlo,monospace`,style:'normal',cas:'none',ls:'-.01em',w:700,ds:.92,r:6,hero:'flat',bar:'thin',
+  dark:{bg:'#0B0C0E',sf:'#121316',s2:'#191B1F',s3:'#26292E',ink:'#F4F5F6',mut:'#8D9299',line:'#26292E',me:'#7DD3FC',me2:'#BAE6FD',opp:'#8E96A3',opp2:'#C3C9D2',acc:'#7DD3FC',ai:'#062030',hero:'#191B1F',hi:'#F4F5F6',hm:'#8D9299',li:'#0B1A24'},
+  light:{bg:'#F5F6F7',sf:'#FFFFFF',s2:'#EFF1F3',s3:'#E0E4E8',ink:'#111316',mut:'#636A74',line:'#E1E4E8',me:'#0284C7',me2:'#38BDF8',opp:'#6B7480',opp2:'#A3ABB6',acc:'#0284C7',ai:'#FFFFFF',hero:'#EFF1F3',hi:'#111316',hm:'#636A74'}},
+ {name:'Turf',desc:'Dark stadium green with bright emerald against silver. Tall condensed headlines and blocky bars, like a broadcast graphic.',
+  fd:`"Barlow Condensed","Arial Narrow",sans-serif`,fb:INTER,fm:PLEX,style:'normal',cas:'uppercase',ls:'.02em',w:700,ds:1.16,r:8,hero:'glow',bar:'block',
+  dark:{bg:'#050B08',sf:'#0A1410',s2:'#0F1D17',s3:'#183027',ink:'#ECF5F0',mut:'#86A093',line:'#173027',me:'#34D399',me2:'#A7F3D0',opp:'#B9C4CE',opp2:'#E8EEF3',acc:'#34D399',ai:'#03241A',hero:'linear-gradient(180deg,#0E2A20,#07140F)',hi:'#ECF5F0',hm:'#8FB3A2',li:'#04261B'},
+  light:{bg:'#F2F6F3',sf:'#FFFFFF',s2:'#EBF2EE',s3:'#DCE8E1',ink:'#0A1A13',mut:'#56695F',line:'#DAE5DF',me:'#0E9F6E',me2:'#34D399',opp:'#64748B',opp2:'#A3B1C2',acc:'#0E9F6E',ai:'#FFFFFF',hero:'linear-gradient(180deg,#0E2A20,#07140F)',hi:'#ECF5F0',hm:'#8FB3A2',hme:'#34D399',hme2:'#A7F3D0',hopp:'#B9C4CE',hopp2:'#E8EEF3',li:'#04261B'}},
+ {name:'Oxblood',desc:'Deep burgundy and black with gold. Feels like a members-only lounge: rich, confident, a little luxurious.',
+  fd:`"Oswald","Arial Narrow",sans-serif`,fb:INTER,fm:PLEX,style:'normal',cas:'uppercase',ls:'.03em',w:600,ds:1,r:4,hero:'flat',bar:'pill',
+  dark:{bg:'#0D0809',sf:'#151012',s2:'#1E1719',s3:'#2C2125',ink:'#F6EFEA',mut:'#A3948F',line:'#2C2125',me:'#E7B549',me2:'#F6D98A',opp:'#C2516C',opp2:'#E58AA0',acc:'#E7B549',ai:'#251A02',hero:'linear-gradient(180deg,#2D1219,#170C10)',hi:'#F6EFEA',hm:'#B9A49D',li:'#2A1D02',lio:'#FFFFFF'},
+  light:{bg:'#F7F4F2',sf:'#FFFFFF',s2:'#F3EEEB',s3:'#E6DDD8',ink:'#1C1113',mut:'#6E5F5B',line:'#E6DCD6',me:'#A87708',me2:'#E7B549',opp:'#9F2F4C',opp2:'#C2516C',acc:'#9F2F4C',ai:'#FFFFFF',hero:'linear-gradient(180deg,#2D1219,#170C10)',hi:'#F6EFEA',hm:'#B9A49D',hme:'#E7B549',hme2:'#F6D98A',hopp:'#C2516C',hopp2:'#E58AA0',li:'#2A1D02',lio:'#FFFFFF'}},
+ {name:'Press Box',desc:'Crisp white, royal blue and slate with sharp corners. Reads like a major sports news site. Strongest in light mode.',
+  fd:`"Archivo","Arial",sans-serif`,fb:INTER,fm:PLEX,style:'normal',cas:'uppercase',ls:'0',w:800,ds:.9,r:3,hero:'flat',bar:'block',
+  dark:{bg:'#080A0E',sf:'#0F1217',s2:'#161A21',s3:'#222831',ink:'#F1F4F8',mut:'#8B95A5',line:'#222831',me:'#5B8DEF',me2:'#93B8FF',opp:'#7C8798',opp2:'#B4BECB',acc:'#5B8DEF',ai:'#061022',hero:'#161A21',hi:'#F1F4F8',hm:'#8B95A5'},
+  light:{bg:'#F4F5F7',sf:'#FFFFFF',s2:'#F0F2F5',s3:'#E0E5EB',ink:'#0B1220',mut:'#5B6676',line:'#DDE2E8',me:'#1D4ED8',me2:'#3B82F6',opp:'#475569',opp2:'#94A3B8',acc:'#1D4ED8',ai:'#FFFFFF',hero:'#0B1220',hi:'#FFFFFF',hm:'#9AA6B8',hme:'#5B8DEF',hme2:'#93B8FF',hopp:'#8B97A8',hopp2:'#C2CBD6'}},
+ {name:'Indigo',desc:'Dark indigo with soft violet against coral. Rounded corners and friendly lettering give it a modern app feel.',
+  fd:`"Sora",${SANS}`,fb:INTER,fm:PLEX,style:'normal',cas:'none',ls:'-.02em',w:700,ds:.84,r:16,hero:'glow',bar:'pill',
+  dark:{bg:'#07061A',sf:'#100E20',s2:'#17152B',s3:'#24213F',ink:'#F0EEFF',mut:'#9490B8',line:'#24213F',me:'#8B7CFF',me2:'#B9AEFF',opp:'#FF7A70',opp2:'#FFB3A1',acc:'#8B7CFF',ai:'#0E0A2C',hero:'linear-gradient(180deg,#1B1740,#0E0C22)',hi:'#F0EEFF',hm:'#A29DCB'},
+  light:{bg:'#F5F4FB',sf:'#FFFFFF',s2:'#EFEDF8',s3:'#E1DEF1',ink:'#120F2A',mut:'#655F88',line:'#E0DDEF',me:'#5B4BE0',me2:'#8B7CFF',opp:'#E5554A',opp2:'#FF8F80',acc:'#5B4BE0',ai:'#FFFFFF',hero:'linear-gradient(180deg,#1B1740,#0E0C22)',hi:'#F0EEFF',hm:'#A29DCB',hme:'#8B7CFF',hme2:'#B9AEFF',hopp:'#FF7A70',hopp2:'#FFB3A1'}},
+ {name:'Copper',desc:'Keeps the TradeMetric orange you already have, now on cool slate with steel blue for the opponent. The smallest change from today\'s site.',
+  fd:`"Kanit","Arial",sans-serif`,fb:INTER,fm:PLEX,style:'italic',cas:'uppercase',ls:'.01em',w:800,ds:1,r:10,hero:'flat',bar:'pill',
+  dark:{bg:'#0A0C0F',sf:'#11151A',s2:'#181D24',s3:'#232A33',ink:'#F2F4F6',mut:'#8E98A5',line:'#232A33',me:'#FF6A33',me2:'#FFA070',opp:'#6B8FB8',opp2:'#A3C0E0',acc:'#FF6A33',ai:'#1A0700',hero:'linear-gradient(180deg,#1C232D,#12161C)',hi:'#F2F4F6',hm:'#97A2B0'},
+  light:{bg:'#F3F5F7',sf:'#FFFFFF',s2:'#EEF1F4',s3:'#E0E5EA',ink:'#0E1318',mut:'#5E6874',line:'#DEE3E8',me:'#F04E0F',me2:'#FF8A4D',opp:'#4A6F99',opp2:'#7FA3CC',acc:'#F04E0F',ai:'#FFFFFF',hero:'linear-gradient(180deg,#1C232D,#12161C)',hi:'#F2F4F6',hm:'#97A2B0',hme:'#FF6A33',hme2:'#FFA070',hopp:'#6B8FB8',hopp2:'#A3C0E0'}},
+ {name:'Deep Teal',desc:'Dark ocean teal with mint against soft periwinkle. Calm and technical, with slim bars and smooth rounded shapes.',
+  fd:`"Manrope",${SANS}`,fb:`"Manrope",${SANS}`,fm:`"Manrope",${SANS}`,style:'normal',cas:'none',ls:'-.02em',w:800,ds:.9,r:14,hero:'glow',bar:'thin',
+  dark:{bg:'#041013',sf:'#08191D',s2:'#0D2328',s3:'#16353B',ink:'#E9F6F6',mut:'#7FA3A6',line:'#14343A',me:'#2DD4BF',me2:'#99F6E4',opp:'#A5B4FC',opp2:'#C7D2FE',acc:'#2DD4BF',ai:'#032420',hero:'linear-gradient(180deg,#0E3138,#07191D)',hi:'#E9F6F6',hm:'#8DB4B7',li:'#04201D'},
+  light:{bg:'#F1F6F6',sf:'#FFFFFF',s2:'#EAF2F2',s3:'#DAE7E7',ink:'#071C1F',mut:'#55706F',line:'#D8E5E5',me:'#0D9488',me2:'#2DD4BF',opp:'#6366F1',opp2:'#A5B4FC',acc:'#0D9488',ai:'#FFFFFF',hero:'linear-gradient(180deg,#0E3138,#07191D)',hi:'#E9F6F6',hm:'#8DB4B7',hme:'#2DD4BF',hme2:'#99F6E4',hopp:'#A5B4FC',hopp2:'#C7D2FE',li:'#04201D'}},
+ {name:'Daybreak',desc:'Light and airy: a pale sky-blue scoreboard, navy text, royal blue against plum. Open, calm and easy to read in daylight.',
+  fd:`"Outfit",${SANS}`,fb:`"Outfit",${SANS}`,fm:PLEX,style:'normal',cas:'none',ls:'-.01em',w:700,ds:.96,r:12,hero:'flat',bar:'pill',
+  dark:{bg:'#060B14',sf:'#0B1320',s2:'#111C2D',s3:'#1B2A41',ink:'#EAF1FB',mut:'#8496B3',line:'#1B2A41',me:'#6EA0FF',me2:'#A8C6FF',opp:'#D58BC6',opp2:'#EDB9E2',acc:'#6EA0FF',ai:'#06122A',hero:'linear-gradient(180deg,#16263F,#0E1929)',hi:'#EAF1FB',hm:'#8FA2C0'},
+  light:{bg:'#F6F9FC',sf:'#FFFFFF',s2:'#EEF4FA',s3:'#DCE8F4',ink:'#0C1B33',mut:'#5A6B85',line:'#DCE6F0',me:'#1E40AF',me2:'#3B82F6',opp:'#A2478F',opp2:'#C97DB9',acc:'#1E40AF',ai:'#FFFFFF',hero:'linear-gradient(180deg,#E3EEFB,#D2E3F8)',hi:'#0C1B33',hm:'#52668A'}},
+ {name:'Cobalt',desc:'A solid block of bright cobalt for the scoreboard, clean white cards and ink-dark text. Bold and unmistakably branded.',
+  fd:`"Lexend",${SANS}`,fb:INTER,fm:PLEX,style:'normal',cas:'none',ls:'-.02em',w:700,ds:.86,r:10,hero:'solid',bar:'pill',
+  dark:{bg:'#05060F',sf:'#0B0D1A',s2:'#121527',s3:'#1D2240',ink:'#EEF0FF',mut:'#8990B5',line:'#1D2240',me:'#6B85FF',me2:'#9DB0FF',opp:'#B7BDD9',opp2:'#E4E7F5',acc:'#6B85FF',ai:'#060A26',hero:'#2A44E8',hi:'#FFFFFF',hm:'#C9D3FF',hme:'#FFFFFF',hme2:'#FFFFFF',hopp:'#0A1030',hopp2:'#1B2460',li:'#2A44E8',lio:'#FFFFFF'},
+  light:{bg:'#F4F6FB',sf:'#FFFFFF',s2:'#EEF1F8',s3:'#DEE3F0',ink:'#0A1030',mut:'#5C6485',line:'#DEE2EE',me:'#2447F9',me2:'#6C8BFF',opp:'#0A1030',opp2:'#4A5278',acc:'#2447F9',ai:'#FFFFFF',hero:'#2447F9',hi:'#FFFFFF',hm:'#C9D3FF',hme:'#FFFFFF',hme2:'#FFFFFF',hopp:'#0A1030',hopp2:'#1B2460',li:'#2447F9',lio:'#FFFFFF'}}
+];
+const f1=x=>x.toFixed(1),sg=x=>(x>=0?'+':'−')+Math.abs(x).toFixed(1);
+const jy=p=>`<svg class="jy" viewBox="0 0 28 28" aria-hidden="true"><path d="M9 3.5 4.5 6 1.5 11.5l4 2L7 12v12.5h14V12l1.5 1.5 4-2L23.5 6 19 3.5c-1.2 2.4-8.8 2.4-10 0z" fill="${p.c}" stroke="rgba(128,128,128,.5)" stroke-width=".8"/><text x="14" y="19" text-anchor="middle" font-size="9.5" font-weight="700" font-family="Inter,Arial,sans-serif" fill="${p.ct}">${p.num}</text></svg>`;
+const sh=n=>n.includes('D/ST')?n.split(' ')[0]:n.split(' ').slice(1).join(' ');
+const nm=p=>`<span class="pn"><span class="fl">${p.n}</span><span class="sh">${sh(p.n)}</span></span>`;
+const sub=p=>`<span class="ps">${p.pos==='DST'?'D/ST':p.pos} · ${p.st==='final'?'<span class="fin">Final</span>':p.opp+(p.rk?` <span class="chip ${p.tone}">${p.rk} v ${p.pos}</span>`:'')}</span>`;
+const pl=(p,r)=>`<div class="pl${r?' r':''}">${jy(p)}<div class="meta">${nm(p)}${sub(p)}</div></div>`;
+const left=s=>ROWS.filter(r=>r[s].st!=='final').length;
+
+function cardHtml(){
+  const lead=ME.pts>=OP.pts,pc=Math.round(PW*100),led=ROWS.filter(r=>r[1].v>=r[2].v).length,mx=Math.max(...ROWS.flatMap(r=>[r[1].v,r[2].v]));
+  const team=(T,k,ini,r)=>`<div class="b-team ${k}${r?' r':''}"><span class="b-logo disp">${ini}</span><div class="b-id"><span class="tn disp">${T.name}</span><span class="b-rec">${T.rec}</span></div></div>`;
+  const sc=(T,k,on)=>`<div class="b-sc ${k}${on?'':' dim'}"><span class="big disp">${f1(T.pts)}</span><small>PROJ ${f1(T.proj)}</small></div>`;
+  const bar=(p,m)=>`<i class="${p.st==='final'?'':'up'}" style="width:${(p.v/m*100).toFixed(1)}%"></i>`;
+  const tug=(a,b,s,m)=>{const aw=a.v>=b.v;return `<div class="b-tug"><span class="b-v l me${aw?' won':''}">${f1(a.v)}</span><div class="b-tr l me${aw?' won':''}">${bar(a,m)}</div><span class="slot disp">${s}</span><div class="b-tr op${aw?'':' won'}">${bar(b,m)}</div><span class="b-v op${aw?'':' won'}">${f1(b.v)}</span></div>`};
+  return `<nav class="nav" aria-hidden="true"><span class="logo disp">Trade<b>Metric</b></span><div class="tabs"><span class="on">My Team</span><span>Trades</span><span>Rankings</span><span>Alerts</span></div><span class="cta">Import league</span><span class="ava">N</span></nav>
+  <div class="site-b"><section class="card">
+   <div class="card-h"><h2 class="disp">Week 12 matchup</h2><span class="kick">Next kickoff Sun 10:00 AM</span></div>
+   <div class="b-hero"><div class="b-top">${team(ME,'me','NN')}<div class="b-score">${sc(ME,'me',lead)}<span class="b-vs">VS</span>${sc(OP,'op',!lead)}</div>${team(OP,'op','BD',1)}</div>
+    <div class="b-meter"><div class="b-ml"><span class="me"><b class="disp">${pc}%</b>you</span><span class="c">Chance to win</span><span class="op"><span class="on">${OP.name}</span><b class="disp">${100-pc}%</b></span></div><div class="b-wb" aria-hidden="true"><i style="width:${pc}%"></i><i style="width:${100-pc}%"></i></div></div>
+    <div class="b-stats"><div><b>${led} of ${ROWS.length}</b><span>Positions you lead</span></div><div><b>${left(1)} v ${left(2)}</b><span>Players still to play</span></div><div><b>${sg(ME.proj-OP.proj)}</b><span>Projected margin</span></div></div></div>
+   <div class="sec-h"><b>Position by position</b><span class="key">Filled = final · outlined = projected</span></div>
+   <div class="b-hd"><span>You</span><span>Points</span><span>${OP.name}</span></div>
+   ${ROWS.map(([s,a,b])=>`<div class="b-row ${a.v>=b.v?'wl':'wr'}">${pl(a)}${tug(a,b,s,mx)}${pl(b,1)}</div>`).join('')}
+   <div class="b-row tot"><span class="b-tl disp">Projected total</span>${tug({v:ME.proj,st:'up'},{v:OP.proj,st:'up'},'Total',OP.proj)}<span></span></div>
+  </section></div>`}
+
+const $=id=>document.getElementById(id);
+let cur=0,mode=(document.documentElement.dataset.theme)||(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');
+$('picker').innerHTML=THEMES.map((T,i)=>`<button type="button" id="style-${i+1}" data-s="${i}" aria-pressed="false"><span class="dots" id="dots-${i}"></span><span class="nm"><b>${i+1}</b>${T.name}</span></button>`).join('');
+$('site').innerHTML=cardHtml();
+function apply(){const T=THEMES[cur],m=T[mode],dk=mode==='dark',site=$('site');
+  const v={'--bg':m.bg,'--surface':m.sf,'--surface-2':m.s2,'--surface-3':m.s3,'--ink':m.ink,'--muted':m.mut,'--line':m.line,'--me':m.me,'--me2':m.me2,'--opp':m.opp,'--opp2':m.opp2,'--accent':m.acc,'--accent-ink':m.ai,
+   '--hero':m.hero,'--hero-ink':m.hi,'--hero-mut':m.hm,'--hme':m.hme||m.me,'--hme2':m.hme2||m.me2,'--hopp':m.hopp||m.opp,'--hopp2':m.hopp2||m.opp2,'--logo-ink':m.li||'#FFFFFF','--logo-ink-op':m.lio||m.li||'#FFFFFF',
+   '--good':dk?'#3CD88A':'#0F9D4F','--bad':dk?'#FF6B6E':'#D43A3D','--f-display':T.fd,'--f-body':T.fb,'--f-mono':T.fm,'--d-style':T.style,'--d-case':T.cas,'--d-ls':T.ls,'--d-w':T.w,'--ds':T.ds,
+   '--r':T.r+'px','--r-sm':Math.max(2,Math.round(T.r*.6))+'px','--br':T.bar==='block'?'2px':'99px','--bh':T.bar==='block'?'14px':'12px','color-scheme':mode};
+  site.style.cssText=Object.entries(v).map(([k,x])=>k+':'+x).join(';');site.dataset.hero=T.hero;site.dataset.bar=T.bar;
+  THEMES.forEach((X,i)=>{const x=X[mode];$('style-'+(i+1)).setAttribute('aria-pressed',i===cur);$('dots-'+i).innerHTML=[x.bg,x.me,x.opp,x.acc].map(c=>`<i style="background:${c}"></i>`).join('')});
+  $('mode-dark').setAttribute('aria-pressed',dk);$('mode-light').setAttribute('aria-pressed',!dk);
+  $('o-name').textContent=`${cur+1} · ${T.name}`;$('o-desc').textContent=T.desc;
+  $('sw').innerHTML=[['Background',m.bg],['Cards',m.sf],['Text',m.ink],['You',m.me],['Opponent',m.opp],['Buttons',m.acc]].map(([n,c])=>`<span><i style="background:${c}"></i>${n}</span>`).join('')}
+document.addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;
+  if(b.dataset.s){cur=+b.dataset.s;try{history.replaceState(null,'','#style-'+(cur+1))}catch(_){}}
+  else if(b.dataset.m)mode=b.dataset.m;
+  else if(b.dataset.v){const ph=b.dataset.v==='phone';$('stage').classList.toggle('phone',ph);$('view-phone').setAttribute('aria-pressed',ph);$('view-desktop').setAttribute('aria-pressed',!ph);return}
+  else return;apply()});
+function fromHash(){const k=+(location.hash.match(/^#style-(\d+)$/)||[])[1];if(k>=1&&k<=THEMES.length)cur=k-1;apply()}
+addEventListener('hashchange',fromHash);fromHash();
+</script>
