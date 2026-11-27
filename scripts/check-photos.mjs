@@ -2,7 +2,7 @@
    Fails (exit 1) when this is the main branch or a Production build AND either
      - TM_PHOTO_MODE in js/photos.js is 'private', or
      - the private-photos folder exists.
-   Runs on every Vercel build (package.json "vercel-build") and with `npm test`.
+   Runs on every Vercel build ("buildCommand" in vercel.json) and with `npm test`.
    node scripts/check-photos.mjs [--branch main]   (the flag is for testing the check itself) */
 import fs from 'node:fs';
 import { execSync } from 'node:child_process';

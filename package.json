@@ -4,7 +4,6 @@
   "type": "module",
   "scripts": {
     "dev": "npx --yes serve . -l 3000",
-    "vercel-build": "node scripts/check-photos.mjs",
     "test": "node scripts/check-photos.mjs"
   },
   "engines": {
