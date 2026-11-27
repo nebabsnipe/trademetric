@@ -10,6 +10,8 @@ const ST={hero:0,odds:'playoff',wk:null,stand:'rec',seg:'matchup',timer:null,sig
 const CHEV='<svg viewBox="0 0 20 20" width="12" height="12" aria-hidden="true"><path d="M5 7.5 10 12.5 15 7.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 const ARROW='<svg viewBox="0 0 20 20" width="16" height="16" aria-hidden="true"><path d="M7.5 4.5 13 10l-5.5 5.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 const ICON={
+  open:'<svg viewBox="0 0 20 20" width="15" height="15" aria-hidden="true"><path d="M8 4H4v4M12 4h4v4M8 16H4v-4M12 16h4v-4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  sim:'<svg viewBox="0 0 20 20" width="16" height="16" aria-hidden="true"><path d="M3 16V4M3 16h14M6.5 12.5l3-3.5 2.5 2 4-5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>',
   star:'<svg viewBox="0 0 20 20" width="13" height="13" aria-hidden="true"><path d="m10 2.8 2.2 4.5 5 .700-3.6 3.5.900 4.900L10 14.100l-4.5 2.3.900-4.900L2.8 8l5-.700z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>',
   clock:'<svg viewBox="0 0 20 20" width="12" height="12" aria-hidden="true"><circle cx="10" cy="10" r="7" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M10 6v4.200l2.6 1.6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>',
 };
@@ -28,18 +30,20 @@ function face(p,kind){const src=typeof tmPhoto==='function'?tmPhoto(p.id,kind):n
 
 /* ---------- top bar ---------- */
 function livePill(){const el=$('tmd-live');if(!el)return;const live=!!(typeof LIVE!=='undefined'&&LIVE&&LIVE.live&&LIVE.week===WEEK);
-  const lg=typeof S!=='undefined'&&S&&!S.noLeague&&S.league&&S.league.name&&!document.body.classList.contains('signed-out')?S.league.name:'';
-  el.innerHTML=(live?'<span class="tmd-live-dot"></span><b>Live</b>':'')+`<span class="tmd-live-pill">Week ${WEEK}${lg?`<span class="tmd-lg"> <i>·</i> ${esc(lg)}</span>`:''}</span>`}
-function chip(){const b=$('acct-btn');if(!b||!b.classList.contains('in')||b.querySelector('.tmd-chip-n'))return;
-  const n=typeof acctName==='function'?acctName():'';b.insertAdjacentHTML('beforeend',`<span class="tmd-chip-n d-only">${esc(n||'Account')}</span><span class="tmd-chip-c d-only">${CHEV}</span>`)}
+  el.innerHTML=(live?'<span class="tmd-live-dot"></span><b>Live</b>':'')+`<span class="tmd-live-pill">Week ${WEEK}</span>`}
+function chip(){const b=$('acct-btn');if(!b||!b.classList.contains('in'))return;
+  const n=(typeof acctName==='function'?acctName():'')||'Account',lg=typeof S!=='undefined'&&S&&!S.noLeague&&S.league&&S.league.name||'My account',sig=n+'|'+lg;
+  const old=b.querySelector('.tmd-chip-t');if(old&&old.dataset.sig===sig)return;b.querySelectorAll('.tmd-chip-t,.tmd-chip-c').forEach(x=>x.remove());
+  b.insertAdjacentHTML('beforeend',`<span class="tmd-chip-t d-only" data-sig="${esc(sig)}"><b>${esc(n)}</b><small>${esc(lg)}</small></span><span class="tmd-chip-c d-only">${CHEV}</span>`)}
 
 /* ---------- My Team dashboard ---------- */
 function skeleton(el){el.innerHTML=`
   <aside class="tmd-col tmd-left" aria-label="Overview">
-    <div class="tmd-head" id="tmd-head"></div>
-    <div class="tmd-label">Overview</div>
-    <div id="tmd-feature"></div>
-    <div id="tmd-tiles"></div>
+    <div class="tmd-card tmd-group">
+      <div class="tmd-head" id="tmd-head"></div>
+      <div id="tmd-feature"></div>
+      <div id="tmd-tiles"></div>
+    </div>
     <div class="tmd-card" id="tmd-odds"></div>
   </aside>
   <section class="tmd-col tmd-centre" aria-label="This week">
@@ -47,8 +51,7 @@ function skeleton(el){el.innerHTML=`
     <div class="tmd-card tmd-panel" id="tmd-panel"></div>
   </section>
   <aside class="tmd-col tmd-right" aria-label="Matchup and standings">
-    <div class="tmd-card tmd-livecard" id="tmd-livecard"></div>
-    <div class="tmd-card" id="tmd-stand"></div>
+    <div class="tmd-card tmd-rightcard"><div class="tmd-livecard" id="tmd-livecard"></div><div id="tmd-stand"></div></div>
   </aside>`}
 /* the four My Team tiles are the real ones: on desktop they sit in the left column, on the phone back where they were */
 function placeTiles(){const t=$('team-tiles'),slot=$('tmd-tiles'),dash=$('tmd-dash');if(!t||!dash)return;
@@ -58,21 +61,27 @@ function placeTiles(){const t=$('team-tiles'),slot=$('tmd-tiles'),dash=$('tmd-da
 function starters(){const me=myTeam(),LU=myLineup(me,realLineup(S.me)),f=pickVal(WEEK);
   return LU.slots.filter(s=>s.p).map(s=>({p:s.p,slot:s.label,...valOf(s.p.id,f),proj:f(s.p.id)})).sort((a,b)=>b.v-a.v)}
 
-function drawHead(){const me=myTeam();$('tmd-head').innerHTML=`<h1>${esc(me.name)}</h1><p>${esc(S.league.name||'My League')} · Week ${WEEK} · ${recTxt(S.me)}</p>`}
+function drawHead(){const me=myTeam();$('tmd-head').innerHTML=`<h1>${esc(me.name)}</h1><p>${esc(S.league.name||'My League')} · ${recTxt(S.me)}</p>
+  <div class="tmd-over"><b>Overview</b><span>Week ${WEEK}</span><a href="#season">See all</a></div>`}
 function drawFeature(list){const el=$('tmd-feature'),x=list[0];if(!x){el.innerHTML='';return}
-  const p=x.p,ph=face(p,'head');
-  el.innerHTML=`<button type="button" class="tmd-card tmd-feature" data-open="${p.id}" data-face style="--t1:${(TC[p.t]||['#3a3f47'])[0]};--t2:${(TC[p.t]||[0,'#8a919c'])[1]}">
+  const p=x.p,ph=face(p,'head'),tc=TC[p.t]||['#3a3f47','#8a919c'];
+  el.innerHTML=`<button type="button" class="tmd-feature" data-open="${p.id}" data-face style="--t1:${tc[0]};--t2:${tc[1]}">
+    <span class="tmd-feature-txt"><small>${x.k==='Proj'?'Top projected starter':'Top starter this week'}</small><b>${esc(p.n)}</b><em>${esc(NICK[p.t]||p.t)} · ${p.pos}</em><span class="tmd-feature-meta">${liveOf(p.id)?liveTxt(p.id):oppHtml(p.id)}</span></span>
     <span class="tmd-feature-pic${ph?'':' nophoto'}">${ph||av(p,'lg')}</span>
-    <span class="tmd-feature-txt"><small>${ICON.star} ${x.k==='Proj'?'Top projected':'Top starter'}</small><b>${esc(p.n)}</b><em>${esc(NICK[p.t]||p.t)} · ${p.pos}</em></span>
-    <span class="tmd-score" title="${x.k==='Proj'?'Projected points this week':x.k+' score this week'}"><b>${f1(x.v)}</b><small>${x.k==='Proj'?'proj':x.k.toLowerCase()}</small></span></button>`}
+    <span class="tmd-score" title="${x.k==='Proj'?'Projected points this week':x.k+' score this week'}"><small>${x.k==='Proj'?'Proj':x.k}</small><b>${f1(x.v)}</b></span></button>`}
 
+/* a team's recent weekly scores as a small line. Real scores only; no line when the league gave fewer than three weeks */
+function spark(tid){const R=S.real;if(!R||!R.scores)return '';const v=[];for(let w=1;w<=(R.played||0);w++){const x=R.scores[w]&&R.scores[w][tid];if(x!=null)v.push(+x)}
+  const a=v.slice(-6);if(a.length<3)return '';const mn=Math.min(...a),mx=Math.max(...a),W=74,H=22,px=i=>3+i*(W-10)/(a.length-1),py=x=>H-4-(mx===mn?.5:(x-mn)/(mx-mn))*(H-8);
+  let d=`M${px(0).toFixed(1)} ${py(a[0]).toFixed(1)}`;for(let i=1;i<a.length;i++){const cx=(px(i-1)+px(i))/2;d+=` C${cx.toFixed(1)} ${py(a[i-1]).toFixed(1)} ${cx.toFixed(1)} ${py(a[i]).toFixed(1)} ${px(i).toFixed(1)} ${py(a[i]).toFixed(1)}`}
+  return `<svg class="tmd-spark" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="img" aria-label="Last ${a.length} weekly scores: ${a.map(x=>Math.round(x)).join(', ')}"><path d="${d}" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><circle cx="${px(a.length-1).toFixed(1)}" cy="${py(a[a.length-1]).toFixed(1)}" r="3.2" fill="currentColor"/></svg>`}
 function drawOdds(sim){const el=$('tmd-odds');if(!sim){el.hidden=true;return}el.hidden=false;
-  const k=ST.odds,all=S.teams.map(T=>T.id).sort((a,b)=>sim[b][k]-sim[a][k]||sim[b].wins-sim[a].wins);let rows=all.slice(0,6);
-  if(!rows.includes(S.me))rows=[...rows.slice(0,5),S.me];
-  const lab={playoff:'Playoff odds',bye:'First-round bye',title:'Title odds'};
-  el.innerHTML=`<div class="tmd-card-h"><h2>${lab[k]}</h2>${sel('odds',[['playoff','Playoffs'],['bye','Bye'],['title','Title']],k,'Which odds to show')}</div>
-   <ul class="tmd-list">${rows.map(t=>{const T=teamById(t),v=sim[t][k];return `<li class="${t===S.me?'me':''}">${badge(t)}<span class="tmd-nm">${esc(T.name)}</span><span class="tmd-bar" aria-hidden="true"><i style="width:${Math.max(2,Math.round(v*100))}%"></i></span><b class="num">${wp(v)}</b></li>`}).join('')}</ul>
-   <a class="tmd-more" href="#season">Open Season Sim ${ARROW}</a>`}
+  const k=ST.odds,all=S.teams.map(T=>T.id).sort((a,b)=>sim[b][k]-sim[a][k]||sim[b].wins-sim[a].wins);let rows=all.slice(0,5);
+  if(!rows.includes(S.me))rows=[...rows.slice(0,4),S.me];
+  const lab={playoff:'Playoff odds',bye:'First-round bye odds',title:'Title odds'},sp=rows.map(spark),any=sp.some(Boolean);
+  el.innerHTML=`<div class="tmd-card-h"><h2>Season Sim</h2><a class="tmd-seeall" href="#season">See all</a></div>
+   <div class="tmd-sub-h"><div><b>${lab[k]}</b>${any?'<small><i></i>Line: last 6 weekly scores</small>':''}</div>${sel('odds',[['playoff','Playoffs'],['bye','Bye'],['title','Title']],k,'Which odds to show')}</div>
+   <ul class="tmd-rows${any?'':' nospark'}">${rows.map((t,i)=>{const T=teamById(t),v=sim[t][k];return `<li class="${t===S.me?'me':''}"><span class="tmd-tpill">${badge(t)}<span>${esc(T.name)}</span></span>${any?`<span class="tmd-sp">${sp[i]}</span>`:''}<b class="num">${wp(v)}</b></li>`}).join('')}</ul>`}
 
 function drawHero(list){const el=$('tmd-hero');if(!list.length){el.innerHTML='';return}
   if(ST.hero>=list.length)ST.hero=0;
@@ -98,39 +107,38 @@ function drawPanel(sim){const el=$('tmd-panel'),wks=weeksLeft();if(!wks.includes
   if(oid==null)vs=`<div class="tmd-vs"><p class="tmd-empty">No opponent in Week ${w}.</p></div>`;
   else{const O=teamById(oid),A=weekLine(me.players,w,S.me),B=weekLine(O.players,w,oid),pw=lineP(A,B,w),d=A.m-B.m;
     vs=`<div class="tmd-vs">
-      <div class="tmd-vs-row"><div class="tmd-vs-t">${badge(S.me,'lg')}<b>${esc(me.name)}</b><small>${recTxt(S.me)}</small></div>
-        <div class="tmd-vs-mid"><span>VS</span><small>Week ${w}</small></div>
-        <div class="tmd-vs-t">${badge(oid,'lg')}<b>${esc(O.name)}</b><small>${recTxt(oid)}</small></div></div>
-      <p class="tmd-vs-line">Projected <b class="num">${f1(A.m)}</b> – <b class="num">${f1(B.m)}</b></p>
+      <div class="tmd-vs-row"><div class="tmd-cap2">${badge(S.me,'lg')}<small>${recTxt(S.me)}</small></div><span class="tmd-vs-mid">VS</span><div class="tmd-cap2">${badge(oid,'lg')}<small>${recTxt(oid)}</small></div></div>
+      <div class="tmd-vs-info"><div><b>${esc(me.name)}</b><small>vs ${esc(O.name)}</small></div><div class="r"><b class="num">${f1(A.m)} – ${f1(B.m)}</b><small>Projected</small></div></div>
       <div class="tmd-chips"><span class="tmd-chipx"><small>You win</small><b class="num">${wp(pw)}</b></span><span class="tmd-chipx"><small>They win</small><b class="num">${wp(1-pw)}</b></span><span class="tmd-chipx ${d>=0?'up':'dn'}"><small>Margin</small><b class="num">${sgn(d)}</b></span></div></div>`}
   let rank='';
-  if(sim){const ids=S.teams.map(T=>T.id).sort((a,b)=>sim[b].wins-sim[a].wins||sim[b].playoff-sim[a].playoff);let rows=ids.slice(0,5);if(!rows.includes(S.me))rows=[...rows.slice(0,4),S.me];
-    rank=`<div class="tmd-rank"><div class="tmd-rank-h"><span>Simulated finish</span><span>Wins</span><span>Playoffs</span></div>
-      <ul class="tmd-list tmd-rk">${rows.map(t=>{const T=teamById(t);return `<li class="${t===S.me?'me':''}"><span class="tmd-pos num">${ids.indexOf(t)+1}</span>${badge(t)}<span class="tmd-nm">${esc(T.name)}</span><span class="num tmd-w">${f1(sim[t].wins)}</span><b class="num">${wp(sim[t].playoff)}</b></li>`}).join('')}</ul></div>`}
-  el.innerHTML=`<div class="tmd-card-h"><h2>${w===WEEK?'This week':'Week '+w}</h2>${wks.length>1?sel('wk',wks.map(x=>[x,'Week '+x+(x===WEEK?' (now)':'')]),w,'Which week to show'):''}</div><div class="tmd-split${rank?'':' one'}">${vs}${rank}</div>`}
+  if(sim){const ids=S.teams.map(T=>T.id).sort((a,b)=>sim[b].wins-sim[a].wins||sim[b].playoff-sim[a].playoff);let rows=ids.slice(0,6);if(!rows.includes(S.me))rows=[...rows.slice(0,5),S.me];
+    rank=`<ul class="tmd-rows tmd-rk">${rows.map(t=>{const T=teamById(t);return `<li class="${t===S.me?'me':''}"><span class="tmd-tpill">${badge(t)}<span>${esc(T.name)}</span></span><span class="tmd-rk-r"><span class="num">${f1(sim[t].wins)}</span> <small>wins</small><i></i><b class="num">${wp(sim[t].playoff)}</b></span></li>`}).join('')}</ul>`}
+  el.innerHTML=`<div class="tmd-card-h"><h2>${ICON.sim} Matchup and Season Sim</h2>${wks.length>1?sel('wk',wks.map(x=>[x,'Week '+x]),w,'Which week to show'):''}</div>
+   <div class="tmd-split${rank?'':' one'}"><div><h3>${w===WEEK?'This week':'Week '+w}</h3>${vs}</div>${rank?`<div><h3>Simulated finish</h3>${rank}</div>`:''}</div>`}
 
 function statusPill(A,B){if(typeof LIVE==='undefined'||!LIVE||LIVE.week!==WEEK||!LIVE.games)return '';
   const sl=[...A.lu.slots,...B.lu.slots].filter(x=>x.p),gs=[...new Set(sl.map(x=>x.p.t))].map(t=>LIVE.games[t]).filter(Boolean);
   if(gs.some(g=>g.state==='in'))return `<span class="tmd-clock live"><span class="tmd-live-dot"></span>Live</span>`;
   const nx=gs.filter(g=>g.state==='pre'&&g.start&&Date.parse(g.start)>Date.now()).map(g=>Date.parse(g.start)).sort((a,b)=>a-b)[0];
-  if(nx){const d=new Date(nx);return `<span class="tmd-clock">${ICON.clock}Next ${d.toLocaleString([], {weekday:'short',hour:'numeric',minute:'2-digit'})}</span>`}
-  if(gs.length&&gs.every(g=>g.state==='post'))return `<span class="tmd-clock">${ICON.clock}Final</span>`;
+  if(nx){const d=new Date(nx);return `<span class="tmd-clock">${d.toLocaleString([], {weekday:'short',hour:'numeric',minute:'2-digit'})}</span>`}
+  if(gs.length&&gs.every(g=>g.state==='post'))return `<span class="tmd-clock">Final</span>`;
   return ''}
-const SEG=[['matchup','Matchup','matchup'],['lineup','Lineup','lineup'],['bench','Bench','bench'],['startsit','Start / sit','startsit']];
+const SEG=[['matchup','Matchup','matchup'],['lineup','Lineup','lineup'],['bench','Bench','bench'],['startsit','Start/sit','startsit']];
 function drawLive(){const el=$('tmd-livecard'),oid=oppOf(S.me,WEEK),me=myTeam();
-  if(oid==null){el.innerHTML=`<div class="tmd-stageline">Week ${WEEK}</div><p class="tmd-empty">No opponent this week.</p>`;return}
-  const O=teamById(oid),A=weekLine(me.players,WEEK,S.me),B=weekLine(O.players,WEEK,oid),pw=lineP(A,B,WEEK);
+  if(oid==null){el.innerHTML=`<div class="tmd-card-h"><h2>This week</h2></div><p class="tmd-empty">No opponent this week.</p>`;return}
+  const O=teamById(oid),A=weekLine(me.players,WEEK,S.me),B=weekLine(O.players,WEEK,oid),pw=lineP(A,B,WEEK),f=pickVal(WEEK);
   const act=lu=>sum(lu.slots.filter(x=>x.p&&liveOf(x.p.id)),x=>liveOf(x.p.id).pts),any=[...A.lu.slots,...B.lu.slots].some(x=>x.p&&liveOf(x.p.id));
   const a=any?act(A.lu):A.m,b=any?act(B.lu):B.m;
-  el.innerHTML=`<div class="tmd-stageline"><span>Week ${WEEK} · ${any?'Score so far':'Projected score'}</span>${statusPill(A,B)}</div>
-    <div class="tmd-score-row"><div class="tmd-side">${badge(S.me,'xl')}</div>
-      <div class="tmd-big num"><b class="${a>=b?'lead':''}">${f1(a)}</b><i>:</i><b class="${b>a?'lead':''}">${f1(b)}</b></div>
-      <div class="tmd-side">${badge(oid,'xl')}</div></div>
-    <div class="tmd-names"><div><b>${esc(me.name)}</b><small>Win <span class="num">${wp(pw)}</span>${any?` · proj <span class="num">${f1(A.m)}</span>`:''}</small></div>
-      <div class="r"><b>${esc(O.name)}</b><small>Win <span class="num">${wp(1-pw)}</span>${any?` · proj <span class="num">${f1(B.m)}</span>`:''}</small></div></div>
-    <div class="tmd-wpbar" aria-hidden="true"><i style="width:${pw*100}%"></i></div>
+  /* each side's best starter so far (or best projected, before kickoff) */
+  const top=lu=>{const s=lu.slots.filter(x=>x.p).map(x=>({p:x.p,...valOf(x.p.id,f)})).sort((x,y)=>y.v-x.v)[0];return s?`<button type="button" class="tmd-topp" data-open="${s.p.id}"><i></i>${esc(s.p.n)}</button>`:'<span></span>'};
+  el.innerHTML=`<div class="tmd-card-h"><h2>${any?'Live matchup':'This week\'s matchup'}</h2><button type="button" class="tmd-round" data-tmd-open aria-label="Open the full matchup">${ICON.open}</button></div>
+    <div class="tmd-stageline"><b>Week ${WEEK}<i></i>${any?'Score so far':'Projected score'}</b><small>${esc(S.league.name||'My League')}</small></div>
+    <div class="tmd-score-row"><div class="tmd-side">${badge(S.me,'xl')}<b>${esc(me.name)}</b></div>
+      <div class="tmd-mid"><div class="tmd-big num">${f1(a)} <i>-</i> ${f1(b)}</div>${statusPill(A,B)}</div>
+      <div class="tmd-side">${badge(oid,'xl')}<b>${esc(O.name)}</b></div></div>
+    <div class="tmd-names"><div>${top(A.lu)}<small>Win ${wp(pw)}</small></div><span class="tmd-div" aria-hidden="true"></span><div class="r">${top(B.lu)}<small>Win ${wp(1-pw)}</small></div></div>
     <div class="tmd-seg" role="group" aria-label="Jump to a part of My Team">${SEG.map(([k,t])=>`<button type="button" data-tmd-seg="${k}" aria-pressed="${ST.seg===k}">${t}</button>`).join('')}</div>
-    <button type="button" class="tmd-cta" data-tmd-open>Open full ${(SEG.find(s=>s[0]===ST.seg)||SEG[0])[1].toLowerCase()} ${ARROW}</button>`}
+    <div class="tmd-cta-wrap"><button type="button" class="tmd-cta" data-tmd-open>Open ${(SEG.find(s=>s[0]===ST.seg)||SEG[0])[1].toLowerCase()}</button><span class="tmd-pitch" aria-hidden="true"></span></div>`}
 
 /* points against, from the league's own weekly scores; null when the league didn't give weekly scores */
 function pointsAgainst(){const R=S.real;if(!R||!R.scores||!R.sched)return null;const pa={};let any=false;
@@ -138,9 +146,9 @@ function pointsAgainst(){const R=S.real;if(!R||!R.scores||!R.sched)return null;c
     pa[x]=(pa[x]||0)+sc[y];pa[y]=(pa[y]||0)+sc[x];any=true})});return any?pa:null}
 function drawStand(){const el=$('tmd-stand'),rec=records(),pa=pointsAgainst();
   const ids=S.teams.map(T=>T.id).sort(ST.stand==='pf'?(a,b)=>rec[b].pf-rec[a].pf:(a,b)=>(rec[b].w+rec[b].t/2)-(rec[a].w+rec[a].t/2)||rec[b].pf-rec[a].pf);
-  el.innerHTML=`<div class="tmd-card-h"><h2>Standings</h2>${sel('stand',[['rec','By record'],['pf','By points']],ST.stand,'How to sort the standings')}</div>
-   <table class="tmd-table"><thead><tr><th>#</th><th>Team</th><th>W</th><th>L</th><th>PF</th>${pa?'<th>PA</th>':''}</tr></thead>
-   <tbody>${ids.map((t,i)=>{const T=teamById(t),r=rec[t];return `<tr class="${t===S.me?'me':''}"><td class="num">${i+1}</td><td><span class="tmd-tn">${badge(t,'sm')}<span>${esc(T.name)}</span></span></td><td class="num">${r.w}</td><td class="num">${r.l}</td><td class="num">${Math.round(r.pf)}</td>${pa?`<td class="num">${Math.round(pa[t]||0)}</td>`:''}</tr>`}).join('')}</tbody></table>`}
+  el.innerHTML=`<div class="tmd-card-h"><h2>League standings</h2>${sel('stand',[['rec','Record'],['pf','Points']],ST.stand,'How to sort the standings')}</div>
+   <table class="tmd-table"><thead><tr><th>P</th><th>Team</th><th>W</th><th>L</th><th>PF</th>${pa?'<th>PA</th>':''}</tr></thead>
+   <tbody>${ids.map((t,i)=>{const T=teamById(t),r=rec[t];return `<tr class="${t===S.me?'me':''}"><td class="num">${i+1}</td><td><span class="tmd-tn">${badge(t)}<span>${esc(T.name)}</span></span></td><td class="num">${r.w}</td><td class="num">${r.l}</td><td class="num">${Math.round(r.pf)}</td>${pa?`<td class="num">${Math.round(pa[t]||0)}</td>`:''}</tr>`}).join('')}</tbody></table>`}
 
 function drawDash(){const el=$('tmd-dash');if(!el)return;if(!on()){placeTiles();clearInterval(ST.timer);return}
   if(!el.firstElementChild)skeleton(el);placeTiles();
