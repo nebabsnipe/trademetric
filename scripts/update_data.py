@@ -347,6 +347,17 @@ try:
     d['num']=num;print(len(num),'jersey numbers',file=sys.stderr)
 except Exception as e:
     print('no jersey numbers',e,file=sys.stderr)
+# player photo ids (for the big player card): current roster, matched the same way as jersey numbers.
+# Kept in its own small file so the daily nfl.json stays the same shape.
+try:
+    faces={}
+    for r in ros[ros.position.isin(['QB','RB','WR','TE','K','FB'])].itertuples():
+        i=slug(r.full_name)
+        if i in ids and pd.notna(r.espn_id):faces.setdefault(i,int(r.espn_id))
+    if faces:json.dump(dict(sorted(faces.items())),open(os.path.join(ROOT,'data','faces.json'),'w'),separators=(',',':'))
+    print(len(faces),'player photos',file=sys.stderr)
+except Exception as e:
+    print('no player photos',e,file=sys.stderr)
 print(len(kickers),'kickers',file=sys.stderr)
 
 d=data

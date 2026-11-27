@@ -26,6 +26,6 @@ jobs:
         run: |
           git config user.name "trademetric-bot"
           git config user.email "trademetric-bot@users.noreply.github.com"
-          git add data/nfl.json data/yt_channels.json data/market.json
+          git add data/nfl.json data/yt_channels.json data/market.json data/faces.json
           git diff --cached --quiet || git commit -m "Update NFL data $(date -u +%F)"
           git push

@@ -85,3 +85,11 @@ Account emails (welcome, league stopped updating) plus update emails with their 
 
 ## Payments (added 2026-11-25, on the `payments` branch, test mode only, NOT live)
 Pro through Stripe: monthly or yearly, 7-day free trial with a card up front, one trial per account ever, 7-day grace after a failed payment with a banner. Stripe's own pages for paying and for card / plan / cancel. Prices are read from Stripe. Billing emails (trial ending in 2 days, receipt, payment failed, yearly renewal 7 days before, cancelled) are always sent. Beta users' deal and the refunds wording are waiting on the owner. Full setup and the go-live checklist: `docs/payments.md`.
+
+## Player card: big photo header (added 2026-11-27, on branch `claude/nice-carson-4zm5pv`, not on main yet)
+Owner showed a racing-driver profile design and asked for the same feel when you click into a player.
+- The top of the player card is now a tall team-colored panel: the player's photo on the right, his jersey number faded large behind him, first name over a big last name on the left, and three headline numbers (overall rank, position rank, average points). On phones the three numbers sit in a strip under the photo.
+- The row under it now shows this week's projection, last 3 and season points (overall and position moved up into the panel).
+- Photos: `data/faces.json` maps each player to a photo id. It is written by `scripts/update_data.py` in the daily data job (same name matching as jersey numbers) and loaded by `js/app.js` (`FACES`, `heroHtml`). Defenses, players with no photo, and photos that fail to load fall back to the jersey badge.
+- The photos are loaded straight from the sports network's public image server. They are not ours; if that ever becomes a concern, delete `data/faces.json` and every card falls back to the jersey badge.
+- Tested with stand-in pictures (the test machine could not reach the photo server): desktop 1280 and phone 390, light and dark, no console errors. Real photos still need a look on the preview link.

@@ -683,6 +683,7 @@ let TR_CACHE={v:-1,list:[]},TR_LOOSE={v:-1,list:[]};
    3 Will they      market value (FantasyCalc, KeepTradeCut, FantasyPros) + their lineup change + filling a need
    4 Final score    season sim odds + playoff-week points, weighted by team mode, minus injury and stacking risk */
 var MARKET=null;
+let FACES={};fetch('data/faces.json').then(r=>r.ok?r.json():null).then(d=>{if(d)FACES=d}).catch(()=>{});
 fetch('data/market.json',{cache:'no-cache'}).then(r=>r.ok?r.json():null).then(d=>{if(d){MARKET=d;VER++;if(typeof render==='function'&&tab==='trade')render()}}).catch(()=>{});
 const PO_WT=1.75;
 const poWeeks=()=>{const r=(S.real&&S.real.regWeeks)||14;return [r+1,r+2,r+3].filter(w=>w<=18)};
@@ -932,6 +933,7 @@ const NUM=DATA.num||{};let JY_ID=0;
 const jyShade=(hex,f)=>{const n=parseInt(hex.slice(1),16);let r=n>>16,g=n>>8&255,b=n&255;const t=f<0?0:255,q=Math.abs(f);r=Math.round((t-r)*q+r);g=Math.round((t-g)*q+g);b=Math.round((t-b)*q+b);return '#'+((1<<24)+(r<<16)+(g<<8)+b).toString(16).slice(1)};
 const jyLum=hex=>{const n=parseInt(hex.slice(1),16);return (.299*(n>>16)+.587*(n>>8&255)+.114*(n&255))/255};
 /* trim that stands out on the base: the team's second color unless it's too close, then white or near-black */
+const jySat=hex=>{const n=parseInt(hex.slice(1),16),r=n>>16,g=n>>8&255,b=n&255,mx=Math.max(r,g,b);return mx?(mx-Math.min(r,g,b))/mx:0};
 const jyTrim=(c1,c2)=>Math.abs(jyLum(c1)-jyLum(c2))>.18?c2:(jyLum(c1)>.5?'#101820':'#ffffff');
 const jyLast=n=>String(n).replace(/\s+(Jr\.?|Sr\.?|II|III|IV|V)$/i,'').split(/\s+/).slice(-1)[0].toUpperCase();
 function jersey(p,lg){const [c1,c2,ct]=TC[p.t]||['#3a3f47','#8a919c','#fff'],tr=jyTrim(c1,c2),id='jy'+(JY_ID++),n=NUM[p.id];
@@ -1954,7 +1956,7 @@ function newsItems(p,g){const out=[];const s=stOf(p.id);
   g.opp.forEach(o=>out.push({t:`<b>${oppTxtLine(o)}</b> ${OWN[p.id]?'':'He is a free agent in your league.'}`}));
   if(g.role&&!g.mates.length)out.push({t:esc(g.role)});
   return out}
-function openCard(id){if(openId!==id)delete SORTS['log-table'];openId=id;const p=byId[id];if(!p)return;const g=G[id],sc=S.league.sc;
+function openCard(id){const fresh=openId!==id;if(fresh)delete SORTS['log-table'];openId=id;const p=byId[id];if(!p)return;const g=G[id],sc=S.league.sc;
   const games=g.log.filter(x=>!x.bye&&!x.dnp),teamGames=g.log.filter(x=>!x.bye).length,tot=k=>sum(games,x=>x[k]),n=Math.max(1,games.length),season=sum(g.pts.filter(x=>x!==null),x=>x);
   const cols=p.pos==='K'?[['FG 0-39','k39'],['FG 40-49','k49'],['FG 50+','k50'],['MISS','kmiss'],['XP','xpm'],['XP MISS','xpmiss']]:p.pos==='DST'?[['SACK','dsk'],['INT','dint'],['FR','dfr'],['TD','dtd'],['SFTY','dsf'],['PA','pa']]:p.pos==='QB'?[['CMP','cmp'],['YDS','pyd'],['TD','ptd'],['INT','int'],['CAR','ratt'],['RYDS','ryd'],['RTD','rtd']]:p.pos==='RB'?[['CAR','ratt'],['YDS','ryd'],['TD','rtd'],['TGT','tgt'],['REC','rec'],['RYDS','recyd'],['RTD','rectd']]:[['TGT','tgt'],['REC','rec'],['YDS','recyd'],['TD','rectd']].concat(p.ratt?[['CAR','ratt'],['RUSH','ryd']]:[]);
   const usage=p.pos==='K'?[['FG made/G',(tot('k39')+tot('k49')+tot('k50'))/n],['40+ yd made',tot('k49')+tot('k50')],['FG pct',(tot('k39')+tot('k49')+tot('k50'))/Math.max(1,tot('k39')+tot('k49')+tot('k50')+tot('kmiss'))*100,'%'],['XP made/G',tot('xpm')/n]]:p.pos==='DST'?[['Sacks/G',tot('dsk')/n],['Takeaways/G',(tot('dint')+tot('dfr'))/n],['Pts allowed/G',tot('pa')/n],['Def TD',tot('dtd')]]:p.pos==='QB'?[['Pass yds/G',tot('pyd')/n],['Pass TD',tot('ptd')],['INT',tot('int')],['Rush yds/G',tot('ryd')/n],['Rush TD',tot('rtd')]]
@@ -1964,9 +1966,9 @@ function openCard(id){if(openId!==id)delete SORTS['log-table'];openId=id;const p
   const own=OWN[id],isMine=own===S.me;
   const comps=V.list.filter(q=>q.id!==id&&(isMine?(OWN[q.id]&&OWN[q.id]!==S.me):OWN[q.id]===S.me)&&Math.abs(tv(q.id)-tv(id))<=Math.max(2,.18*tv(id))).sort((a,b)=>{const w=teamStats().rows.find(r=>r.T.id===S.me).weak;return (isMine?(b.pos===w)-(a.pos===w):0)||Math.abs(tv(a.id)-tv(id))-Math.abs(tv(b.id)-tv(id))}).slice(0,3);
   const nx=g.next;
-  $('modal').setAttribute('aria-label','Player card');$('modal').innerHTML=`<div class="mhead" style="${tcVars(p.t)}"><button class="mclose" id="mclose" aria-label="Close">×</button>${av(p,'lg')}<div style="position:relative;z-index:1;min-width:0"><h2>${esc(p.n)}</h2><div class="msub"><span>${p.pos} · ${p.t}</span><span>Bye Wk ${BYE[p.t]||'—'}</span>${stOf(id)?`<span class="tag" style="background:rgba(0,0,0,.4);color:#fff">${ST_LABEL[stOf(id)]}</span>`:''}${tagFull(id)}${OWN[id]!==S.me?followBtn(id):''}</div></div></div>
+  $('modal').setAttribute('aria-label','Player card');$('modal').innerHTML=`${heroHtml(p,g,fresh)}
    <div class="mbody">
-    <div class="mstats"><div><b>#${V.rank[id]}</b><span>Overall</span></div><div><b>${p.pos}${V.posRank[id]}</b><span>Position</span></div><div><b>${(x=>x.k==='bye'?'—':f1(x.v))(nextWk(id))}</b><span>${wkLab(nextWk(id))}</span></div><div><b>${f1(g.season)}</b><span>Avg pts</span></div><div><b>${f1(g.last3)}</b><span>Last 3</span></div></div>${sparkHtml(g)}
+    <div class="mstats m3"><div><b>${(x=>x.k==='bye'?'—':f1(x.v))(nextWk(id))}</b><span>${wkLab(nextWk(id))}</span></div><div><b>${f1(g.last3)}</b><span>Last 3</span></div><div><b>${f1(season)}</b><span>Season pts</span></div></div>${sparkHtml(g)}
     ${muBanner(p,g)}
     ${outlookHtml(p,g)}
     ${g.buy?`<div class="callout buy"><b>Why buy him</b><ul class="reasons">${g.buy.map(x=>`<li>${esc(x)}</li>`).join('')}</ul></div>`:''}
@@ -1992,11 +1994,22 @@ function openCard(id){if(openId!==id)delete SORTS['log-table'];openId=id;const p
     <div class="msec"><h4>${isMine?'Trade him for similar value':own?'What it would take from your roster':'Similar value on your roster'}</h4>${comps.length?comps.map(q=>`<div class="mini-row">${plCell(q,`${q.pos}${V.posRank[q.id]} · ${f1(V.pts[q.id])} pts/G · ${OWN[q.id]===S.me?'your team':esc(teamById(OWN[q.id]).name)}`)}${tagHtml(q.id)||'<span></span>'}<button class="btn small" data-load="${isMine?id:q.id}|${isMine?q.id:id}" ${(!isMine&&!own)?'hidden':''}>Trade</button></div>`).join(''):'<p class="empty">No close matches in your league right now.</p>'}</div>
     <div class="msec"><h4>News and practice</h4>${(()=>{const st=newsItems(p,g);return st.length?`<ul class="news">${st.map(x=>`<li><span>${x.t}</span></li>`).join('')}</ul>`:''})()}${pracHtml(id)}<div id="card-news">${newsHtml(id)}</div></div>
    </div>`;
-  sortTable('log-table');loadNews(id);$('scrim').hidden=false;document.body.style.overflow='hidden';$('mclose').focus();
+  sortTable('log-table');loadNews(id);{const im=$('modal').querySelector('.ph-img');if(im)im.onerror=()=>im.closest('.mhead').classList.add('no-face')}$('scrim').hidden=false;document.body.style.overflow='hidden';$('mclose').focus();
 }
 const DAYS={Sunday:'Sun',Monday:'Mon',Tuesday:'Tue',Wednesday:'Wed',Thursday:'Thu',Friday:'Fri',Saturday:'Sat'};
 function kickTxt(t){const k=KICK[t];if(!k||!k[1])return '';const [wd,day,tm]=k,d=new Date(day+'T12:00:00');let s=(DAYS[wd]||wd)+' '+d.toLocaleDateString('en-US',{month:'short',day:'numeric'});
   if(tm){const [h,m]=tm.split(':').map(Number);s+=` · ${(h%12)||12}:${String(m).padStart(2,'0')} ${h>=12?'PM':'AM'} ET`}return s}
+/* Player card header: big team-colored panel with the player's photo, name and three headline numbers.
+   No photo (defenses, or the picture fails to load) falls back to the jersey badge. */
+function heroHtml(p,g,fresh){const id=p.id,f=p.pos!=='DST'&&FACES[id],n=NUM[id],c=TC[p.t]||['#333','#666','#fff'],tr=jyTrim(c[0],c[1]);
+  const parts=p.n.trim().split(/\s+/),first=parts.length>1?parts[0]:'',last=parts.slice(first?1:0).join(' ');
+  return `<div class="mhead ph${f?'':' no-face'}${fresh?' in':''}" style="${tcVars(p.t)};--c3:${Math.abs(jyLum(tr)-jyLum(c[0]))>.3&&jySat(tr)>.5?tr:c[2]}"><button class="mclose" id="mclose" aria-label="Close">×</button>
+    ${p.pos!=='DST'&&n!=null?`<span class="ph-num" aria-hidden="true">${n}</span>`:''}
+    <div class="ph-id"><div class="ph-kick">${p.pos} · ${esc(NICK[p.t]||p.t)}${p.pos!=='DST'&&n!=null?` · #${n}`:''}</div>
+      <h2 class="${last.length>11?'long':''}">${first?`<span>${esc(first)}</span>`:''}${esc(last)}</h2>
+      <div class="msub"><span>Bye Wk ${BYE[p.t]||'—'}</span>${stOf(id)?`<span class="tag" style="background:rgba(0,0,0,.4);color:#fff">${ST_LABEL[stOf(id)]}</span>`:''}${tagFull(id)}${OWN[id]!==S.me?followBtn(id):''}</div></div>
+    <div class="ph-face">${f?`<img class="ph-img" src="https://a.espncdn.com/i/headshots/nfl/players/full/${f}.png" alt="" width="600" height="436" decoding="async" referrerpolicy="no-referrer">`:''}${av(p,'lg')}</div>
+    <div class="ph-stats"><div><b>#${V.rank[id]}</b><span>Overall</span></div><div><b>${p.pos}${V.posRank[id]}</b><span>Position</span></div><div class="hi"><b>${f1(g.season)}</b><span>Avg pts</span></div></div></div>`}
 function muBanner(p,g){const nw=nextWk(p.id),fin=nw.k==='proj'&&nw.w!==WEEK,nx=fin?nw.o:g.next,own=ownerHtml(p.id),WK=fin?nw.w:WEEK;
   if(!nx)return `<div class="mu-line bye"><span class="mu-wk">Week ${WEEK}</span><b>Bye week</b><span class="mu-own">${own}</span></div>`;
   const r=nx.rank,cls=r>=24?'easy':r<=8?'hard':'';
